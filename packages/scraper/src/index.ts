@@ -82,6 +82,7 @@ type Import52pokeOptions = {
   preferCache?: boolean;
   refreshRaw?: boolean;
   checkpointEvery?: number;
+  concurrency?: number;
 };
 
 type Import52pokeProgress = {
