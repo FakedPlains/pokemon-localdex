@@ -91,6 +91,14 @@ export type GenerationAvailability = {
   regions?: RegionalDexRecord[];
 };
 
+export type PokemonLearnsetRecord = {
+  moveId: string;
+  moveNameZh?: string;
+  learnMethod?: "level-up" | "tm" | "hm" | "egg" | "tutor" | "event" | "evolution" | "other";
+  level?: number;
+  notes?: string;
+};
+
 export type PokemonGenerationRecord = {
   generation: number;
   label?: string;
@@ -100,6 +108,7 @@ export type PokemonGenerationRecord = {
   hiddenAbilityId?: string;
   baseStats?: StatBlock;
   moveIds?: string[];
+  learnset?: PokemonLearnsetRecord[];
   notes?: string;
 };
 

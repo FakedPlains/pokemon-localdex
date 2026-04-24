@@ -23,6 +23,7 @@ import {
 } from "../../../packages/sqlite-store/src/index.ts";
 
 const port = Number(process.env.PORT ?? 3030);
+const host = process.env.HOST ?? "127.0.0.1";
 const WEB_ROOT = resolve(import.meta.dirname, "../../web/public");
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -218,6 +219,7 @@ const server = createServer(async (req, res) => {
   sendText(res, 404, "Not Found", "text/plain; charset=utf-8");
 });
 
-server.listen(port, () => {
-  console.log(`Pokemon LocalDex API listening on http://localhost:${port}`);
+server.listen(port, host, () => {
+  const displayHost = host === "0.0.0.0" ? "localhost" : host;
+  console.log(`Pokemon LocalDex API listening on http://${displayHost}:${port}`);
 });

@@ -388,6 +388,20 @@ button.secondary {
   margin: 10px 0 12px;
 }
 
+.damage-hint-panel {
+  margin-bottom: 12px;
+}
+
+.learnset-strip {
+  margin-bottom: 0;
+}
+
+.warning-note {
+  color: #a54927;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .checkbox-row {
   display: flex;
   gap: 10px;

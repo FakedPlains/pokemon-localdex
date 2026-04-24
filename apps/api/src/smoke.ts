@@ -66,6 +66,20 @@ try {
   console.log("pokemon detail sample:", listPokemonEntries().find((item) => item.nameZh === "皮卡丘")?.baseStats);
   console.log("pokemon image sample:", listPokemonEntries().find((item) => item.nameZh === "皮卡丘")?.images?.official?.url);
   console.log("pokemon forms sample:", listPokemonEntries().find((item) => item.nameZh === "皮卡丘")?.forms?.map((item) => item.nameZh));
+  console.log(
+    "pokemon learnset sample:",
+    listPokemonEntries()
+      .find((item) => item.nameZh === "皮卡丘")
+      ?.generationRecords?.find((record) => record.generation === 1)
+      ?.learnset?.map((item) => `${item.moveNameZh || item.moveId}:${item.learnMethod || "unknown"}`)
+  );
+  console.log(
+    "charizard gen1 moves:",
+    listPokemonEntries()
+      .find((item) => item.nameZh === "喷火龙")
+      ?.generationRecords?.find((record) => record.generation === 1)
+      ?.moveIds
+  );
   console.log("pokemon search sample:", searchPokemonEntries({ query: "皮卡", type: "电", generation: 1 }).map((item) => item.nameZh));
   console.log("move search sample:", searchMoves({ query: "十万", type: "电", generation: 1 }).map((item) => item.nameZh));
   console.log("ability search sample:", searchAbilities({ query: "静电", generation: 3 }).map((item) => item.nameZh));

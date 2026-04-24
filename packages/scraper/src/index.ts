@@ -504,6 +504,20 @@ export async function importFromFixtures() {
               abilityIds: [],
               baseStats: { hp: 35, atk: 55, def: 30, spa: 50, spd: 40, spe: 90 },
               moveIds: ["move-thunderbolt", "move-quick-attack"],
+              learnset: [
+                {
+                  moveId: "move-quick-attack",
+                  moveNameZh: "电光一闪",
+                  learnMethod: "level-up",
+                  level: 11
+                },
+                {
+                  moveId: "move-thunderbolt",
+                  moveNameZh: "十万伏特",
+                  learnMethod: "tm",
+                  notes: "可通过招式机器习得。"
+                }
+              ],
               notes: "在第一世代中，特攻与特防尚未拆分。"
             },
             {
@@ -513,7 +527,21 @@ export async function importFromFixtures() {
               abilityIds: ["ability-static"],
               hiddenAbilityId: undefined,
               baseStats: { hp: 35, atk: 55, def: 30, spa: 50, spd: 40, spe: 90 },
-              moveIds: ["move-thunderbolt", "move-quick-attack"]
+              moveIds: ["move-thunderbolt", "move-quick-attack"],
+              learnset: [
+                {
+                  moveId: "move-quick-attack",
+                  moveNameZh: "电光一闪",
+                  learnMethod: "level-up",
+                  level: 11
+                },
+                {
+                  moveId: "move-thunderbolt",
+                  moveNameZh: "十万伏特",
+                  learnMethod: "tm",
+                  notes: "可通过招式机器24习得。"
+                }
+              ]
             },
             {
               generation: 5,
@@ -522,7 +550,20 @@ export async function importFromFixtures() {
               abilityIds: ["ability-static"],
               hiddenAbilityId: "ability-lightning-rod",
               baseStats: { hp: 35, atk: 55, def: 40, spa: 50, spd: 50, spe: 90 },
-              moveIds: ["move-thunderbolt", "move-quick-attack"]
+              moveIds: ["move-thunderbolt", "move-quick-attack"],
+              learnset: [
+                {
+                  moveId: "move-quick-attack",
+                  moveNameZh: "电光一闪",
+                  learnMethod: "level-up",
+                  level: 13
+                },
+                {
+                  moveId: "move-thunderbolt",
+                  moveNameZh: "十万伏特",
+                  learnMethod: "tm"
+                }
+              ]
             },
             {
               generation: 9,
@@ -531,7 +572,20 @@ export async function importFromFixtures() {
               abilityIds: ["ability-static"],
               hiddenAbilityId: "ability-lightning-rod",
               baseStats: { hp: 35, atk: 55, def: 40, spa: 50, spd: 50, spe: 90 },
-              moveIds: ["move-thunderbolt", "move-quick-attack"]
+              moveIds: ["move-thunderbolt", "move-quick-attack"],
+              learnset: [
+                {
+                  moveId: "move-quick-attack",
+                  moveNameZh: "电光一闪",
+                  learnMethod: "level-up",
+                  level: 10
+                },
+                {
+                  moveId: "move-thunderbolt",
+                  moveNameZh: "十万伏特",
+                  learnMethod: "tm"
+                }
+              ]
             }
           ]
         },
@@ -615,7 +669,15 @@ export async function importFromFixtures() {
                     secondaryType: "飞行",
                     abilityIds: [],
                     baseStats: { hp: 78, atk: 84, def: 78, spa: 85, spd: 85, spe: 100 },
-                    moveIds: ["move-flamethrower", "move-air-slash"],
+                    moveIds: ["move-flamethrower"],
+                    learnset: [
+                      {
+                        moveId: "move-flamethrower",
+                        moveNameZh: "喷射火焰",
+                        learnMethod: "level-up",
+                        level: 46
+                      }
+                    ],
                     notes: "第一世代未引入特性与隐藏特性。"
                   },
                   {
@@ -625,7 +687,15 @@ export async function importFromFixtures() {
                     secondaryType: "飞行",
                     abilityIds: ["ability-blaze"],
                     baseStats: { hp: 78, atk: 84, def: 78, spa: 109, spd: 85, spe: 100 },
-                    moveIds: ["move-flamethrower", "move-air-slash"]
+                    moveIds: ["move-flamethrower"],
+                    learnset: [
+                      {
+                        moveId: "move-flamethrower",
+                        moveNameZh: "喷射火焰",
+                        learnMethod: "level-up",
+                        level: 49
+                      }
+                    ]
                   },
                   {
                     generation: 6,
@@ -636,6 +706,21 @@ export async function importFromFixtures() {
                     hiddenAbilityId: "ability-solar-power",
                     baseStats: { hp: 78, atk: 84, def: 78, spa: 109, spd: 85, spe: 100 },
                     moveIds: ["move-flamethrower", "move-air-slash"],
+                    learnset: [
+                      {
+                        moveId: "move-flamethrower",
+                        moveNameZh: "喷射火焰",
+                        learnMethod: "level-up",
+                        level: 47
+                      },
+                      {
+                        moveId: "move-air-slash",
+                        moveNameZh: "空气斩",
+                        learnMethod: "level-up",
+                        level: 1,
+                        notes: "可通过回忆招式重新习得。"
+                      }
+                    ],
                     notes: "此世代引入超级喷火龙X与超级喷火龙Y。"
                   },
                   {
@@ -646,7 +731,22 @@ export async function importFromFixtures() {
                     abilityIds: ["ability-blaze"],
                     hiddenAbilityId: "ability-solar-power",
                     baseStats: { hp: 78, atk: 84, def: 78, spa: 109, spd: 85, spe: 100 },
-                    moveIds: ["move-flamethrower", "move-air-slash"]
+                    moveIds: ["move-flamethrower", "move-air-slash"],
+                    learnset: [
+                      {
+                        moveId: "move-flamethrower",
+                        moveNameZh: "喷射火焰",
+                        learnMethod: "level-up",
+                        level: 48
+                      },
+                      {
+                        moveId: "move-air-slash",
+                        moveNameZh: "空气斩",
+                        learnMethod: "level-up",
+                        level: 1,
+                        notes: "可通过回忆招式重新习得。"
+                      }
+                    ]
                   }
                 ]
               }

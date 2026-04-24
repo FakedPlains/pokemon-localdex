@@ -13,6 +13,16 @@ const ALL_TYPE_OPTIONS = [
   "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
   "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精"
 ];
+const LEARN_METHOD_LABELS = {
+  "level-up": "升级",
+  tm: "招式学习器",
+  hm: "秘传学习器",
+  egg: "蛋招式",
+  tutor: "教学",
+  event: "活动",
+  evolution: "进化",
+  other: "其他"
+};
 const NATURE_EFFECTS = {
   怕寂寞: { up: "atk", down: "def" },
   固执: { up: "atk", down: "spa" },
@@ -336,6 +346,13 @@ function renderPokemonGenerationCards(detail) {
         <div>特性：${escapeHtml((record.abilityIds || []).join(" / ") || "未记录")}</div>
         <div>隐藏特性：${escapeHtml(record.hiddenAbilityId || "无")}</div>
         <div>招式：${escapeHtml((record.moveIds || []).join(" / ") || "未记录")}</div>
+        <div>可学招式表：${record.learnset?.length
+          ? record.learnset.map((entry) => {
+              const name = entry.moveNameZh || entry.moveId;
+              const detailText = describeLearnsetEntry(entry);
+              return escapeHtml(detailText ? `${name}（${detailText}）` : name);
+            }).join(" / ")
+          : "未记录"}</div>
         <div>种族值：${record.baseStats ? escapeHtml(`HP ${record.baseStats.hp} / ATK ${record.baseStats.atk} / DEF ${record.baseStats.def} / SPA ${record.baseStats.spa} / SPD ${record.baseStats.spd} / SPE ${record.baseStats.spe}`) : "未记录"}</div>
         ${record.notes ? `<div class="muted">${escapeHtml(record.notes)}</div>` : ""}
       </div>
@@ -370,6 +387,77 @@ function renderAbilityGenerationCards(ability) {
       </div>
     </div>
   `).join("");
+}
+
+function describeLearnsetEntry(entry) {
+  const parts = [];
+  const method = LEARN_METHOD_LABELS[entry.learnMethod] || entry.learnMethod;
+  if (method) {
+    parts.push(method);
+  }
+  if (entry.level !== undefined) {
+    parts.push(`Lv.${entry.level}`);
+  }
+  if (entry.notes) {
+    parts.push(entry.notes);
+  }
+  return parts.join(" · ");
+}
+
+function resolvePokemonGenerationRecord(pokemon, generation) {
+  const targetGeneration = Number(generation || 9);
+  const records = [...(pokemon?.generationRecords || [])].sort((left, right) => left.generation - right.generation);
+  if (records.length === 0) {
+    return undefined;
+  }
+
+  const exact = records.find((record) => record.generation === targetGeneration);
+  if (exact) {
+    return exact;
+  }
+
+  const previous = [...records].reverse().find((record) => record.generation <= targetGeneration);
+  return previous || records[records.length - 1];
+}
+
+function getPokemonLearnsetEntries(pokemon, generation) {
+  const record = resolvePokemonGenerationRecord(pokemon, generation);
+  if (record?.learnset?.length) {
+    return record.learnset;
+  }
+
+  if (record?.moveIds?.length) {
+    return record.moveIds.map((moveId) => ({ moveId }));
+  }
+
+  if (pokemon?.moveIds?.length) {
+    return pokemon.moveIds.map((moveId) => ({ moveId }));
+  }
+
+  return [];
+}
+
+function getLearnableDamageMoves(pokemon, allMoves, generation) {
+  const learnsetEntries = getPokemonLearnsetEntries(pokemon, generation);
+  if (!pokemon || learnsetEntries.length === 0) {
+    return {
+      moves: allMoves,
+      learnsetEntries: []
+    };
+  }
+
+  const moveIds = new Set(
+    learnsetEntries.flatMap((entry) => [entry.moveId, entry.moveNameZh]).filter(Boolean)
+  );
+  const moves = allMoves.filter((move) =>
+    moveIds.has(move.id) ||
+    moveIds.has(move.slug) ||
+    moveIds.has(move.nameZh)
+  );
+  return {
+    moves,
+    learnsetEntries
+  };
 }
 
 function resolveMoveGenerationRecord(move, generation) {
@@ -1222,8 +1310,16 @@ async function renderDamage() {
   const pokemonOptionsHtml = pokemonList
     .map((pokemon) => `<option value="${escapeHtml(pokemon.slug || pokemon.id)}">${escapeHtml(pokemon.nameZh)} / ${escapeHtml(pokemon.nameEn || "")}</option>`)
     .join("");
+  const learnableMoveState = getLearnableDamageMoves(attacker.detail, allMoves, state.damage.moveGeneration);
+  const damageMoveOptions = learnableMoveState.moves;
+  const attackerLearnsetEntries = learnableMoveState.learnsetEntries;
   const selectedMove = allMoves.find((move) => move.id === state.damage.moveId || move.slug === state.damage.moveId || move.nameZh === state.damage.moveName);
   const selectedMoveRecord = selectedMove ? resolveMoveGenerationRecord(selectedMove, state.damage.moveGeneration) : null;
+  const selectedMoveIsLearnable = !selectedMove
+    ? true
+    : !attacker.detail || attackerLearnsetEntries.length === 0
+      ? true
+      : damageMoveOptions.some((move) => move.id === selectedMove.id);
   const attackerMoveButtons = (state.damage.attacker.moves || []).filter(Boolean);
 
   app.innerHTML = `
@@ -1245,8 +1341,34 @@ async function renderDamage() {
             ${renderDamageMemberEditor("防守方", "defender", state.damage.defender, defender.detail, teamMembers, pokemonOptionsHtml)}
           </div>
           <datalist id="damage-move-options">
-            ${allMoves.map((move) => `<option value="${escapeHtml(move.slug || move.id)}">${escapeHtml(move.nameZh)} / ${escapeHtml(move.type || "未知")} / ${escapeHtml(move.category || "未分类")}</option>`).join("")}
+            ${damageMoveOptions.map((move) => {
+              const learnsetEntry = attackerLearnsetEntries.find((entry) => entry.moveId === move.id || entry.moveId === move.slug || entry.moveNameZh === move.nameZh);
+              const learnsetDetail = learnsetEntry ? describeLearnsetEntry(learnsetEntry) : "";
+              return `<option value="${escapeHtml(move.slug || move.id)}">${escapeHtml(move.nameZh)} / ${escapeHtml(learnsetDetail || move.type || "未知")} / ${escapeHtml(move.category || "未分类")}</option>`;
+            }).join("")}
           </datalist>
+          ${attacker.detail ? `
+            <div class="subpanel damage-hint-panel">
+              <strong>攻击方可学招式</strong>
+              <div class="panel-subtitle">
+                ${attackerLearnsetEntries.length > 0
+                  ? `当前已按 ${escapeHtml(attacker.detail.nameZh)} 在第 ${escapeHtml(state.damage.moveGeneration)} 世代的可学招式表过滤，共 ${damageMoveOptions.length} 个候选招式。`
+                  : `${escapeHtml(attacker.detail.nameZh)} 暂无第 ${escapeHtml(state.damage.moveGeneration)} 世代学招式记录，当前回退为显示全部招式。`}
+              </div>
+              ${attackerLearnsetEntries.length > 0 ? `
+                <div class="import-strip learnset-strip">
+                  ${attackerLearnsetEntries.map((entry) => `
+                    <button class="secondary compact-button" data-learnset-move="${escapeHtml(entry.moveId)}">
+                      ${escapeHtml(entry.moveNameZh || entry.moveId)}
+                      ${describeLearnsetEntry(entry) ? ` · ${escapeHtml(describeLearnsetEntry(entry))}` : ""}
+                    </button>
+                  `).join("")}
+                </div>
+              ` : ""}
+            </div>
+          ` : `
+            <p class="panel-subtitle">选择攻击方后，招式候选会自动收窄到该宝可梦在当前世代真正可学的招式。</p>
+          `}
           ${attackerMoveButtons.length > 0 ? `
             <div class="import-strip">
               ${attackerMoveButtons.map((moveName) => `<button class="secondary compact-button" data-import-move="${escapeHtml(moveName)}">${escapeHtml(moveName)}</button>`).join("")}
@@ -1326,6 +1448,7 @@ async function renderDamage() {
                 <div>威力：${escapeHtml(selectedMoveRecord?.power ?? selectedMove.power ?? state.damage.power ?? "-")}</div>
                 <div>命中：${escapeHtml(selectedMoveRecord?.accuracy || selectedMove.accuracy || state.damage.accuracy || "-")}</div>
                 <div>${escapeHtml(selectedMoveRecord?.effectSummary || selectedMove.effectSummary || state.damage.moveEffectSummary || "暂无说明")}</div>
+                ${selectedMoveIsLearnable ? "" : `<div class="warning-note">当前攻击方在第 ${escapeHtml(state.damage.moveGeneration)} 世代的可学招式表中未找到这招。</div>`}
               </div>
             </div>
           ` : `<p class="panel-subtitle">选择一个招式后，这里会自动显示当前世代下的属性、分类、威力、命中和效果摘要。</p>`}
@@ -1405,6 +1528,16 @@ async function renderDamage() {
   document.querySelectorAll("[data-import-move]").forEach((button) => {
     button.addEventListener("click", async () => {
       const move = allMoves.find((item) => item.nameZh === button.dataset.importMove || item.slug === button.dataset.importMove);
+      if (!move) return;
+      applyMoveToDamage(move, state.damage.moveGeneration);
+      state.damage.result = null;
+      await renderDamage();
+    });
+  });
+
+  document.querySelectorAll("[data-learnset-move]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const move = allMoves.find((item) => item.id === button.dataset.learnsetMove || item.slug === button.dataset.learnsetMove);
       if (!move) return;
       applyMoveToDamage(move, state.damage.moveGeneration);
       state.damage.result = null;
