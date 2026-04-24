@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, extname, resolve } from "node:path";
 import {
   type AbilityEntry,
   type ItemEntry,
@@ -7,6 +7,10 @@ import {
   type PokemonEntry,
   type PokemonForm,
   type RegionalDexRecord,
+  listAbilities,
+  listItems,
+  listMoves,
+  listPokemonEntries,
   replaceAbilities,
   replaceItems,
   replaceMoves,
@@ -15,8 +19,11 @@ import {
 
 const ROOT = resolve(import.meta.dirname, "../../../");
 const RAW_DIR = resolve(ROOT, "data/raw");
+const IMPORT_PROGRESS_FILE = resolve(RAW_DIR, "import-progress-52poke.json");
 const FIXTURE_DIR = resolve(import.meta.dirname, "../fixtures");
+const CACHE_DIR = resolve(ROOT, "apps/web/public/assets/cache");
 const WEB_ASSET_ROOT = "/assets/demo";
+const WEB_CACHE_ROOT = "/assets/cache";
 
 const POKEMON_LIST_URL =
   "https://wiki.52poke.com/wiki/%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89/%E7%AE%80%E5%8D%95%E7%89%88";
@@ -45,6 +52,49 @@ type ItemSeed = {
   category?: string;
   effectSummary?: string;
   detailUrl: string;
+};
+
+type ScrapedMoveStub = {
+  nameZh: string;
+  generation: number;
+  type?: string;
+  category?: string;
+  power?: number;
+  accuracy?: string;
+  pp?: number;
+  source?: {
+    url: string;
+    title: string;
+    fetchedAt: string;
+  };
+};
+
+type FetchPageOptions = {
+  preferCache?: boolean;
+  refresh?: boolean;
+};
+
+type Import52pokeOptions = {
+  pokemonLimit?: number;
+  startDex?: number;
+  endDex?: number;
+  onlyMissing?: boolean;
+  preferCache?: boolean;
+  refreshRaw?: boolean;
+  checkpointEvery?: number;
+};
+
+type Import52pokeProgress = {
+  startedAt: string;
+  updatedAt: string;
+  totalSeeds: number;
+  processedCount: number;
+  successCount: number;
+  failureCount: number;
+  skippedCount: number;
+  lastDexNumber?: number;
+  processedDexNumbers: number[];
+  failed: Array<{ dexNumber: number; nameZh: string; error: string }>;
 };
 
 function ensureDir(pathname: string) {
@@ -99,8 +149,25 @@ function readFixture(fileName: string) {
   return readFileSync(resolve(FIXTURE_DIR, fileName), "utf8");
 }
 
+function readRawPageCache(slug: string): RawPage | undefined {
+  const pathname = resolve(RAW_DIR, `${slug}.json`);
+  if (!existsSync(pathname)) {
+    return undefined;
+  }
+  return JSON.parse(readFileSync(pathname, "utf8"));
+}
+
+function writeImportProgress(progress: Import52pokeProgress) {
+  ensureDir(IMPORT_PROGRESS_FILE);
+  writeFileSync(IMPORT_PROGRESS_FILE, JSON.stringify(progress, null, 2));
+}
+
 function assetUrl(pathname: string) {
   return `${WEB_ASSET_ROOT}/${pathname}`;
+}
+
+function cacheAssetUrl(pathname: string) {
+  return `${WEB_CACHE_ROOT}/${pathname}`;
 }
 
 function readNumber(input: string | undefined) {
@@ -110,6 +177,305 @@ function readNumber(input: string | undefined) {
 
   const matched = input.match(/(\d+(?:\.\d+)?)/);
   return matched ? Number(matched[1]) : undefined;
+}
+
+function normalizeCategory(input: string | undefined) {
+  if (!input) {
+    return undefined;
+  }
+  if (input === "物理") {
+    return "physical";
+  }
+  if (input === "特殊") {
+    return "special";
+  }
+  if (input === "变化") {
+    return "status";
+  }
+  return input.toLowerCase();
+}
+
+function formatAccuracy(input: string | undefined) {
+  if (!input || input === "—") {
+    return input;
+  }
+  return /^\d+$/.test(input) ? `${input}%` : input;
+}
+
+function normalizePower(input: string | undefined) {
+  if (!input || input === "—" || input === "变化") {
+    return undefined;
+  }
+  const matched = input.match(/^\d+$/);
+  return matched ? Number(input) : undefined;
+}
+
+function normalizePp(input: string | undefined) {
+  if (!input || input === "—") {
+    return undefined;
+  }
+  return /^\d+$/.test(input) ? Number(input) : undefined;
+}
+
+function normalizeMediaUrl(url: string) {
+  const absolute = url.startsWith("//")
+    ? `https:${url}`
+    : url.startsWith("/")
+      ? `https://wiki.52poke.com${url}`
+      : url;
+
+  if (!absolute.includes("/thumb/")) {
+    return absolute;
+  }
+
+  const [prefix = "", tail = ""] = absolute.split("/thumb/");
+  const parts = tail.split("/");
+  if (parts.length < 3) {
+    return absolute;
+  }
+  return `${prefix}/${parts[0]}/${parts[1]}/${parts[2]}`;
+}
+
+function extractFileNameFromUrl(url: string) {
+  const fileName = decodeURIComponent(url.split("?")[0].split("#")[0].split("/").pop() || "");
+  return fileName.replace(/^\d+px-/, "");
+}
+
+function inferImageExtension(url: string, contentType?: string | null) {
+  const byType = contentType?.split(";")[0]?.trim().toLowerCase();
+  const contentTypeMap = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "image/svg+xml": ".svg"
+  };
+  if (byType && contentTypeMap[byType as keyof typeof contentTypeMap]) {
+    return contentTypeMap[byType as keyof typeof contentTypeMap];
+  }
+
+  const extension = extname(extractFileNameFromUrl(url)).toLowerCase();
+  return extension || ".png";
+}
+
+function extractImageCandidates(html: string) {
+  const found = new Set<string>();
+  const pattern = /\b(?:src|data-src|srcset)=["']([^"']+)["']/gi;
+
+  for (const match of html.matchAll(pattern)) {
+    const rawValue = match[1];
+    const candidates = rawValue.includes(",")
+      ? rawValue.split(",").map((item) => item.trim().split(/\s+/)[0]).filter(Boolean)
+      : [rawValue.trim()];
+
+    for (const candidate of candidates) {
+      const normalized = normalizeMediaUrl(candidate);
+      const fileName = extractFileNameFromUrl(normalized);
+      if (!/^https?:/.test(normalized)) {
+        continue;
+      }
+      if (!/\.(png|jpe?g|webp|gif|svg)$/i.test(fileName)) {
+        continue;
+      }
+      if (
+        /favicon|logo|spritecss|wiki\.png|commons-logo|poweredby_mediawiki|blank\.png/i.test(fileName)
+      ) {
+        continue;
+      }
+      found.add(normalized);
+    }
+  }
+
+  return [...found];
+}
+
+function getPokemonImageHeuristics(seed: PokemonSeed) {
+  const dex3 = seed.dexNumber.toString().padStart(3, "0");
+  const dex4 = seed.dexNumber.toString().padStart(4, "0");
+  const englishToken = (seed.nameEn || "")
+    .replace(/[♀♂]/g, "")
+    .replace(/[^A-Za-z0-9]+/g, "");
+  return {
+    dex3,
+    dex4,
+    englishToken: englishToken.toLowerCase()
+  };
+}
+
+function hasShinyMarker(fileName: string) {
+  return /(?:^|[_\-\s])s(?:[_\-.]|$)|spr_[0-9]+s_|shiny|色违|異色|异色/i.test(fileName);
+}
+
+function hasSpriteMarker(fileName: string) {
+  return /^(spr|mspr)|sprite|icon/i.test(fileName);
+}
+
+function hasOfficialMarker(fileName: string) {
+  return /artwork|official|home|poke_capture|cap\d+/i.test(fileName);
+}
+
+function scoreBasePokemonImage(fileName: string, seed: PokemonSeed, kind: "official" | "sprite" | "shinySprite" | "shinyOfficial") {
+  const normalized = fileName.toLowerCase();
+  const { dex3, dex4, englishToken } = getPokemonImageHeuristics(seed);
+  let score = 0;
+
+  if (normalized.includes(dex3.toLowerCase())) score += 5;
+  if (normalized.includes(dex4.toLowerCase())) score += 5;
+  if (englishToken && normalized.includes(englishToken)) score += 6;
+  if (hasSpriteMarker(fileName)) score += kind.includes("sprite") ? 7 : -4;
+  if (hasOfficialMarker(fileName)) score += kind.includes("official") ? 7 : -2;
+  if (normalized.includes("dream")) score -= 3;
+  if (normalized.includes("home")) score += 1;
+  if (normalized.includes("mega") || normalized.includes("alola") || normalized.includes("galar") || normalized.includes("hisui") || normalized.includes("paldea")) score -= 4;
+  if (hasShinyMarker(fileName)) score += kind.startsWith("shiny") ? 8 : -6;
+  if (kind === "official" && !hasSpriteMarker(fileName) && !hasShinyMarker(fileName)) score += 4;
+  if (kind === "shinyOfficial" && !hasSpriteMarker(fileName) && hasShinyMarker(fileName)) score += 5;
+  if (kind === "sprite" && hasSpriteMarker(fileName) && !hasShinyMarker(fileName)) score += 4;
+  if (kind === "shinySprite" && hasSpriteMarker(fileName) && hasShinyMarker(fileName)) score += 5;
+  return score;
+}
+
+function getFormKeywordHints(nameZh: string) {
+  const hints = [];
+  if (nameZh.includes("超级")) hints.push("mega");
+  if (nameZh.includes("超极巨")) hints.push("gigantamax");
+  if (nameZh.includes("阿罗拉")) hints.push("alola");
+  if (nameZh.includes("伽勒尔")) hints.push("galar");
+  if (nameZh.includes("洗翠")) hints.push("hisui");
+  if (nameZh.includes("帕底亚")) hints.push("paldea");
+  if (nameZh.includes("X")) hints.push("mega x", "x");
+  if (nameZh.includes("Y")) hints.push("mega y", "y");
+  return hints;
+}
+
+function scoreFormImage(fileName: string, seed: PokemonSeed, form: PokemonForm, kind: "official" | "shinyOfficial" = "official") {
+  const normalized = fileName.toLowerCase();
+  const { dex3, dex4, englishToken } = getPokemonImageHeuristics(seed);
+  let score = 0;
+  if (normalized.includes(dex3.toLowerCase())) score += 5;
+  if (normalized.includes(dex4.toLowerCase())) score += 5;
+  if (englishToken && normalized.includes(englishToken)) score += 6;
+  for (const hint of getFormKeywordHints(form.nameZh)) {
+    if (normalized.includes(hint)) {
+      score += 6;
+    }
+  }
+  if (hasSpriteMarker(fileName)) score -= 3;
+  if (hasShinyMarker(fileName)) {
+    score += kind === "shinyOfficial" ? 7 : -6;
+  } else if (kind === "shinyOfficial") {
+    score -= 5;
+  }
+  return score;
+}
+
+function scoreItemImage(fileName: string, item: ItemSeed) {
+  const normalized = fileName.toLowerCase();
+  const englishToken = (item.nameEn || "")
+    .replace(/[^A-Za-z0-9]+/g, "")
+    .toLowerCase();
+  let score = 0;
+  if (englishToken && normalized.includes(englishToken)) score += 7;
+  if (normalized.includes(slugify(item.nameZh).replace(/-/g, ""))) score += 4;
+  if (normalized.includes("bag") || normalized.includes("item")) score += 2;
+  if (normalized.includes("icon")) score += 2;
+  if (normalized.includes("sprite") || normalized.startsWith("spr")) score -= 3;
+  if (normalized.includes("type") || normalized.includes("move")) score -= 5;
+  return score;
+}
+
+export function resolvePokemonImageCandidateUrls(pageHtml: string, seed: PokemonSeed, forms?: PokemonForm[]) {
+  const imageUrls = extractImageCandidates(pageHtml);
+  const shinyImageUrls = imageUrls.filter((url) => hasShinyMarker(extractFileNameFromUrl(url)));
+  const shinyOfficialUrls = shinyImageUrls.filter((url) => !hasSpriteMarker(extractFileNameFromUrl(url)));
+  const formCandidates = Object.fromEntries((forms || []).map((form) => {
+    const official = pickBestImageUrl(imageUrls, (fileName) => scoreFormImage(fileName, seed, form, "official"));
+    const shinyOfficial = pickBestImageUrl(
+      shinyOfficialUrls,
+      (fileName) => scoreFormImage(fileName, seed, form, "shinyOfficial")
+    );
+    return [form.id, { official, shinyOfficial }];
+  }));
+
+  return {
+    official: pickBestImageUrl(imageUrls, (fileName) => scoreBasePokemonImage(fileName, seed, "official")),
+    shinyOfficial: pickBestImageUrl(shinyOfficialUrls, (fileName) => scoreBasePokemonImage(fileName, seed, "shinyOfficial")),
+    sprite: pickBestImageUrl(imageUrls, (fileName) => scoreBasePokemonImage(fileName, seed, "sprite")),
+    shinySprite: pickBestImageUrl(shinyImageUrls, (fileName) => scoreBasePokemonImage(fileName, seed, "shinySprite")),
+    forms: formCandidates
+  };
+}
+
+function pickBestImageUrl(urls: string[], scorer: (fileName: string) => number) {
+  const ranked = urls
+    .map((url) => ({ url, fileName: extractFileNameFromUrl(url), score: scorer(extractFileNameFromUrl(url)) }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.fileName.length - right.fileName.length);
+
+  return ranked[0]?.url;
+}
+
+async function downloadAssetToCache(remoteUrl: string, cacheRelativePath: string) {
+  const normalizedUrl = normalizeMediaUrl(remoteUrl);
+  const guessedExtension = inferImageExtension(normalizedUrl);
+  const normalizedRelativePath = cacheRelativePath.replace(/\.[^.]+$/, "");
+  const guessedRelativePath = `${normalizedRelativePath}${guessedExtension}`;
+  const guessedOutputPath = resolve(CACHE_DIR, guessedRelativePath);
+
+  if (existsSync(guessedOutputPath)) {
+    return {
+      localUrl: cacheAssetUrl(guessedRelativePath),
+      sourceUrl: normalizedUrl
+    };
+  }
+
+  const response = await fetch(normalizedUrl, {
+    headers: {
+      "User-Agent": "pokemon-localdex-bot/0.2"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Asset fetch failed: ${response.status} ${response.statusText}`);
+  }
+
+  const extension = inferImageExtension(normalizedUrl, response.headers.get("content-type"));
+  const outputRelativePath = `${normalizedRelativePath}${extension}`;
+  const outputPath = resolve(CACHE_DIR, outputRelativePath);
+
+  if (!existsSync(outputPath)) {
+    ensureDir(outputPath);
+    const arrayBuffer = await response.arrayBuffer();
+    writeFileSync(outputPath, Buffer.from(arrayBuffer));
+  }
+
+  return {
+    localUrl: cacheAssetUrl(outputRelativePath),
+    sourceUrl: normalizedUrl
+  };
+}
+
+function generationToChinese(generation: number) {
+  const map: Record<number, string> = {
+    1: "一",
+    2: "二",
+    3: "三",
+    4: "四",
+    5: "五",
+    6: "六",
+    7: "七",
+    8: "八",
+    9: "九"
+  };
+  return map[generation];
+}
+
+function buildLearnsetPageUrl(nameZh: string, generation: number) {
+  const generationText = generationToChinese(generation);
+  if (!generationText) {
+    return undefined;
+  }
+  return `https://wiki.52poke.com/wiki/${encodeURIComponent(nameZh)}/${encodeURIComponent(`第${generationText}世代招式表`)}`;
 }
 
 function collectGenerationsAround(index: number, text: string) {
@@ -182,6 +548,281 @@ function splitTokens(value: string | undefined) {
 
 function uniqueByJson<T>(items: T[]) {
   return dedupe(items.map((item) => JSON.stringify(item))).map((item) => JSON.parse(item));
+}
+
+function cleanLearnsetLine(line: string) {
+  return line
+    .replace(/\[[^\]]+\]/g, "")
+    .replace(/[\u200b-\u200d\ufeff]/g, "")
+    .replace(/（详）|【详】|详/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function splitLearnsetLines(html: string) {
+  return normalizeText(html)
+    .split("\n")
+    .map((line) => cleanLearnsetLine(line))
+    .filter(Boolean);
+}
+
+function isLearnsetSectionHeading(line: string) {
+  return [
+    "可学会的招式",
+    "能使用的招式学习器",
+    "能使用的秘传学习器",
+    "能使用的招式记录",
+    "教授招式",
+    "能使用的招式教学",
+    "遗传招式",
+    "进化前招式",
+    "其他世代："
+  ].some((heading) => line.includes(heading));
+}
+
+function parseLearnsetTableCells(
+  cells: string[],
+  method: "level-up" | "tm" | "hm",
+  generation: number,
+  notes?: string
+) {
+  const headerStartCandidates =
+    method === "level-up"
+      ? ["等级"]
+      : method === "hm"
+        ? ["秘传学习器", "学习器"]
+        : ["学习器", "招式记录", "招式記錄"];
+  const headerStart = cells.findIndex((cell) => headerStartCandidates.includes(cell));
+  if (headerStart < 0) {
+    return { learnset: [], moves: [] };
+  }
+
+  const headerEnd = cells.findIndex((cell, index) => index >= headerStart && cell === "PP");
+  if (headerEnd < 0) {
+    return { learnset: [], moves: [] };
+  }
+
+  const header = cells.slice(headerStart, headerEnd + 1);
+  const rowSize = header.length;
+  const learnset = [];
+  const moves: ScrapedMoveStub[] = [];
+
+  for (let index = headerEnd + 1; index + rowSize - 1 < cells.length; index += rowSize) {
+    const row = cells.slice(index, index + rowSize);
+    if (row.length < rowSize || row.some((cell) => isLearnsetSectionHeading(cell))) {
+      break;
+    }
+
+    const firstCell = row[0];
+    const moveNameZh = row[1];
+    if (!moveNameZh) {
+      continue;
+    }
+
+    let learnMethod: "level-up" | "tm" | "hm" | "other" = method;
+    let level: number | undefined;
+    if (method === "level-up") {
+      if (/^\d+$/.test(firstCell)) {
+        level = Number(firstCell);
+      } else if (firstCell === "—" || firstCell === "-") {
+        learnMethod = "other";
+      } else {
+        continue;
+      }
+    }
+
+    const hasCategory = header.includes("分类");
+    const typeToken = row[2];
+    const categoryToken = hasCategory ? row[3] : undefined;
+    const powerToken = row[hasCategory ? 4 : 3];
+    const accuracyToken = row[hasCategory ? 5 : 4];
+    const ppToken = row[hasCategory ? 6 : 5];
+
+    learnset.push({
+      moveId: moveNameZh,
+      moveNameZh,
+      learnMethod,
+      level,
+      notes
+    });
+    moves.push({
+      nameZh: moveNameZh,
+      generation,
+      type: typeToken,
+      category: normalizeCategory(categoryToken),
+      power: normalizePower(powerToken),
+      accuracy: formatAccuracy(accuracyToken),
+      pp: normalizePp(ppToken)
+    });
+  }
+
+  return { learnset, moves };
+}
+
+export function parseLearnsetPage(page: RawPage, generation: number) {
+  const lines = splitLearnsetLines(page.html);
+  const learnset = [];
+  const moves: ScrapedMoveStub[] = [];
+  let currentGameLabel = "";
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^《.+》$/.test(line) || /^第.+世代$/.test(line)) {
+      currentGameLabel = line;
+      continue;
+    }
+
+    const method = line.includes("可学会的招式")
+      ? "level-up"
+      : line.includes("能使用的招式学习器") || line.includes("能使用的招式记录")
+        ? "tm"
+        : line.includes("能使用的秘传学习器")
+          ? "hm"
+          : undefined;
+    if (!method) {
+      continue;
+    }
+
+    const sectionCells = [];
+    for (let pointer = index + 1; pointer < lines.length; pointer += 1) {
+      const cell = lines[pointer];
+      if (isLearnsetSectionHeading(cell)) {
+        break;
+      }
+      sectionCells.push(cell);
+    }
+
+    const parsed = parseLearnsetTableCells(sectionCells, method, generation, currentGameLabel || undefined);
+    learnset.push(...parsed.learnset);
+    moves.push(...parsed.moves.map((move) => ({
+      ...move,
+      source: {
+        url: page.url,
+        title: page.title,
+        fetchedAt: page.fetchedAt
+      }
+    })));
+  }
+
+  return {
+    learnset: uniqueByJson(learnset),
+    moves: uniqueByJson(moves)
+  };
+}
+
+function mergeMoveStubs(existingMoves: MoveEntry[], scrapedMoves: ScrapedMoveStub[]) {
+  const byName = new Map<string, MoveEntry>();
+
+  for (const move of existingMoves) {
+    byName.set(move.nameZh, {
+      ...move,
+      generations: [...(move.generations || [])]
+    });
+  }
+
+  for (const stub of scrapedMoves) {
+    const existing = byName.get(stub.nameZh);
+    const nextGenerationRecord = {
+      generation: stub.generation,
+      type: stub.type,
+      category: stub.category,
+      power: stub.power,
+      accuracy: stub.accuracy,
+      pp: stub.pp,
+      effectSummary: "来自 52Poké 宝可梦学招式表的基础参数记录。"
+    };
+
+    if (!existing) {
+      byName.set(stub.nameZh, {
+        id: `move-${slugify(stub.nameZh)}`,
+        slug: stub.nameZh,
+        nameZh: stub.nameZh,
+        type: stub.type,
+        category: stub.category,
+        power: stub.power,
+        accuracy: stub.accuracy,
+        pp: stub.pp,
+        effectSummary: "来自 52Poké 宝可梦学招式表的基础参数记录。",
+        generations: [nextGenerationRecord],
+        source: stub.source
+      });
+      continue;
+    }
+
+    existing.type = existing.type ?? stub.type;
+    existing.category = existing.category ?? stub.category;
+    existing.power = existing.power ?? stub.power;
+    existing.accuracy = existing.accuracy ?? stub.accuracy;
+    existing.pp = existing.pp ?? stub.pp;
+    existing.effectSummary = existing.effectSummary ?? "来自 52Poké 宝可梦学招式表的基础参数记录。";
+    existing.source = existing.source ?? stub.source;
+
+    if (!existing.generations.some((record) => record.generation === stub.generation)) {
+      existing.generations.push(nextGenerationRecord);
+    }
+  }
+
+  return [...byName.values()]
+    .map((move) => ({
+      ...move,
+      generations: [...move.generations].sort((left, right) => left.generation - right.generation)
+    }))
+    .sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-Hans-CN"));
+}
+
+function listCurrentMovesSafe() {
+  try {
+    return listMoves();
+  } catch {
+    return [];
+  }
+}
+
+function listCurrentPokemonEntriesSafe() {
+  try {
+    return listPokemonEntries();
+  } catch {
+    return [];
+  }
+}
+
+function listCurrentItemsSafe() {
+  try {
+    return listItems();
+  } catch {
+    return [];
+  }
+}
+
+function listCurrentAbilitiesSafe() {
+  try {
+    return listAbilities();
+  } catch {
+    return [];
+  }
+}
+
+function mergePokemonEntriesByDex(existingEntries: PokemonEntry[], updatedEntries: PokemonEntry[]) {
+  const byDex = new Map<number, PokemonEntry>();
+  for (const entry of existingEntries) {
+    byDex.set(entry.dexNumber, entry);
+  }
+  for (const entry of updatedEntries) {
+    byDex.set(entry.dexNumber, entry);
+  }
+  return [...byDex.values()].sort((left, right) => left.dexNumber - right.dexNumber);
+}
+
+function checkpointNormalizedData(input: {
+  pokemonEntries: PokemonEntry[];
+  items: ItemEntry[];
+  moves: MoveEntry[];
+  abilities: AbilityEntry[];
+}) {
+  replacePokemonEntries(input.pokemonEntries);
+  replaceItems(input.items);
+  replaceMoves(input.moves);
+  replaceAbilities(input.abilities);
 }
 
 function extractBlock(text: string, startLabel: string, endLabelCandidates: string[]) {
@@ -289,7 +930,109 @@ function buildGenerationAvailability(seedGenerations: number[], regionalDexRecor
     }));
 }
 
-export async function fetchRawPage(url: string, slug: string): Promise<RawPage> {
+async function cachePokemonImagesFromPage(page: RawPage, seed: PokemonSeed, forms?: PokemonForm[]) {
+  const resolved = resolvePokemonImageCandidateUrls(page.html, seed, forms);
+  const baseDir = `pokemon/${seed.dexNumber.toString().padStart(4, "0")}-${slugify(seed.nameZh)}`;
+
+  const images = {};
+
+  if (resolved.official) {
+    const cached = await downloadAssetToCache(resolved.official, `${baseDir}/official`);
+    images.official = {
+      url: cached.localUrl,
+      alt: `${seed.nameZh}官方图`,
+      sourceUrl: cached.sourceUrl
+    };
+  }
+
+  if (resolved.shinyOfficial) {
+    const cached = await downloadAssetToCache(resolved.shinyOfficial, `${baseDir}/shiny-official`);
+    images.shinyOfficial = {
+      url: cached.localUrl,
+      alt: `${seed.nameZh}闪光官方图`,
+      sourceUrl: cached.sourceUrl
+    };
+  }
+
+  if (resolved.sprite) {
+    const cached = await downloadAssetToCache(resolved.sprite, `${baseDir}/sprite`);
+    images.sprite = {
+      url: cached.localUrl,
+      alt: `${seed.nameZh}图像`,
+      sourceUrl: cached.sourceUrl
+    };
+  }
+
+  if (resolved.shinySprite) {
+    const cached = await downloadAssetToCache(resolved.shinySprite, `${baseDir}/shiny-sprite`);
+    images.shinySprite = {
+      url: cached.localUrl,
+      alt: `${seed.nameZh}闪光图像`,
+      sourceUrl: cached.sourceUrl
+    };
+  }
+
+  const nextForms = await Promise.all((forms || []).map(async (form) => {
+    const candidates = resolved.forms?.[form.id] || {};
+    if (!candidates.official && !candidates.shinyOfficial) {
+      return form;
+    }
+
+    const nextImages = { ...(form.images || {}) };
+
+    if (candidates.official) {
+      const cached = await downloadAssetToCache(candidates.official, `${baseDir}/${slugify(form.nameZh)}-official`);
+      nextImages.official = {
+        url: cached.localUrl,
+        alt: `${form.nameZh}官方图`,
+        sourceUrl: cached.sourceUrl
+      };
+    }
+
+    if (candidates.shinyOfficial) {
+      const cached = await downloadAssetToCache(candidates.shinyOfficial, `${baseDir}/${slugify(form.nameZh)}-shiny-official`);
+      nextImages.shinyOfficial = {
+        url: cached.localUrl,
+        alt: `${form.nameZh}闪光官方图`,
+        sourceUrl: cached.sourceUrl
+      };
+    }
+
+    return {
+      ...form,
+      images: nextImages
+    };
+  }));
+
+  return {
+    images: Object.keys(images).length > 0 ? images : undefined,
+    forms: nextForms.length > 0 ? nextForms : forms
+  };
+}
+
+async function cacheItemImageFromPage(page: RawPage, item: ItemSeed) {
+  const imageUrls = extractImageCandidates(page.html);
+  const bestUrl = pickBestImageUrl(imageUrls, (fileName) => scoreItemImage(fileName, item));
+  if (!bestUrl) {
+    return undefined;
+  }
+
+  const cached = await downloadAssetToCache(bestUrl, `items/${slugify(item.nameZh)}/official`);
+  return {
+    url: cached.localUrl,
+    alt: `${item.nameZh}图片`,
+    sourceUrl: cached.sourceUrl
+  };
+}
+
+export async function fetchRawPage(url: string, slug: string, options?: FetchPageOptions): Promise<RawPage> {
+  if (options?.preferCache && !options?.refresh) {
+    const cached = readRawPageCache(slug);
+    if (cached?.html) {
+      return cached;
+    }
+  }
+
   const response = await fetch(url, {
     headers: {
       "User-Agent": "pokemon-localdex-bot/0.2"
@@ -1077,24 +1820,116 @@ export async function importFromFixtures() {
   };
 }
 
-export async function importFrom52poke(options?: { pokemonLimit?: number }) {
-  const pokemonListPage = await fetchRawPage(POKEMON_LIST_URL, "pokemon-list-simple");
-  const itemListPage = await fetchRawPage(ITEM_LIST_URL, "item-list");
+export async function importFrom52poke(options?: Import52pokeOptions) {
+  const preferCache = options?.preferCache ?? true;
+  const refreshRaw = options?.refreshRaw ?? false;
+  const checkpointEvery = Math.max(1, Number(options?.checkpointEvery ?? 20));
+
+  const pokemonListPage = await fetchRawPage(POKEMON_LIST_URL, "pokemon-list-simple", {
+    preferCache,
+    refresh: refreshRaw
+  });
+  const itemListPage = await fetchRawPage(ITEM_LIST_URL, "item-list", {
+    preferCache,
+    refresh: refreshRaw
+  });
 
   const pokemonSeeds = parsePokemonListPage(pokemonListPage.html);
   const itemSeeds = parseItemListPage(itemListPage.html);
-  const pokemonLimit = options?.pokemonLimit ?? pokemonSeeds.length;
-  const selectedSeeds = pokemonSeeds.slice(0, pokemonLimit);
+  const startDex = options?.startDex ?? 1;
+  const endDex = options?.endDex ?? Number.MAX_SAFE_INTEGER;
+  const dexFilteredSeeds = pokemonSeeds.filter((seed) => seed.dexNumber >= startDex && seed.dexNumber <= endDex);
+  const pokemonLimit = options?.pokemonLimit ?? dexFilteredSeeds.length;
+  const limitedSeeds = dexFilteredSeeds.slice(0, pokemonLimit);
+  const existingPokemonEntries = listCurrentPokemonEntriesSafe();
+  const existingItems = listCurrentItemsSafe();
+  const existingMoves = listCurrentMovesSafe();
+  const existingAbilities = listCurrentAbilitiesSafe();
+  const existingPokemonDexSet = new Set(existingPokemonEntries.map((entry) => entry.dexNumber));
+  const selectedSeeds = options?.onlyMissing
+    ? limitedSeeds.filter((seed) => !existingPokemonDexSet.has(seed.dexNumber))
+    : limitedSeeds;
   const fetchedAt = new Date().toISOString();
 
-  const pokemonEntries: PokemonEntry[] = [];
+  const importedPokemonEntries: PokemonEntry[] = [];
+  const importedItems: ItemEntry[] = [];
+  const scrapedMoves: ScrapedMoveStub[] = [];
+  const progress: Import52pokeProgress = {
+    startedAt: fetchedAt,
+    updatedAt: fetchedAt,
+    totalSeeds: selectedSeeds.length,
+    processedCount: 0,
+    successCount: 0,
+    failureCount: 0,
+    skippedCount: limitedSeeds.length - selectedSeeds.length,
+    processedDexNumbers: [],
+    failed: []
+  };
+  writeImportProgress(progress);
 
-  for (const seed of selectedSeeds) {
+  for (const [index, seed] of selectedSeeds.entries()) {
     try {
-      const detailPage = await fetchRawPage(seed.detailUrl, `pokemon-${seed.dexNumber.toString().padStart(4, "0")}`);
-      pokemonEntries.push(normalizePokemonPage(detailPage, seed));
+      const detailPage = await fetchRawPage(seed.detailUrl, `pokemon-${seed.dexNumber.toString().padStart(4, "0")}`, {
+        preferCache,
+        refresh: refreshRaw
+      });
+      const normalized = normalizePokemonPage(detailPage, seed);
+      const cachedImages = await cachePokemonImagesFromPage(detailPage, seed, normalized.forms);
+      const generationsToFetch = uniqueByJson(
+        [
+          ...(normalized.generationAvailability?.map((item) => item.generation) ?? []),
+          ...(seed.generations ?? [])
+        ].filter(Boolean)
+      ).sort((left, right) => left - right);
+
+      const generationRecords = [];
+
+      for (const generation of generationsToFetch) {
+        const learnsetUrl = buildLearnsetPageUrl(seed.nameZh, generation);
+        if (!learnsetUrl) {
+          continue;
+        }
+
+        try {
+          const learnsetPage = await fetchRawPage(
+            learnsetUrl,
+            `pokemon-${seed.dexNumber.toString().padStart(4, "0")}-gen-${generation}-moves`,
+            {
+              preferCache,
+              refresh: refreshRaw
+            }
+          );
+          const parsedLearnset = parseLearnsetPage(learnsetPage, generation);
+          if (parsedLearnset.learnset.length === 0) {
+            continue;
+          }
+
+          generationRecords.push({
+            generation,
+            moveIds: parsedLearnset.learnset.map((entry) => entry.moveId),
+            learnset: parsedLearnset.learnset
+          });
+          scrapedMoves.push(...parsedLearnset.moves);
+        } catch (error) {
+          generationRecords.push({
+            generation,
+            notes: `learnset fetch failed: ${error instanceof Error ? error.message : String(error)}`
+          });
+        }
+      }
+
+      importedPokemonEntries.push({
+        ...normalized,
+        images: cachedImages.images ?? normalized.images,
+        forms: cachedImages.forms ?? normalized.forms,
+        moveIds: uniqueByJson(
+          generationRecords.flatMap((record) => record.learnset?.map((item) => item.moveId) ?? [])
+        ),
+        generationRecords: generationRecords.length > 0 ? generationRecords : undefined
+      });
+      progress.successCount += 1;
     } catch (error) {
-      pokemonEntries.push({
+      importedPokemonEntries.push({
         id: `pokemon-${seed.dexNumber.toString().padStart(4, "0")}`,
         dexNumber: seed.dexNumber,
         slug: slugify(seed.nameZh),
@@ -1111,31 +1946,83 @@ export async function importFrom52poke(options?: { pokemonLimit?: number }) {
         },
         parseNote: `detail fetch failed: ${error instanceof Error ? error.message : String(error)}`
       });
+      progress.failureCount += 1;
+      progress.failed.push({
+        dexNumber: seed.dexNumber,
+        nameZh: seed.nameZh,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    progress.processedCount += 1;
+    progress.lastDexNumber = seed.dexNumber;
+    progress.updatedAt = new Date().toISOString();
+    progress.processedDexNumbers.push(seed.dexNumber);
+
+    if ((index + 1) % checkpointEvery === 0) {
+      const checkpointMoves = mergeMoveStubs(existingMoves, scrapedMoves);
+      checkpointNormalizedData({
+        pokemonEntries: mergePokemonEntriesByDex(existingPokemonEntries, importedPokemonEntries),
+        items: existingItems,
+        moves: checkpointMoves,
+        abilities: existingAbilities
+      });
+      writeImportProgress(progress);
     }
   }
 
-  const items: ItemEntry[] = itemSeeds.map((item) => ({
-    id: `item-${slugify(item.nameZh)}`,
-    slug: slugify(item.nameZh),
-    nameZh: item.nameZh,
-    nameJa: item.nameJa,
-    nameEn: item.nameEn,
-    category: item.category,
-    effectSummary: item.effectSummary,
-    source: {
-      url: item.detailUrl,
-      title: item.nameZh,
-      fetchedAt
+  for (const item of itemSeeds) {
+    let image;
+    try {
+      const detailPage = await fetchRawPage(item.detailUrl, `item-${slugify(item.nameZh)}`, {
+        preferCache,
+        refresh: refreshRaw
+      });
+      image = await cacheItemImageFromPage(detailPage, item);
+    } catch {
+      image = undefined;
     }
-  }));
 
-  replacePokemonEntries(pokemonEntries);
-  replaceItems(items);
-  replaceMoves([]);
-  replaceAbilities([]);
+    importedItems.push({
+      id: `item-${slugify(item.nameZh)}`,
+      slug: slugify(item.nameZh),
+      nameZh: item.nameZh,
+      nameJa: item.nameJa,
+      nameEn: item.nameEn,
+      category: item.category,
+      effectSummary: item.effectSummary,
+      image,
+      source: {
+        url: item.detailUrl,
+        title: item.nameZh,
+        fetchedAt
+      }
+    });
+  }
+
+  const moves = mergeMoveStubs(existingMoves, scrapedMoves);
+  const mergedPokemonEntries = mergePokemonEntriesByDex(existingPokemonEntries, importedPokemonEntries);
+  const mergedItems = mergeItems(existingItems, importedItems);
+
+  checkpointNormalizedData({
+    pokemonEntries: mergedPokemonEntries,
+    items: mergedItems,
+    moves,
+    abilities: existingAbilities
+  });
+  writeImportProgress({
+    ...progress,
+    updatedAt: new Date().toISOString()
+  });
 
   return {
-    pokemonCount: pokemonEntries.length,
-    itemCount: items.length
+    requestedPokemonCount: limitedSeeds.length,
+    processedPokemonCount: selectedSeeds.length,
+    pokemonCount: mergedPokemonEntries.length,
+    itemCount: mergedItems.length,
+    moveCount: moves.length,
+    skippedPokemonCount: progress.skippedCount,
+    failedPokemonCount: progress.failureCount,
+    progressFile: IMPORT_PROGRESS_FILE
   };
 }

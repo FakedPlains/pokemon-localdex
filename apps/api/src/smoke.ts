@@ -15,7 +15,7 @@ import {
   searchPokemonEntries,
   saveTeam
 } from "../../../packages/data-model/src/index.ts";
-import { importFromFixtures } from "../../../packages/scraper/src/index.ts";
+import { importFromFixtures, parseLearnsetPage, resolvePokemonImageCandidateUrls } from "../../../packages/scraper/src/index.ts";
 import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
 import {
   getItemFromSqlite,
@@ -33,6 +33,59 @@ const originalAbilities = listAbilities();
 try {
   const fixtureImport = await importFromFixtures();
   const sqliteImport = importNormalizedDataToSqlite();
+  const parsedLearnset = parseLearnsetPage(
+    {
+      url: "https://example.com/pikachu/gen1",
+      title: "皮卡丘/第一世代招式表",
+      fetchedAt: new Date().toISOString(),
+      html: `
+        <h2>可学会的招式</h2>
+        <table>
+          <tr><th>等级</th><th>招式</th><th>属性</th><th>威力</th><th>命中</th><th>PP</th></tr>
+          <tr><td>11</td><td>电光一闪</td><td>一般</td><td>40</td><td>100</td><td>30</td></tr>
+        </table>
+        <h2>能使用的招式学习器</h2>
+        <table>
+          <tr><th>学习器</th><th>招式</th><th>属性</th><th>威力</th><th>命中</th><th>PP</th></tr>
+          <tr><td>招式学习器24</td><td>十万伏特</td><td>电</td><td>95</td><td>100</td><td>15</td></tr>
+        </table>
+      `
+    },
+    1
+  );
+  const pikachuImageCandidates = resolvePokemonImageCandidateUrls(
+    `
+      <img src="https://media.52poke.com/wiki/thumb/a/a7/025Pikachu.png/250px-025Pikachu.png" />
+      <img src="https://media.52poke.com/wiki/thumb/b/b4/Spr_9s_025.png/250px-Spr_9s_025.png" />
+      <img src="https://media.52poke.com/wiki/thumb/c/c8/Spr_9_025.png/250px-Spr_9_025.png" />
+    `,
+    {
+      dexNumber: 25,
+      nameZh: "皮卡丘",
+      nameEn: "Pikachu",
+      generations: [1, 9],
+      detailUrl: "https://wiki.52poke.com/wiki/皮卡丘"
+    }
+  );
+  const charizardImageCandidates = resolvePokemonImageCandidateUrls(
+    `
+      <img src="https://media.52poke.com/wiki/thumb/d/d0/006Charizard-Mega_X.png/250px-006Charizard-Mega_X.png" />
+      <img src="https://media.52poke.com/wiki/thumb/e/e5/006Charizard-Mega_X_s.png/250px-006Charizard-Mega_X_s.png" />
+    `,
+    {
+      dexNumber: 6,
+      nameZh: "喷火龙",
+      nameEn: "Charizard",
+      generations: [1, 9],
+      detailUrl: "https://wiki.52poke.com/wiki/喷火龙"
+    },
+    [
+      {
+        id: "charizard-mega-x",
+        nameZh: "超级喷火龙X"
+      }
+    ]
+  );
 
   const saved = saveTeam({
     name: "示例队伍",
@@ -66,6 +119,13 @@ try {
   console.log("pokemon detail sample:", listPokemonEntries().find((item) => item.nameZh === "皮卡丘")?.baseStats);
   console.log("pokemon image sample:", listPokemonEntries().find((item) => item.nameZh === "皮卡丘")?.images?.official?.url);
   console.log("pokemon forms sample:", listPokemonEntries().find((item) => item.nameZh === "皮卡丘")?.forms?.map((item) => item.nameZh));
+  console.log("image candidate sample:", {
+    official: pikachuImageCandidates.official?.includes("025Pikachu.png"),
+    shinySprite: pikachuImageCandidates.shinySprite?.includes("Spr_9s_025.png"),
+    formOfficial: charizardImageCandidates.forms?.["charizard-mega-x"]?.official?.includes("Mega_X.png"),
+    formShiny: charizardImageCandidates.forms?.["charizard-mega-x"]?.shinyOfficial?.includes("Mega_X_s.png")
+  });
+  console.log("learnset parser sample:", parsedLearnset.learnset.map((item) => `${item.moveNameZh}:${item.learnMethod}`));
   console.log(
     "pokemon learnset sample:",
     listPokemonEntries()
