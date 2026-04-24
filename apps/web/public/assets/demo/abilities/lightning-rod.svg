@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <rect width="240" height="240" rx="24" fill="#f4f0d6"/>
+  <path d="M120 46v130" stroke="#7c6636" stroke-width="12" stroke-linecap="round"/>
+  <path d="M120 68l-36 34m36-34l36 34" stroke="#7c6636" stroke-width="12" stroke-linecap="round"/>
+  <path d="M122 98l-20 42h24l-8 30 24-46h-22z" fill="#d6b113"/>
+  <text x="120" y="214" text-anchor="middle" font-size="20" fill="#7c6636" font-family="Arial">避雷针</text>
+</svg>

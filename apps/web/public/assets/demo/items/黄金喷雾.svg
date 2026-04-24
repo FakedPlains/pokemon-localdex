@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <rect width="240" height="240" rx="24" fill="#f8efcf"/>
+  <rect x="86" y="70" width="68" height="94" rx="14" fill="#d5aa35"/>
+  <rect x="104" y="48" width="32" height="28" rx="8" fill="#9b7720"/>
+  <circle cx="172" cy="86" r="10" fill="#ecd89a"/>
+  <text x="120" y="210" text-anchor="middle" font-size="20" fill="#9b7720" font-family="Arial">黄金喷雾</text>
+</svg>

@@ -1,0 +1,470 @@
+:root {
+  --bg: #f6f1e7;
+  --panel: rgba(255, 250, 240, 0.92);
+  --ink: #1f2a1f;
+  --muted: #5f6b5c;
+  --line: rgba(51, 70, 46, 0.15);
+  --accent: #d94f3d;
+  --accent-strong: #9f2318;
+  --grass: #8aa65a;
+  --electric: #d6b113;
+  --water: #3b84c5;
+  --shadow: 0 18px 48px rgba(64, 50, 28, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(214, 177, 19, 0.24), transparent 28%),
+    radial-gradient(circle at top right, rgba(59, 132, 197, 0.16), transparent 24%),
+    linear-gradient(180deg, #f9f3ea 0%, #efe3cf 100%);
+}
+
+.app-shell {
+  width: min(1200px, calc(100vw - 24px));
+  margin: 0 auto;
+  padding: 20px 0 40px;
+}
+
+.hero {
+  display: grid;
+  gap: 20px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255, 248, 236, 0.95), rgba(234, 223, 198, 0.95));
+  box-shadow: var(--shadow);
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: 0.95;
+}
+
+.hero-text {
+  max-width: 720px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.hero-nav { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.hero-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 92px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+}
+
+.hero-nav a.active { background: var(--accent); color: white; }
+
+.main-panel { padding-top: 20px; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+}
+
+.view-grid { display: grid; gap: 18px; }
+.pokedex-layout, .items-layout, .teams-layout, .damage-layout {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 0;
+}
+
+.panel-title { margin: 0; font-size: 24px; }
+.panel-subtitle { margin: 6px 0 0; color: var(--muted); line-height: 1.6; }
+
+.toolbar { display: grid; gap: 12px; padding: 20px 24px 24px; }
+.toolbar-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.team-header-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(180px, 0.6fr);
+  gap: 12px;
+}
+
+input, select, button, textarea { font: inherit; }
+
+input, select, textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(31, 42, 31, 0.15);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+}
+
+button {
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 16px;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  cursor: pointer;
+}
+
+button.secondary {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(31, 42, 31, 0.12);
+}
+
+.pokemon-list, .item-list, .team-list { display: grid; gap: 12px; padding: 0 24px 24px; }
+
+.list-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.88), rgba(248, 241, 226, 0.92));
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.list-card:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(64, 50, 28, 0.08); }
+
+.card-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.dex-badge, .chip, .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(31, 42, 31, 0.06);
+}
+
+.pill { font-size: 13px; background: rgba(138, 166, 90, 0.12); }
+
+.types, .forms-grid, .generation-grid, .team-member-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.generation-card-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.media-layout {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1fr);
+  margin-top: 16px;
+}
+
+.compact-media {
+  grid-template-columns: minmax(160px, 0.55fr) minmax(0, 1fr);
+}
+
+.media-viewer,
+.media-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+}
+
+.entity-image {
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  object-fit: contain;
+}
+
+.item-image {
+  max-width: 220px;
+}
+
+.form-card {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 260px);
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.72);
+  border: 1px solid rgba(31,42,31,0.08);
+}
+
+.mini-image {
+  width: 100%;
+  max-width: 160px;
+  height: auto;
+  object-fit: contain;
+}
+
+.info-stack {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.type-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: white;
+}
+
+.type-chip.type-草 { background: var(--grass); }
+.type-chip.type-毒 { background: #8b5ea7; }
+.type-chip.type-电 { background: var(--electric); color: #352a00; }
+.type-chip.type-水 { background: var(--water); }
+.type-chip.type-火 { background: #d26a2e; }
+.type-chip.type-一般 { background: #8a8a7f; }
+.type-chip.type-冰 { background: #6ebec9; color: #12343a; }
+.type-chip.type-格斗 { background: #b4473f; }
+.type-chip.type-地面 { background: #b68f4e; }
+.type-chip.type-飞行 { background: #7f9cd6; }
+.type-chip.type-超能力 { background: #db6390; }
+.type-chip.type-虫 { background: #7a9a2a; }
+.type-chip.type-岩石 { background: #9a8752; }
+.type-chip.type-幽灵 { background: #6b5b95; }
+.type-chip.type-龙 { background: #4c62d4; }
+.type-chip.type-恶 { background: #5a4b43; }
+.type-chip.type-钢 { background: #7b8da1; }
+.type-chip.type-妖精 { background: #d98db8; }
+.type-chip.type-unknown { background: #7b8481; }
+
+.detail-panel, .team-builder { padding: 24px; }
+.detail-empty, .muted { color: var(--muted); line-height: 1.7; }
+
+.detail-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.detail-title-row h2 { margin: 0; font-size: 30px; }
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.meta-card, .subpanel, .team-member {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+}
+
+.team-slot-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.team-member-editor {
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+}
+
+.member-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.member-grid,
+.move-grid,
+.stats-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.member-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.move-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.member-grid label,
+.move-grid label,
+.mini-field {
+  display: grid;
+  gap: 6px;
+}
+
+.member-grid span,
+.move-grid span,
+.mini-field span,
+.section-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stats-details {
+  margin-top: 14px;
+}
+
+.stats-details summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.stats-editor {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.stat-input-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.compact-button {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.damage-grid,
+.result-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.damage-side-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.import-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.checkbox-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+  border: 1px solid rgba(31, 42, 31, 0.15);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.checkbox-row input {
+  width: auto;
+  margin: 0;
+}
+
+.result-card {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.result-card h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.result-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), #eb9f4b);
+}
+
+.result-note {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.stat-grid { display: grid; gap: 10px; margin-top: 16px; }
+
+.stat-row {
+  display: grid;
+  grid-template-columns: 70px 1fr 52px;
+  gap: 10px;
+  align-items: center;
+}
+
+.stat-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(31, 42, 31, 0.08);
+  overflow: hidden;
+}
+
+.stat-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), #eb9f4b);
+}
+
+.loading-panel { display: grid; place-items: center; min-height: 260px; }
+.pulse-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+@media (max-width: 900px) {
+  .pokedex-layout, .items-layout, .teams-layout, .damage-layout, .meta-grid, .team-header-grid, .member-grid, .move-grid, .stats-editor, .damage-grid, .result-grid, .damage-side-grid, .media-layout { grid-template-columns: 1fr; }
+  .app-shell { width: min(100vw - 16px, 1200px); padding-top: 12px; }
+  .hero, .detail-panel, .team-builder { padding: 18px; }
+  .stat-input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

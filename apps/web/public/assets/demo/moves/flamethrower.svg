@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <rect width="240" height="240" rx="24" fill="#ffd9b4"/>
+  <path d="M122 42c22 24 38 42 38 72 0 28-16 54-40 54s-40-24-40-48c0-16 10-30 18-40 8 14 20 22 30 22 8 0 12-4 16-12-2-16-12-30-22-48z" fill="#d94f3d"/>
+  <text x="120" y="214" text-anchor="middle" font-size="20" fill="#8a2f1d" font-family="Arial">喷射火焰</text>
+</svg>

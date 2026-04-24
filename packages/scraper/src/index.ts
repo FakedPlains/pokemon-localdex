@@ -1,15 +1,22 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import {
+  type AbilityEntry,
   type ItemEntry,
+  type MoveEntry,
   type PokemonEntry,
+  type PokemonForm,
+  type RegionalDexRecord,
+  replaceAbilities,
   replaceItems,
+  replaceMoves,
   replacePokemonEntries
 } from "../../data-model/src/index.ts";
 
 const ROOT = resolve(import.meta.dirname, "../../../");
 const RAW_DIR = resolve(ROOT, "data/raw");
 const FIXTURE_DIR = resolve(import.meta.dirname, "../fixtures");
+const WEB_ASSET_ROOT = "/assets/demo";
 
 const POKEMON_LIST_URL =
   "https://wiki.52poke.com/wiki/%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89/%E7%AE%80%E5%8D%95%E7%89%88";
@@ -92,6 +99,10 @@ function readFixture(fileName: string) {
   return readFileSync(resolve(FIXTURE_DIR, fileName), "utf8");
 }
 
+function assetUrl(pathname: string) {
+  return `${WEB_ASSET_ROOT}/${pathname}`;
+}
+
 function readNumber(input: string | undefined) {
   if (!input) {
     return undefined;
@@ -163,6 +174,119 @@ function chooseBaseStatBlock(blocks: ReturnType<typeof extractStatBlocks>) {
 function extractLineValue(text: string, label: string) {
   const pattern = new RegExp(`(?:^|\\n)${label}\\s+([^\\n]+)`);
   return text.match(pattern)?.[1]?.trim();
+}
+
+function splitTokens(value: string | undefined) {
+  return value?.split(/\s+/).map((item) => item.trim()).filter(Boolean) ?? [];
+}
+
+function uniqueByJson<T>(items: T[]) {
+  return dedupe(items.map((item) => JSON.stringify(item))).map((item) => JSON.parse(item));
+}
+
+function extractBlock(text: string, startLabel: string, endLabelCandidates: string[]) {
+  const startPattern = new RegExp(`(?:^|\\n)${startLabel}\\s*`);
+  const startMatch = text.match(startPattern);
+  if (!startMatch || startMatch.index === undefined) {
+    return "";
+  }
+
+  const startIndex = startMatch.index + startMatch[0].length;
+  const tail = text.slice(startIndex);
+  let endIndex = tail.length;
+
+  for (const label of endLabelCandidates) {
+    const pattern = new RegExp(`\\n${label}\\s`);
+    const match = tail.match(pattern);
+    if (match && match.index !== undefined) {
+      endIndex = Math.min(endIndex, match.index);
+    }
+  }
+
+  return tail.slice(0, endIndex).trim();
+}
+
+function extractForms(text: string, baseNameZh: string): PokemonForm[] {
+  const block = extractBlock(text, "形态", ["概述", "属性", "分类", "身高", "体重", "种族值", "取得基础点数"]);
+  if (!block) {
+    return [];
+  }
+
+  const candidates = block
+    .split(/\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => item !== "形态");
+
+  const forms = candidates.map((nameZh) => ({
+    id: `${slugify(baseNameZh)}-${slugify(nameZh)}`,
+    nameZh
+  }));
+
+  return uniqueByJson(forms).filter((form) => form.nameZh !== baseNameZh);
+}
+
+function generationFromRegion(region: string) {
+  const regionMap: Record<string, number> = {
+    关都: 1,
+    城都: 2,
+    丰缘: 3,
+    神奥: 4,
+    合众: 5,
+    卡洛斯: 6,
+    阿罗拉: 7,
+    伽勒尔: 8,
+    洗翠: 8,
+    帕底亚: 9,
+    北上: 9,
+    蓝莓: 9,
+    密阿雷: 10
+  };
+
+  return regionMap[region];
+}
+
+function extractRegionalDexRecords(text: string): RegionalDexRecord[] {
+  const block = extractBlock(text, "地区图鉴编号", ["地区浏览器编号", "身高", "体重", "叫声"]);
+  if (!block) {
+    return [];
+  }
+
+  const records: RegionalDexRecord[] = [];
+  const pattern = /(关都|城都|丰缘|神奥|合众|卡洛斯|阿罗拉|伽勒尔|铠岛|王冠雪原|洗翠|帕底亚|北上|蓝莓|密阿雷)\s+#?([0-9A-Z\-]*)/g;
+
+  for (const match of block.matchAll(pattern)) {
+    records.push({
+      region: match[1],
+      dexNumber: match[2] || undefined
+    });
+  }
+
+  return uniqueByJson(records);
+}
+
+function buildGenerationAvailability(seedGenerations: number[], regionalDexRecords: RegionalDexRecord[]) {
+  const grouped = new Map<number, RegionalDexRecord[]>();
+
+  for (const generation of seedGenerations) {
+    grouped.set(generation, grouped.get(generation) ?? []);
+  }
+
+  for (const record of regionalDexRecords) {
+    const generation = generationFromRegion(record.region);
+    if (!generation) {
+      continue;
+    }
+
+    grouped.set(generation, [...(grouped.get(generation) ?? []), record]);
+  }
+
+  return [...grouped.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([generation, regions]) => ({
+      generation,
+      regions: regions.length > 0 ? uniqueByJson(regions) : undefined
+    }));
 }
 
 export async function fetchRawPage(url: string, slug: string): Promise<RawPage> {
@@ -262,8 +386,11 @@ export function normalizePokemonPage(page: RawPage, seed: PokemonSeed): PokemonE
   const catchRateLine = extractLineValue(text, "捕获率");
   const genderMatch = text.match(/雄性\s*([0-9.]+%)｜雌性\s*([0-9.]+%)/);
   const statBlock = chooseBaseStatBlock(extractStatBlocks(text));
-  const typeTokens = typeLine?.split(/\s+/).filter(Boolean) ?? [];
-  const abilityTokens = abilityLine?.split(/\s+/).filter(Boolean) ?? [];
+  const typeTokens = splitTokens(typeLine);
+  const abilityTokens = splitTokens(abilityLine);
+  const forms = extractForms(text, seed.nameZh);
+  const regionalDexRecords = extractRegionalDexRecords(text);
+  const generationAvailability = buildGenerationAvailability(seed.generations, regionalDexRecords);
 
   return {
     id: `pokemon-${seed.dexNumber.toString().padStart(4, "0")}`,
@@ -298,6 +425,8 @@ export function normalizePokemonPage(page: RawPage, seed: PokemonSeed): PokemonE
           spe: statBlock.spe
         }
       : undefined,
+    forms: forms.length > 0 ? forms : undefined,
+    generationAvailability: generationAvailability.length > 0 ? generationAvailability : undefined,
     source: {
       url: page.url,
       title: page.title,
@@ -310,21 +439,24 @@ export async function importFromFixtures() {
   const pokemonListHtml = readFixture("pokemon-list-simple.html");
   const itemListHtml = readFixture("item-list.html");
   const pikachuHtml = readFixture("pokemon-detail-pikachu.html");
+  const charizardHtml = readFixture("pokemon-detail-charizard.html");
+  const now = new Date().toISOString();
 
   const parsedSeeds = parsePokemonListPage(pokemonListHtml);
   const pokemonSeeds = dedupe(
     [
       ...parsedSeeds.slice(0, 3),
-      ...parsedSeeds.filter((item) => item.nameZh === "皮卡丘")
+      ...parsedSeeds.filter((item) => item.nameZh === "皮卡丘" || item.nameZh === "喷火龙")
     ].map((item) => JSON.stringify(item))
   ).map((item) => JSON.parse(item));
   const itemSeeds = parseItemListPage(itemListHtml).slice(0, 5);
   const pikachuSeed = pokemonSeeds.find((item) => item.nameZh === "皮卡丘");
+  const charizardSeed = pokemonSeeds.find((item) => item.nameZh === "喷火龙");
 
   const pokemonEntries = pikachuSeed
     ? [
         ...pokemonSeeds
-          .filter((item) => item.nameZh !== "皮卡丘")
+          .filter((item) => item.nameZh !== "皮卡丘" && item.nameZh !== "喷火龙")
           .map((item) => ({
             id: `pokemon-${item.dexNumber.toString().padStart(4, "0")}`,
             dexNumber: item.dexNumber,
@@ -338,18 +470,188 @@ export async function importFromFixtures() {
             source: {
               url: item.detailUrl,
               title: item.nameZh,
-              fetchedAt: new Date().toISOString()
+              fetchedAt: now
             }
           })),
-        normalizePokemonPage(
-          {
-            url: pikachuSeed.detailUrl,
-            title: "皮卡丘 - 神奇宝贝百科，关于宝可梦的百科全书",
-            fetchedAt: new Date().toISOString(),
-            html: pikachuHtml
+        {
+          ...normalizePokemonPage(
+            {
+              url: pikachuSeed.detailUrl,
+              title: "皮卡丘 - 神奇宝贝百科，关于宝可梦的百科全书",
+              fetchedAt: now,
+              html: pikachuHtml
+            },
+            pikachuSeed
+          ),
+          abilityIds: ["ability-static", "ability-lightning-rod"],
+          hiddenAbilityId: "ability-lightning-rod",
+          moveIds: ["move-thunderbolt", "move-quick-attack"],
+          images: {
+            official: {
+              url: assetUrl("pokemon/pikachu-official.svg"),
+              alt: "皮卡丘官方绘图"
+            },
+            shinyOfficial: {
+              url: assetUrl("pokemon/pikachu-shiny.svg"),
+              alt: "皮卡丘闪光官方绘图"
+            }
           },
-          pikachuSeed
-        )
+          generationRecords: [
+            {
+              generation: 1,
+              label: "红／绿／蓝",
+              primaryType: "电",
+              abilityIds: [],
+              baseStats: { hp: 35, atk: 55, def: 30, spa: 50, spd: 40, spe: 90 },
+              moveIds: ["move-thunderbolt", "move-quick-attack"],
+              notes: "在第一世代中，特攻与特防尚未拆分。"
+            },
+            {
+              generation: 3,
+              label: "红宝石／蓝宝石",
+              primaryType: "电",
+              abilityIds: ["ability-static"],
+              hiddenAbilityId: undefined,
+              baseStats: { hp: 35, atk: 55, def: 30, spa: 50, spd: 40, spe: 90 },
+              moveIds: ["move-thunderbolt", "move-quick-attack"]
+            },
+            {
+              generation: 5,
+              label: "黑／白",
+              primaryType: "电",
+              abilityIds: ["ability-static"],
+              hiddenAbilityId: "ability-lightning-rod",
+              baseStats: { hp: 35, atk: 55, def: 40, spa: 50, spd: 50, spe: 90 },
+              moveIds: ["move-thunderbolt", "move-quick-attack"]
+            },
+            {
+              generation: 9,
+              label: "朱／紫",
+              primaryType: "电",
+              abilityIds: ["ability-static"],
+              hiddenAbilityId: "ability-lightning-rod",
+              baseStats: { hp: 35, atk: 55, def: 40, spa: 50, spd: 50, spe: 90 },
+              moveIds: ["move-thunderbolt", "move-quick-attack"]
+            }
+          ]
+        },
+        ...(charizardSeed
+          ? [
+              {
+                ...normalizePokemonPage(
+                  {
+                    url: charizardSeed.detailUrl,
+                    title: "喷火龙 - 神奇宝贝百科，关于宝可梦的百科全书",
+                    fetchedAt: now,
+                    html: charizardHtml
+                  },
+                  charizardSeed
+                ),
+                abilityIds: ["ability-blaze"],
+                hiddenAbilityId: "ability-solar-power",
+                moveIds: ["move-flamethrower", "move-air-slash"],
+                images: {
+                  official: {
+                    url: assetUrl("pokemon/charizard-official.svg"),
+                    alt: "喷火龙官方绘图"
+                  },
+                  shinyOfficial: {
+                    url: assetUrl("pokemon/charizard-shiny.svg"),
+                    alt: "喷火龙闪光官方绘图"
+                  }
+                },
+                forms: [
+                  ...(normalizePokemonPage(
+                    {
+                      url: charizardSeed.detailUrl,
+                      title: "喷火龙 - 神奇宝贝百科，关于宝可梦的百科全书",
+                      fetchedAt: now,
+                      html: charizardHtml
+                    },
+                    charizardSeed
+                  ).forms ?? []),
+                  {
+                    id: "charizard-mega-x",
+                    nameZh: "超级喷火龙X",
+                    primaryType: "火",
+                    secondaryType: "龙",
+                    abilityIds: ["ability-tough-claws"],
+                    baseStats: { hp: 78, atk: 130, def: 111, spa: 130, spd: 85, spe: 100 },
+                    introducedGeneration: 6,
+                    isMega: true,
+                    images: {
+                      official: {
+                        url: assetUrl("pokemon/charizard-mega-x.svg"),
+                        alt: "超级喷火龙X官方绘图"
+                      },
+                      shinyOfficial: {
+                        url: assetUrl("pokemon/charizard-mega-x-shiny.svg"),
+                        alt: "超级喷火龙X闪光官方绘图"
+                      }
+                    }
+                  },
+                  {
+                    id: "charizard-mega-y",
+                    nameZh: "超级喷火龙Y",
+                    primaryType: "火",
+                    secondaryType: "飞行",
+                    abilityIds: ["ability-drought"],
+                    baseStats: { hp: 78, atk: 104, def: 78, spa: 159, spd: 115, spe: 100 },
+                    introducedGeneration: 6,
+                    isMega: true,
+                    images: {
+                      official: {
+                        url: assetUrl("pokemon/charizard-mega-y.svg"),
+                        alt: "超级喷火龙Y官方绘图"
+                      }
+                    }
+                  }
+                ],
+                generationRecords: [
+                  {
+                    generation: 1,
+                    label: "红／绿／蓝",
+                    primaryType: "火",
+                    secondaryType: "飞行",
+                    abilityIds: [],
+                    baseStats: { hp: 78, atk: 84, def: 78, spa: 85, spd: 85, spe: 100 },
+                    moveIds: ["move-flamethrower", "move-air-slash"],
+                    notes: "第一世代未引入特性与隐藏特性。"
+                  },
+                  {
+                    generation: 3,
+                    label: "红宝石／蓝宝石",
+                    primaryType: "火",
+                    secondaryType: "飞行",
+                    abilityIds: ["ability-blaze"],
+                    baseStats: { hp: 78, atk: 84, def: 78, spa: 109, spd: 85, spe: 100 },
+                    moveIds: ["move-flamethrower", "move-air-slash"]
+                  },
+                  {
+                    generation: 6,
+                    label: "X／Y",
+                    primaryType: "火",
+                    secondaryType: "飞行",
+                    abilityIds: ["ability-blaze"],
+                    hiddenAbilityId: "ability-solar-power",
+                    baseStats: { hp: 78, atk: 84, def: 78, spa: 109, spd: 85, spe: 100 },
+                    moveIds: ["move-flamethrower", "move-air-slash"],
+                    notes: "此世代引入超级喷火龙X与超级喷火龙Y。"
+                  },
+                  {
+                    generation: 9,
+                    label: "朱／紫",
+                    primaryType: "火",
+                    secondaryType: "飞行",
+                    abilityIds: ["ability-blaze"],
+                    hiddenAbilityId: "ability-solar-power",
+                    baseStats: { hp: 78, atk: 84, def: 78, spa: 109, spd: 85, spe: 100 },
+                    moveIds: ["move-flamethrower", "move-air-slash"]
+                  }
+                ]
+              }
+            ]
+          : [])
       ]
     : [];
 
@@ -361,19 +663,317 @@ export async function importFromFixtures() {
     nameEn: item.nameEn,
     category: item.category,
     effectSummary: item.effectSummary,
+    image: {
+      url: assetUrl(`items/${slugify(item.nameZh)}.svg`),
+      alt: `${item.nameZh}图片`
+    },
     source: {
       url: item.detailUrl,
       title: item.nameZh,
-      fetchedAt: new Date().toISOString()
+      fetchedAt: now
     }
   }));
 
+  const moves: MoveEntry[] = [
+    {
+      id: "move-thunderbolt",
+      slug: "十万伏特",
+      nameZh: "十万伏特",
+      nameJa: "１０まんボルト",
+      nameEn: "Thunderbolt",
+      type: "电",
+      category: "special",
+      power: 90,
+      accuracy: "100%",
+      pp: 15,
+      effectSummary: "攻击目标造成伤害。有10%的概率使目标陷入麻痹状态。",
+      image: {
+        url: assetUrl("moves/thunderbolt.svg"),
+        alt: "十万伏特图标"
+      },
+      generations: [
+        {
+          generation: 1,
+          type: "电",
+          category: "special",
+          power: 95,
+          accuracy: "100%",
+          pp: 15,
+          effectSummary: "攻击目标造成伤害。有10%的概率使目标陷入麻痹状态。"
+        },
+        {
+          generation: 6,
+          type: "电",
+          category: "special",
+          power: 90,
+          accuracy: "100%",
+          pp: 15,
+          effectSummary: "攻击目标造成伤害。有10%的概率使目标陷入麻痹状态。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E5%8D%81%E4%B8%87%E4%BC%8F%E7%89%B9",
+        title: "十万伏特 - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    },
+    {
+      id: "move-flamethrower",
+      slug: "喷射火焰",
+      nameZh: "喷射火焰",
+      nameJa: "かえんほうしゃ",
+      nameEn: "Flamethrower",
+      type: "火",
+      category: "special",
+      power: 90,
+      accuracy: "100%",
+      pp: 15,
+      effectSummary: "攻击目标造成伤害。有10%的概率使目标陷入灼伤状态。",
+      image: {
+        url: assetUrl("moves/flamethrower.svg"),
+        alt: "喷射火焰图标"
+      },
+      generations: [
+        {
+          generation: 1,
+          type: "火",
+          category: "special",
+          power: 95,
+          accuracy: "100%",
+          pp: 15,
+          effectSummary: "攻击目标造成伤害。有10%的概率使目标陷入灼伤状态。"
+        },
+        {
+          generation: 6,
+          type: "火",
+          category: "special",
+          power: 90,
+          accuracy: "100%",
+          pp: 15,
+          effectSummary: "攻击目标造成伤害。有10%的概率使目标陷入灼伤状态。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E5%96%B7%E5%B0%84%E7%81%AB%E7%84%B0",
+        title: "喷射火焰 - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    },
+    {
+      id: "move-quick-attack",
+      slug: "电光一闪",
+      nameZh: "电光一闪",
+      nameJa: "でんこうせっか",
+      nameEn: "Quick Attack",
+      type: "一般",
+      category: "physical",
+      power: 40,
+      accuracy: "100%",
+      pp: 30,
+      effectSummary: "必定先制攻击。",
+      image: {
+        url: assetUrl("moves/quick-attack.svg"),
+        alt: "电光一闪图标"
+      },
+      generations: [
+        {
+          generation: 1,
+          type: "一般",
+          category: "physical",
+          power: 40,
+          accuracy: "100%",
+          pp: 30,
+          effectSummary: "必定先制攻击。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E7%94%B5%E5%85%89%E4%B8%80%E9%97%AA",
+        title: "电光一闪 - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    },
+    {
+      id: "move-air-slash",
+      slug: "空气斩",
+      nameZh: "空气斩",
+      nameJa: "エアスラッシュ",
+      nameEn: "Air Slash",
+      type: "飞行",
+      category: "special",
+      power: 75,
+      accuracy: "95%",
+      pp: 15,
+      effectSummary: "攻击目标造成伤害。有30%的概率使目标畏缩。",
+      image: {
+        url: assetUrl("moves/air-slash.svg"),
+        alt: "空气斩图标"
+      },
+      generations: [
+        {
+          generation: 4,
+          type: "飞行",
+          category: "special",
+          power: 75,
+          accuracy: "95%",
+          pp: 15,
+          effectSummary: "攻击目标造成伤害。有30%的概率使目标畏缩。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E7%A9%BA%E6%B0%94%E6%96%A9",
+        title: "空气斩 - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    }
+  ];
+
+  const abilities: AbilityEntry[] = [
+    {
+      id: "ability-static",
+      slug: "静电",
+      nameZh: "静电",
+      nameJa: "せいでんき",
+      nameEn: "Static",
+      effectSummary: "身上带有静电，有时会让接触到的对手麻痹。",
+      image: {
+        url: assetUrl("abilities/static.svg"),
+        alt: "静电特性图标"
+      },
+      generations: [
+        {
+          generation: 3,
+          effectSummary: "使用接触类招式攻击该特性的宝可梦时会有30%的机率麻痹。"
+        },
+        {
+          generation: 9,
+          effectSummary: "使用接触类招式攻击该特性的宝可梦时会有30%的机率麻痹。对战外还能提高遇见电属性宝可梦的概率。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E9%9D%99%E7%94%B5%EF%BC%88%E7%89%B9%E6%80%A7%EF%BC%89",
+        title: "静电（特性） - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    },
+    {
+      id: "ability-lightning-rod",
+      slug: "避雷针",
+      nameZh: "避雷针",
+      nameJa: "ひらいしん",
+      nameEn: "Lightning Rod",
+      effectSummary: "将电属性的招式吸引到自己身上，不会受到伤害，还会提高特攻。",
+      image: {
+        url: assetUrl("abilities/lightning-rod.svg"),
+        alt: "避雷针特性图标"
+      },
+      generations: [
+        {
+          generation: 3,
+          effectSummary: "将单体电属性招式吸引到自己身上。"
+        },
+        {
+          generation: 5,
+          effectSummary: "将电属性招式吸引到自己身上并无效，还会提升一级特攻。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E9%81%BF%E9%9B%B7%E9%92%88%EF%BC%88%E7%89%B9%E6%80%A7%EF%BC%89",
+        title: "避雷针（特性） - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    },
+    {
+      id: "ability-blaze",
+      slug: "猛火",
+      nameZh: "猛火",
+      nameJa: "もうか",
+      nameEn: "Blaze",
+      effectSummary: "ＨＰ减少时，火属性的招式威力会提高。",
+      image: {
+        url: assetUrl("abilities/blaze.svg"),
+        alt: "猛火特性图标"
+      },
+      generations: [
+        {
+          generation: 3,
+          effectSummary: "ＨＰ不大于最大值的1/3时，火属性招式威力提升为1.5倍。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E7%8C%9B%E7%81%AB%EF%BC%88%E7%89%B9%E6%80%A7%EF%BC%89",
+        title: "猛火（特性） - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    },
+    {
+      id: "ability-solar-power",
+      slug: "太阳之力",
+      nameZh: "太阳之力",
+      nameJa: "サンパワー",
+      nameEn: "Solar Power",
+      effectSummary: "大晴天或大日照下特攻提高，但每回合会损失HP。",
+      generations: [
+        {
+          generation: 4,
+          effectSummary: "在晴天天气下特攻提高1.5倍，但每回合损失最大HP的1/8。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E5%A4%AA%E9%98%B3%E4%B9%8B%E5%8A%9B%EF%BC%88%E7%89%B9%E6%80%A7%EF%BC%89",
+        title: "太阳之力（特性） - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    },
+    {
+      id: "ability-tough-claws",
+      slug: "硬爪",
+      nameZh: "硬爪",
+      nameJa: "かたいツメ",
+      nameEn: "Tough Claws",
+      effectSummary: "接触类招式威力会提高。",
+      generations: [
+        {
+          generation: 6,
+          effectSummary: "接触类招式的威力提高约1.3倍。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E7%A1%AC%E7%88%AA%EF%BC%88%E7%89%B9%E6%80%A7%EF%BC%89",
+        title: "硬爪（特性） - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    },
+    {
+      id: "ability-drought",
+      slug: "日照",
+      nameZh: "日照",
+      nameJa: "ひでり",
+      nameEn: "Drought",
+      effectSummary: "出场时，会将天气变为大晴天。",
+      generations: [
+        {
+          generation: 3,
+          effectSummary: "出场时，将天气变为大晴天。"
+        }
+      ],
+      source: {
+        url: "https://wiki.52poke.com/wiki/%E6%97%A5%E7%85%A7%EF%BC%88%E7%89%B9%E6%80%A7%EF%BC%89",
+        title: "日照（特性） - 神奇宝贝百科，关于宝可梦的百科全书",
+        fetchedAt: now
+      }
+    }
+  ];
+
   replacePokemonEntries(pokemonEntries);
   replaceItems(items);
+  replaceMoves(moves);
+  replaceAbilities(abilities);
 
   return {
     pokemonCount: pokemonEntries.length,
-    itemCount: items.length
+    itemCount: items.length,
+    moveCount: moves.length,
+    abilityCount: abilities.length
   };
 }
 
@@ -431,6 +1031,8 @@ export async function importFrom52poke(options?: { pokemonLimit?: number }) {
 
   replacePokemonEntries(pokemonEntries);
   replaceItems(items);
+  replaceMoves([]);
+  replaceAbilities([]);
 
   return {
     pokemonCount: pokemonEntries.length,

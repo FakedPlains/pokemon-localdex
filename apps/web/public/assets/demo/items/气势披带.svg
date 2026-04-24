@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <rect width="240" height="240" rx="24" fill="#f7e7d1"/>
+  <path d="M48 124h144l-26 46H74z" fill="#d94f3d"/>
+  <path d="M80 70h80l32 54H48z" fill="#fff8ec"/>
+  <text x="120" y="210" text-anchor="middle" font-size="20" fill="#5a4030" font-family="Arial">气势披带</text>
+</svg>

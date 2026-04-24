@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <rect width="240" height="240" rx="24" fill="#fff0a9"/>
+  <circle cx="120" cy="120" r="52" fill="#d6b113"/>
+  <path d="M122 70l-20 42h24l-8 30 24-46h-22z" fill="#fff7da"/>
+  <text x="120" y="214" text-anchor="middle" font-size="20" fill="#705a00" font-family="Arial">静电</text>
+</svg>

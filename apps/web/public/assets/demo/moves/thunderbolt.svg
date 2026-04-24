@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <rect width="240" height="240" rx="24" fill="#fff0a9"/>
+  <path d="M136 36l-54 82h34l-16 86 58-94h-34z" fill="#d6b113"/>
+  <text x="120" y="214" text-anchor="middle" font-size="20" fill="#705a00" font-family="Arial">十万伏特</text>
+</svg>

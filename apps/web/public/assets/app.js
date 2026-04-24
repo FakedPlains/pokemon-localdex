@@ -1,0 +1,1476 @@
+const app = document.querySelector("#app");
+const navLinks = [...document.querySelectorAll("[data-nav]")];
+
+const STAT_KEYS = ["hp", "atk", "def", "spa", "spd", "spe"];
+const NATURE_OPTIONS = [
+  "勤奋", "怕寂寞", "固执", "顽皮", "勇敢",
+  "大胆", "坦率", "淘气", "乐天", "悠闲",
+  "胆小", "急躁", "认真", "爽朗", "天真",
+  "内敛", "慢吞吞", "害羞", "马虎", "冷静",
+  "温和", "温顺", "慎重", "浮躁", "自大"
+];
+const ALL_TYPE_OPTIONS = [
+  "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
+  "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精"
+];
+const NATURE_EFFECTS = {
+  怕寂寞: { up: "atk", down: "def" },
+  固执: { up: "atk", down: "spa" },
+  顽皮: { up: "atk", down: "spd" },
+  勇敢: { up: "atk", down: "spe" },
+  大胆: { up: "def", down: "atk" },
+  淘气: { up: "def", down: "spa" },
+  乐天: { up: "def", down: "spd" },
+  悠闲: { up: "def", down: "spe" },
+  胆小: { up: "spe", down: "atk" },
+  急躁: { up: "spe", down: "def" },
+  爽朗: { up: "spe", down: "spa" },
+  天真: { up: "spe", down: "spd" },
+  内敛: { up: "spa", down: "atk" },
+  马虎: { up: "spa", down: "def" },
+  冷静: { up: "spa", down: "spe" },
+  温和: { up: "spd", down: "atk" },
+  温顺: { up: "spd", down: "def" },
+  慎重: { up: "spd", down: "spa" },
+  自大: { up: "spd", down: "spe" }
+};
+
+const state = {
+  pokedex: { query: "", type: "", generation: "", selected: null, imageMode: "official" },
+  items: { selected: null },
+  moves: { query: "", type: "", generation: "", selected: null },
+  abilities: { query: "", generation: "", selected: null },
+  teams: { id: "", name: "", format: "singles", members: [], saved: [] },
+  damage: {
+    attacker: createDraftMember(),
+    defender: createDraftMember(),
+    moveId: "",
+    moveGeneration: "9",
+    moveName: "",
+    moveType: "电",
+    power: 90,
+    category: "special",
+    accuracy: "100%",
+    moveEffectSummary: "",
+    typeEffectiveness: 1,
+    weather: 1,
+    critical: false,
+    other: 1,
+    result: null
+  }
+};
+
+const typeOptions = ALL_TYPE_OPTIONS;
+const generationOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+function setLoading() {
+  app.innerHTML = document.querySelector("#loading-template").innerHTML;
+}
+
+async function api(path, options) {
+  const response = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...options
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function typeChip(type) {
+  if (!type) return "";
+  return `<span class="type-chip type-${String(type)}">${escapeHtml(type)}</span>`;
+}
+
+function activateNav(route) {
+  navLinks.forEach((link) => {
+    const target = link.getAttribute("href").replace("#", "");
+    link.classList.toggle("active", route.startsWith(target));
+  });
+}
+
+function createDefaultStats(kind) {
+  return Object.fromEntries(
+    STAT_KEYS.map((key) => [key, kind === "iv" ? 31 : 0])
+  );
+}
+
+function createDraftMember(pokemon) {
+  return {
+    pokemonId: pokemon?.slug || pokemon?.id || "",
+    nameZh: pokemon?.nameZh || "",
+    level: 50,
+    itemId: "",
+    abilityId: "",
+    nature: "认真",
+    moves: ["", "", "", ""],
+    ivs: createDefaultStats("iv"),
+    evs: createDefaultStats("ev")
+  };
+}
+
+function getDraftSlots() {
+  const slots = Array.from({ length: 6 }, (_, index) => state.teams.members[index] || createDraftMember());
+  return slots;
+}
+
+function setDraftMemberAt(index, member) {
+  const slots = getDraftSlots();
+  slots[index] = member;
+  while (slots.length > 0 && !slots[slots.length - 1].pokemonId) {
+    slots.pop();
+  }
+  state.teams.members = slots;
+}
+
+function addPokemonToTeam(detail) {
+  const slots = getDraftSlots();
+  const nextIndex = slots.findIndex((member) => !member.pokemonId);
+  const index = nextIndex >= 0 ? nextIndex : 5;
+  slots[index] = {
+    ...createDraftMember(detail),
+    abilityId: detail?.abilities?.[0] || ""
+  };
+  state.teams.members = slots.filter((member, slotIndex) => member.pokemonId || slotIndex < index + 1);
+}
+
+function loadSavedTeam(team) {
+  state.teams.id = team.id || "";
+  state.teams.name = team.name || "";
+  state.teams.format = team.format || "singles";
+  state.teams.members = (team.members || []).map((member) => ({
+    pokemonId: member.pokemonId || "",
+    nameZh: member.nameZh || member.pokemonId || "",
+    level: member.level || 50,
+    itemId: member.itemId || "",
+    abilityId: member.abilityId || "",
+    nature: member.nature || "认真",
+    moves: [...(member.moves || []), "", "", "", ""].slice(0, 4),
+    ivs: { ...createDefaultStats("iv"), ...(member.ivs || {}) },
+    evs: { ...createDefaultStats("ev"), ...(member.evs || {}) }
+  }));
+}
+
+function clearDraft() {
+  state.teams.id = "";
+  state.teams.name = "";
+  state.teams.format = "singles";
+  state.teams.members = [];
+}
+
+function setDamageMemberField(sideKey, field, value) {
+  state.damage[sideKey] = {
+    ...state.damage[sideKey],
+    [field]: value
+  };
+}
+
+function setDamageMemberStat(sideKey, kind, statKey, value) {
+  state.damage[sideKey] = {
+    ...state.damage[sideKey],
+    [kind]: {
+      ...state.damage[sideKey][kind],
+      [statKey]: value
+    }
+  };
+}
+
+function loadTeamMemberToDamage(sideKey, slotIndex) {
+  const teamMember = getDraftSlots()[slotIndex];
+  if (!teamMember?.pokemonId) {
+    return;
+  }
+
+  state.damage[sideKey] = {
+    ...createDraftMember(),
+    ...teamMember,
+    moves: [...(teamMember.moves || []), "", "", "", ""].slice(0, 4),
+    ivs: { ...createDefaultStats("iv"), ...(teamMember.ivs || {}) },
+    evs: { ...createDefaultStats("ev"), ...(teamMember.evs || {}) }
+  };
+}
+
+async function render() {
+  const route = (window.location.hash || "#/pokedex").replace("#", "");
+  activateNav(route);
+  setLoading();
+
+  if (route.startsWith("/items")) {
+    await renderItems();
+    return;
+  }
+
+  if (route.startsWith("/moves")) {
+    await renderMoves();
+    return;
+  }
+
+  if (route.startsWith("/abilities")) {
+    await renderAbilities();
+    return;
+  }
+
+  if (route.startsWith("/teams")) {
+    await renderTeams();
+    return;
+  }
+
+  if (route.startsWith("/damage")) {
+    await renderDamage();
+    return;
+  }
+
+  await renderPokedex();
+}
+
+function getNatureMultiplier(nature, statKey) {
+  const effect = NATURE_EFFECTS[nature];
+  if (!effect) return 1;
+  if (effect.up === statKey) return 1.1;
+  if (effect.down === statKey) return 0.9;
+  return 1;
+}
+
+function calculateFinalStat(member, detail, statKey) {
+  const base = detail?.baseStats?.[statKey];
+  if (base === undefined) {
+    return undefined;
+  }
+
+  const level = Number(member.level || 50);
+  const iv = Number(member.ivs?.[statKey] ?? 31);
+  const ev = Number(member.evs?.[statKey] ?? 0);
+
+  if (statKey === "hp") {
+    return Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + level + 10;
+  }
+
+  const raw = Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + 5;
+  return Math.floor(raw * getNatureMultiplier(member.nature || "认真", statKey));
+}
+
+function buildDerivedStats(member, detail) {
+  if (!detail?.baseStats) {
+    return undefined;
+  }
+
+  return {
+    hp: calculateFinalStat(member, detail, "hp"),
+    atk: calculateFinalStat(member, detail, "atk"),
+    def: calculateFinalStat(member, detail, "def"),
+    spa: calculateFinalStat(member, detail, "spa"),
+    spd: calculateFinalStat(member, detail, "spd"),
+    spe: calculateFinalStat(member, detail, "spe")
+  };
+}
+
+async function hydrateDamageSide(member) {
+  if (!member?.pokemonId) {
+    return {
+      member,
+      detail: null,
+      derivedStats: undefined
+    };
+  }
+
+  try {
+    const detail = (await api(`/pokemon/${encodeURIComponent(member.pokemonId)}`)).data;
+    return {
+      member,
+      detail,
+      derivedStats: buildDerivedStats(member, detail)
+    };
+  } catch {
+    return {
+      member,
+      detail: null,
+      derivedStats: undefined
+    };
+  }
+}
+
+function renderImageViewer(images, imageMode) {
+  const selected = imageMode === "shiny"
+    ? images?.shinyOfficial || images?.shinySprite || images?.official || images?.sprite
+    : images?.official || images?.sprite || images?.shinyOfficial || images?.shinySprite;
+
+  if (!selected?.url) {
+    return `<div class="media-placeholder">暂无图片</div>`;
+  }
+
+  return `
+    <div class="media-viewer">
+      <img src="${escapeHtml(selected.url)}" alt="${escapeHtml(selected.alt || "图片")}" class="entity-image" />
+      <div class="toolbar-row" style="margin-top: 12px;">
+        <button class="${imageMode === "official" ? "" : "secondary"} compact-button" data-image-mode="official">普通</button>
+        <button class="${imageMode === "shiny" ? "" : "secondary"} compact-button" data-image-mode="shiny">闪光</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderPokemonGenerationCards(detail) {
+  const records = detail.generationRecords || [];
+  if (records.length === 0) {
+    return `<span class="pill">暂无按世代记录</span>`;
+  }
+
+  return records.map((record) => `
+    <div class="meta-card generation-card">
+      <strong>第 ${record.generation} 世代 ${record.label ? `· ${escapeHtml(record.label)}` : ""}</strong>
+      <div class="info-stack">
+        <div>属性：${escapeHtml([record.primaryType, record.secondaryType].filter(Boolean).join(" / ") || "未记录")}</div>
+        <div>特性：${escapeHtml((record.abilityIds || []).join(" / ") || "未记录")}</div>
+        <div>隐藏特性：${escapeHtml(record.hiddenAbilityId || "无")}</div>
+        <div>招式：${escapeHtml((record.moveIds || []).join(" / ") || "未记录")}</div>
+        <div>种族值：${record.baseStats ? escapeHtml(`HP ${record.baseStats.hp} / ATK ${record.baseStats.atk} / DEF ${record.baseStats.def} / SPA ${record.baseStats.spa} / SPD ${record.baseStats.spd} / SPE ${record.baseStats.spe}`) : "未记录"}</div>
+        ${record.notes ? `<div class="muted">${escapeHtml(record.notes)}</div>` : ""}
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderMoveGenerationCards(move) {
+  return (move.generations || []).map((record) => `
+    <div class="meta-card generation-card">
+      <strong>第 ${record.generation} 世代</strong>
+      <div class="info-stack">
+        <div>属性：${escapeHtml(record.type || move.type || "未记录")}</div>
+        <div>分类：${escapeHtml(record.category || move.category || "未记录")}</div>
+        <div>威力：${escapeHtml(record.power ?? move.power ?? "-")}</div>
+        <div>命中：${escapeHtml(record.accuracy || move.accuracy || "-")}</div>
+        <div>PP：${escapeHtml(record.pp ?? move.pp ?? "-")}</div>
+        <div>${escapeHtml(record.effectSummary)}</div>
+        ${record.notes ? `<div class="muted">${escapeHtml(record.notes)}</div>` : ""}
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderAbilityGenerationCards(ability) {
+  return (ability.generations || []).map((record) => `
+    <div class="meta-card generation-card">
+      <strong>第 ${record.generation} 世代</strong>
+      <div class="info-stack">
+        <div>${escapeHtml(record.effectSummary)}</div>
+        ${record.notes ? `<div class="muted">${escapeHtml(record.notes)}</div>` : ""}
+      </div>
+    </div>
+  `).join("");
+}
+
+function resolveMoveGenerationRecord(move, generation) {
+  const targetGeneration = Number(generation || 9);
+  const records = [...(move?.generations || [])].sort((left, right) => left.generation - right.generation);
+  if (records.length === 0) {
+    return undefined;
+  }
+
+  const exact = records.find((record) => record.generation === targetGeneration);
+  if (exact) {
+    return exact;
+  }
+
+  const previous = [...records].reverse().find((record) => record.generation <= targetGeneration);
+  return previous || records[records.length - 1];
+}
+
+function applyMoveToDamage(move, generation) {
+  const record = resolveMoveGenerationRecord(move, generation);
+  state.damage.moveId = move?.slug || move?.id || "";
+  state.damage.moveName = move?.nameZh || "";
+  state.damage.moveType = record?.type || move?.type || "";
+  state.damage.category = record?.category || move?.category || "special";
+  state.damage.power = record?.power ?? move?.power ?? 0;
+  state.damage.accuracy = record?.accuracy || move?.accuracy || "—";
+  state.damage.moveEffectSummary = record?.effectSummary || move?.effectSummary || "";
+}
+
+function renderPokemonDetail(detail) {
+  const stats = detail.baseStats || {};
+  const forms = detail.forms || [];
+  const generations = detail.generationAvailability || [];
+
+  return `
+    <div class="detail-title-row">
+      <div>
+        <div class="muted">#${String(detail.dexNumber).padStart(4, "0")}</div>
+        <h2>${escapeHtml(detail.nameZh)}</h2>
+        <div class="muted">${escapeHtml(detail.nameEn || "")}</div>
+      </div>
+      <button data-add-team>加入队伍</button>
+    </div>
+    <div class="media-layout">
+      ${renderImageViewer(detail.images, state.pokedex.imageMode)}
+      <div class="subpanel">
+        <strong>图片与形态</strong>
+        <div class="panel-subtitle">当前支持普通、闪光，以及超级进化等特殊形态的独立图片展示。</div>
+        <div class="forms-grid" style="margin-top: 14px;">
+          ${(forms.length > 0 ? forms : [{ nameZh: "默认形态" }]).map((form) => `<span class="pill">${escapeHtml(form.nameZh)}${form.isMega ? " · 超级进化" : ""}</span>`).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="types" style="margin-top: 16px;">
+      ${typeChip(detail.primaryType)}
+      ${typeChip(detail.secondaryType)}
+    </div>
+    <div class="meta-grid">
+      <div class="meta-card"><strong>分类</strong><div>${escapeHtml(detail.category || "未解析")}</div></div>
+      <div class="meta-card"><strong>特性</strong><div>${escapeHtml((detail.abilities || []).join(" / ") || "未解析")}</div></div>
+      <div class="meta-card"><strong>隐藏特性</strong><div>${escapeHtml(detail.hiddenAbility || "无")}</div></div>
+      <div class="meta-card"><strong>捕获率</strong><div>${escapeHtml(detail.catchRate || "未解析")}</div></div>
+      <div class="meta-card"><strong>身高 / 体重</strong><div>${escapeHtml(detail.heightM || "?")} m / ${escapeHtml(detail.weightKg || "?")} kg</div></div>
+      <div class="meta-card"><strong>图鉴颜色</strong><div>${escapeHtml(detail.color || "未解析")}</div></div>
+    </div>
+    <div class="subpanel" style="margin-top: 16px;">
+      <strong>种族值</strong>
+      <div class="stat-grid">
+        ${STAT_KEYS.map((key) => `
+          <div class="stat-row">
+            <span>${key.toUpperCase()}</span>
+            <div class="stat-bar"><div class="stat-fill" style="width:${Math.min(((stats[key] || 0) / 180) * 100, 100)}%"></div></div>
+            <strong>${stats[key] || "-"}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+    <div class="subpanel" style="margin-top: 16px;">
+      <strong>形态</strong>
+      <div class="forms-grid">
+        ${(forms.length > 0 ? forms : [{ nameZh: "默认形态" }]).map((form) => `
+          <div class="form-card">
+            ${form.images?.official?.url ? `<img src="${escapeHtml(form.images.official.url)}" alt="${escapeHtml(form.images.official.alt || form.nameZh)}" class="mini-image" />` : ""}
+            <div><strong>${escapeHtml(form.nameZh)}</strong></div>
+            <div class="muted">${escapeHtml([form.primaryType, form.secondaryType].filter(Boolean).join(" / ") || "类型未记录")}</div>
+            <div class="muted">${escapeHtml((form.abilityIds || []).join(" / ") || "特性未记录")}</div>
+            ${form.baseStats ? `<div class="muted">种族值：HP ${form.baseStats.hp} / ATK ${form.baseStats.atk} / DEF ${form.baseStats.def} / SPA ${form.baseStats.spa} / SPD ${form.baseStats.spd} / SPE ${form.baseStats.spe}</div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+    <div class="subpanel" style="margin-top: 16px;">
+      <strong>世代与地区图鉴</strong>
+      <div class="generation-grid">
+        ${generations.map((generation) => `
+          <span class="pill">第 ${generation.generation} 世代 · ${escapeHtml((generation.regions || []).map((region) => `${region.region}${region.dexNumber ? ` #${region.dexNumber}` : ""}`).join(" / ") || "可用")}</span>
+        `).join("") || `<span class="pill">暂无世代记录</span>`}
+      </div>
+    </div>
+    <div class="subpanel" style="margin-top: 16px;">
+      <strong>按世代记录</strong>
+      <div class="generation-card-grid">
+        ${renderPokemonGenerationCards(detail)}
+      </div>
+    </div>
+  `;
+}
+
+async function renderPokedex() {
+  const params = new URLSearchParams();
+  if (state.pokedex.query) params.set("q", state.pokedex.query);
+  if (state.pokedex.type) params.set("type", state.pokedex.type);
+  if (state.pokedex.generation) params.set("generation", state.pokedex.generation);
+
+  const list = (await api(`/pokemon?${params.toString()}`)).data;
+  if (!state.pokedex.selected && list[0]) {
+    state.pokedex.selected = list[0].slug || list[0].id;
+  }
+
+  const selectedId = state.pokedex.selected;
+  const detail = selectedId ? (await api(`/pokemon/${encodeURIComponent(selectedId)}`)).data : null;
+
+  app.innerHTML = `
+    <section class="view-grid pokedex-layout">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">全国图鉴</h2>
+            <p class="panel-subtitle">按关键字、属性和世代过滤本地资料。</p>
+          </div>
+          <span class="chip">${list.length} 条结果</span>
+        </div>
+        <div class="toolbar">
+          <div class="toolbar-row">
+            <input id="pokemon-query" placeholder="搜索中文 / 英文 / 日文名" value="${escapeHtml(state.pokedex.query)}" />
+          </div>
+          <div class="toolbar-row">
+            <select id="pokemon-type">
+              <option value="">全部属性</option>
+              ${typeOptions.map((type) => `<option value="${type}" ${state.pokedex.type === type ? "selected" : ""}>${type}</option>`).join("")}
+            </select>
+            <select id="pokemon-generation">
+              <option value="">全部世代</option>
+              ${generationOptions.map((generation) => `<option value="${generation}" ${String(state.pokedex.generation) === String(generation) ? "selected" : ""}>第 ${generation} 世代</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div class="pokemon-list">
+          ${list.map((item) => `
+            <button class="list-card secondary" data-pokemon="${escapeHtml(item.slug || item.id)}">
+              <div class="card-topline">
+                <span class="dex-badge">#${String(item.dexNumber).padStart(4, "0")}</span>
+                <span class="chip">${(item.generations || []).join(", ") || "?"} 代</span>
+              </div>
+              <div>
+                <strong>${escapeHtml(item.nameZh)}</strong>
+                <div class="muted">${escapeHtml(item.nameEn || "")}</div>
+              </div>
+              <div class="types">${typeChip(item.primaryType)}${typeChip(item.secondaryType)}</div>
+            </button>
+          `).join("") || `<div class="muted">没有命中结果。</div>`}
+        </div>
+      </div>
+      <div class="panel detail-panel">
+        ${detail ? renderPokemonDetail(detail) : `<div class="detail-empty">请选择一只宝可梦查看详情。</div>`}
+      </div>
+    </section>
+  `;
+
+  document.querySelector("#pokemon-query")?.addEventListener("input", async (event) => {
+    state.pokedex.query = event.target.value.trim();
+    await renderPokedex();
+  });
+  document.querySelector("#pokemon-type")?.addEventListener("change", async (event) => {
+    state.pokedex.type = event.target.value;
+    await renderPokedex();
+  });
+  document.querySelector("#pokemon-generation")?.addEventListener("change", async (event) => {
+    state.pokedex.generation = event.target.value;
+    await renderPokedex();
+  });
+  document.querySelectorAll("[data-pokemon]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.pokedex.selected = button.getAttribute("data-pokemon");
+      await renderPokedex();
+    });
+  });
+  document.querySelector("[data-add-team]")?.addEventListener("click", () => {
+    if (!detail) return;
+    addPokemonToTeam(detail);
+    window.location.hash = "#/teams";
+  });
+  document.querySelectorAll("[data-image-mode]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.pokedex.imageMode = button.dataset.imageMode;
+      await renderPokedex();
+    });
+  });
+}
+
+async function renderItems() {
+  const items = (await api("/items")).data;
+  if (!state.items.selected && items[0]) {
+    state.items.selected = items[0].slug || items[0].id;
+  }
+  const detail = state.items.selected ? (await api(`/items/${encodeURIComponent(state.items.selected)}`)).data : null;
+
+  app.innerHTML = `
+    <section class="view-grid items-layout">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">道具资料</h2>
+            <p class="panel-subtitle">当前展示本地已导入的道具数据。</p>
+          </div>
+          <span class="chip">${items.length} 个道具</span>
+        </div>
+        <div class="item-list">
+          ${items.map((item) => `
+            <button class="list-card secondary" data-item="${escapeHtml(item.slug || item.id)}">
+              <div class="card-topline">
+                <strong>${escapeHtml(item.nameZh)}</strong>
+                <span class="chip">${escapeHtml(item.category || "未分类")}</span>
+              </div>
+              <div class="muted">${escapeHtml(item.nameEn || "")}</div>
+              <div>${escapeHtml(item.effectSummary || "暂无说明")}</div>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+      <div class="panel detail-panel">
+        ${detail ? `
+          <div class="detail-title-row">
+            <div>
+              <div class="muted">${escapeHtml(detail.category || "未分类")}</div>
+              <h2>${escapeHtml(detail.nameZh)}</h2>
+              <div class="muted">${escapeHtml(detail.nameEn || "")}</div>
+            </div>
+          </div>
+          <div class="media-layout">
+            ${detail.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(detail.image.url)}" alt="${escapeHtml(detail.image.alt || detail.nameZh)}" class="entity-image item-image" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
+            <div class="subpanel">
+              <strong>道具图片</strong>
+              <p class="panel-subtitle">当前先展示导入数据中的主图，后续可补充不同世代外观或图标资源。</p>
+            </div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-card"><strong>日文名</strong><div>${escapeHtml(detail.nameJa || "未记录")}</div></div>
+            <div class="meta-card"><strong>来源</strong><div>${escapeHtml(detail.source?.title || "本地标准化")}</div></div>
+          </div>
+          <div class="subpanel" style="margin-top: 16px;">
+            <strong>效果说明</strong>
+            <p class="panel-subtitle">${escapeHtml(detail.effectSummary || "暂无说明")}</p>
+          </div>
+        ` : `<div class="detail-empty">请选择一个道具查看详情。</div>`}
+      </div>
+    </section>
+  `;
+
+  document.querySelectorAll("[data-item]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.items.selected = button.getAttribute("data-item");
+      await renderItems();
+    });
+  });
+}
+
+async function renderMoves() {
+  const params = new URLSearchParams();
+  if (state.moves.query) params.set("q", state.moves.query);
+  if (state.moves.type) params.set("type", state.moves.type);
+  if (state.moves.generation) params.set("generation", state.moves.generation);
+
+  const moves = (await api(`/moves?${params.toString()}`)).data;
+  if (!state.moves.selected && moves[0]) {
+    state.moves.selected = moves[0].slug || moves[0].id;
+  }
+  const detail = state.moves.selected ? (await api(`/moves/${encodeURIComponent(state.moves.selected)}`)).data : null;
+
+  app.innerHTML = `
+    <section class="view-grid items-layout">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">招式资料</h2>
+            <p class="panel-subtitle">支持按关键字、属性和世代检索，并查看不同世代的威力、PP 和效果差异。</p>
+          </div>
+          <span class="chip">${moves.length} 个招式</span>
+        </div>
+        <div class="toolbar">
+          <div class="toolbar-row">
+            <input id="move-query" placeholder="搜索招式名" value="${escapeHtml(state.moves.query)}" />
+          </div>
+          <div class="toolbar-row">
+            <select id="move-type">
+              <option value="">全部属性</option>
+              ${ALL_TYPE_OPTIONS.map((type) => `<option value="${type}" ${state.moves.type === type ? "selected" : ""}>${type}</option>`).join("")}
+            </select>
+            <select id="move-generation">
+              <option value="">全部世代</option>
+              ${generationOptions.map((generation) => `<option value="${generation}" ${String(state.moves.generation) === String(generation) ? "selected" : ""}>第 ${generation} 世代</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div class="item-list">
+          ${moves.map((move) => `
+            <button class="list-card secondary" data-move="${escapeHtml(move.slug || move.id)}">
+              <div class="card-topline">
+                <strong>${escapeHtml(move.nameZh)}</strong>
+                <span class="chip">${escapeHtml(move.type || "未知")} · ${escapeHtml(move.category || "未分类")}</span>
+              </div>
+              <div class="muted">${escapeHtml(move.nameEn || "")}</div>
+              <div>${escapeHtml(move.effectSummary || "暂无说明")}</div>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+      <div class="panel detail-panel">
+        ${detail ? `
+          <div class="detail-title-row">
+            <div>
+              <div class="muted">${escapeHtml(detail.type || "未知")} · ${escapeHtml(detail.category || "未分类")}</div>
+              <h2>${escapeHtml(detail.nameZh)}</h2>
+              <div class="muted">${escapeHtml(detail.nameEn || "")}</div>
+            </div>
+          </div>
+          <div class="media-layout">
+            ${detail.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(detail.image.url)}" alt="${escapeHtml(detail.image.alt || detail.nameZh)}" class="entity-image item-image" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
+            <div class="subpanel">
+              <strong>当前世代前台摘要</strong>
+              <div class="info-stack">
+                <div>威力：${escapeHtml(detail.power ?? "-")}</div>
+                <div>命中：${escapeHtml(detail.accuracy || "-")}</div>
+                <div>PP：${escapeHtml(detail.pp ?? "-")}</div>
+                <div>${escapeHtml(detail.effectSummary || "暂无说明")}</div>
+              </div>
+            </div>
+          </div>
+          <div class="subpanel" style="margin-top: 16px;">
+            <strong>按世代效果</strong>
+            <div class="generation-card-grid">
+              ${renderMoveGenerationCards(detail)}
+            </div>
+          </div>
+        ` : `<div class="detail-empty">请选择一个招式查看详情。</div>`}
+      </div>
+    </section>
+  `;
+
+  document.querySelector("#move-query")?.addEventListener("input", async (event) => {
+    state.moves.query = event.target.value.trim();
+    await renderMoves();
+  });
+  document.querySelector("#move-type")?.addEventListener("change", async (event) => {
+    state.moves.type = event.target.value;
+    await renderMoves();
+  });
+  document.querySelector("#move-generation")?.addEventListener("change", async (event) => {
+    state.moves.generation = event.target.value;
+    await renderMoves();
+  });
+  document.querySelectorAll("[data-move]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.moves.selected = button.getAttribute("data-move");
+      await renderMoves();
+    });
+  });
+}
+
+async function renderAbilities() {
+  const params = new URLSearchParams();
+  if (state.abilities.query) params.set("q", state.abilities.query);
+  if (state.abilities.generation) params.set("generation", state.abilities.generation);
+
+  const abilities = (await api(`/abilities?${params.toString()}`)).data;
+  if (!state.abilities.selected && abilities[0]) {
+    state.abilities.selected = abilities[0].slug || abilities[0].id;
+  }
+  const detail = state.abilities.selected ? (await api(`/abilities/${encodeURIComponent(state.abilities.selected)}`)).data : null;
+
+  app.innerHTML = `
+    <section class="view-grid items-layout">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">特性资料</h2>
+            <p class="panel-subtitle">支持按关键字和世代检索，并查看不同世代的效果说明差异。</p>
+          </div>
+          <span class="chip">${abilities.length} 个特性</span>
+        </div>
+        <div class="toolbar">
+          <div class="toolbar-row">
+            <input id="ability-query" placeholder="搜索特性名" value="${escapeHtml(state.abilities.query)}" />
+          </div>
+          <div class="toolbar-row">
+            <select id="ability-generation">
+              <option value="">全部世代</option>
+              ${generationOptions.map((generation) => `<option value="${generation}" ${String(state.abilities.generation) === String(generation) ? "selected" : ""}>第 ${generation} 世代</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div class="item-list">
+          ${abilities.map((ability) => `
+            <button class="list-card secondary" data-ability="${escapeHtml(ability.slug || ability.id)}">
+              <div class="card-topline">
+                <strong>${escapeHtml(ability.nameZh)}</strong>
+                <span class="chip">${escapeHtml(ability.nameEn || "")}</span>
+              </div>
+              <div>${escapeHtml(ability.effectSummary || "暂无说明")}</div>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+      <div class="panel detail-panel">
+        ${detail ? `
+          <div class="detail-title-row">
+            <div>
+              <div class="muted">${escapeHtml(detail.nameJa || "")}</div>
+              <h2>${escapeHtml(detail.nameZh)}</h2>
+              <div class="muted">${escapeHtml(detail.nameEn || "")}</div>
+            </div>
+          </div>
+          <div class="media-layout">
+            ${detail.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(detail.image.url)}" alt="${escapeHtml(detail.image.alt || detail.nameZh)}" class="entity-image item-image" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
+            <div class="subpanel">
+              <strong>当前摘要</strong>
+              <div class="info-stack">
+                <div>${escapeHtml(detail.effectSummary || "暂无说明")}</div>
+              </div>
+            </div>
+          </div>
+          <div class="subpanel" style="margin-top: 16px;">
+            <strong>按世代效果</strong>
+            <div class="generation-card-grid">
+              ${renderAbilityGenerationCards(detail)}
+            </div>
+          </div>
+        ` : `<div class="detail-empty">请选择一个特性查看详情。</div>`}
+      </div>
+    </section>
+  `;
+
+  document.querySelector("#ability-query")?.addEventListener("input", async (event) => {
+    state.abilities.query = event.target.value.trim();
+    await renderAbilities();
+  });
+  document.querySelector("#ability-generation")?.addEventListener("change", async (event) => {
+    state.abilities.generation = event.target.value;
+    await renderAbilities();
+  });
+  document.querySelectorAll("[data-ability]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.abilities.selected = button.getAttribute("data-ability");
+      await renderAbilities();
+    });
+  });
+}
+
+function renderStatInputs(kind, slotIndex, stats) {
+  return `
+    <div class="stat-input-grid">
+      ${STAT_KEYS.map((key) => `
+        <label class="mini-field">
+          <span>${key.toUpperCase()}</span>
+          <input
+            type="number"
+            min="0"
+            max="${kind === "ivs" ? 31 : 252}"
+            data-stat-kind="${kind}"
+            data-stat-key="${key}"
+            data-slot="${slotIndex}"
+            value="${escapeHtml(stats?.[key] ?? (kind === "ivs" ? 31 : 0))}"
+          />
+        </label>
+      `).join("")}
+    </div>
+  `;
+}
+
+async function renderTeams() {
+  const [teams, pokemonList, items] = await Promise.all([
+    api("/teams").then((result) => result.data),
+    api("/pokemon").then((result) => result.data),
+    api("/items").then((result) => result.data)
+  ]);
+  state.teams.saved = teams;
+
+  const slots = getDraftSlots();
+
+  app.innerHTML = `
+    <section class="view-grid teams-layout">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">我的队伍</h2>
+            <p class="panel-subtitle">现在已经支持 6 个位置的宝可梦编辑、性格、招式、个体值和努力值输入。</p>
+          </div>
+          ${state.teams.id ? `<span class="chip">编辑中：${escapeHtml(state.teams.name || state.teams.id)}</span>` : `<span class="chip">新建队伍</span>`}
+        </div>
+        <div class="team-builder">
+          <div class="team-header-grid">
+            <input id="team-name" placeholder="队伍名称" value="${escapeHtml(state.teams.name)}" />
+            <select id="team-format">
+              <option value="singles" ${state.teams.format === "singles" ? "selected" : ""}>单打</option>
+              <option value="doubles" ${state.teams.format === "doubles" ? "selected" : ""}>双打</option>
+            </select>
+          </div>
+
+          <datalist id="pokemon-options">
+            ${pokemonList.map((pokemon) => `<option value="${escapeHtml(pokemon.slug || pokemon.id)}">${escapeHtml(pokemon.nameZh)} / ${escapeHtml(pokemon.nameEn || "")}</option>`).join("")}
+          </datalist>
+          <datalist id="item-options">
+            ${items.map((item) => `<option value="${escapeHtml(item.slug || item.id)}">${escapeHtml(item.nameZh)}</option>`).join("")}
+          </datalist>
+
+          <div class="team-slot-grid">
+            ${slots.map((member, index) => `
+              <section class="team-member-editor" data-member-slot="${index}">
+                <div class="member-topline">
+                  <strong>位置 ${index + 1}</strong>
+                  <button class="secondary compact-button" data-clear-slot="${index}">清空该位</button>
+                </div>
+                <div class="member-grid">
+                  <label>
+                    <span>宝可梦</span>
+                    <input list="pokemon-options" data-member-field="pokemonId" data-slot="${index}" value="${escapeHtml(member.pokemonId || "")}" placeholder="如：皮卡丘" />
+                  </label>
+                  <label>
+                    <span>显示名</span>
+                    <input data-member-field="nameZh" data-slot="${index}" value="${escapeHtml(member.nameZh || "")}" placeholder="队伍里显示的名字" />
+                  </label>
+                  <label>
+                    <span>等级</span>
+                    <input type="number" min="1" max="100" data-member-field="level" data-slot="${index}" value="${escapeHtml(member.level || 50)}" />
+                  </label>
+                  <label>
+                    <span>性格</span>
+                    <select data-member-field="nature" data-slot="${index}">
+                      ${NATURE_OPTIONS.map((nature) => `<option value="${nature}" ${member.nature === nature ? "selected" : ""}>${nature}</option>`).join("")}
+                    </select>
+                  </label>
+                  <label>
+                    <span>道具</span>
+                    <input list="item-options" data-member-field="itemId" data-slot="${index}" value="${escapeHtml(member.itemId || "")}" placeholder="如：气势披带" />
+                  </label>
+                  <label>
+                    <span>特性</span>
+                    <input data-member-field="abilityId" data-slot="${index}" value="${escapeHtml(member.abilityId || "")}" placeholder="如：静电" />
+                  </label>
+                </div>
+                <div class="move-grid">
+                  ${[0, 1, 2, 3].map((moveIndex) => `
+                    <label>
+                      <span>招式 ${moveIndex + 1}</span>
+                      <input data-move-index="${moveIndex}" data-slot="${index}" value="${escapeHtml(member.moves?.[moveIndex] || "")}" placeholder="输入招式名" />
+                    </label>
+                  `).join("")}
+                </div>
+                <details class="stats-details">
+                  <summary>个体值 / 努力值</summary>
+                  <div class="stats-editor">
+                    <div>
+                      <strong class="section-label">个体值 IV</strong>
+                      ${renderStatInputs("ivs", index, member.ivs)}
+                    </div>
+                    <div>
+                      <strong class="section-label">努力值 EV</strong>
+                      ${renderStatInputs("evs", index, member.evs)}
+                    </div>
+                  </div>
+                </details>
+              </section>
+            `).join("")}
+          </div>
+
+          <div class="toolbar-row">
+            <button id="save-team">保存队伍</button>
+            <button id="new-team" class="secondary">新建草稿</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">已保存队伍</h2>
+            <p class="panel-subtitle">点击“载入编辑”可以继续修改并覆盖保存。</p>
+          </div>
+          <span class="chip">${teams.length} 支队伍</span>
+        </div>
+        <div class="team-list">
+          ${teams.map((team) => `
+            <div class="list-card">
+              <div class="card-topline">
+                <strong>${escapeHtml(team.name)}</strong>
+                <span class="chip">${escapeHtml(team.format)}</span>
+              </div>
+              <div class="muted">${(team.members || []).length} / 6 成员</div>
+              <div class="forms-grid">
+                ${(team.members || []).map((member) => `<span class="pill">${escapeHtml(member.pokemonId)}</span>`).join("") || `<span class="muted">暂无成员</span>`}
+              </div>
+              <div class="toolbar-row">
+                <button class="secondary compact-button" data-load-team="${escapeHtml(team.id)}">载入编辑</button>
+              </div>
+            </div>
+          `).join("") || `<div class="muted" style="padding: 0 24px 24px;">还没有保存的队伍。</div>`}
+        </div>
+      </div>
+    </section>
+  `;
+
+  document.querySelector("#team-name")?.addEventListener("input", (event) => {
+    state.teams.name = event.target.value;
+  });
+
+  document.querySelector("#team-format")?.addEventListener("change", (event) => {
+    state.teams.format = event.target.value;
+  });
+
+  document.querySelector("#new-team")?.addEventListener("click", async () => {
+    clearDraft();
+    await renderTeams();
+  });
+
+  document.querySelectorAll("[data-member-field]").forEach((element) => {
+    element.addEventListener("input", (event) => {
+      const slot = Number(event.target.dataset.slot);
+      const field = event.target.dataset.memberField;
+      const draft = { ...getDraftSlots()[slot] };
+      draft[field] = field === "level" ? Number(event.target.value || 50) : event.target.value;
+      if (field === "pokemonId" && !draft.nameZh) {
+        draft.nameZh = event.target.value;
+      }
+      setDraftMemberAt(slot, draft);
+    });
+  });
+
+  document.querySelectorAll("[data-move-index]").forEach((element) => {
+    element.addEventListener("input", (event) => {
+      const slot = Number(event.target.dataset.slot);
+      const moveIndex = Number(event.target.dataset.moveIndex);
+      const draft = { ...getDraftSlots()[slot], moves: [...getDraftSlots()[slot].moves] };
+      draft.moves[moveIndex] = event.target.value;
+      setDraftMemberAt(slot, draft);
+    });
+  });
+
+  document.querySelectorAll("[data-stat-kind]").forEach((element) => {
+    element.addEventListener("input", (event) => {
+      const slot = Number(event.target.dataset.slot);
+      const kind = event.target.dataset.statKind;
+      const key = event.target.dataset.statKey;
+      const draft = { ...getDraftSlots()[slot] };
+      draft[kind] = { ...draft[kind], [key]: Number(event.target.value || 0) };
+      setDraftMemberAt(slot, draft);
+    });
+  });
+
+  document.querySelectorAll("[data-clear-slot]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      setDraftMemberAt(Number(button.dataset.clearSlot), createDraftMember());
+      await renderTeams();
+    });
+  });
+
+  document.querySelectorAll("[data-load-team]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const team = state.teams.saved.find((item) => item.id === button.dataset.loadTeam);
+      if (!team) return;
+      loadSavedTeam(team);
+      await renderTeams();
+    });
+  });
+
+  document.querySelector("#save-team")?.addEventListener("click", async () => {
+    const members = getDraftSlots()
+      .filter((member) => member.pokemonId)
+      .map((member, index) => ({
+        slot: index + 1,
+        pokemonId: member.pokemonId,
+        nameZh: member.nameZh,
+        level: Number(member.level || 50),
+        itemId: member.itemId || undefined,
+        abilityId: member.abilityId || undefined,
+        nature: member.nature || undefined,
+        moves: (member.moves || []).filter(Boolean),
+        ivs: { ...createDefaultStats("iv"), ...(member.ivs || {}) },
+        evs: { ...createDefaultStats("ev"), ...(member.evs || {}) }
+      }));
+
+    if (members.length === 0) {
+      window.alert("请先至少填写一只宝可梦。");
+      return;
+    }
+
+    const saved = await api("/teams", {
+      method: "POST",
+      body: JSON.stringify({
+        id: state.teams.id || undefined,
+        name: state.teams.name || "新队伍",
+        format: state.teams.format,
+        members
+      })
+    });
+
+    state.teams.id = saved.data.id;
+    state.teams.name = saved.data.name;
+    await renderTeams();
+  });
+}
+
+function renderDerivedStatSummary(title, battleMember, category) {
+  if (!battleMember?.detail || !battleMember?.derivedStats) {
+    return `<div class="subpanel"><strong>${title}</strong><p class="panel-subtitle">缺少宝可梦详细数据，暂时无法计算最终能力值。</p></div>`;
+  }
+
+  const offensiveKey = category === "physical" ? "atk" : "spa";
+  const defensiveKey = category === "physical" ? "def" : "spd";
+
+  return `
+    <div class="subpanel">
+      <strong>${title}</strong>
+      <div class="panel-subtitle">${escapeHtml(battleMember.member.nameZh || battleMember.detail.nameZh)} · Lv.${escapeHtml(battleMember.member.level || 50)}</div>
+      <div class="forms-grid" style="margin-top: 12px;">
+        ${typeChip(battleMember.detail.primaryType)}
+        ${typeChip(battleMember.detail.secondaryType)}
+      </div>
+      <div class="stat-grid">
+        ${STAT_KEYS.map((key) => `
+          <div class="stat-row">
+            <span>${key.toUpperCase()}</span>
+            <div class="stat-bar"><div class="stat-fill" style="width:${Math.min(((battleMember.derivedStats[key] || 0) / 220) * 100, 100)}%"></div></div>
+            <strong>${battleMember.derivedStats[key] || "-"}</strong>
+          </div>
+        `).join("")}
+      </div>
+      <div class="result-note">
+        ${title === "攻击方"
+          ? `当前用于计算的攻击数值：<strong>${battleMember.derivedStats[offensiveKey] || "-"}</strong>`
+          : `当前用于计算的防御数值：<strong>${battleMember.derivedStats[defensiveKey] || "-"}</strong>`}
+      </div>
+    </div>
+  `;
+}
+
+function renderDamageMemberEditor(title, sideKey, side, detail, teamMembers, pokemonOptionsHtml) {
+  const importButtons = teamMembers.length > 0
+    ? `
+      <div class="import-strip">
+        ${teamMembers.map((entry) => `
+          <button class="secondary compact-button" data-import-side="${sideKey}" data-import-slot="${entry.slot}">
+            从队伍位置 ${entry.slot + 1} 导入 ${escapeHtml(entry.member.nameZh || entry.member.pokemonId)}
+          </button>
+        `).join("")}
+      </div>
+    `
+    : `<p class="panel-subtitle">当前没有队伍草稿，直接手动选择宝可梦即可。</p>`;
+
+  return `
+    <section class="team-member-editor">
+      <div class="member-topline">
+        <strong>${title}</strong>
+        <span class="chip">${detail?.nameZh ? `已选择 ${escapeHtml(detail.nameZh)}` : "手动配置中"}</span>
+      </div>
+      ${importButtons}
+      <label>
+        <span>宝可梦</span>
+        <input list="damage-pokemon-options" data-damage-field="pokemonId" data-side="${sideKey}" value="${escapeHtml(side.pokemonId || "")}" placeholder="如：皮卡丘" />
+      </label>
+      <div class="member-grid" style="margin-top: 12px;">
+        <label>
+          <span>显示名</span>
+          <input data-damage-field="nameZh" data-side="${sideKey}" value="${escapeHtml(side.nameZh || "")}" placeholder="显示名称" />
+        </label>
+        <label>
+          <span>等级</span>
+          <input type="number" min="1" max="100" data-damage-field="level" data-side="${sideKey}" value="${escapeHtml(side.level || 50)}" />
+        </label>
+        <label>
+          <span>性格</span>
+          <select data-damage-field="nature" data-side="${sideKey}">
+            ${NATURE_OPTIONS.map((nature) => `<option value="${nature}" ${side.nature === nature ? "selected" : ""}>${nature}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <details class="stats-details" open>
+        <summary>个体值 / 努力值</summary>
+        <div class="stats-editor">
+          <div>
+            <strong class="section-label">个体值 IV</strong>
+            ${renderStatInputs("ivs", sideKey, side.ivs)}
+          </div>
+          <div>
+            <strong class="section-label">努力值 EV</strong>
+            ${renderStatInputs("evs", sideKey, side.evs)}
+          </div>
+        </div>
+      </details>
+    </section>
+  `;
+}
+
+async function runDamageCalculation(attacker, defender) {
+  if (!attacker?.derivedStats || !defender?.derivedStats) {
+    window.alert("当前选中的宝可梦缺少可用种族值，暂时无法计算。");
+    return;
+  }
+
+  const category = state.damage.category;
+  const attackStat = category === "physical" ? attacker.derivedStats.atk : attacker.derivedStats.spa;
+  const defenseStat = category === "physical" ? defender.derivedStats.def : defender.derivedStats.spd;
+  const attackerTypes = [attacker.detail.primaryType, attacker.detail.secondaryType].filter(Boolean);
+  const stab = attackerTypes.includes(state.damage.moveType) ? 1.5 : 1;
+
+  const result = await api("/battle/damage", {
+    method: "POST",
+    body: JSON.stringify({
+      level: Number(attacker.member.level || 50),
+      power: Number(state.damage.power || 0),
+      attack: Number(attackStat || 1),
+      defense: Number(defenseStat || 1),
+      stab,
+      typeEffectiveness: Number(state.damage.typeEffectiveness || 1),
+      weather: Number(state.damage.weather || 1),
+      critical: state.damage.critical ? 1.5 : 1,
+      other: Number(state.damage.other || 1)
+    })
+  });
+
+  state.damage.result = {
+    ...result.data,
+    stab,
+    attackStat,
+    defenseStat,
+    attackerName: attacker.member.nameZh || attacker.detail.nameZh,
+    defenderName: defender.member.nameZh || defender.detail.nameZh
+  };
+}
+
+async function renderDamage() {
+  const [pokemonList, allMoves, attacker, defender] = await Promise.all([
+    api("/pokemon").then((result) => result.data),
+    api("/moves").then((result) => result.data),
+    hydrateDamageSide(state.damage.attacker),
+    hydrateDamageSide(state.damage.defender)
+  ]);
+  const teamMembers = getDraftSlots()
+    .map((member, slot) => ({ member, slot }))
+    .filter((entry) => entry.member.pokemonId);
+  const pokemonOptionsHtml = pokemonList
+    .map((pokemon) => `<option value="${escapeHtml(pokemon.slug || pokemon.id)}">${escapeHtml(pokemon.nameZh)} / ${escapeHtml(pokemon.nameEn || "")}</option>`)
+    .join("");
+  const selectedMove = allMoves.find((move) => move.id === state.damage.moveId || move.slug === state.damage.moveId || move.nameZh === state.damage.moveName);
+  const selectedMoveRecord = selectedMove ? resolveMoveGenerationRecord(selectedMove, state.damage.moveGeneration) : null;
+  const attackerMoveButtons = (state.damage.attacker.moves || []).filter(Boolean);
+
+  app.innerHTML = `
+    <section class="view-grid damage-layout">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">伤害计算器</h2>
+            <p class="panel-subtitle">现在可以独立配置攻击方和防守方，不需要先完成队伍构筑；如果你已经有队伍草稿，也可以一键导入。</p>
+          </div>
+          <span class="chip">${teamMembers.length > 0 ? `${teamMembers.length} 个队伍快捷导入` : "独立模式"}</span>
+        </div>
+        <div class="team-builder">
+          <datalist id="damage-pokemon-options">
+            ${pokemonOptionsHtml}
+          </datalist>
+          <div class="damage-side-grid">
+            ${renderDamageMemberEditor("攻击方", "attacker", state.damage.attacker, attacker.detail, teamMembers, pokemonOptionsHtml)}
+            ${renderDamageMemberEditor("防守方", "defender", state.damage.defender, defender.detail, teamMembers, pokemonOptionsHtml)}
+          </div>
+          <datalist id="damage-move-options">
+            ${allMoves.map((move) => `<option value="${escapeHtml(move.slug || move.id)}">${escapeHtml(move.nameZh)} / ${escapeHtml(move.type || "未知")} / ${escapeHtml(move.category || "未分类")}</option>`).join("")}
+          </datalist>
+          ${attackerMoveButtons.length > 0 ? `
+            <div class="import-strip">
+              ${attackerMoveButtons.map((moveName) => `<button class="secondary compact-button" data-import-move="${escapeHtml(moveName)}">${escapeHtml(moveName)}</button>`).join("")}
+            </div>
+          ` : ""}
+          <div class="damage-grid">
+            <label>
+              <span>招式名</span>
+              <input id="damage-move-name" list="damage-move-options" value="${escapeHtml(state.damage.moveId || state.damage.moveName)}" placeholder="如：十万伏特" />
+            </label>
+            <label>
+              <span>招式世代</span>
+              <select id="damage-move-generation">
+                ${generationOptions.map((generation) => `<option value="${generation}" ${String(state.damage.moveGeneration) === String(generation) ? "selected" : ""}>第 ${generation} 世代</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              <span>招式属性</span>
+              <select id="damage-move-type">
+                ${ALL_TYPE_OPTIONS.map((type) => `<option value="${type}" ${state.damage.moveType === type ? "selected" : ""}>${type}</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              <span>招式威力</span>
+              <input id="damage-power" type="number" min="1" value="${escapeHtml(state.damage.power)}" />
+            </label>
+            <label>
+              <span>分类</span>
+              <select id="damage-category">
+                <option value="physical" ${state.damage.category === "physical" ? "selected" : ""}>物理</option>
+                <option value="special" ${state.damage.category === "special" ? "selected" : ""}>特殊</option>
+              </select>
+            </label>
+            <label>
+              <span>克制倍率</span>
+              <select id="damage-effectiveness">
+                ${[0, 0.25, 0.5, 1, 2, 4].map((value) => `<option value="${value}" ${Number(state.damage.typeEffectiveness) === value ? "selected" : ""}>${value}x</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              <span>天气倍率</span>
+              <select id="damage-weather">
+                ${[0.5, 1, 1.5].map((value) => `<option value="${value}" ${Number(state.damage.weather) === value ? "selected" : ""}>${value}x</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              <span>其他修正</span>
+              <input id="damage-other" type="number" min="0" step="0.1" value="${escapeHtml(state.damage.other)}" />
+            </label>
+            <label class="checkbox-row">
+              <input id="damage-critical" type="checkbox" ${state.damage.critical ? "checked" : ""} />
+              <span>暴击</span>
+            </label>
+          </div>
+          <div class="toolbar-row">
+            <button id="run-damage">计算伤害</button>
+            <button id="damage-reset" class="secondary">重置攻守双方</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel detail-panel">
+        ${renderDerivedStatSummary("攻击方", attacker, state.damage.category)}
+        <div style="height: 12px;"></div>
+        ${renderDerivedStatSummary("防守方", defender, state.damage.category)}
+        <div style="height: 12px;"></div>
+        <div class="subpanel">
+          <strong>招式摘要</strong>
+          ${selectedMove ? `
+            <div class="media-layout compact-media">
+              ${selectedMove.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(selectedMove.image.url)}" alt="${escapeHtml(selectedMove.image.alt || selectedMove.nameZh)}" class="entity-image item-image" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
+              <div class="info-stack">
+                <div><strong>${escapeHtml(selectedMove.nameZh)}</strong> · ${escapeHtml(selectedMove.nameEn || "")}</div>
+                <div>当前世代：第 ${escapeHtml(state.damage.moveGeneration)} 世代</div>
+                <div>属性：${escapeHtml(selectedMoveRecord?.type || selectedMove.type || state.damage.moveType || "未记录")}</div>
+                <div>分类：${escapeHtml(selectedMoveRecord?.category || selectedMove.category || state.damage.category || "未记录")}</div>
+                <div>威力：${escapeHtml(selectedMoveRecord?.power ?? selectedMove.power ?? state.damage.power ?? "-")}</div>
+                <div>命中：${escapeHtml(selectedMoveRecord?.accuracy || selectedMove.accuracy || state.damage.accuracy || "-")}</div>
+                <div>${escapeHtml(selectedMoveRecord?.effectSummary || selectedMove.effectSummary || state.damage.moveEffectSummary || "暂无说明")}</div>
+              </div>
+            </div>
+          ` : `<p class="panel-subtitle">选择一个招式后，这里会自动显示当前世代下的属性、分类、威力、命中和效果摘要。</p>`}
+        </div>
+        <div style="height: 12px;"></div>
+        <div class="subpanel">
+          <strong>试算结果</strong>
+          ${state.damage.result ? `
+            <div class="result-card">
+              <div class="result-badge">${escapeHtml(state.damage.result.attackerName)} → ${escapeHtml(state.damage.result.defenderName)}</div>
+              <h3>${escapeHtml(state.damage.moveName || "未命名招式")}</h3>
+              <div class="result-grid">
+                <div class="meta-card"><strong>最小伤害</strong><div>${escapeHtml(state.damage.result.min)}</div></div>
+                <div class="meta-card"><strong>最大伤害</strong><div>${escapeHtml(state.damage.result.max)}</div></div>
+                <div class="meta-card"><strong>平均伤害</strong><div>${escapeHtml(state.damage.result.average)}</div></div>
+                <div class="meta-card"><strong>STAB</strong><div>${escapeHtml(state.damage.result.stab)}x</div></div>
+              </div>
+              <p class="panel-subtitle">
+                当前计算使用攻击值 ${escapeHtml(state.damage.result.attackStat)}、防御值 ${escapeHtml(state.damage.result.defenseStat)}，
+                并叠加克制倍率 ${escapeHtml(state.damage.typeEffectiveness)}x、天气倍率 ${escapeHtml(state.damage.weather)}x、其他修正 ${escapeHtml(state.damage.other)}x。
+              </p>
+            </div>
+          ` : `<p class="panel-subtitle">填写参数后点击“计算伤害”，这里会显示最小值、最大值和平均值。</p>`}
+        </div>
+      </div>
+    </section>
+  `;
+
+  const bindField = (selector, key, transform = (value) => value, rerender = false) => {
+    document.querySelector(selector)?.addEventListener("input", (event) => {
+      state.damage[key] = transform(event.target.type === "checkbox" ? event.target.checked : event.target.value);
+      if (rerender) {
+        renderDamage();
+      }
+    });
+    document.querySelector(selector)?.addEventListener("change", (event) => {
+      state.damage[key] = transform(event.target.type === "checkbox" ? event.target.checked : event.target.value);
+      if (rerender) {
+        renderDamage();
+      }
+    });
+  };
+
+  bindField("#damage-move-name", "moveName", String);
+  bindField("#damage-move-type", "moveType", String);
+  bindField("#damage-power", "power", Number);
+  bindField("#damage-category", "category", String, true);
+  bindField("#damage-effectiveness", "typeEffectiveness", Number);
+  bindField("#damage-weather", "weather", Number);
+  bindField("#damage-other", "other", Number);
+  bindField("#damage-critical", "critical", Boolean);
+
+  document.querySelector("#damage-move-name")?.addEventListener("change", async (event) => {
+    const move = allMoves.find((item) =>
+      item.id === event.target.value ||
+      item.slug === event.target.value ||
+      item.nameZh === event.target.value
+    );
+    if (move) {
+      applyMoveToDamage(move, state.damage.moveGeneration);
+      state.damage.result = null;
+      await renderDamage();
+    } else {
+      state.damage.moveId = "";
+    }
+  });
+
+  document.querySelector("#damage-move-generation")?.addEventListener("change", async (event) => {
+    state.damage.moveGeneration = event.target.value;
+    if (selectedMove) {
+      applyMoveToDamage(selectedMove, event.target.value);
+    }
+    state.damage.result = null;
+    await renderDamage();
+  });
+
+  document.querySelectorAll("[data-import-move]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const move = allMoves.find((item) => item.nameZh === button.dataset.importMove || item.slug === button.dataset.importMove);
+      if (!move) return;
+      applyMoveToDamage(move, state.damage.moveGeneration);
+      state.damage.result = null;
+      await renderDamage();
+    });
+  });
+
+  document.querySelectorAll("[data-damage-field]").forEach((element) => {
+    const rerenderFields = new Set(["pokemonId", "level", "nature"]);
+    const handler = async (event) => {
+      const side = event.target.dataset.side;
+      const field = event.target.dataset.damageField;
+      const value = field === "level" ? Number(event.target.value || 50) : event.target.value;
+      setDamageMemberField(side, field, value);
+      if (field === "pokemonId" && !state.damage[side].nameZh) {
+        setDamageMemberField(side, "nameZh", event.target.value);
+      }
+      if (rerenderFields.has(field) && event.type === "change") {
+        state.damage.result = null;
+        await renderDamage();
+      }
+    };
+
+    element.addEventListener("input", handler);
+    element.addEventListener("change", handler);
+  });
+
+  document.querySelectorAll("[data-stat-kind]").forEach((element) => {
+    const handler = async (event) => {
+      const side = event.target.dataset.slot;
+      const kind = event.target.dataset.statKind;
+      const key = event.target.dataset.statKey;
+      setDamageMemberStat(side, kind, key, Number(event.target.value || 0));
+      if (event.type === "change") {
+        state.damage.result = null;
+        await renderDamage();
+      }
+    };
+
+    element.addEventListener("input", handler);
+    element.addEventListener("change", handler);
+  });
+
+  document.querySelectorAll("[data-import-side]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      loadTeamMemberToDamage(button.dataset.importSide, Number(button.dataset.importSlot));
+      state.damage.result = null;
+      await renderDamage();
+    });
+  });
+
+  document.querySelector("#damage-reset")?.addEventListener("click", async () => {
+    state.damage.attacker = createDraftMember();
+    state.damage.defender = createDraftMember();
+    state.damage.result = null;
+    await renderDamage();
+  });
+
+  document.querySelector("#run-damage")?.addEventListener("click", async () => {
+    state.damage.result = null;
+    const currentAttacker = await hydrateDamageSide(state.damage.attacker);
+    const currentDefender = await hydrateDamageSide(state.damage.defender);
+    await runDamageCalculation(currentAttacker, currentDefender);
+    await renderDamage();
+  });
+}
+
+window.addEventListener("hashchange", render);
+render();

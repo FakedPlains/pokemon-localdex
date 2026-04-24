@@ -58,7 +58,15 @@ pokemon-localdex/
 npm run dev:api
 npm run check:damage
 npm run import:fixtures
+npm run db:import
+npm run check:sqlite
 npm run check:api
+```
+
+启动后，浏览器访问：
+
+```bash
+http://localhost:3030/
 ```
 
 如果当前机器能访问 52Poké，也可以直接抓真实页面：
@@ -72,12 +80,21 @@ POKEMON_LIMIT=30 npm run import:52poke
 - 解析全国图鉴简单版，生成宝可梦基础索引
 - 解析道具列表，生成分类、名称和效果摘要
 - 解析宝可梦详情页中的属性、特性、身高、体重、图鉴颜色、捕获率、性别比例、种族值
-- 将标准化结果写入 `data/normalized/pokemon.json` 和 `data/normalized/items.json`
+- 解析宝可梦形态列表和地区图鉴编号，并汇总为世代可用性信息
+- 支持为宝可梦记录普通/闪光图片、超级进化形态和按世代差异记录
+- 支持招式与特性的独立资料实体，并记录按世代的效果差异
+- 将标准化结果写入 `data/normalized/pokemon.json`、`data/normalized/items.json`、`data/normalized/moves.json`、`data/normalized/abilities.json`
+- 可将标准化 JSON 导入 `data/sqlite/localdex.sqlite`
 - 通过 API 提供：
   - `GET /pokemon`
+  - `GET /pokemon?q=皮卡&type=电&generation=1`
   - `GET /pokemon/:id`
   - `GET /items`
   - `GET /items/:id`
+  - `GET /moves`
+  - `GET /moves/:id`
+  - `GET /abilities`
+  - `GET /abilities/:id`
   - `GET /teams`
   - `POST /teams`
   - `POST /battle/damage`
@@ -89,18 +106,39 @@ POKEMON_LIMIT=30 npm run import:52poke
   - `data/raw/`：保留原始页面快照，便于追溯
   - `data/normalized/`：转换为统一 JSON/SQLite 结构，供多端复用
 
+## SQLite 说明
+
+- 默认数据库路径：`data/sqlite/localdex.sqlite`
+- 导入流程：
+  1. 先执行 `npm run import:fixtures` 或 `npm run import:52poke`
+  2. 再执行 `npm run db:import`
+- API 在检测到 SQLite 中有数据时，会优先从 SQLite 读宝可梦和道具资料；否则自动回退到 JSON
+
+## Web 界面
+
+当前已经有一版零依赖 Web 前端，由 `apps/api` 直接托管静态资源。当前页面包含：
+
+- 图鉴搜索页：支持关键字、属性、世代筛选
+- 宝可梦详情页：展示普通 / 闪光图片、超级进化形态、种族值、世代与地区图鉴
+- 道具页：查看道具图片、分类与效果摘要
+- 招式页：搜索招式并查看按世代的威力、命中、PP、效果差异
+- 特性页：搜索特性并查看按世代的效果差异
+- 队伍页：支持 6 槽成员编辑、性格/等级/特性/道具/招式输入、IV/EV 编辑、载入已保存队伍并覆盖保存
+- 伤害页：可独立选择攻守双方宝可梦并设置等级/性格/IV/EV，不依赖队伍构筑；支持直接选择招式并自动带出当前世代的属性、分类、威力、命中和效果摘要
+
 ## 当前限制
 
-- 52Poké 页面结构比较复杂，宝可梦多形态页面仍然采用启发式解析，后续还需要针对形态页和跨世代字段做更细拆分
-- 当前标准化数据先落 JSON，SQLite 还没接入
-- Web / 小程序端还没有正式 UI，只保留了应用边界和 API 契约
+- 52Poké 页面结构比较复杂，当前多形态和跨世代差异仍然采用启发式解析，后续还需要针对形态页模板做更细拆分
+- 当前图片资源先用本地演示图打通展示链路，后续可以替换为真实 52Poké 图片抓取结果
+- SQLite 目前主要覆盖宝可梦和道具；招式、特性仍先从 JSON 提供
+- 微信小程序和 App 端还没有正式 UI，当前优先把 Web 端打磨完整
 
 ## 下一步建议
 
 如果继续做，我建议下一轮直接实现：
 
-- 多形态与各世代差异数据结构
-- SQLite 建库与索引
-- 宝可梦详情页 API 查询和搜索过滤
-- 本地 SQLite 建库和导入
-- Web 端资料检索页面
+- 真实 52Poké 图片抓取与缓存
+- 宝可梦各世代可学招式与特性的真实抓取和标准化
+- 招式学习表、特性拥有者列表、属性克制表
+- Web 端详情页的世代切换视图
+- 微信小程序 / App 复用当前 API

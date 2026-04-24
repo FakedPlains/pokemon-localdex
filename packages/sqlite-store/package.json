@@ -1,0 +1,5 @@
+{
+  "name": "@pokemon-localdex/sqlite-store",
+  "private": true,
+  "type": "module"
+}

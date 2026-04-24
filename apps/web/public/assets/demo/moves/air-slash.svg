@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <rect width="240" height="240" rx="24" fill="#dbe8ff"/>
+  <path d="M52 146c46-56 92-84 136-84-24 28-44 54-54 82 16 0 30 2 54 12-40 10-92 18-136-10z" fill="#6480b5"/>
+  <text x="120" y="214" text-anchor="middle" font-size="20" fill="#43597d" font-family="Arial">空气斩</text>
+</svg>
