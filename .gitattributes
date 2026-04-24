@@ -1,0 +1,4 @@
+data/sqlite/*.sqlite filter=lfs diff=lfs merge=lfs -text
+data/sqlite/*.sqlite-wal filter=lfs diff=lfs merge=lfs -text
+data/sqlite/*.sqlite-shm filter=lfs diff=lfs merge=lfs -text
+data/normalized/*.json filter=lfs diff=lfs merge=lfs -text

@@ -1,0 +1,16 @@
+{
+  "name": "pokemon-localdex",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "node --enable-source-maps apps/api/src/server.ts",
+    "check:damage": "node --enable-source-maps packages/battle-core/src/demo.ts",
+    "check:api": "node --enable-source-maps apps/api/src/smoke.ts",
+    "import:fixtures": "node --enable-source-maps packages/scraper/src/import-fixtures.ts",
+    "import:52poke": "node --enable-source-maps packages/scraper/src/import-52poke.ts"
+  }
+}

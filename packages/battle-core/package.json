@@ -1,0 +1,5 @@
+{
+  "name": "@pokemon-localdex/battle-core",
+  "private": true,
+  "type": "module"
+}

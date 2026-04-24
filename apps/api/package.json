@@ -1,0 +1,5 @@
+{
+  "name": "@pokemon-localdex/api",
+  "private": true,
+  "type": "module"
+}

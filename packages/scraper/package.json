@@ -1,0 +1,5 @@
+{
+  "name": "@pokemon-localdex/scraper",
+  "private": true,
+  "type": "module"
+}
