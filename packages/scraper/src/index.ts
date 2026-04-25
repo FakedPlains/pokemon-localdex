@@ -79,6 +79,7 @@ type Import52pokeOptions = {
   startDex?: number;
   endDex?: number;
   onlyMissing?: boolean;
+  importItems?: boolean;
   preferCache?: boolean;
   refreshRaw?: boolean;
   checkpointEvery?: number;
@@ -161,6 +162,18 @@ function readRawPageCache(slug: string): RawPage | undefined {
 function writeImportProgress(progress: Import52pokeProgress) {
   ensureDir(IMPORT_PROGRESS_FILE);
   writeFileSync(IMPORT_PROGRESS_FILE, JSON.stringify(progress, null, 2));
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelayMs(response: Response, attempt: number, baseDelayMs: number) {
+  const retryAfterSeconds = Number(response.headers.get("retry-after"));
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return retryAfterSeconds * 1000;
+  }
+  return response.status === 429 ? 10000 * attempt : baseDelayMs * attempt;
 }
 
 function assetUrl(pathname: string) {
@@ -429,31 +442,51 @@ async function downloadAssetToCache(remoteUrl: string, cacheRelativePath: string
       sourceUrl: normalizedUrl
     };
   }
+  const maxAttempts = 4;
 
-  const response = await fetch(normalizedUrl, {
-    headers: {
-      "User-Agent": "pokemon-localdex-bot/0.2"
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(normalizedUrl, {
+        headers: {
+          "User-Agent": "pokemon-localdex-bot/0.2"
+        }
+      });
+
+      if (!response.ok) {
+        if ((response.status === 429 || response.status >= 500) && attempt < maxAttempts) {
+          await sleep(retryDelayMs(response, attempt, 1200));
+          continue;
+        }
+        throw new Error(`Asset fetch failed: ${response.status} ${response.statusText}`);
+      }
+
+      const extension = inferImageExtension(normalizedUrl, response.headers.get("content-type"));
+      const outputRelativePath = `${normalizedRelativePath}${extension}`;
+      const outputPath = resolve(CACHE_DIR, outputRelativePath);
+
+      if (!existsSync(outputPath)) {
+        ensureDir(outputPath);
+        const arrayBuffer = await response.arrayBuffer();
+        writeFileSync(outputPath, Buffer.from(arrayBuffer));
+      }
+
+      return {
+        localUrl: cacheAssetUrl(outputRelativePath),
+        sourceUrl: normalizedUrl
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isRetryable = /fetch failed|429|5\d\d|ENOTFOUND|ECONNRESET|ETIMEDOUT|timeout/i.test(message);
+      if (!isRetryable || attempt >= maxAttempts) {
+        throw error;
+      }
+      if (attempt < maxAttempts) {
+        await sleep(1200 * attempt);
+      }
     }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Asset fetch failed: ${response.status} ${response.statusText}`);
   }
 
-  const extension = inferImageExtension(normalizedUrl, response.headers.get("content-type"));
-  const outputRelativePath = `${normalizedRelativePath}${extension}`;
-  const outputPath = resolve(CACHE_DIR, outputRelativePath);
-
-  if (!existsSync(outputPath)) {
-    ensureDir(outputPath);
-    const arrayBuffer = await response.arrayBuffer();
-    writeFileSync(outputPath, Buffer.from(arrayBuffer));
-  }
-
-  return {
-    localUrl: cacheAssetUrl(outputRelativePath),
-    sourceUrl: normalizedUrl
-  };
+  throw new Error(`Asset fetch failed after retries: ${normalizedUrl}`);
 }
 
 function generationToChinese(generation: number) {
@@ -814,6 +847,21 @@ function mergePokemonEntriesByDex(existingEntries: PokemonEntry[], updatedEntrie
   return [...byDex.values()].sort((left, right) => left.dexNumber - right.dexNumber);
 }
 
+function mergeItems(existingItems: ItemEntry[], updatedItems: ItemEntry[]) {
+  const byId = new Map<string, ItemEntry>();
+  for (const item of existingItems) {
+    byId.set(item.id, item);
+  }
+  for (const item of updatedItems) {
+    byId.set(item.id, item);
+  }
+  return [...byId.values()].sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-Hans-CN"));
+}
+
+function isCompletedPokemonEntry(entry: PokemonEntry) {
+  return !entry.parseNote?.startsWith("detail fetch failed:");
+}
+
 function checkpointNormalizedData(input: {
   pokemonEntries: PokemonEntry[];
   items: ItemEntry[];
@@ -824,6 +872,106 @@ function checkpointNormalizedData(input: {
   replaceItems(input.items);
   replaceMoves(input.moves);
   replaceAbilities(input.abilities);
+}
+
+async function importPokemonSeedFrom52poke(
+  seed: PokemonSeed,
+  options: {
+    preferCache: boolean;
+    refreshRaw: boolean;
+    fetchedAt: string;
+  }
+) {
+  try {
+    const detailPage = await fetchRawPage(seed.detailUrl, `pokemon-${seed.dexNumber.toString().padStart(4, "0")}`, {
+      preferCache: options.preferCache,
+      refresh: options.refreshRaw
+    });
+    const normalized = normalizePokemonPage(detailPage, seed);
+    const cachedImages = await cachePokemonImagesFromPage(detailPage, seed, normalized.forms);
+    const generationsToFetch = uniqueByJson(
+      [
+        ...(normalized.generationAvailability?.map((item) => item.generation) ?? []),
+        ...(seed.generations ?? [])
+      ].filter(Boolean)
+    ).sort((left, right) => left - right);
+
+    const generationRecords = [];
+    const scrapedMoves: ScrapedMoveStub[] = [];
+
+    for (const generation of generationsToFetch) {
+      const learnsetUrl = buildLearnsetPageUrl(seed.nameZh, generation);
+      if (!learnsetUrl) {
+        continue;
+      }
+
+      try {
+        const learnsetPage = await fetchRawPage(
+          learnsetUrl,
+          `pokemon-${seed.dexNumber.toString().padStart(4, "0")}-gen-${generation}-moves`,
+          {
+            preferCache: options.preferCache,
+            refresh: options.refreshRaw
+          }
+        );
+        const parsedLearnset = parseLearnsetPage(learnsetPage, generation);
+        if (parsedLearnset.learnset.length === 0) {
+          continue;
+        }
+
+        generationRecords.push({
+          generation,
+          moveIds: parsedLearnset.learnset.map((entry) => entry.moveId),
+          learnset: parsedLearnset.learnset
+        });
+        scrapedMoves.push(...parsedLearnset.moves);
+      } catch (error) {
+        generationRecords.push({
+          generation,
+          notes: `learnset fetch failed: ${error instanceof Error ? error.message : String(error)}`
+        });
+      }
+    }
+
+    return {
+      ok: true as const,
+      seed,
+      scrapedMoves,
+      entry: {
+        ...normalized,
+        images: cachedImages.images ?? normalized.images,
+        forms: cachedImages.forms ?? normalized.forms,
+        moveIds: uniqueByJson(
+          generationRecords.flatMap((record) => record.learnset?.map((item) => item.moveId) ?? [])
+        ),
+        generationRecords: generationRecords.length > 0 ? generationRecords : undefined
+      }
+    };
+  } catch (error) {
+    return {
+      ok: false as const,
+      seed,
+      scrapedMoves: [] as ScrapedMoveStub[],
+      entry: {
+        id: `pokemon-${seed.dexNumber.toString().padStart(4, "0")}`,
+        dexNumber: seed.dexNumber,
+        slug: slugify(seed.nameZh),
+        nameZh: seed.nameZh,
+        nameJa: seed.nameJa,
+        nameEn: seed.nameEn,
+        generations: seed.generations,
+        primaryType: undefined,
+        secondaryType: undefined,
+        source: {
+          url: seed.detailUrl,
+          title: seed.nameZh,
+          fetchedAt: options.fetchedAt
+        },
+        parseNote: `detail fetch failed: ${error instanceof Error ? error.message : String(error)}`
+      } satisfies PokemonEntry,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
 }
 
 function extractBlock(text: string, startLabel: string, endLabelCandidates: string[]) {
@@ -1033,31 +1181,49 @@ export async function fetchRawPage(url: string, slug: string, options?: FetchPag
       return cached;
     }
   }
+  const maxAttempts = 5;
 
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "pokemon-localdex-bot/0.2"
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "pokemon-localdex-bot/0.2"
+        }
+      });
+
+      if (!response.ok) {
+        if ((response.status === 429 || response.status >= 500) && attempt < maxAttempts) {
+          await sleep(retryDelayMs(response, attempt, 1500));
+          continue;
+        }
+        throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+      }
+
+      const html = await response.text();
+      const titleMatch = html.match(/<title>(.*?)<\/title>/i);
+
+      const page: RawPage = {
+        url,
+        title: titleMatch?.[1]?.trim() ?? slug,
+        fetchedAt: new Date().toISOString(),
+        html
+      };
+
+      const output = resolve(RAW_DIR, `${slug}.json`);
+      ensureDir(output);
+      writeFileSync(output, JSON.stringify(page, null, 2));
+      return page;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isRetryable = /fetch failed|429|5\d\d|ENOTFOUND|ECONNRESET|ETIMEDOUT|timeout/i.test(message);
+      if (!isRetryable || attempt >= maxAttempts) {
+        throw error;
+      }
+      await sleep(1500 * attempt);
     }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
   }
 
-  const html = await response.text();
-  const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-
-  const page: RawPage = {
-    url,
-    title: titleMatch?.[1]?.trim() ?? slug,
-    fetchedAt: new Date().toISOString(),
-    html
-  };
-
-  const output = resolve(RAW_DIR, `${slug}.json`);
-  ensureDir(output);
-  writeFileSync(output, JSON.stringify(page, null, 2));
-  return page;
+  throw new Error(`Fetch failed after retries: ${url}`);
 }
 
 export function parsePokemonListPage(html: string): PokemonSeed[] {
@@ -1824,19 +1990,23 @@ export async function importFromFixtures() {
 export async function importFrom52poke(options?: Import52pokeOptions) {
   const preferCache = options?.preferCache ?? true;
   const refreshRaw = options?.refreshRaw ?? false;
+  const importItems = options?.importItems ?? true;
   const checkpointEvery = Math.max(1, Number(options?.checkpointEvery ?? 20));
+  const concurrency = Math.max(1, Number(options?.concurrency ?? 1));
 
   const pokemonListPage = await fetchRawPage(POKEMON_LIST_URL, "pokemon-list-simple", {
     preferCache,
     refresh: refreshRaw
   });
-  const itemListPage = await fetchRawPage(ITEM_LIST_URL, "item-list", {
-    preferCache,
-    refresh: refreshRaw
-  });
+  const itemListPage = importItems
+    ? await fetchRawPage(ITEM_LIST_URL, "item-list", {
+        preferCache,
+        refresh: refreshRaw
+      })
+    : undefined;
 
   const pokemonSeeds = parsePokemonListPage(pokemonListPage.html);
-  const itemSeeds = parseItemListPage(itemListPage.html);
+  const itemSeeds = itemListPage ? parseItemListPage(itemListPage.html) : [];
   const startDex = options?.startDex ?? 1;
   const endDex = options?.endDex ?? Number.MAX_SAFE_INTEGER;
   const dexFilteredSeeds = pokemonSeeds.filter((seed) => seed.dexNumber >= startDex && seed.dexNumber <= endDex);
@@ -1846,7 +2016,9 @@ export async function importFrom52poke(options?: Import52pokeOptions) {
   const existingItems = listCurrentItemsSafe();
   const existingMoves = listCurrentMovesSafe();
   const existingAbilities = listCurrentAbilitiesSafe();
-  const existingPokemonDexSet = new Set(existingPokemonEntries.map((entry) => entry.dexNumber));
+  const existingPokemonDexSet = new Set(
+    existingPokemonEntries.filter(isCompletedPokemonEntry).map((entry) => entry.dexNumber)
+  );
   const selectedSeeds = options?.onlyMissing
     ? limitedSeeds.filter((seed) => !existingPokemonDexSet.has(seed.dexNumber))
     : limitedSeeds;
@@ -1868,99 +2040,39 @@ export async function importFrom52poke(options?: Import52pokeOptions) {
   };
   writeImportProgress(progress);
 
-  for (const [index, seed] of selectedSeeds.entries()) {
-    try {
-      const detailPage = await fetchRawPage(seed.detailUrl, `pokemon-${seed.dexNumber.toString().padStart(4, "0")}`, {
-        preferCache,
-        refresh: refreshRaw
-      });
-      const normalized = normalizePokemonPage(detailPage, seed);
-      const cachedImages = await cachePokemonImagesFromPage(detailPage, seed, normalized.forms);
-      const generationsToFetch = uniqueByJson(
-        [
-          ...(normalized.generationAvailability?.map((item) => item.generation) ?? []),
-          ...(seed.generations ?? [])
-        ].filter(Boolean)
-      ).sort((left, right) => left - right);
-
-      const generationRecords = [];
-
-      for (const generation of generationsToFetch) {
-        const learnsetUrl = buildLearnsetPageUrl(seed.nameZh, generation);
-        if (!learnsetUrl) {
-          continue;
-        }
-
-        try {
-          const learnsetPage = await fetchRawPage(
-            learnsetUrl,
-            `pokemon-${seed.dexNumber.toString().padStart(4, "0")}-gen-${generation}-moves`,
-            {
-              preferCache,
-              refresh: refreshRaw
-            }
-          );
-          const parsedLearnset = parseLearnsetPage(learnsetPage, generation);
-          if (parsedLearnset.learnset.length === 0) {
-            continue;
-          }
-
-          generationRecords.push({
-            generation,
-            moveIds: parsedLearnset.learnset.map((entry) => entry.moveId),
-            learnset: parsedLearnset.learnset
-          });
-          scrapedMoves.push(...parsedLearnset.moves);
-        } catch (error) {
-          generationRecords.push({
-            generation,
-            notes: `learnset fetch failed: ${error instanceof Error ? error.message : String(error)}`
-          });
-        }
-      }
-
-      importedPokemonEntries.push({
-        ...normalized,
-        images: cachedImages.images ?? normalized.images,
-        forms: cachedImages.forms ?? normalized.forms,
-        moveIds: uniqueByJson(
-          generationRecords.flatMap((record) => record.learnset?.map((item) => item.moveId) ?? [])
-        ),
-        generationRecords: generationRecords.length > 0 ? generationRecords : undefined
-      });
-      progress.successCount += 1;
-    } catch (error) {
-      importedPokemonEntries.push({
-        id: `pokemon-${seed.dexNumber.toString().padStart(4, "0")}`,
-        dexNumber: seed.dexNumber,
-        slug: slugify(seed.nameZh),
-        nameZh: seed.nameZh,
-        nameJa: seed.nameJa,
-        nameEn: seed.nameEn,
-        generations: seed.generations,
-        primaryType: undefined,
-        secondaryType: undefined,
-        source: {
-          url: seed.detailUrl,
-          title: seed.nameZh,
+  for (let index = 0; index < selectedSeeds.length; index += concurrency) {
+    const batch = selectedSeeds.slice(index, index + concurrency);
+    const batchResults = await Promise.all(
+      batch.map((seed) =>
+        importPokemonSeedFrom52poke(seed, {
+          preferCache,
+          refreshRaw,
           fetchedAt
-        },
-        parseNote: `detail fetch failed: ${error instanceof Error ? error.message : String(error)}`
-      });
-      progress.failureCount += 1;
-      progress.failed.push({
-        dexNumber: seed.dexNumber,
-        nameZh: seed.nameZh,
-        error: error instanceof Error ? error.message : String(error)
-      });
+        })
+      )
+    );
+
+    for (const result of batchResults) {
+      importedPokemonEntries.push(result.entry);
+      scrapedMoves.push(...result.scrapedMoves);
+      progress.processedCount += 1;
+      progress.lastDexNumber = result.seed.dexNumber;
+      progress.updatedAt = new Date().toISOString();
+      progress.processedDexNumbers.push(result.seed.dexNumber);
+
+      if (result.ok) {
+        progress.successCount += 1;
+      } else {
+        progress.failureCount += 1;
+        progress.failed.push({
+          dexNumber: result.seed.dexNumber,
+          nameZh: result.seed.nameZh,
+          error: result.error
+        });
+      }
     }
 
-    progress.processedCount += 1;
-    progress.lastDexNumber = seed.dexNumber;
-    progress.updatedAt = new Date().toISOString();
-    progress.processedDexNumbers.push(seed.dexNumber);
-
-    if ((index + 1) % checkpointEvery === 0) {
+    if (progress.processedCount % checkpointEvery === 0 || progress.processedCount === selectedSeeds.length) {
       const checkpointMoves = mergeMoveStubs(existingMoves, scrapedMoves);
       checkpointNormalizedData({
         pokemonEntries: mergePokemonEntriesByDex(existingPokemonEntries, importedPokemonEntries),

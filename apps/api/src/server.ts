@@ -57,7 +57,12 @@ function sendText(res, statusCode, text, contentType) {
 }
 
 function serveStaticFile(pathname, res) {
-  const requestedPath = pathname === "/" ? "/index.html" : pathname;
+  let requestedPath;
+  try {
+    requestedPath = decodeURIComponent(pathname === "/" ? "/index.html" : pathname);
+  } catch {
+    return false;
+  }
   const safePath = requestedPath.replace(/\.\./g, "");
   const filePath = resolve(WEB_ROOT, `.${safePath}`);
 
