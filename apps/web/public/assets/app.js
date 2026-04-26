@@ -3,6 +3,7 @@ const navLinks = [...document.querySelectorAll("[data-nav]")];
 const STATIC_MODE =
   window.location.hostname.endsWith(".github.io") ||
   window.location.protocol === "file:" ||
+  window.location.pathname.startsWith("/pokemon-localdex/") ||
   new URLSearchParams(window.location.search).has("static");
 const STATIC_TEAM_STORAGE_KEY = "pokemon-localdex-teams";
 const staticCache = new Map();
