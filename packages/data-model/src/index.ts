@@ -37,6 +37,18 @@ export type PokemonImageSet = {
   shinySprite?: ImageAsset;
 };
 
+export type PokemonEvolutionMember = {
+  id: string;
+  dexNumber: number;
+  slug: string;
+  nameZh: string;
+  nameEn?: string;
+  primaryType?: string;
+  secondaryType?: string;
+  stageLabel?: string;
+  image?: ImageAsset;
+};
+
 export type PokemonSummary = {
   id: string;
   dexNumber: number;
@@ -119,6 +131,7 @@ export type PokemonEntry = PokemonSummary & {
   abilityIds?: string[];
   hiddenAbilityId?: string;
   moveIds?: string[];
+  evolutionChain?: PokemonEvolutionMember[];
   heightM?: number;
   weightKg?: number;
   color?: string;
@@ -289,6 +302,74 @@ export function replaceAbilities(abilities: AbilityEntry[]) {
   writeJson(ABILITIES_FILE, abilities);
 }
 
+const POKEMON_TYPES = [
+  "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
+  "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精"
+];
+const TYPE_ALIASES: Record<string, string> = {
+  電: "电",
+  飛行: "飞行",
+  蟲: "虫",
+  龍: "龙",
+  惡: "恶",
+  鋼: "钢",
+  格鬥: "格斗",
+  幽靈: "幽灵"
+};
+
+function normalizeTypeName(type: string | undefined) {
+  return TYPE_ALIASES[String(type || "").trim()] || String(type || "").trim();
+}
+
+function splitTypeNames(type: string | undefined) {
+  const normalized = normalizeTypeName(type);
+  if (!normalized) {
+    return [];
+  }
+  if (POKEMON_TYPES.includes(normalized)) {
+    return [normalized];
+  }
+
+  const result: string[] = [];
+  let remaining = normalized;
+  const candidates = [...POKEMON_TYPES, ...Object.keys(TYPE_ALIASES)]
+    .sort((left, right) => right.length - left.length);
+
+  while (remaining) {
+    const matched = candidates.find((candidate) => remaining.startsWith(candidate));
+    if (!matched) {
+      return [normalized];
+    }
+    result.push(normalizeTypeName(matched));
+    remaining = remaining.slice(matched.length);
+  }
+
+  return result;
+}
+
+function hasType(typeValue: string | undefined, expectedType: string) {
+  return splitTypeNames(typeValue).includes(expectedType);
+}
+
+function isSearchablePokemonFormName(name: string | undefined) {
+  if (!name || /[{}]/.test(name)) {
+    return false;
+  }
+
+  const text = name.trim();
+  if (!text || text.length > 24 || /[／/]/.test(text)) {
+    return false;
+  }
+
+  return !/^(第[一二三四五六七八九]+世代|获得方式|宝可梦|游戏版本|地点|方式|备注|金|银|水晶版|红宝石|蓝宝石|绿宝石|火红|叶绿|钻石|珍珠|白金|心金|魂银|黑|白|黑２|白２|Ｘ|Ｙ|太阳|月亮|究极之日|究极之月|Let's|Go！皮卡丘|Go！伊布|传说|阿尔宙斯|朱|紫|Z-A)$|冒[险險]/.test(text);
+}
+
+function searchablePokemonFormNames(entry: PokemonEntry) {
+  return (entry.forms ?? [])
+    .map((form) => form.nameZh)
+    .filter(isSearchablePokemonFormName);
+}
+
 export function searchPokemonEntries(filters?: {
   query?: string;
   type?: string;
@@ -307,17 +388,17 @@ export function searchPokemonEntries(filters?: {
           entry.nameZh,
           entry.nameJa,
           entry.nameEn,
-          ...(entry.forms?.map((form) => form.nameZh) ?? [])
+          ...searchablePokemonFormNames(entry)
         ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(query));
 
     const matchesType = !type
       ? true
-      : entry.primaryType === type ||
-        entry.secondaryType === type ||
-        entry.forms?.some((form) => form.primaryType === type || form.secondaryType === type) ||
-        entry.generationRecords?.some((record) => record.primaryType === type || record.secondaryType === type);
+      : hasType(entry.primaryType, type) ||
+        hasType(entry.secondaryType, type) ||
+        entry.forms?.some((form) => hasType(form.primaryType, type) || hasType(form.secondaryType, type)) ||
+        entry.generationRecords?.some((record) => hasType(record.primaryType, type) || hasType(record.secondaryType, type));
 
     const matchesGeneration = !generation
       ? true

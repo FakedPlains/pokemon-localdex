@@ -20,6 +20,16 @@ const ALL_TYPE_OPTIONS = [
   "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
   "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精"
 ];
+const TYPE_ALIASES = {
+  電: "电",
+  飛行: "飞行",
+  蟲: "虫",
+  龍: "龙",
+  惡: "恶",
+  鋼: "钢",
+  格鬥: "格斗",
+  幽靈: "幽灵"
+};
 const LEARN_METHOD_LABELS = {
   "level-up": "升级",
   tm: "招式学习器",
@@ -53,7 +63,7 @@ const NATURE_EFFECTS = {
 };
 
 const state = {
-  pokedex: { query: "", type: "", generation: "", selected: null, imageMode: "official" },
+  pokedex: { query: "", type: "", generation: "", selected: null, imageMode: "official", detailGeneration: "", detailForm: "base" },
   items: { selected: null, query: "", category: "", visibleLimit: 120 },
   moves: { query: "", type: "", generation: "", selected: null },
   abilities: { query: "", generation: "", selected: null },
@@ -109,7 +119,6 @@ function toStaticUrl(path) {
 function normalizeStaticAssetUrl(url, sourceUrl) {
   if (!url) return url;
   if (/^https?:\/\//.test(url)) return url;
-  if (url.startsWith("/assets/cache/") && sourceUrl) return sourceUrl;
   return toStaticUrl(url);
 }
 
@@ -153,6 +162,62 @@ function matchesTextQuery(entry, query, extraValues = []) {
     .some((value) => String(value).toLowerCase().includes(normalized));
 }
 
+function isSearchablePokemonFormName(name) {
+  if (!name || /[{}]/.test(name)) {
+    return false;
+  }
+
+  const text = String(name).trim();
+  if (!text || text.length > 24 || /[／/]/.test(text)) {
+    return false;
+  }
+
+  return !/^(第[一二三四五六七八九]+世代|获得方式|宝可梦|游戏版本|地点|方式|备注|金|银|水晶版|红宝石|蓝宝石|绿宝石|火红|叶绿|钻石|珍珠|白金|心金|魂银|黑|白|黑２|白２|Ｘ|Ｙ|太阳|月亮|究极之日|究极之月|Let's|Go！皮卡丘|Go！伊布|传说|阿尔宙斯|朱|紫|Z-A)$|冒[险險]/.test(text);
+}
+
+function searchablePokemonFormNames(entry) {
+  return (entry.forms || [])
+    .map((form) => form.nameZh)
+    .filter(isSearchablePokemonFormName);
+}
+
+async function renderAndRestoreInput(renderView, input) {
+  const snapshot = {
+    id: input.id,
+    start: input.selectionStart,
+    end: input.selectionEnd
+  };
+
+  await renderView();
+
+  const nextInput = document.getElementById(snapshot.id);
+  if (!nextInput) {
+    return;
+  }
+
+  nextInput.focus();
+  if (typeof nextInput.setSelectionRange === "function") {
+    const start = Math.min(snapshot.start ?? nextInput.value.length, nextInput.value.length);
+    const end = Math.min(snapshot.end ?? start, nextInput.value.length);
+    nextInput.setSelectionRange(start, end);
+  }
+}
+
+function bindSearchInput(selector, setValue, renderView) {
+  const input = document.querySelector(selector);
+  input?.addEventListener("input", async (event) => {
+    if (event.isComposing) {
+      return;
+    }
+    setValue(event.target.value);
+    await renderAndRestoreInput(renderView, event.target);
+  });
+  input?.addEventListener("compositionend", async (event) => {
+    setValue(event.target.value);
+    await renderAndRestoreInput(renderView, event.target);
+  });
+}
+
 function searchStaticPokemon(entries, filters) {
   const query = filters.get("q");
   const type = filters.get("type");
@@ -162,13 +227,13 @@ function searchStaticPokemon(entries, filters) {
     const matchesQuery = matchesTextQuery(
       entry,
       query,
-      entry.forms?.map((form) => form.nameZh) || []
+      searchablePokemonFormNames(entry)
     );
     const matchesType = !type ||
-      entry.primaryType === type ||
-      entry.secondaryType === type ||
-      entry.forms?.some((form) => form.primaryType === type || form.secondaryType === type) ||
-      entry.generationRecords?.some((record) => record.primaryType === type || record.secondaryType === type);
+      hasType(entry.primaryType, type) ||
+      hasType(entry.secondaryType, type) ||
+      entry.forms?.some((form) => hasType(form.primaryType, type) || hasType(form.secondaryType, type)) ||
+      entry.generationRecords?.some((record) => hasType(record.primaryType, type) || hasType(record.secondaryType, type));
     const matchesGeneration = !generation ||
       entry.generations?.includes(generation) ||
       entry.generationAvailability?.some((record) => record.generation === generation) ||
@@ -327,9 +392,45 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function normalizeTypeName(type) {
+  return TYPE_ALIASES[String(type || "").trim()] || String(type || "").trim();
+}
+
+function splitTypeNames(type) {
+  const normalized = normalizeTypeName(type);
+  if (!normalized) {
+    return [];
+  }
+  if (ALL_TYPE_OPTIONS.includes(normalized)) {
+    return [normalized];
+  }
+
+  const result = [];
+  let remaining = normalized;
+  const candidates = [...ALL_TYPE_OPTIONS, ...Object.keys(TYPE_ALIASES)]
+    .sort((left, right) => right.length - left.length);
+
+  while (remaining) {
+    const matched = candidates.find((candidate) => remaining.startsWith(candidate));
+    if (!matched) {
+      return [normalized];
+    }
+    result.push(normalizeTypeName(matched));
+    remaining = remaining.slice(matched.length);
+  }
+
+  return result;
+}
+
+function hasType(typeValue, expectedType) {
+  return splitTypeNames(typeValue).includes(expectedType);
+}
+
 function typeChip(type) {
   if (!type) return "";
-  return `<span class="type-chip type-${String(type)}">${escapeHtml(type)}</span>`;
+  return [...new Set(splitTypeNames(type))]
+    .map((name) => `<span class="type-chip type-${name}">${escapeHtml(name)}</span>`)
+    .join("");
 }
 
 function activateNav(route) {
@@ -559,6 +660,87 @@ function renderImageViewer(images, imageMode) {
   `;
 }
 
+function getPokemonPreviewImage(pokemon) {
+  return pokemon?.image || pokemon?.images?.official || pokemon?.images?.sprite || pokemon?.images?.shinyOfficial || pokemon?.images?.shinySprite;
+}
+
+function toEvolutionMember(pokemon) {
+  return {
+    id: pokemon.id,
+    dexNumber: pokemon.dexNumber,
+    slug: pokemon.slug,
+    nameZh: pokemon.nameZh,
+    nameEn: pokemon.nameEn,
+    primaryType: pokemon.primaryType,
+    secondaryType: pokemon.secondaryType,
+    stageLabel: "未进化",
+    image: getPokemonPreviewImage(pokemon)
+  };
+}
+
+function buildEvolutionFamilies(pokemonList) {
+  const families = new Map();
+
+  for (const pokemon of pokemonList) {
+    const chain = Array.isArray(pokemon.evolutionChain) && pokemon.evolutionChain.length > 0
+      ? pokemon.evolutionChain
+      : [toEvolutionMember(pokemon)];
+    const key = chain.map((member) => member.id || member.slug || member.nameZh).join("|");
+
+    if (!families.has(key)) {
+      families.set(key, {
+        key,
+        chain,
+        matches: []
+      });
+    }
+
+    families.get(key).matches.push(pokemon);
+  }
+
+  return [...families.values()].sort((left, right) => {
+    const leftDex = Math.min(...left.chain.map((member) => Number(member.dexNumber || 9999)));
+    const rightDex = Math.min(...right.chain.map((member) => Number(member.dexNumber || 9999)));
+    return leftDex - rightDex;
+  });
+}
+
+function renderEvolutionFamilyCard(family, selectedId) {
+  const matchedIds = new Set(family.matches.map((pokemon) => pokemon.id));
+  const selectedInFamily = family.chain.some((member) => member.id === selectedId || member.slug === selectedId);
+  const first = family.chain[0];
+  const last = family.chain[family.chain.length - 1];
+  const dexRange = first?.dexNumber === last?.dexNumber
+    ? `#${String(first?.dexNumber || "?").padStart(4, "0")}`
+    : `#${String(first?.dexNumber || "?").padStart(4, "0")} - #${String(last?.dexNumber || "?").padStart(4, "0")}`;
+
+  return `
+    <div class="list-card evolution-family-card ${selectedInFamily ? "active-card" : ""}">
+      <div class="card-topline">
+        <span class="dex-badge">${dexRange}</span>
+        <span class="chip">${family.chain.length > 1 ? `${family.chain.length} 段进化链` : "不进化"}</span>
+      </div>
+      <div class="evolution-chain-row">
+        ${family.chain.map((member, index) => {
+          const image = getPokemonPreviewImage(member);
+          const isMatched = matchedIds.has(member.id);
+          const isSelected = member.id === selectedId || member.slug === selectedId;
+          return `
+            <button class="evolution-member ${isMatched ? "matched" : ""} ${isSelected ? "selected" : ""}" data-pokemon="${escapeHtml(member.slug || member.id)}" title="查看 ${escapeHtml(member.nameZh)}">
+              <span class="evolution-stage">${escapeHtml(member.stageLabel || (index === 0 ? "基础" : `${index}阶`))}</span>
+              ${image?.url ? `<img src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt || member.nameZh)}" class="chain-image" />` : `<span class="chain-image placeholder">?</span>`}
+              <strong>${escapeHtml(member.nameZh)}</strong>
+              <span class="muted">#${String(member.dexNumber || "?").padStart(4, "0")}</span>
+              <span class="types">${typeChip(member.primaryType)}${typeChip(member.secondaryType)}</span>
+            </button>
+          `;
+        }).join("")}
+      </div>
+      <div class="muted">${escapeHtml(family.matches.length === family.chain.length ? "完整命中当前筛选" : `当前筛选命中：${family.matches.map((pokemon) => pokemon.nameZh).join(" / ")}`)}</div>
+    </div>
+  `;
+}
+
 function renderPokemonGenerationCards(detail) {
   const records = detail.generationRecords || [];
   if (records.length === 0) {
@@ -714,9 +896,92 @@ function applyMoveToDamage(move, generation) {
   state.damage.moveEffectSummary = record?.effectSummary || move?.effectSummary || "";
 }
 
+function buildPokemonGenerationOptions(detail) {
+  const values = new Set();
+  for (const generation of detail.generations || []) values.add(Number(generation));
+  for (const generation of detail.generationAvailability || []) values.add(Number(generation.generation));
+  for (const record of detail.generationRecords || []) values.add(Number(record.generation));
+  return [...values].filter(Boolean).sort((left, right) => left - right);
+}
+
+function resolvePokemonDetailGeneration(detail) {
+  const options = buildPokemonGenerationOptions(detail);
+  if (options.length === 0) {
+    return undefined;
+  }
+
+  const requested = Number(state.pokedex.detailGeneration || state.pokedex.generation || 0);
+  if (requested && options.includes(requested)) {
+    return requested;
+  }
+
+  return options[options.length - 1];
+}
+
+function getPokemonGenerationRecordForDetail(detail, generation) {
+  const records = [...(detail.generationRecords || [])].sort((left, right) => left.generation - right.generation);
+  if (!generation || records.length === 0) {
+    return undefined;
+  }
+
+  return records.find((record) => record.generation === generation) ||
+    [...records].reverse().find((record) => record.generation <= generation) ||
+    records[records.length - 1];
+}
+
+function buildPokemonFormOptions(detail) {
+  const forms = (detail.forms || []).filter((form) =>
+    form?.nameZh &&
+    form.nameZh !== detail.nameZh &&
+    (form.baseStats || form.images || form.primaryType || form.secondaryType || form.abilityIds?.length || form.isMega)
+  );
+
+  return [
+    {
+      id: "base",
+      nameZh: "普通形态",
+      images: detail.images,
+      baseStats: detail.baseStats,
+      primaryType: detail.primaryType,
+      secondaryType: detail.secondaryType,
+      abilityIds: detail.abilityIds
+    },
+    ...forms
+  ];
+}
+
+function resolvePokemonDisplayVariant(detail) {
+  const generation = resolvePokemonDetailGeneration(detail);
+  const generationRecord = getPokemonGenerationRecordForDetail(detail, generation);
+  const formOptions = buildPokemonFormOptions(detail);
+  const selectedForm = formOptions.find((form) => form.id === state.pokedex.detailForm) || formOptions[0];
+  const stats = selectedForm.baseStats || generationRecord?.baseStats || detail.baseStats || {};
+  const primaryType = selectedForm.primaryType || generationRecord?.primaryType || detail.primaryType;
+  const secondaryType = selectedForm.secondaryType || generationRecord?.secondaryType || detail.secondaryType;
+  const abilityText = selectedForm.abilityIds?.length
+    ? selectedForm.abilityIds.join(" / ")
+    : generationRecord?.abilityIds?.length
+      ? generationRecord.abilityIds.join(" / ")
+      : (detail.abilities || []).join(" / ");
+
+  return {
+    generation,
+    generationRecord,
+    form: selectedForm,
+    formOptions,
+    generationOptions: buildPokemonGenerationOptions(detail),
+    stats,
+    images: selectedForm.images || detail.images,
+    primaryType,
+    secondaryType,
+    abilityText,
+    hiddenAbilityText: generationRecord?.hiddenAbilityId || detail.hiddenAbility || "无"
+  };
+}
+
 function renderPokemonDetail(detail) {
-  const stats = detail.baseStats || {};
-  const forms = detail.forms || [];
+  const display = resolvePokemonDisplayVariant(detail);
+  const stats = display.stats || {};
   const generations = detail.generationAvailability || [];
 
   return `
@@ -728,30 +993,44 @@ function renderPokemonDetail(detail) {
       </div>
       <button data-add-team>加入队伍</button>
     </div>
+    <div class="variant-toolbar">
+      <label>
+        <span>世代资料</span>
+        <select id="pokemon-detail-generation">
+          ${display.generationOptions.map((generation) => `<option value="${generation}" ${String(display.generation) === String(generation) ? "selected" : ""}>第 ${generation} 世代</option>`).join("") || `<option value="">暂无世代记录</option>`}
+        </select>
+      </label>
+      <label>
+        <span>形态</span>
+        <select id="pokemon-detail-form">
+          ${display.formOptions.map((form) => `<option value="${escapeHtml(form.id)}" ${display.form.id === form.id ? "selected" : ""}>${escapeHtml(form.nameZh)}${form.isMega ? " · 超级进化" : ""}</option>`).join("")}
+        </select>
+      </label>
+    </div>
     <div class="media-layout">
-      ${renderImageViewer(detail.images, state.pokedex.imageMode)}
+      ${renderImageViewer(display.images, state.pokedex.imageMode)}
       <div class="subpanel">
-        <strong>图片与形态</strong>
-        <div class="panel-subtitle">当前支持普通、闪光，以及超级进化等特殊形态的独立图片展示。</div>
+        <strong>${escapeHtml(display.form.nameZh)}${display.generation ? ` · 第 ${display.generation} 世代` : ""}</strong>
+        <div class="panel-subtitle">切换世代会影响有世代差异的属性、特性与种族值；切换形态会展示超级进化、超极巨化等形态的图片和种族值。</div>
         <div class="forms-grid" style="margin-top: 14px;">
-          ${(forms.length > 0 ? forms : [{ nameZh: "默认形态" }]).map((form) => `<span class="pill">${escapeHtml(form.nameZh)}${form.isMega ? " · 超级进化" : ""}</span>`).join("")}
+          ${display.formOptions.map((form) => `<span class="pill ${display.form.id === form.id ? "active-pill" : ""}">${escapeHtml(form.nameZh)}${form.isMega ? " · 超级进化" : ""}</span>`).join("")}
         </div>
       </div>
     </div>
     <div class="types" style="margin-top: 16px;">
-      ${typeChip(detail.primaryType)}
-      ${typeChip(detail.secondaryType)}
+      ${typeChip(display.primaryType)}
+      ${typeChip(display.secondaryType)}
     </div>
     <div class="meta-grid">
       <div class="meta-card"><strong>分类</strong><div>${escapeHtml(detail.category || "未解析")}</div></div>
-      <div class="meta-card"><strong>特性</strong><div>${escapeHtml((detail.abilities || []).join(" / ") || "未解析")}</div></div>
-      <div class="meta-card"><strong>隐藏特性</strong><div>${escapeHtml(detail.hiddenAbility || "无")}</div></div>
+      <div class="meta-card"><strong>特性</strong><div>${escapeHtml(display.abilityText || "未解析")}</div></div>
+      <div class="meta-card"><strong>隐藏特性</strong><div>${escapeHtml(display.hiddenAbilityText)}</div></div>
       <div class="meta-card"><strong>捕获率</strong><div>${escapeHtml(detail.catchRate || "未解析")}</div></div>
       <div class="meta-card"><strong>身高 / 体重</strong><div>${escapeHtml(detail.heightM || "?")} m / ${escapeHtml(detail.weightKg || "?")} kg</div></div>
       <div class="meta-card"><strong>图鉴颜色</strong><div>${escapeHtml(detail.color || "未解析")}</div></div>
     </div>
     <div class="subpanel" style="margin-top: 16px;">
-      <strong>种族值</strong>
+      <strong>种族值${display.form.id !== "base" ? ` · ${escapeHtml(display.form.nameZh)}` : ""}${display.generation ? ` · 第 ${display.generation} 世代` : ""}</strong>
       <div class="stat-grid">
         ${STAT_KEYS.map((key) => `
           <div class="stat-row">
@@ -763,9 +1042,9 @@ function renderPokemonDetail(detail) {
       </div>
     </div>
     <div class="subpanel" style="margin-top: 16px;">
-      <strong>形态</strong>
+      <strong>形态资料</strong>
       <div class="forms-grid">
-        ${(forms.length > 0 ? forms : [{ nameZh: "默认形态" }]).map((form) => `
+        ${display.formOptions.map((form) => `
           <div class="form-card">
             ${form.images?.official?.url ? `<img src="${escapeHtml(form.images.official.url)}" alt="${escapeHtml(form.images.official.alt || form.nameZh)}" class="mini-image" />` : ""}
             <div><strong>${escapeHtml(form.nameZh)}</strong></div>
@@ -800,8 +1079,16 @@ async function renderPokedex() {
   if (state.pokedex.generation) params.set("generation", state.pokedex.generation);
 
   const list = (await api(`/pokemon?${params.toString()}`)).data;
-  if (!state.pokedex.selected && list[0]) {
+  const families = buildEvolutionFamilies(list);
+  const selectedIsVisible = list.some((pokemon) =>
+    pokemon.id === state.pokedex.selected || pokemon.slug === state.pokedex.selected
+  );
+  if ((!state.pokedex.selected || !selectedIsVisible) && list[0]) {
     state.pokedex.selected = list[0].slug || list[0].id;
+    state.pokedex.detailForm = "base";
+    state.pokedex.detailGeneration = "";
+  } else if (!list[0]) {
+    state.pokedex.selected = null;
   }
 
   const selectedId = state.pokedex.selected;
@@ -813,9 +1100,9 @@ async function renderPokedex() {
         <div class="panel-header">
           <div>
             <h2 class="panel-title">全国图鉴</h2>
-            <p class="panel-subtitle">按关键字、属性和世代过滤本地资料。</p>
+            <p class="panel-subtitle">按关键字、属性和世代过滤本地资料；同一进化链会合并到同一张卡片展示。</p>
           </div>
-          <span class="chip">${list.length} 条结果</span>
+          <span class="chip">${families.length} 条进化链 / ${list.length} 只宝可梦</span>
         </div>
         <div class="toolbar">
           <div class="toolbar-row">
@@ -833,19 +1120,7 @@ async function renderPokedex() {
           </div>
         </div>
         <div class="pokemon-list">
-          ${list.map((item) => `
-            <button class="list-card secondary" data-pokemon="${escapeHtml(item.slug || item.id)}">
-              <div class="card-topline">
-                <span class="dex-badge">#${String(item.dexNumber).padStart(4, "0")}</span>
-                <span class="chip">${(item.generations || []).join(", ") || "?"} 代</span>
-              </div>
-              <div>
-                <strong>${escapeHtml(item.nameZh)}</strong>
-                <div class="muted">${escapeHtml(item.nameEn || "")}</div>
-              </div>
-              <div class="types">${typeChip(item.primaryType)}${typeChip(item.secondaryType)}</div>
-            </button>
-          `).join("") || `<div class="muted">没有命中结果。</div>`}
+          ${families.map((family) => renderEvolutionFamilyCard(family, selectedId)).join("") || `<div class="muted">没有命中结果。</div>`}
         </div>
       </div>
       <div class="panel detail-panel">
@@ -854,10 +1129,9 @@ async function renderPokedex() {
     </section>
   `;
 
-  document.querySelector("#pokemon-query")?.addEventListener("input", async (event) => {
-    state.pokedex.query = event.target.value.trim();
-    await renderPokedex();
-  });
+  bindSearchInput("#pokemon-query", (value) => {
+    state.pokedex.query = value;
+  }, renderPokedex);
   document.querySelector("#pokemon-type")?.addEventListener("change", async (event) => {
     state.pokedex.type = event.target.value;
     await renderPokedex();
@@ -869,8 +1143,18 @@ async function renderPokedex() {
   document.querySelectorAll("[data-pokemon]").forEach((button) => {
     button.addEventListener("click", async () => {
       state.pokedex.selected = button.getAttribute("data-pokemon");
+      state.pokedex.detailForm = "base";
+      state.pokedex.detailGeneration = "";
       await renderPokedex();
     });
+  });
+  document.querySelector("#pokemon-detail-generation")?.addEventListener("change", async (event) => {
+    state.pokedex.detailGeneration = event.target.value;
+    await renderPokedex();
+  });
+  document.querySelector("#pokemon-detail-form")?.addEventListener("change", async (event) => {
+    state.pokedex.detailForm = event.target.value;
+    await renderPokedex();
   });
   document.querySelector("[data-add-team]")?.addEventListener("click", () => {
     if (!detail) return;
@@ -900,8 +1184,13 @@ async function renderItems() {
   });
   const visibleItems = filteredItems.slice(0, state.items.visibleLimit);
 
-  if (!state.items.selected && filteredItems[0]) {
+  const selectedIsVisible = filteredItems.some((item) =>
+    item.id === state.items.selected || item.slug === state.items.selected
+  );
+  if ((!state.items.selected || !selectedIsVisible) && filteredItems[0]) {
     state.items.selected = filteredItems[0].slug || filteredItems[0].id;
+  } else if (!filteredItems[0]) {
+    state.items.selected = null;
   }
   const detail = state.items.selected ? (await api(`/items/${encodeURIComponent(state.items.selected)}`)).data : null;
 
@@ -973,12 +1262,10 @@ async function renderItems() {
     </section>
   `;
 
-  document.querySelector("#item-query")?.addEventListener("input", async (event) => {
-    state.items.query = event.target.value;
+  bindSearchInput("#item-query", (value) => {
+    state.items.query = value;
     state.items.visibleLimit = 120;
-    state.items.selected = null;
-    await renderItems();
-  });
+  }, renderItems);
   document.querySelector("#item-category")?.addEventListener("change", async (event) => {
     state.items.category = event.target.value;
     state.items.visibleLimit = 120;
@@ -1004,8 +1291,13 @@ async function renderMoves() {
   if (state.moves.generation) params.set("generation", state.moves.generation);
 
   const moves = (await api(`/moves?${params.toString()}`)).data;
-  if (!state.moves.selected && moves[0]) {
+  const selectedIsVisible = moves.some((move) =>
+    move.id === state.moves.selected || move.slug === state.moves.selected
+  );
+  if ((!state.moves.selected || !selectedIsVisible) && moves[0]) {
     state.moves.selected = moves[0].slug || moves[0].id;
+  } else if (!moves[0]) {
+    state.moves.selected = null;
   }
   const detail = state.moves.selected ? (await api(`/moves/${encodeURIComponent(state.moves.selected)}`)).data : null;
 
@@ -1079,10 +1371,9 @@ async function renderMoves() {
     </section>
   `;
 
-  document.querySelector("#move-query")?.addEventListener("input", async (event) => {
-    state.moves.query = event.target.value.trim();
-    await renderMoves();
-  });
+  bindSearchInput("#move-query", (value) => {
+    state.moves.query = value;
+  }, renderMoves);
   document.querySelector("#move-type")?.addEventListener("change", async (event) => {
     state.moves.type = event.target.value;
     await renderMoves();
@@ -1105,8 +1396,13 @@ async function renderAbilities() {
   if (state.abilities.generation) params.set("generation", state.abilities.generation);
 
   const abilities = (await api(`/abilities?${params.toString()}`)).data;
-  if (!state.abilities.selected && abilities[0]) {
+  const selectedIsVisible = abilities.some((ability) =>
+    ability.id === state.abilities.selected || ability.slug === state.abilities.selected
+  );
+  if ((!state.abilities.selected || !selectedIsVisible) && abilities[0]) {
     state.abilities.selected = abilities[0].slug || abilities[0].id;
+  } else if (!abilities[0]) {
+    state.abilities.selected = null;
   }
   const detail = state.abilities.selected ? (await api(`/abilities/${encodeURIComponent(state.abilities.selected)}`)).data : null;
 
@@ -1172,10 +1468,9 @@ async function renderAbilities() {
     </section>
   `;
 
-  document.querySelector("#ability-query")?.addEventListener("input", async (event) => {
-    state.abilities.query = event.target.value.trim();
-    await renderAbilities();
-  });
+  bindSearchInput("#ability-query", (value) => {
+    state.abilities.query = value;
+  }, renderAbilities);
   document.querySelector("#ability-generation")?.addEventListener("change", async (event) => {
     state.abilities.generation = event.target.value;
     await renderAbilities();

@@ -421,10 +421,48 @@ function getFormKeywordHints(nameZh: string) {
   return hints;
 }
 
+function getCompactFormCodes(nameZh: string) {
+  if (nameZh.includes("超极巨")) {
+    return ["gm"];
+  }
+  if (!nameZh.includes("超级")) {
+    return [];
+  }
+  if (nameZh.includes("X")) {
+    return ["mx"];
+  }
+  if (nameZh.includes("Y")) {
+    return ["my"];
+  }
+  return ["m"];
+}
+
+function isPlausibleFormName(nameZh: string) {
+  return nameZh.length <= 24 && !/[，。；：、,.!?]/.test(nameZh);
+}
+
+function hasCompactFormCode(fileName: string, seed: PokemonSeed, form: PokemonForm) {
+  const normalized = fileName.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const { dex3, dex4 } = getPokemonImageHeuristics(seed);
+  const dexTokens = [dex3.toLowerCase(), dex4.toLowerCase()];
+  return getCompactFormCodes(form.nameZh).some((code) =>
+    dexTokens.some((dex) => normalized.includes(`${dex}${code}`))
+  );
+}
+
+function hasFormKeyword(fileName: string, form: PokemonForm) {
+  const normalized = fileName.toLowerCase();
+  return getFormKeywordHints(form.nameZh).some((hint) => normalized.includes(hint));
+}
+
 function scoreFormImage(fileName: string, seed: PokemonSeed, form: PokemonForm, kind: "official" | "shinyOfficial" = "official") {
   const normalized = fileName.toLowerCase();
   const { dex3, dex4, englishToken } = getPokemonImageHeuristics(seed);
   let score = 0;
+  const expectsCompactCode = getCompactFormCodes(form.nameZh).length > 0;
+  const hasExpectedCompactCode = hasCompactFormCode(fileName, seed, form);
+  const hasExpectedKeyword = hasFormKeyword(fileName, form);
+
   if (normalized.includes(dex3.toLowerCase())) score += 5;
   if (normalized.includes(dex4.toLowerCase())) score += 5;
   if (englishToken && normalized.includes(englishToken)) score += 6;
@@ -433,7 +471,14 @@ function scoreFormImage(fileName: string, seed: PokemonSeed, form: PokemonForm, 
       score += 6;
     }
   }
-  if (hasSpriteMarker(fileName)) score -= 3;
+  if (hasExpectedCompactCode) {
+    score += kind === "shinyOfficial" ? 14 : 6;
+  } else if (expectsCompactCode && !hasExpectedKeyword) {
+    score -= kind === "shinyOfficial" ? 10 : 8;
+  }
+  if (hasSpriteMarker(fileName)) score += kind === "shinyOfficial" ? -3 : -12;
+  if (hasOfficialMarker(fileName)) score += 7;
+  if (kind === "official" && !hasSpriteMarker(fileName) && !hasShinyMarker(fileName)) score += 4;
   if (hasShinyMarker(fileName)) {
     score += kind === "shinyOfficial" ? 7 : -6;
   } else if (kind === "shinyOfficial") {
@@ -464,7 +509,7 @@ export function resolvePokemonImageCandidateUrls(pageHtml: string, seed: Pokemon
   const formCandidates = Object.fromEntries((forms || []).map((form) => {
     const official = pickBestImageUrl(imageUrls, (fileName) => scoreFormImage(fileName, seed, form, "official"));
     const shinyOfficial = pickBestImageUrl(
-      shinyOfficialUrls,
+      shinyImageUrls,
       (fileName) => scoreFormImage(fileName, seed, form, "shinyOfficial")
     );
     return [form.id, { official, shinyOfficial }];
@@ -713,7 +758,7 @@ function dedupe<T>(items: T[]) {
 
 function extractStatBlocks(text: string) {
   const pattern =
-    /ＨＰ[：:]\s*(\d+)[\s\S]{0,80}?攻击[：:]\s*(\d+)[\s\S]{0,80}?防御[：:]\s*(\d+)[\s\S]{0,80}?特攻[：:]\s*(\d+)[\s\S]{0,80}?特防[：:]\s*(\d+)[\s\S]{0,80}?速度[：:]\s*(\d+)/g;
+    /ＨＰ\s*[：:]?\s*(\d+)[\s\S]{0,360}?攻击\s*[：:]?\s*(\d+)[\s\S]{0,360}?防御\s*[：:]?\s*(\d+)[\s\S]{0,360}?特攻\s*[：:]?\s*(\d+)[\s\S]{0,360}?特防\s*[：:]?\s*(\d+)[\s\S]{0,360}?速度\s*[：:]?\s*(\d+)/g;
   const blocks = [];
 
   for (const match of text.matchAll(pattern)) {
@@ -738,12 +783,13 @@ function extractStatBlocks(text: string) {
 }
 
 function chooseBaseStatBlock(blocks: ReturnType<typeof extractStatBlocks>) {
-  if (blocks.length === 0) {
+  const plausibleBlocks = blocks.filter((block) => block.total >= 175);
+  if (plausibleBlocks.length === 0) {
     return undefined;
   }
 
-  blocks.sort((left, right) => left.total - right.total);
-  return blocks[0];
+  plausibleBlocks.sort((left, right) => left.total - right.total);
+  return plausibleBlocks[0];
 }
 
 function extractLineValue(text: string, label: string) {

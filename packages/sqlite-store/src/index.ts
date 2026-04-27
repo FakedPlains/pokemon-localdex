@@ -53,6 +53,7 @@ function mapPokemonRow(row: Record<string, unknown>): PokemonEntry {
     abilityIds: parseJson<PokemonEntry["abilityIds"]>(row.ability_ids_json as string | null),
     hiddenAbilityId: row.hidden_ability_id ? String(row.hidden_ability_id) : undefined,
     moveIds: parseJson<PokemonEntry["moveIds"]>(row.move_ids_json as string | null),
+    evolutionChain: parseJson<PokemonEntry["evolutionChain"]>(row.evolution_chain_json as string | null),
     source: parseJson<PokemonEntry["source"]>(row.source_json as string | null),
     parseNote: row.parse_note ? String(row.parse_note) : undefined
   };
@@ -120,6 +121,7 @@ export function ensureSchema() {
       ability_ids_json TEXT,
       hidden_ability_id TEXT,
       move_ids_json TEXT,
+      evolution_chain_json TEXT,
       source_json TEXT,
       parse_note TEXT
     );
@@ -168,9 +170,9 @@ export function importNormalizedDataToSqlite(input?: {
         primary_type, secondary_type, category, abilities_json, hidden_ability,
         height_m, weight_kg, color, catch_rate, gender_ratio_json, base_stats_json,
         images_json, forms_json, generation_availability_json, generation_records_json,
-        ability_ids_json, hidden_ability_id, move_ids_json, source_json, parse_note
+        ability_ids_json, hidden_ability_id, move_ids_json, evolution_chain_json, source_json, parse_note
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
     `);
 
@@ -201,6 +203,7 @@ export function importNormalizedDataToSqlite(input?: {
         serialize(entry.abilityIds),
         entry.hiddenAbilityId ?? null,
         serialize(entry.moveIds),
+        serialize(entry.evolutionChain),
         serialize(entry.source),
         entry.parseNote ?? null
       );
@@ -270,8 +273,9 @@ export function listPokemonFromSqlite(filters?: {
   }
 
   if (filters?.type) {
-    conditions.push("(primary_type = ? OR secondary_type = ? OR forms_json LIKE ?)");
-    params.push(filters.type, filters.type, `%${filters.type}%`);
+    conditions.push("(primary_type = ? OR secondary_type = ? OR primary_type LIKE ? OR secondary_type LIKE ? OR forms_json LIKE ? OR generation_records_json LIKE ?)");
+    const value = `%${filters.type}%`;
+    params.push(filters.type, filters.type, value, value, value, value);
   }
 
   if (filters?.generation) {

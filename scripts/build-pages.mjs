@@ -13,10 +13,9 @@ cpSync(WEB_PUBLIC_DIR, DIST_DIR, { recursive: true });
 mkdirSync(resolve(DIST_DIR, "data/normalized"), { recursive: true });
 cpSync(NORMALIZED_DATA_DIR, resolve(DIST_DIR, "data/normalized"), { recursive: true });
 
-function toPagesAssetUrl(url, sourceUrl) {
+function toPagesAssetUrl(url) {
   if (!url) return url;
   if (/^https?:\/\//.test(url)) return url;
-  if (url.startsWith("/assets/cache/") && sourceUrl) return sourceUrl;
   if (url.startsWith("/")) return url.slice(1);
   return url;
 }
@@ -35,7 +34,7 @@ function normalizePagesAssets(value) {
   );
 
   if (typeof value.url === "string") {
-    next.url = toPagesAssetUrl(value.url, value.sourceUrl);
+    next.url = toPagesAssetUrl(value.url);
   }
 
   return next;

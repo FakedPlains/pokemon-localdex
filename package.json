@@ -13,6 +13,7 @@
     "check:sqlite": "LOCALDEX_DB_PATH=/tmp/pokemon-localdex-checksqlite.sqlite node --enable-source-maps packages/sqlite-store/src/demo.ts",
     "build:pages": "node scripts/build-pages.mjs",
     "db:import": "node --enable-source-maps packages/sqlite-store/src/import-db.ts",
+    "enrich:evolution": "node scripts/enrich-evolution-chains.mjs",
     "import:fixtures": "node --enable-source-maps packages/scraper/src/import-fixtures.ts",
     "import:52poke": "node --enable-source-maps packages/scraper/src/import-52poke.ts",
     "import:52poke:catalog": "node --enable-source-maps packages/scraper/src/import-52poke-catalog.ts"
