@@ -24,10 +24,33 @@ const FIXTURE_DIR = resolve(import.meta.dirname, "../fixtures");
 const CACHE_DIR = resolve(ROOT, "apps/web/public/assets/cache");
 const WEB_ASSET_ROOT = "/assets/demo";
 const WEB_CACHE_ROOT = "/assets/cache";
+const POKEMON_TYPES = new Set([
+  "一般",
+  "火",
+  "水",
+  "电",
+  "草",
+  "冰",
+  "格斗",
+  "毒",
+  "地面",
+  "飞行",
+  "超能力",
+  "虫",
+  "岩石",
+  "幽灵",
+  "龙",
+  "恶",
+  "钢",
+  "妖精"
+]);
+const MOVE_CATEGORIES = new Set(["physical", "special", "status"]);
 
 const POKEMON_LIST_URL =
   "https://wiki.52poke.com/wiki/%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89/%E7%AE%80%E5%8D%95%E7%89%88";
 const ITEM_LIST_URL = "https://wiki.52poke.com/wiki/%E9%81%93%E5%85%B7%E5%88%97%E8%A1%A8";
+const MOVE_LIST_URL = "https://wiki.52poke.com/wiki/%E6%8B%9B%E5%BC%8F%E5%88%97%E8%A1%A8";
+const ABILITY_LIST_URL = "https://wiki.52poke.com/wiki/%E7%89%B9%E6%80%A7%E5%88%97%E8%A1%A8";
 
 export type RawPage = {
   url: string;
@@ -50,6 +73,29 @@ type ItemSeed = {
   nameJa?: string;
   nameEn?: string;
   category?: string;
+  effectSummary?: string;
+  detailUrl: string;
+};
+
+type MoveSeed = {
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  generation: number;
+  type?: string;
+  category?: string;
+  power?: number;
+  accuracy?: string;
+  pp?: number;
+  effectSummary?: string;
+  detailUrl: string;
+};
+
+type AbilitySeed = {
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  generation: number;
   effectSummary?: string;
   detailUrl: string;
 };
@@ -80,6 +126,19 @@ type Import52pokeOptions = {
   endDex?: number;
   onlyMissing?: boolean;
   importItems?: boolean;
+  preferCache?: boolean;
+  refreshRaw?: boolean;
+  checkpointEvery?: number;
+  concurrency?: number;
+};
+
+type ImportCatalog52pokeOptions = {
+  importMoves?: boolean;
+  importAbilities?: boolean;
+  importItems?: boolean;
+  moveLimit?: number;
+  abilityLimit?: number;
+  itemLimit?: number;
   preferCache?: boolean;
   refreshRaw?: boolean;
   checkpointEvery?: number;
@@ -502,6 +561,122 @@ function generationToChinese(generation: number) {
     9: "九"
   };
   return map[generation];
+}
+
+function generationFromChineseNumeral(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+  const map: Record<string, number> = {
+    一: 1,
+    二: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9
+  };
+  return map[value];
+}
+
+function generationFromHeading(value: string | undefined) {
+  const matched = value?.match(/第([一二三四五六七八九])世代/);
+  return generationFromChineseNumeral(matched?.[1]);
+}
+
+function buildMovePageUrl(nameZh: string) {
+  return `https://wiki.52poke.com/wiki/${encodeURIComponent(`${nameZh}（招式）`)}`;
+}
+
+function buildAbilityPageUrl(nameZh: string) {
+  return `https://wiki.52poke.com/wiki/${encodeURIComponent(`${nameZh}（特性）`)}`;
+}
+
+function buildItemPageUrl(nameZh: string) {
+  return `https://wiki.52poke.com/wiki/${encodeURIComponent(`${nameZh}（道具）`)}`;
+}
+
+function cleanSummary(input: string | undefined, maxLength = 700) {
+  if (!input) {
+    return undefined;
+  }
+
+  const text = input
+    .replace(/\[[^\]]+\]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/返回.*$/g, "")
+    .trim();
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength).trim()}…`;
+}
+
+function extractSectionTextByHeading(html: string, heading: string, level = 2) {
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const startPattern = new RegExp(`<h${level}[^>]*>[\\s\\S]*?<span[^>]+id=["'][^"']*${escapedHeading}[^"']*["'][^>]*>[\\s\\S]*?<\\/span>[\\s\\S]*?<\\/h${level}>`, "i");
+  const startMatch = html.match(startPattern);
+  if (!startMatch || startMatch.index === undefined) {
+    return "";
+  }
+
+  const startIndex = startMatch.index + startMatch[0].length;
+  const tail = html.slice(startIndex);
+  const endMatch = tail.match(new RegExp(`<h${level}[^>]*>`, "i"));
+  const block = endMatch?.index === undefined ? tail : tail.slice(0, endMatch.index);
+  return normalizeText(block);
+}
+
+function extractNamesFromIntro(text: string, fallbackNameZh: string) {
+  const escapedName = fallbackNameZh.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`${escapedName}[\\s\\S]{0,80}?日文[︰:：]\\s*([^，,）\\n]+)[\\s\\S]{0,80}?英文[︰:：]\\s*([^，,）\\n]+)`);
+  const matched = text.match(pattern);
+  return {
+    nameJa: matched?.[1]?.trim(),
+    nameEn: matched?.[2]?.trim()
+  };
+}
+
+function extractGenerationChanges(html: string, heading: string) {
+  const section = extractSectionTextByHeading(html, heading);
+  if (!section) {
+    return [];
+  }
+
+  const lines = section.split("\n").map((line) => line.trim()).filter(Boolean);
+  const changes: Array<{ generation: number; summary: string }> = [];
+  let currentGeneration: number | undefined;
+  let buffer: string[] = [];
+
+  const flush = () => {
+    if (!currentGeneration || buffer.length === 0) {
+      buffer = [];
+      return;
+    }
+    const summary = cleanSummary(buffer.join(" "), 500);
+    if (summary) {
+      changes.push({ generation: currentGeneration, summary });
+    }
+    buffer = [];
+  };
+
+  for (const line of lines) {
+    const nextGeneration = generationFromHeading(line);
+    if (nextGeneration) {
+      flush();
+      currentGeneration = nextGeneration;
+      continue;
+    }
+    if (currentGeneration && !/^\d+$/.test(line)) {
+      buffer.push(line);
+    }
+  }
+  flush();
+
+  return uniqueByJson(changes);
 }
 
 function buildLearnsetPageUrl(nameZh: string, generation: number) {
@@ -1174,6 +1349,151 @@ async function cacheItemImageFromPage(page: RawPage, item: ItemSeed) {
   };
 }
 
+function normalizeMoveDetailPage(page: RawPage, seed: MoveSeed): MoveEntry {
+  const text = normalizeText(page.html);
+  const introNames = extractNamesFromIntro(text, seed.nameZh);
+  const effectSummary =
+    cleanSummary(extractSectionTextByHeading(page.html, "招式附加效果")) ||
+    cleanSummary(seed.effectSummary) ||
+    "暂无说明";
+  const changes = extractGenerationChanges(page.html, "招式变更");
+  const generationRecords = new Map<number, MoveEntry["generations"][number]>();
+
+  generationRecords.set(seed.generation, {
+    generation: seed.generation,
+    type: seed.type,
+    category: seed.category,
+    power: seed.power,
+    accuracy: seed.accuracy,
+    pp: seed.pp,
+    effectSummary
+  });
+
+  for (const change of changes) {
+    generationRecords.set(change.generation, {
+      generation: change.generation,
+      type: seed.type,
+      category: seed.category,
+      power: seed.power,
+      accuracy: seed.accuracy,
+      pp: seed.pp,
+      effectSummary: change.summary,
+      notes: "来自 52Poké 招式变更章节。"
+    });
+  }
+
+  const imageUrl = extractImageCandidates(page.html).find((url) => /animoves|move/i.test(extractFileNameFromUrl(url)));
+
+  return {
+    id: `move-${slugify(seed.nameZh)}`,
+    slug: seed.nameZh,
+    nameZh: seed.nameZh,
+    nameJa: introNames.nameJa || seed.nameJa,
+    nameEn: introNames.nameEn || seed.nameEn,
+    type: seed.type,
+    category: seed.category,
+    power: seed.power,
+    accuracy: seed.accuracy,
+    pp: seed.pp,
+    effectSummary,
+    image: imageUrl
+      ? {
+          url: normalizeMediaUrl(imageUrl),
+          alt: `${seed.nameZh}招式动画`
+        }
+      : undefined,
+    generations: [...generationRecords.values()].sort((left, right) => left.generation - right.generation),
+    source: {
+      url: page.url,
+      title: page.title,
+      fetchedAt: page.fetchedAt
+    }
+  };
+}
+
+function normalizeAbilityDetailPage(page: RawPage, seed: AbilitySeed): AbilityEntry {
+  const text = normalizeText(page.html);
+  const introNames = extractNamesFromIntro(text, seed.nameZh);
+  const effectSummary =
+    cleanSummary(extractSectionTextByHeading(page.html, "特性效果")) ||
+    cleanSummary(seed.effectSummary) ||
+    "暂无说明";
+  const changes = extractGenerationChanges(page.html, "特性变更");
+  const generationRecords = new Map<number, AbilityEntry["generations"][number]>();
+
+  generationRecords.set(seed.generation, {
+    generation: seed.generation,
+    effectSummary
+  });
+
+  for (const change of changes) {
+    generationRecords.set(change.generation, {
+      generation: change.generation,
+      effectSummary: change.summary,
+      notes: "来自 52Poké 特性变更章节。"
+    });
+  }
+
+  return {
+    id: `ability-${slugify(seed.nameZh)}`,
+    slug: seed.nameZh,
+    nameZh: seed.nameZh,
+    nameJa: introNames.nameJa || seed.nameJa,
+    nameEn: introNames.nameEn || seed.nameEn,
+    effectSummary,
+    generations: [...generationRecords.values()].sort((left, right) => left.generation - right.generation),
+    source: {
+      url: page.url,
+      title: page.title,
+      fetchedAt: page.fetchedAt
+    }
+  };
+}
+
+async function normalizeItemDetailPage(page: RawPage, seed: ItemSeed): Promise<ItemEntry> {
+  const text = normalizeText(page.html);
+  const introNames = extractNamesFromIntro(text, seed.nameZh);
+  const effectSummary =
+    cleanSummary(extractSectionTextByHeading(page.html, "效果")) ||
+    cleanSummary(seed.effectSummary) ||
+    "暂无说明";
+  const bagInfo = extractSectionTextByHeading(page.html, "包包信息");
+  const category =
+    seed.category ||
+    bagInfo.match(/口袋\s+([^\n ]+)/)?.[1]?.trim() ||
+    text.match(/口袋\s+([^\n ]+)/)?.[1]?.trim();
+  let image;
+
+  try {
+    image = await cacheItemImageFromPage(page, seed);
+  } catch {
+    const imageUrl = pickBestImageUrl(extractImageCandidates(page.html), (fileName) => scoreItemImage(fileName, seed));
+    image = imageUrl
+      ? {
+          url: normalizeMediaUrl(imageUrl),
+          alt: `${seed.nameZh}图片`,
+          sourceUrl: normalizeMediaUrl(imageUrl)
+        }
+      : undefined;
+  }
+
+  return {
+    id: `item-${slugify(seed.nameZh)}`,
+    slug: seed.nameZh,
+    nameZh: seed.nameZh,
+    nameJa: introNames.nameJa || seed.nameJa,
+    nameEn: introNames.nameEn || seed.nameEn,
+    category,
+    effectSummary,
+    image,
+    source: {
+      url: page.url,
+      title: page.title,
+      fetchedAt: page.fetchedAt
+    }
+  };
+}
+
 export async function fetchRawPage(url: string, slug: string, options?: FetchPageOptions): Promise<RawPage> {
   if (options?.preferCache && !options?.refresh) {
     const cached = readRawPageCache(slug);
@@ -1224,6 +1544,96 @@ export async function fetchRawPage(url: string, slug: string, options?: FetchPag
   }
 
   throw new Error(`Fetch failed after retries: ${url}`);
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+  onCheckpoint?: (results: R[], processedCount: number) => void
+) {
+  const results: R[] = [];
+  const size = Math.max(1, concurrency);
+
+  for (let index = 0; index < items.length; index += size) {
+    const batch = items.slice(index, index + size);
+    const batchResults = await Promise.all(batch.map((item, batchIndex) => worker(item, index + batchIndex)));
+    results.push(...batchResults);
+    onCheckpoint?.(results, results.length);
+  }
+
+  return results;
+}
+
+function moveFromSeed(seed: MoveSeed, fetchedAt: string): MoveEntry {
+  return {
+    id: `move-${slugify(seed.nameZh)}`,
+    slug: seed.nameZh,
+    nameZh: seed.nameZh,
+    nameJa: seed.nameJa,
+    nameEn: seed.nameEn,
+    type: seed.type,
+    category: seed.category,
+    power: seed.power,
+    accuracy: seed.accuracy,
+    pp: seed.pp,
+    effectSummary: seed.effectSummary,
+    generations: [
+      {
+        generation: seed.generation,
+        type: seed.type,
+        category: seed.category,
+        power: seed.power,
+        accuracy: seed.accuracy,
+        pp: seed.pp,
+        effectSummary: seed.effectSummary || "暂无说明"
+      }
+    ],
+    source: {
+      url: seed.detailUrl,
+      title: seed.nameZh,
+      fetchedAt
+    }
+  };
+}
+
+function abilityFromSeed(seed: AbilitySeed, fetchedAt: string): AbilityEntry {
+  return {
+    id: `ability-${slugify(seed.nameZh)}`,
+    slug: seed.nameZh,
+    nameZh: seed.nameZh,
+    nameJa: seed.nameJa,
+    nameEn: seed.nameEn,
+    effectSummary: seed.effectSummary,
+    generations: [
+      {
+        generation: seed.generation,
+        effectSummary: seed.effectSummary || "暂无说明"
+      }
+    ],
+    source: {
+      url: seed.detailUrl,
+      title: seed.nameZh,
+      fetchedAt
+    }
+  };
+}
+
+function itemFromSeed(seed: ItemSeed, fetchedAt: string): ItemEntry {
+  return {
+    id: `item-${slugify(seed.nameZh)}`,
+    slug: seed.nameZh,
+    nameZh: seed.nameZh,
+    nameJa: seed.nameJa,
+    nameEn: seed.nameEn,
+    category: seed.category,
+    effectSummary: seed.effectSummary,
+    source: {
+      url: seed.detailUrl,
+      title: seed.nameZh,
+      fetchedAt
+    }
+  };
 }
 
 export function parsePokemonListPage(html: string): PokemonSeed[] {
@@ -1282,6 +1692,131 @@ export function parseItemListPage(html: string): ItemSeed[] {
   }
 
   return items;
+}
+
+export function parseMoveListPage(html: string): MoveSeed[] {
+  const text = normalizeText(html);
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const seeds: MoveSeed[] = [];
+  let currentGeneration = 1;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const generation = generationFromHeading(lines[index]);
+    if (generation) {
+      currentGeneration = generation;
+      continue;
+    }
+
+    if (!/^\d{1,4}$/.test(lines[index])) {
+      continue;
+    }
+
+    const nameZh = lines[index + 1];
+    const nameJa = lines[index + 2];
+    const nameEn = lines[index + 3];
+    const type = lines[index + 4];
+    const category = normalizeCategory(lines[index + 5]);
+    const power = normalizePower(lines[index + 6]);
+    const accuracy = formatAccuracy(lines[index + 7]);
+    const pp = normalizePp(lines[index + 8]);
+    const effectSummary = lines[index + 9];
+
+    if (!nameZh || !nameJa || !nameEn || !type || !category || !effectSummary) {
+      continue;
+    }
+    if (["中文名", "日文名", "英文名"].includes(nameZh)) {
+      continue;
+    }
+    if (!POKEMON_TYPES.has(type) || !MOVE_CATEGORIES.has(category)) {
+      continue;
+    }
+
+    seeds.push({
+      nameZh,
+      nameJa,
+      nameEn,
+      generation: currentGeneration,
+      type,
+      category,
+      power,
+      accuracy,
+      pp,
+      effectSummary,
+      detailUrl: buildMovePageUrl(nameZh)
+    });
+  }
+
+  return uniqueByJson(seeds).filter((seed) => !/^[A-Z]$/.test(seed.nameZh));
+}
+
+export function parseAbilityListPage(html: string): AbilitySeed[] {
+  const text = normalizeText(html);
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
+  const seeds: AbilitySeed[] = [];
+  let currentGeneration = 3;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const generation = generationFromHeading(lines[index]);
+    if (generation) {
+      currentGeneration = generation;
+      continue;
+    }
+
+    if (!/^\d{3}$/.test(lines[index])) {
+      continue;
+    }
+
+    const nameZh = lines[index + 1];
+    const nameJa = lines[index + 2];
+    const nameEn = lines[index + 3];
+    const effectSummary = lines[index + 4];
+
+    if (!nameZh || !nameJa || !nameEn || !effectSummary) {
+      continue;
+    }
+    if (["中文名", "日文名", "英文名"].includes(nameZh)) {
+      continue;
+    }
+
+    seeds.push({
+      nameZh,
+      nameJa,
+      nameEn,
+      generation: currentGeneration,
+      effectSummary,
+      detailUrl: buildAbilityPageUrl(nameZh)
+    });
+  }
+
+  return uniqueByJson(seeds);
+}
+
+function parseItemSeedsFromLinks(html: string) {
+  const seeds = new Map<string, ItemSeed>();
+  const pattern = /<a\s+[^>]*href=["']([^"']+)["'][^>]*title=["']([^"']+（道具）)["'][^>]*>([\s\S]*?)<\/a>/gi;
+
+  for (const match of html.matchAll(pattern)) {
+    const title = decodeHtmlEntities(match[2]).replace(/（道具）$/, "").trim();
+    const label = stripTags(match[3]).trim();
+    const nameZh = label && !label.includes("[") ? label : title;
+    if (!nameZh || /道具|列表|分类|页面/.test(nameZh)) {
+      continue;
+    }
+
+    seeds.set(nameZh, {
+      nameZh,
+      detailUrl: toAbsoluteUrl(match[1])
+    });
+  }
+
+  for (const item of parseItemListPage(html)) {
+    seeds.set(item.nameZh, {
+      ...seeds.get(item.nameZh),
+      ...item
+    });
+  }
+
+  return [...seeds.values()].sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-Hans-CN"));
 }
 
 export function normalizePokemonPage(page: RawPage, seed: PokemonSeed): PokemonEntry {
@@ -1984,6 +2519,108 @@ export async function importFromFixtures() {
     itemCount: items.length,
     moveCount: moves.length,
     abilityCount: abilities.length
+  };
+}
+
+export async function importCatalogDetailsFrom52poke(options?: ImportCatalog52pokeOptions) {
+  const preferCache = options?.preferCache ?? true;
+  const refreshRaw = options?.refreshRaw ?? false;
+  const concurrency = Math.max(1, Number(options?.concurrency ?? 2));
+  const checkpointEvery = Math.max(1, Number(options?.checkpointEvery ?? 50));
+  const shouldImportMoves = options?.importMoves ?? true;
+  const shouldImportAbilities = options?.importAbilities ?? true;
+  const shouldImportItems = options?.importItems ?? true;
+  const fetchedAt = new Date().toISOString();
+
+  let moves = listCurrentMovesSafe();
+  let abilities = listCurrentAbilitiesSafe();
+  let items = listCurrentItemsSafe();
+
+  if (shouldImportMoves) {
+    const moveListPage = await fetchRawPage(MOVE_LIST_URL, "move-list", { preferCache, refresh: refreshRaw });
+    const moveSeeds = parseMoveListPage(moveListPage.html).slice(0, options?.moveLimit);
+    const importedMoves = await mapWithConcurrency(
+      moveSeeds,
+      concurrency,
+      async (seed) => {
+        try {
+          const detailPage = await fetchRawPage(seed.detailUrl, `move-${slugify(seed.nameZh)}`, {
+            preferCache,
+            refresh: refreshRaw
+          });
+          return normalizeMoveDetailPage(detailPage, seed);
+        } catch {
+          return moveFromSeed(seed, fetchedAt);
+        }
+      },
+      (partialMoves, processedCount) => {
+        if (processedCount % checkpointEvery === 0 || processedCount === moveSeeds.length) {
+          replaceMoves([...partialMoves].sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-Hans-CN")));
+        }
+      }
+    );
+    moves = importedMoves.sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-Hans-CN"));
+    replaceMoves(moves);
+  }
+
+  if (shouldImportAbilities) {
+    const abilityListPage = await fetchRawPage(ABILITY_LIST_URL, "ability-list", { preferCache, refresh: refreshRaw });
+    const abilitySeeds = parseAbilityListPage(abilityListPage.html).slice(0, options?.abilityLimit);
+    const importedAbilities = await mapWithConcurrency(
+      abilitySeeds,
+      concurrency,
+      async (seed) => {
+        try {
+          const detailPage = await fetchRawPage(seed.detailUrl, `ability-${slugify(seed.nameZh)}`, {
+            preferCache,
+            refresh: refreshRaw
+          });
+          return normalizeAbilityDetailPage(detailPage, seed);
+        } catch {
+          return abilityFromSeed(seed, fetchedAt);
+        }
+      },
+      (partialAbilities, processedCount) => {
+        if (processedCount % checkpointEvery === 0 || processedCount === abilitySeeds.length) {
+          replaceAbilities([...partialAbilities].sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-Hans-CN")));
+        }
+      }
+    );
+    abilities = importedAbilities.sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-Hans-CN"));
+    replaceAbilities(abilities);
+  }
+
+  if (shouldImportItems) {
+    const itemListPage = await fetchRawPage(ITEM_LIST_URL, "item-list", { preferCache, refresh: refreshRaw });
+    const itemSeeds = parseItemSeedsFromLinks(itemListPage.html).slice(0, options?.itemLimit);
+    const importedItems = await mapWithConcurrency(
+      itemSeeds,
+      concurrency,
+      async (seed) => {
+        try {
+          const detailPage = await fetchRawPage(seed.detailUrl, `item-${slugify(seed.nameZh)}`, {
+            preferCache,
+            refresh: refreshRaw
+          });
+          return normalizeItemDetailPage(detailPage, seed);
+        } catch {
+          return itemFromSeed(seed, fetchedAt);
+        }
+      },
+      (partialItems, processedCount) => {
+        if (processedCount % checkpointEvery === 0 || processedCount === itemSeeds.length) {
+          replaceItems([...partialItems].sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-Hans-CN")));
+        }
+      }
+    );
+    items = importedItems.sort((left, right) => left.nameZh.localeCompare(right.nameZh, "zh-Hans-CN"));
+    replaceItems(items);
+  }
+
+  return {
+    moveCount: moves.length,
+    abilityCount: abilities.length,
+    itemCount: items.length
   };
 }
 

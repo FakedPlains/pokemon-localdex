@@ -54,7 +54,7 @@ const NATURE_EFFECTS = {
 
 const state = {
   pokedex: { query: "", type: "", generation: "", selected: null, imageMode: "official" },
-  items: { selected: null },
+  items: { selected: null, query: "", category: "", visibleLimit: 120 },
   moves: { query: "", type: "", generation: "", selected: null },
   abilities: { query: "", generation: "", selected: null },
   teams: { id: "", name: "", format: "singles", members: [], saved: [] },
@@ -887,8 +887,21 @@ async function renderPokedex() {
 
 async function renderItems() {
   const items = (await api("/items")).data;
-  if (!state.items.selected && items[0]) {
-    state.items.selected = items[0].slug || items[0].id;
+  const itemCategories = [...new Set(items.map((item) => item.category).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, "zh-Hans-CN"));
+  const query = state.items.query.trim().toLowerCase();
+  const filteredItems = items.filter((item) => {
+    const matchesQuery = !query ||
+      [item.id, item.slug, item.nameZh, item.nameJa, item.nameEn, item.effectSummary]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    const matchesCategory = !state.items.category || item.category === state.items.category;
+    return matchesQuery && matchesCategory;
+  });
+  const visibleItems = filteredItems.slice(0, state.items.visibleLimit);
+
+  if (!state.items.selected && filteredItems[0]) {
+    state.items.selected = filteredItems[0].slug || filteredItems[0].id;
   }
   const detail = state.items.selected ? (await api(`/items/${encodeURIComponent(state.items.selected)}`)).data : null;
 
@@ -898,12 +911,23 @@ async function renderItems() {
         <div class="panel-header">
           <div>
             <h2 class="panel-title">道具资料</h2>
-            <p class="panel-subtitle">当前展示本地已导入的道具数据。</p>
+            <p class="panel-subtitle">当前展示本地已导入的真实道具详情，支持按名称、说明和分类筛选。</p>
           </div>
-          <span class="chip">${items.length} 个道具</span>
+          <span class="chip">${filteredItems.length} / ${items.length} 个道具</span>
+        </div>
+        <div class="toolbar">
+          <div class="toolbar-row">
+            <input id="item-query" placeholder="搜索道具中文 / 日文 / 英文名或效果" value="${escapeHtml(state.items.query)}" />
+          </div>
+          <div class="toolbar-row">
+            <select id="item-category">
+              <option value="">全部分类</option>
+              ${itemCategories.map((category) => `<option value="${escapeHtml(category)}" ${state.items.category === category ? "selected" : ""}>${escapeHtml(category)}</option>`).join("")}
+            </select>
+          </div>
         </div>
         <div class="item-list">
-          ${items.map((item) => `
+          ${visibleItems.map((item) => `
             <button class="list-card secondary" data-item="${escapeHtml(item.slug || item.id)}">
               <div class="card-topline">
                 <strong>${escapeHtml(item.nameZh)}</strong>
@@ -912,8 +936,13 @@ async function renderItems() {
               <div class="muted">${escapeHtml(item.nameEn || "")}</div>
               <div>${escapeHtml(item.effectSummary || "暂无说明")}</div>
             </button>
-          `).join("")}
+          `).join("") || `<div class="muted" style="padding: 0 24px 24px;">没有命中道具。</div>`}
         </div>
+        ${visibleItems.length < filteredItems.length ? `
+          <div class="toolbar-row" style="padding: 0 24px 24px;">
+            <button id="load-more-items" class="secondary">再显示 ${Math.min(120, filteredItems.length - visibleItems.length)} 个道具</button>
+          </div>
+        ` : ""}
       </div>
       <div class="panel detail-panel">
         ${detail ? `
@@ -944,6 +973,22 @@ async function renderItems() {
     </section>
   `;
 
+  document.querySelector("#item-query")?.addEventListener("input", async (event) => {
+    state.items.query = event.target.value;
+    state.items.visibleLimit = 120;
+    state.items.selected = null;
+    await renderItems();
+  });
+  document.querySelector("#item-category")?.addEventListener("change", async (event) => {
+    state.items.category = event.target.value;
+    state.items.visibleLimit = 120;
+    state.items.selected = null;
+    await renderItems();
+  });
+  document.querySelector("#load-more-items")?.addEventListener("click", async () => {
+    state.items.visibleLimit += 120;
+    await renderItems();
+  });
   document.querySelectorAll("[data-item]").forEach((button) => {
     button.addEventListener("click", async () => {
       state.items.selected = button.getAttribute("data-item");
