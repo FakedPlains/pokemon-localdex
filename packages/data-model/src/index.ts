@@ -39,6 +39,7 @@ export type PokemonImageSet = {
 
 export type PokemonEvolutionMember = {
   id: string;
+  legacyId?: string;
   dexNumber: number;
   slug: string;
   nameZh: string;
@@ -51,6 +52,7 @@ export type PokemonEvolutionMember = {
 
 export type PokemonSummary = {
   id: string;
+  legacyId?: string;
   dexNumber: number;
   slug: string;
   nameZh: string;
@@ -63,6 +65,7 @@ export type PokemonSummary = {
 
 export type ItemEntry = {
   id: string;
+  legacyId?: string;
   slug: string;
   nameZh: string;
   nameJa?: string;
@@ -80,6 +83,7 @@ export type GenderRatio = {
 
 export type PokemonForm = {
   id: string;
+  legacyId?: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -159,6 +163,7 @@ export type MoveGenerationRecord = {
 
 export type MoveEntry = {
   id: string;
+  legacyId?: string;
   slug: string;
   nameZh: string;
   nameJa?: string;
@@ -182,6 +187,7 @@ export type AbilityGenerationRecord = {
 
 export type AbilityEntry = {
   id: string;
+  legacyId?: string;
   slug: string;
   nameZh: string;
   nameJa?: string;

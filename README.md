@@ -21,6 +21,8 @@
 - 本地 API 服务骨架
 - Web / 小程序端的应用边界规划
 - 离线 fixture 导入与 smoke test
+- SQLite 结构化存储，核心表使用自增整数主键，并保留 `legacy_id` 追溯原始业务标识
+- 宝可梦、招式、特性、道具、图片、形态、进化链和世代差异数据的关系化入库
 
 ## 目录
 
@@ -34,11 +36,13 @@ pokemon-localdex/
     battle-core 伤害计算与队伍规则核心
     data-model  统一数据模型与本地 JSON 数据加载
     scraper     52Poké 采集与标准化导入
+    sqlite-store SQLite 建表、导入和查询适配
   docs/
     architecture.md
   data/
     normalized/ 标准化后的本地 JSON 数据
     raw/        原始抓取页面缓存
+    sqlite/     本地 SQLite 数据库
 ```
 
 ## 先做什么
@@ -100,7 +104,8 @@ REFRESH_RAW=1 START_DEX=1 END_DEX=30 npm run import:52poke
 - 支持招式与特性的独立资料实体，并记录按世代的效果差异
 - `import:52poke` 会尝试继续抓取宝可梦各世代招式表，并从招式表里补出本地 `moves.json` 的基础参数
 - 将标准化结果写入 `data/normalized/pokemon.json`、`data/normalized/items.json`、`data/normalized/moves.json`、`data/normalized/abilities.json`
-- 可将标准化 JSON 导入 `data/sqlite/localdex.sqlite`
+- 可将标准化 JSON 结构化导入 `data/sqlite/localdex.sqlite`
+- SQLite 中宝可梦、招式、特性、道具、形态、图片、进化链、世代属性、世代特性、世代种族值、可学招式均已关系化存储
 - 通过 API 提供：
   - `GET /pokemon`
   - `GET /pokemon?q=皮卡&type=电&generation=1`
@@ -121,7 +126,7 @@ REFRESH_RAW=1 START_DEX=1 END_DEX=30 npm run import:52poke
 - 本地落地形态分两层：
   - `data/raw/`：保留原始页面快照，便于追溯
   - `data/normalized/`：转换为统一 JSON/SQLite 结构，供多端复用
-- 真实抓取到的图片会缓存到 `apps/web/public/assets/cache/`，供 Web 端直接展示
+- 宝可梦和道具图片优先存储 52Poké 在线图片 URL；宝可梦图片取自详情页“形象”区域的 Pokemon HOME 图片，并将缩略图 URL 还原为原图 URL
 - 全量抓取进度会写到 `data/raw/import-progress-52poke.json`，用于查看断点续跑状态
 
 ## SQLite 说明
@@ -130,7 +135,30 @@ REFRESH_RAW=1 START_DEX=1 END_DEX=30 npm run import:52poke
 - 导入流程：
   1. 先执行 `npm run import:fixtures` 或 `npm run import:52poke`
   2. 再执行 `npm run db:import`
-- API 在检测到 SQLite 中有数据时，会优先从 SQLite 读宝可梦和道具资料；否则自动回退到 JSON
+- API 在检测到 SQLite 中有数据时，会优先从 SQLite 读取宝可梦、道具、招式和特性资料；否则自动回退到 JSON
+- 所有核心表的 `id` 都使用 `INTEGER PRIMARY KEY AUTOINCREMENT`
+- 原标准化 JSON 中的字符串 ID 会写入 `legacy_id`，例如 `pokemon-0003`、`move-十万伏特`、`ability-静电`
+- 外键关系使用自增整数 ID，API 查询仍兼容数字 ID、`legacy_id`、`slug` 和中文名
+
+### 主要表结构
+
+- `pokemon`、`moves`、`abilities`、`items`：宝可梦、招式、特性、道具主表
+- `types`、`generations`：属性与世代字典表，其中 `generations.number` 表示第几世代
+- `image_assets`：统一图片表，按 `entity_type`、`entity_id`、`form_id`、`image_kind` 记录在线图片 URL
+- `pokemon_forms`、`pokemon_form_stats`、`pokemon_form_types`、`pokemon_form_abilities`：形态、超级进化、超极巨化等形态资料
+- `pokemon_evolution_members`：进化链成员关系，用于图鉴按进化链展示
+- `pokemon_moves`：宝可梦按世代可学招式，包含学习方式、等级、版本备注和排序
+- `move_generation_records`、`ability_generation_records`：招式/特性自身在不同世代的效果差异
+
+### 宝可梦世代差异表
+
+`pokemon_generation_records` 现在只保存宝可梦与世代的基础记录、标签和备注。具体变化拆分到以下表：
+
+- `pokemon_generation_types`：记录各世代属性变化
+- `pokemon_generation_abilities`：记录各世代普通特性和隐藏特性变化
+- `pokemon_generation_stats`：记录各世代种族值变化
+
+这让“某只宝可梦在某世代属性变了、特性变了、种族值变了”可以分别查询和维护，也避免把多个领域字段混在同一张记录表里。
 
 ## Web 界面
 
@@ -147,10 +175,9 @@ REFRESH_RAW=1 START_DEX=1 END_DEX=30 npm run import:52poke
 ## 当前限制
 
 - 52Poké 页面结构比较复杂，当前多形态和跨世代差异仍然采用启发式解析，后续还需要针对形态页模板做更细拆分
-- 当前图片资源先用本地演示图打通展示链路，后续可以替换为真实 52Poké 图片抓取结果
-- SQLite 目前主要覆盖宝可梦和道具；招式、特性仍先从 JSON 提供
-- 真实 52Poké 在线抓取当前已补到“宝可梦详情 + 世代招式表 + 招式基础参数”，图片与特性详情仍需继续扩展
-- 真实 52Poké 在线抓取当前会尝试缓存宝可梦原图 / 闪光图 / 形态图，以及道具图到本地静态目录；受页面结构影响，个别条目可能仍会缺图
+- 图片使用 52Poké 在线 URL，部署环境需要允许访问 `s1.52poke.com`
+- 真实 52Poké 在线抓取当前已补到“宝可梦详情 + 世代招式表 + 招式/特性/道具基础资料 + Pokemon HOME 图片 URL”
+- 受页面结构影响，个别宝可梦形态、特性文本或招式学习表仍可能需要后续人工校正规则
 - `import:52poke` 默认优先复用 `data/raw/` 已有页面缓存；全量抓取建议配合 `ONLY_MISSING=1` 和 `CHECKPOINT_EVERY` 使用
 - 微信小程序和 App 端还没有正式 UI，当前优先把 Web 端打磨完整
 
@@ -158,8 +185,8 @@ REFRESH_RAW=1 START_DEX=1 END_DEX=30 npm run import:52poke
 
 如果继续做，我建议下一轮直接实现：
 
-- 真实 52Poké 图片抓取与缓存
-- 宝可梦各世代可学招式与特性的真实抓取和标准化
-- 招式学习表、特性拥有者列表、属性克制表
-- Web 端详情页的世代切换视图
+- 继续校正 52Poké 多形态、地区形态、特殊形态的解析规则
+- 补充属性克制表、性格、道具和特性对伤害计算的联动
+- 完善特性拥有者列表和招式学习表的反向查询
+- Web 端详情页继续增强世代切换视图和字段差异提示
 - 微信小程序 / App 复用当前 API
