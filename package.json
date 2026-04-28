@@ -8,16 +8,25 @@
   ],
   "scripts": {
     "dev:api": "node --enable-source-maps apps/api/src/server.ts",
+    "dev:web": "npm run dev -w @pokemon-localdex/web",
+    "build:web": "npm run build -w @pokemon-localdex/web",
     "check:damage": "node --enable-source-maps packages/battle-core/src/demo.ts",
     "check:api": "LOCALDEX_DB_PATH=/tmp/pokemon-localdex-checkapi.sqlite node --enable-source-maps apps/api/src/smoke.ts",
     "check:sqlite": "LOCALDEX_DB_PATH=/tmp/pokemon-localdex-checksqlite.sqlite node --enable-source-maps packages/sqlite-store/src/demo.ts",
-    "build:pages": "node scripts/build-pages.mjs",
+    "build:pages": "npm run build:web && node scripts/build-pages.mjs",
     "db:import": "node --enable-source-maps packages/sqlite-store/src/import-db.ts",
     "enrich:evolution": "node scripts/enrich-evolution-chains.mjs",
     "enrich:learnsets": "node scripts/enrich-learnsets-from-raw.mjs",
     "images:online": "node scripts/use-online-pokemon-images.mjs",
+    "crawl:52poke:db": "python3 scripts/crawl-52poke-db.py",
+    "crawl:52poke:all": "python3 scripts/crawl-52poke-db.py all",
     "import:fixtures": "node --enable-source-maps packages/scraper/src/import-fixtures.ts",
-    "import:52poke": "node --enable-source-maps packages/scraper/src/import-52poke.ts",
-    "import:52poke:catalog": "node --enable-source-maps packages/scraper/src/import-52poke-catalog.ts"
+    "import:52poke": "python3 scripts/crawl-52poke-db.py pokemon",
+    "import:52poke:catalog": "python3 scripts/crawl-52poke-db.py catalog"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.0",
+    "hono": "^4.12.15",
+    "vite": "^8.0.10"
   }
 }

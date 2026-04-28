@@ -801,6 +801,98 @@ function splitTokens(value: string | undefined) {
   return value?.split(/\s+/).map((item) => item.trim()).filter(Boolean) ?? [];
 }
 
+function extractAbilityNamesFromHtml(fragment: string) {
+  const names: string[] = [];
+  const pattern = /<a\b[^>]*title=["']([^"']+（特性）)["'][^>]*>([\s\S]*?)<\/a>/gi;
+
+  for (const match of fragment.matchAll(pattern)) {
+    const title = decodeHtmlEntities(match[1]).replace(/（特性）$/, "").trim();
+    const label = stripTags(match[2]).trim();
+    const name = label && !/[()[\]{}]/.test(label) ? label : title;
+    if (name && !["特性", "隐藏特性", "隱藏特性", "或"].includes(name)) {
+      names.push(name);
+    }
+  }
+
+  return dedupe(names);
+}
+
+function extractPokemonAbilityInfo(html: string) {
+  const labelIndex = html.search(/title=["']特性["'][^>]*>特性<\/a><\/b>/);
+  if (labelIndex < 0) {
+    return { abilities: [], hiddenAbility: undefined };
+  }
+
+  const tableStart = html.slice(labelIndex).search(/<table\b[^>]*bgwhite[^>]*fulltable[^>]*>/i);
+  if (tableStart < 0) {
+    return { abilities: [], hiddenAbility: undefined };
+  }
+
+  const startIndex = labelIndex + tableStart;
+  const tail = html.slice(startIndex);
+  const tableEnd = tail.search(/<\/table>/i);
+  const abilityTableHtml = tableEnd >= 0 ? tail.slice(0, tableEnd) : tail.slice(0, 4000);
+  const abilities: string[] = [];
+  let hiddenAbility: string | undefined;
+  const cellPattern = /<td\b[^>]*>([\s\S]*?)<\/td>/gi;
+
+  for (const cellMatch of abilityTableHtml.matchAll(cellPattern)) {
+    const cellHtml = cellMatch[1];
+    const names = extractAbilityNamesFromHtml(cellHtml);
+    if (names.length === 0) {
+      continue;
+    }
+    if (/隐藏特性|隱藏特性/.test(stripTags(cellHtml))) {
+      hiddenAbility = names[0];
+    } else {
+      abilities.push(...names);
+    }
+  }
+
+  return {
+    abilities: dedupe(abilities),
+    hiddenAbility
+  };
+}
+
+function extractAbilityChangeRecords(html: string) {
+  const records: Array<{ beforeGeneration: number; ability: string }> = [];
+  const pattern =
+    /第([一二三四五六七八九])世代<\/a>前[^。]{0,48}?特性[为為]\s*<a\b[^>]*title=["']([^"']+（特性）)["'][^>]*>([\s\S]*?)<\/a>/g;
+
+  for (const match of html.matchAll(pattern)) {
+    const beforeGeneration = generationFromChineseNumeral(match[1]);
+    const names = extractAbilityNamesFromHtml(match[0]);
+    const ability = names[0] || decodeHtmlEntities(match[2]).replace(/（特性）$/, "").trim();
+    if (beforeGeneration && ability) {
+      records.push({ beforeGeneration, ability });
+    }
+  }
+
+  return records;
+}
+
+function buildAbilityGenerationRecords(
+  generations: number[],
+  abilities: string[],
+  hiddenAbility: string | undefined,
+  changes: Array<{ beforeGeneration: number; ability: string }>
+): NonNullable<PokemonEntry["generationRecords"]> {
+  const records: NonNullable<PokemonEntry["generationRecords"]> = [];
+  const uniqueGenerations = dedupe(generations).sort((left, right) => left - right);
+
+  for (const generation of uniqueGenerations) {
+    const change = changes.find((item) => generation >= 3 && generation < item.beforeGeneration);
+    const abilityIds = generation < 3 ? [] : change ? [change.ability] : abilities;
+    const hiddenAbilityId = generation >= 5 && !change ? hiddenAbility : undefined;
+    if (abilityIds.length > 0 || hiddenAbilityId) {
+      records.push({ generation, abilityIds, hiddenAbilityId });
+    }
+  }
+
+  return records;
+}
+
 function uniqueByJson<T>(items: T[]) {
   return dedupe(items.map((item) => JSON.stringify(item))).map((item) => JSON.parse(item));
 }
@@ -1068,6 +1160,30 @@ function mergePokemonEntriesByDex(existingEntries: PokemonEntry[], updatedEntrie
   return [...byDex.values()].sort((left, right) => left.dexNumber - right.dexNumber);
 }
 
+function mergePokemonGenerationRecords(
+  leftRecords: PokemonEntry["generationRecords"],
+  rightRecords: PokemonEntry["generationRecords"]
+): PokemonEntry["generationRecords"] {
+  const byGeneration = new Map<number, NonNullable<PokemonEntry["generationRecords"]>[number]>();
+
+  for (const record of [...(leftRecords || []), ...(rightRecords || [])]) {
+    const current = byGeneration.get(record.generation);
+    byGeneration.set(record.generation, {
+      ...current,
+      ...record,
+      abilityIds: record.abilityIds ?? current?.abilityIds,
+      hiddenAbilityId: record.hiddenAbilityId ?? current?.hiddenAbilityId,
+      baseStats: record.baseStats ?? current?.baseStats,
+      moveIds: record.moveIds ?? current?.moveIds,
+      learnset: record.learnset ?? current?.learnset,
+      notes: [current?.notes, record.notes].filter(Boolean).join("；") || undefined
+    });
+  }
+
+  const merged = [...byGeneration.values()].sort((left, right) => left.generation - right.generation);
+  return merged.length > 0 ? merged : undefined;
+}
+
 function mergeItems(existingItems: ItemEntry[], updatedItems: ItemEntry[]) {
   const byId = new Map<string, ItemEntry>();
   for (const item of existingItems) {
@@ -1165,7 +1281,7 @@ async function importPokemonSeedFrom52poke(
         moveIds: uniqueByJson(
           generationRecords.flatMap((record) => record.learnset?.map((item) => item.moveId) ?? [])
         ),
-        generationRecords: generationRecords.length > 0 ? generationRecords : undefined
+        generationRecords: mergePokemonGenerationRecords(normalized.generationRecords, generationRecords)
       }
     };
   } catch (error) {
@@ -1868,7 +1984,11 @@ export function normalizePokemonPage(page: RawPage, seed: PokemonSeed): PokemonE
   const typeLine = extractLineValue(text, "属性");
   const categoryLine = extractLineValue(text, "分类");
   const abilityLine = extractLineValue(text, "特性");
-  const hiddenAbilityLine = extractLineValue(text, "隐藏特性") ?? extractLineValue(text, "隱藏特性");
+  const parsedAbilityInfo = extractPokemonAbilityInfo(page.html);
+  const hiddenAbilityLine =
+    parsedAbilityInfo.hiddenAbility ??
+    extractLineValue(text, "隐藏特性") ??
+    extractLineValue(text, "隱藏特性");
   const heightLine = extractLineValue(text, "身高");
   const weightLine = extractLineValue(text, "体重");
   const colorLine = extractLineValue(text, "图鉴颜色");
@@ -1876,10 +1996,18 @@ export function normalizePokemonPage(page: RawPage, seed: PokemonSeed): PokemonE
   const genderMatch = text.match(/雄性\s*([0-9.]+%)｜雌性\s*([0-9.]+%)/);
   const statBlock = chooseBaseStatBlock(extractStatBlocks(text));
   const typeTokens = splitTokens(typeLine);
-  const abilityTokens = splitTokens(abilityLine);
+  const abilityTokens = parsedAbilityInfo.abilities.length > 0
+    ? parsedAbilityInfo.abilities
+    : splitTokens(abilityLine).filter((item) => item !== "或");
   const forms = extractForms(text, seed.nameZh);
   const regionalDexRecords = extractRegionalDexRecords(text);
   const generationAvailability = buildGenerationAvailability(seed.generations, regionalDexRecords);
+  const abilityGenerationRecords = buildAbilityGenerationRecords(
+    generationAvailability.map((item) => item.generation),
+    abilityTokens,
+    hiddenAbilityLine,
+    extractAbilityChangeRecords(page.html)
+  );
 
   return {
     id: `pokemon-${seed.dexNumber.toString().padStart(4, "0")}`,
@@ -1916,6 +2044,7 @@ export function normalizePokemonPage(page: RawPage, seed: PokemonSeed): PokemonE
       : undefined,
     forms: forms.length > 0 ? forms : undefined,
     generationAvailability: generationAvailability.length > 0 ? generationAvailability : undefined,
+    generationRecords: abilityGenerationRecords.length > 0 ? abilityGenerationRecords : undefined,
     source: {
       url: page.url,
       title: page.title,

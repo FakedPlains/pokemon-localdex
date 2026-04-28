@@ -1,0 +1,421 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+import re
+
+from bs4 import BeautifulSoup
+
+from .fetcher import RawPage
+from .utils import (
+    ABILITY_LIST_URL,
+    ITEM_LIST_URL,
+    MOVE_LIST_URL,
+    ImageAsset,
+    build_ability_page_url,
+    build_item_page_url,
+    build_move_page_url,
+    clean_inline_text,
+    clean_summary,
+    extract_file_name,
+    extract_generation_changes,
+    extract_image_candidates,
+    extract_intro_names,
+    format_accuracy,
+    generation_from_heading,
+    normalize_category,
+    normalize_media_url,
+    normalize_power,
+    normalize_pp,
+    normalize_text,
+    section_text_by_heading,
+    slugify,
+    to_absolute_url,
+    unique_by_key,
+)
+
+
+@dataclass(frozen=True)
+class MoveSeed:
+    name_zh: str
+    detail_url: str
+    generation: int = 1
+    name_ja: str | None = None
+    name_en: str | None = None
+    type: str | None = None
+    category: str | None = None
+    power: int | None = None
+    accuracy: str | None = None
+    pp: int | None = None
+    effect_summary: str | None = None
+
+
+@dataclass(frozen=True)
+class AbilitySeed:
+    name_zh: str
+    detail_url: str
+    generation: int = 3
+    name_ja: str | None = None
+    name_en: str | None = None
+    effect_summary: str | None = None
+
+
+@dataclass(frozen=True)
+class ItemSeed:
+    name_zh: str
+    detail_url: str
+    name_ja: str | None = None
+    name_en: str | None = None
+    category: str | None = None
+    effect_summary: str | None = None
+
+
+def parse_move_list_page(html: str) -> list[MoveSeed]:
+    table_seeds = _parse_move_list_tables(html)
+    if table_seeds:
+        return table_seeds
+
+    lines = [line.strip() for line in normalize_text(html).splitlines() if line.strip()]
+    seeds: list[MoveSeed] = []
+    current_generation = 1
+    for index, line in enumerate(lines):
+        generation = generation_from_heading(line)
+        if generation:
+            current_generation = generation
+            continue
+        if not re.fullmatch(r"\d{1,4}", line):
+            continue
+        row = lines[index + 1:index + 10]
+        if len(row) < 9:
+            continue
+        name_zh, name_ja, name_en, type_name, category, power, accuracy, pp, summary = row
+        if name_zh in {"中文名", "日文名", "英文名"}:
+            continue
+        parsed_category = normalize_category(category)
+        if not parsed_category:
+            continue
+        seeds.append(
+            MoveSeed(
+                name_zh=name_zh,
+                name_ja=name_ja,
+                name_en=name_en,
+                generation=current_generation,
+                type=type_name,
+                category=parsed_category,
+                power=normalize_power(power),
+                accuracy=format_accuracy(accuracy),
+                pp=normalize_pp(pp),
+                effect_summary=summary,
+                detail_url=build_move_page_url(name_zh),
+            )
+        )
+    return unique_by_key(seeds, lambda item: item.name_zh)
+
+
+def parse_ability_list_page(html: str) -> list[AbilitySeed]:
+    lines = [line.strip() for line in normalize_text(html).splitlines() if line.strip()]
+    seeds: list[AbilitySeed] = []
+    current_generation = 3
+    for index, line in enumerate(lines):
+        generation = generation_from_heading(line)
+        if generation:
+            current_generation = generation
+            continue
+        if not re.fullmatch(r"\d{3}", line):
+            continue
+        row = lines[index + 1:index + 5]
+        if len(row) < 4:
+            continue
+        name_zh, name_ja, name_en, summary = row
+        if name_zh in {"中文名", "日文名", "英文名"}:
+            continue
+        seeds.append(
+            AbilitySeed(
+                name_zh=name_zh,
+                name_ja=name_ja,
+                name_en=name_en,
+                generation=current_generation,
+                effect_summary=summary,
+                detail_url=build_ability_page_url(name_zh),
+            )
+        )
+    return unique_by_key(seeds, lambda item: item.name_zh)
+
+
+def parse_item_list_page(html: str) -> list[ItemSeed]:
+    table_seeds = _parse_item_list_tables(html)
+    if table_seeds:
+        return table_seeds
+
+    seeds = _parse_item_seeds_from_links(html)
+    text_seeds = _parse_item_table_text(html)
+    for item in text_seeds:
+        previous = seeds.get(item.name_zh)
+        seeds[item.name_zh] = ItemSeed(
+            name_zh=item.name_zh,
+            detail_url=previous.detail_url if previous else item.detail_url,
+            name_ja=item.name_ja,
+            name_en=item.name_en,
+            category=item.category or (previous.category if previous else None),
+            effect_summary=item.effect_summary or (previous.effect_summary if previous else None),
+        )
+    return sorted(seeds.values(), key=lambda item: item.name_zh)
+
+
+def _parse_move_list_tables(html: str) -> list[MoveSeed]:
+    soup = BeautifulSoup(html or "", "html.parser")
+    seeds: list[MoveSeed] = []
+    current_generation = 0
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if not rows:
+            continue
+        header = [clean_inline_text(cell.get_text(" ", strip=True)) for cell in rows[0].find_all(["th", "td"])]
+        if not {"编号", "中文名", "日文名", "英文名", "属性", "分类"}.issubset(set(header)):
+            continue
+        current_generation += 1
+        index = {name: header.index(name) for name in header}
+        for row in rows[1:]:
+            cells_tags = row.find_all(["th", "td"])
+            cells = [clean_inline_text(cell.get_text(" ", strip=True)) for cell in cells_tags]
+            if len(cells) <= max(index.get("说明", 0), index.get("中文名", 0)):
+                continue
+            name_zh = cells[index["中文名"]]
+            if not _looks_like_chinese_name(name_zh):
+                continue
+            anchor = cells_tags[index["中文名"]].find("a") if index["中文名"] < len(cells_tags) else None
+            detail_url = to_absolute_url(str(anchor.get("href"))) if anchor and anchor.get("href") else build_move_page_url(name_zh)
+            seeds.append(MoveSeed(
+                name_zh=name_zh,
+                name_ja=cells[index["日文名"]] if index.get("日文名") is not None and index["日文名"] < len(cells) else None,
+                name_en=cells[index["英文名"]] if index.get("英文名") is not None and index["英文名"] < len(cells) else None,
+                generation=current_generation,
+                type=cells[index["属性"]] if index["属性"] < len(cells) else None,
+                category=normalize_category(cells[index["分类"]] if index["分类"] < len(cells) else None),
+                power=normalize_power(cells[index["威力"]] if "威力" in index and index["威力"] < len(cells) else None),
+                accuracy=format_accuracy(cells[index["命中"]] if "命中" in index and index["命中"] < len(cells) else None),
+                pp=normalize_pp(cells[index["PP"]] if "PP" in index and index["PP"] < len(cells) else cells[index["ＰＰ"]] if "ＰＰ" in index and index["ＰＰ"] < len(cells) else None),
+                effect_summary=cells[index["说明"]] if "说明" in index and index["说明"] < len(cells) else None,
+                detail_url=detail_url,
+            ))
+    return unique_by_key(seeds, lambda item: item.name_zh)
+
+
+def _parse_item_list_tables(html: str) -> list[ItemSeed]:
+    soup = BeautifulSoup(html or "", "html.parser")
+    seeds: list[ItemSeed] = []
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if not rows:
+            continue
+        header = [clean_inline_text(cell.get_text(" ", strip=True)) for cell in rows[0].find_all(["th", "td"])]
+        if "中文" not in header or "英文" not in header or not any(cell in header for cell in ["道具說明", "道具说明"]):
+            continue
+        index = {name: header.index(name) for name in header}
+        summary_index = index.get("道具說明", index.get("道具说明"))
+        for row in rows[1:]:
+            cells_tags = row.find_all(["th", "td"])
+            cells = [clean_inline_text(cell.get_text(" ", strip=True)) for cell in cells_tags]
+            if len(cells) <= max(index["中文"], index["英文"], summary_index or 0):
+                continue
+            name_zh = cells[index["中文"]]
+            if not _looks_like_chinese_name(name_zh):
+                continue
+            anchor = cells_tags[index["中文"]].find("a") if index["中文"] < len(cells_tags) else None
+            detail_url = to_absolute_url(str(anchor.get("href"))) if anchor and anchor.get("href") else build_item_page_url(name_zh)
+            seeds.append(ItemSeed(
+                name_zh=name_zh,
+                name_ja=cells[index["日文"]] if "日文" in index and index["日文"] < len(cells) else None,
+                name_en=cells[index["英文"]] if index["英文"] < len(cells) else None,
+                effect_summary=cells[summary_index] if summary_index is not None and summary_index < len(cells) else None,
+                category=None,
+                detail_url=detail_url,
+            ))
+    return unique_by_key(seeds, lambda item: item.name_zh)
+
+
+def _looks_like_chinese_name(value: str) -> bool:
+    return bool(value and re.search(r"[\u4e00-\u9fff]", value) and not re.search(r"世代|相關|相关|目录|Deutsch|Español", value))
+
+
+def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
+    text = normalize_text(page.html)
+    name_ja, name_en = extract_intro_names(text, seed.name_zh)
+    effect_summary = (
+        clean_summary(section_text_by_heading(page.html, "招式附加效果"))
+        or clean_summary(seed.effect_summary)
+        or "暂无说明"
+    )
+    generations: dict[int, dict] = {
+        seed.generation: {
+            "generation": seed.generation,
+            "type": seed.type,
+            "category": seed.category,
+            "power": seed.power,
+            "accuracy": seed.accuracy,
+            "pp": seed.pp,
+            "effect_summary": effect_summary,
+            "notes": None,
+        }
+    }
+    for change in extract_generation_changes(page.html, "招式变更"):
+        generations[int(change["generation"])] = {
+            "generation": int(change["generation"]),
+            "type": seed.type,
+            "category": seed.category,
+            "power": seed.power,
+            "accuracy": seed.accuracy,
+            "pp": seed.pp,
+            "effect_summary": str(change["summary"]),
+            "notes": "来自 52Poké 招式变更章节。",
+        }
+    image_url = next(
+        (
+            url
+            for url in extract_image_candidates(page.html)
+            if re.search(r"animoves|move", extract_file_name(url), re.I)
+        ),
+        None,
+    )
+    return {
+        "legacy_id": f"move-{slugify(seed.name_zh)}",
+        "slug": slugify(seed.name_zh),
+        "name_zh": seed.name_zh,
+        "name_ja": name_ja or seed.name_ja,
+        "name_en": name_en or seed.name_en,
+        "type": seed.type,
+        "category": seed.category,
+        "power": seed.power,
+        "accuracy": seed.accuracy,
+        "pp": seed.pp,
+        "effect_summary": effect_summary,
+        "image": ImageAsset(normalize_media_url(image_url), f"{seed.name_zh}招式动画", normalize_media_url(image_url)) if image_url else None,
+        "generations": sorted(generations.values(), key=lambda item: item["generation"]),
+        "source": page,
+    }
+
+
+def normalize_ability_detail_page(page: RawPage, seed: AbilitySeed) -> dict:
+    text = normalize_text(page.html)
+    name_ja, name_en = extract_intro_names(text, seed.name_zh)
+    effect_summary = (
+        clean_summary(section_text_by_heading(page.html, "特性效果"))
+        or clean_summary(seed.effect_summary)
+        or "暂无说明"
+    )
+    generations: dict[int, dict] = {
+        seed.generation: {
+            "generation": seed.generation,
+            "effect_summary": effect_summary,
+            "notes": None,
+        }
+    }
+    for change in extract_generation_changes(page.html, "特性变更"):
+        generations[int(change["generation"])] = {
+            "generation": int(change["generation"]),
+            "effect_summary": str(change["summary"]),
+            "notes": "来自 52Poké 特性变更章节。",
+        }
+    return {
+        "legacy_id": f"ability-{slugify(seed.name_zh)}",
+        "slug": slugify(seed.name_zh),
+        "name_zh": seed.name_zh,
+        "name_ja": name_ja or seed.name_ja,
+        "name_en": name_en or seed.name_en,
+        "effect_summary": effect_summary,
+        "generations": sorted(generations.values(), key=lambda item: item["generation"]),
+        "source": page,
+    }
+
+
+def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
+    text = normalize_text(page.html)
+    name_ja, name_en = extract_intro_names(text, seed.name_zh)
+    effect_summary = (
+        clean_summary(section_text_by_heading(page.html, "效果"))
+        or clean_summary(seed.effect_summary)
+        or "暂无说明"
+    )
+    bag_info = section_text_by_heading(page.html, "包包信息")
+    category = seed.category
+    category_match = re.search(r"口袋\s+([^\n ]+)", bag_info or text)
+    if not category and category_match:
+        category = category_match.group(1).strip()
+    image_url = _pick_item_image(page.html, seed)
+    return {
+        "legacy_id": f"item-{slugify(seed.name_zh)}",
+        "slug": slugify(seed.name_zh),
+        "name_zh": seed.name_zh,
+        "name_ja": name_ja or seed.name_ja,
+        "name_en": name_en or seed.name_en,
+        "category": category,
+        "effect_summary": effect_summary,
+        "image": ImageAsset(normalize_media_url(image_url), f"{seed.name_zh}图片", normalize_media_url(image_url)) if image_url else None,
+        "source": page,
+    }
+
+
+def _parse_item_seeds_from_links(html: str) -> dict[str, ItemSeed]:
+    soup = BeautifulSoup(html or "", "html.parser")
+    seeds: dict[str, ItemSeed] = {}
+    for anchor in soup.find_all("a"):
+        title = clean_inline_text(anchor.get("title"))
+        if not title.endswith("（道具）"):
+            continue
+        label = clean_inline_text(anchor.get_text(" ", strip=True))
+        name_zh = label if label and "[" not in label else title.removesuffix("（道具）")
+        if not name_zh or re.search(r"道具|列表|分类|页面", name_zh):
+            continue
+        seeds[name_zh] = ItemSeed(name_zh=name_zh, detail_url=to_absolute_url(str(anchor.get("href") or "")))
+    return seeds
+
+
+def _parse_item_table_text(html: str) -> list[ItemSeed]:
+    lines = [line.strip() for line in normalize_text(html).splitlines() if line.strip()]
+    items: list[ItemSeed] = []
+    current_category = ""
+    for line in lines:
+        if line.startswith("### "):
+            current_category = line.replace("###", "", 1).strip()
+            continue
+        matched = re.match(r"^([^\s]+)\s+([^\s]+)\s+([A-Za-z0-9.'\- ]+)\s+(.+)$", line)
+        if not matched:
+            continue
+        name_zh, name_ja, name_en, summary = matched.groups()
+        if name_zh in {"中文", "日文", "英文", "道具說明"}:
+            continue
+        items.append(
+            ItemSeed(
+                name_zh=name_zh,
+                name_ja=name_ja,
+                name_en=name_en.strip(),
+                effect_summary=summary.strip(),
+                category=current_category or "未分类",
+                detail_url=build_item_page_url(name_zh),
+            )
+        )
+    return items
+
+
+def _pick_item_image(html: str, seed: ItemSeed) -> str | None:
+    english = re.sub(r"[^A-Za-z0-9]+", "", seed.name_en or "").lower()
+    zh_slug = slugify(seed.name_zh).replace("-", "")
+    ranked = []
+    for url in extract_image_candidates(html):
+        file_name = extract_file_name(url).lower()
+        score = 0
+        if english and english in file_name:
+            score += 7
+        if zh_slug and zh_slug in file_name:
+            score += 4
+        if "bag" in file_name or "item" in file_name:
+            score += 2
+        if "icon" in file_name:
+            score += 2
+        if "sprite" in file_name or file_name.startswith("spr"):
+            score -= 3
+        if "type" in file_name or "move" in file_name:
+            score -= 5
+        if score > 0:
+            ranked.append((score, len(file_name), url))
+    ranked.sort(key=lambda item: (-item[0], item[1]))
+    return ranked[0][2] if ranked else None
