@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   normalizePokemonPage,
@@ -8,7 +8,6 @@ import {
 const ROOT = resolve(import.meta.dirname, "..");
 const POKEMON_FILE = resolve(ROOT, "data/normalized/pokemon.json");
 const RAW_DIR = resolve(ROOT, "data/raw");
-const WEB_PUBLIC_DIR = resolve(ROOT, "apps/web/public");
 
 let pokemon = JSON.parse(readFileSync(POKEMON_FILE, "utf8"));
 
@@ -134,18 +133,8 @@ function localImageAsset(entry, kind, sourceUrl) {
     return undefined;
   }
 
-  const baseDir = `assets/cache/pokemon/${String(entry.dexNumber).padStart(4, "0")}-${slugify(entry.nameZh)}`;
-  const fileNameByKind = {
-    official: "official.webp",
-    shinyOfficial: "shiny-official.webp",
-    sprite: "sprite.webp",
-    shinySprite: "shiny-sprite.webp"
-  };
-  const localPath = `/${baseDir}/${fileNameByKind[kind]}`;
-  const absoluteLocalPath = resolve(WEB_PUBLIC_DIR, `.${localPath}`);
-
   return {
-    url: existsSync(absoluteLocalPath) ? localPath : sourceUrl,
+    url: sourceUrl,
     alt: `${entry.nameZh}${kind === "shinyOfficial" || kind === "shinySprite" ? "闪光" : ""}${kind === "official" || kind === "shinyOfficial" ? "官方图" : "图像"}`,
     sourceUrl
   };
@@ -156,13 +145,8 @@ function localFormImageAsset(entry, form, kind, sourceUrl) {
     return undefined;
   }
 
-  const baseDir = `assets/cache/pokemon/${String(entry.dexNumber).padStart(4, "0")}-${slugify(entry.nameZh)}`;
-  const suffix = kind === "shinyOfficial" ? "shiny-official" : "official";
-  const localPath = `/${baseDir}/${slugify(form.nameZh)}-${suffix}.webp`;
-  const absoluteLocalPath = resolve(WEB_PUBLIC_DIR, `.${localPath}`);
-
   return {
-    url: existsSync(absoluteLocalPath) ? localPath : sourceUrl,
+    url: sourceUrl,
     alt: `${form.nameZh}${kind === "shinyOfficial" ? "闪光" : ""}官方图`,
     sourceUrl
   };

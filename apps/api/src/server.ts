@@ -15,10 +15,14 @@ import {
 } from "../../../packages/data-model/src/index.ts";
 import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
 import {
+  getAbilityFromSqlite,
   getItemFromSqlite,
+  getMoveFromSqlite,
   getPokemonFromSqlite,
   hasSqliteData,
+  listAbilitiesFromSqlite,
   listItemsFromSqlite,
+  listMovesFromSqlite,
   listPokemonFromSqlite
 } from "../../../packages/sqlite-store/src/index.ts";
 
@@ -160,16 +164,20 @@ const server = createServer(async (req, res) => {
     const type = url.searchParams.get("type") ?? undefined;
     const generationValue = url.searchParams.get("generation");
     const generation = generationValue ? Number(generationValue) : undefined;
-    const data = query || type || generation
-      ? searchMoves({ query, type, generation })
-      : listMoves();
+    const data = hasSqliteData()
+      ? listMovesFromSqlite({ query, type, generation })
+      : query || type || generation
+        ? searchMoves({ query, type, generation })
+        : listMoves();
     sendJson(res, 200, { data });
     return;
   }
 
   if (req.method === "GET" && url.pathname.startsWith("/moves/")) {
     const id = decodeURIComponent(url.pathname.replace("/moves/", ""));
-    const entry = listMoves().find((item) => item.id === id || item.slug === id);
+    const entry = hasSqliteData()
+      ? getMoveFromSqlite(id)
+      : listMoves().find((item) => item.id === id || item.slug === id);
     if (!entry) {
       sendJson(res, 404, { error: "Move not found" });
       return;
@@ -182,16 +190,20 @@ const server = createServer(async (req, res) => {
     const query = url.searchParams.get("q") ?? undefined;
     const generationValue = url.searchParams.get("generation");
     const generation = generationValue ? Number(generationValue) : undefined;
-    const data = query || generation
-      ? searchAbilities({ query, generation })
-      : listAbilities();
+    const data = hasSqliteData()
+      ? listAbilitiesFromSqlite({ query, generation })
+      : query || generation
+        ? searchAbilities({ query, generation })
+        : listAbilities();
     sendJson(res, 200, { data });
     return;
   }
 
   if (req.method === "GET" && url.pathname.startsWith("/abilities/")) {
     const id = decodeURIComponent(url.pathname.replace("/abilities/", ""));
-    const entry = listAbilities().find((item) => item.id === id || item.slug === id);
+    const entry = hasSqliteData()
+      ? getAbilityFromSqlite(id)
+      : listAbilities().find((item) => item.id === id || item.slug === id);
     if (!entry) {
       sendJson(res, 404, { error: "Ability not found" });
       return;

@@ -651,7 +651,7 @@ function renderImageViewer(images, imageMode) {
 
   return `
     <div class="media-viewer">
-      <img src="${escapeHtml(selected.url)}" alt="${escapeHtml(selected.alt || "图片")}" class="entity-image" />
+      <img src="${escapeHtml(selected.url)}" alt="${escapeHtml(selected.alt || "图片")}" class="entity-image" referrerpolicy="no-referrer" />
       <div class="toolbar-row" style="margin-top: 12px;">
         <button class="${imageMode === "official" ? "" : "secondary"} compact-button" data-image-mode="official">普通</button>
         <button class="${imageMode === "shiny" ? "" : "secondary"} compact-button" data-image-mode="shiny">闪光</button>
@@ -728,7 +728,7 @@ function renderEvolutionFamilyCard(family, selectedId) {
           return `
             <button class="evolution-member ${isMatched ? "matched" : ""} ${isSelected ? "selected" : ""}" data-pokemon="${escapeHtml(member.slug || member.id)}" title="查看 ${escapeHtml(member.nameZh)}">
               <span class="evolution-stage">${escapeHtml(member.stageLabel || (index === 0 ? "基础" : `${index}阶`))}</span>
-              ${image?.url ? `<img src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt || member.nameZh)}" class="chain-image" />` : `<span class="chain-image placeholder">?</span>`}
+              ${image?.url ? `<img src="${escapeHtml(image.url)}" alt="${escapeHtml(image.alt || member.nameZh)}" class="chain-image" referrerpolicy="no-referrer" />` : `<span class="chain-image placeholder">?</span>`}
               <strong>${escapeHtml(member.nameZh)}</strong>
               <span class="muted">#${String(member.dexNumber || "?").padStart(4, "0")}</span>
               <span class="types">${typeChip(member.primaryType)}${typeChip(member.secondaryType)}</span>
@@ -755,13 +755,7 @@ function renderPokemonGenerationCards(detail) {
         <div>特性：${escapeHtml((record.abilityIds || []).join(" / ") || "未记录")}</div>
         <div>隐藏特性：${escapeHtml(record.hiddenAbilityId || "无")}</div>
         <div>招式：${escapeHtml((record.moveIds || []).join(" / ") || "未记录")}</div>
-        <div>可学招式表：${record.learnset?.length
-          ? record.learnset.map((entry) => {
-              const name = entry.moveNameZh || entry.moveId;
-              const detailText = describeLearnsetEntry(entry);
-              return escapeHtml(detailText ? `${name}（${detailText}）` : name);
-            }).join(" / ")
-          : "未记录"}</div>
+        <div>可学招式表：${record.learnset?.length || record.moveIds?.length ? `${record.learnset?.length || record.moveIds?.length} 条记录` : "未记录"}</div>
         <div>种族值：${record.baseStats ? escapeHtml(`HP ${record.baseStats.hp} / ATK ${record.baseStats.atk} / DEF ${record.baseStats.def} / SPA ${record.baseStats.spa} / SPD ${record.baseStats.spd} / SPE ${record.baseStats.spe}`) : "未记录"}</div>
         ${record.notes ? `<div class="muted">${escapeHtml(record.notes)}</div>` : ""}
       </div>
@@ -867,6 +861,106 @@ function getLearnableDamageMoves(pokemon, allMoves, generation) {
     moves,
     learnsetEntries
   };
+}
+
+function buildMoveLookup(allMoves = []) {
+  const lookup = new Map();
+  for (const move of allMoves) {
+    for (const key of [move.id, move.slug, move.nameZh, move.nameEn, move.nameJa].filter(Boolean)) {
+      lookup.set(String(key), move);
+    }
+  }
+  return lookup;
+}
+
+function resolveLearnsetMove(entry, moveLookup) {
+  return moveLookup.get(String(entry.moveId || "")) ||
+    moveLookup.get(String(entry.moveNameZh || "")) ||
+    undefined;
+}
+
+function sortLearnsetEntries(entries) {
+  const methodOrder = {
+    "level-up": 1,
+    evolution: 2,
+    tm: 3,
+    hm: 4,
+    tutor: 5,
+    egg: 6,
+    event: 7,
+    other: 8
+  };
+  return [...entries].sort((left, right) => {
+    const leftMethod = methodOrder[left.learnMethod] || 99;
+    const rightMethod = methodOrder[right.learnMethod] || 99;
+    if (leftMethod !== rightMethod) return leftMethod - rightMethod;
+    const leftLevel = left.level ?? 999;
+    const rightLevel = right.level ?? 999;
+    if (leftLevel !== rightLevel) return leftLevel - rightLevel;
+    return String(left.moveNameZh || left.moveId || "").localeCompare(String(right.moveNameZh || right.moveId || ""), "zh-Hans-CN");
+  });
+}
+
+function renderPokemonLearnsetPanel(detail, display, allMoves = []) {
+  const generation = display.generation;
+  const entries = sortLearnsetEntries(getPokemonLearnsetEntries(detail, generation));
+  const moveLookup = buildMoveLookup(allMoves);
+  const generationRecords = [...(detail.generationRecords || [])]
+    .filter((record) => record.generation)
+    .sort((left, right) => left.generation - right.generation);
+  const generationSummary = generationRecords.map((record) => {
+    const count = record.learnset?.length || record.moveIds?.length || 0;
+    const isActive = String(record.generation) === String(generation);
+    return `<button class="pill learnset-generation-pill ${isActive ? "active-pill" : ""}" data-detail-generation="${record.generation}">第 ${record.generation} 世代 · ${count || "无"} 招</button>`;
+  }).join("");
+
+  if (entries.length === 0) {
+    return `
+      <div class="subpanel" style="margin-top: 16px;">
+        <strong>可学招式${generation ? ` · 第 ${generation} 世代` : ""}</strong>
+        <div class="learnset-generation-strip">${generationSummary || `<span class="pill">暂无世代招式记录</span>`}</div>
+        <p class="panel-subtitle">当前世代还没有导入可学招式表；如果该宝可梦有其他世代记录，可以切换上方“世代资料”查看。</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="subpanel" style="margin-top: 16px;">
+      <strong>可学招式 · 第 ${generation || "?"} 世代</strong>
+      <div class="learnset-generation-strip">${generationSummary}</div>
+      <p class="panel-subtitle">共 ${entries.length} 条记录；招式属性、分类、威力等来自已导入的招式详情，并会按当前世代取值。</p>
+      <div class="learnset-table">
+        <div class="learnset-row learnset-head">
+          <span>招式</span>
+          <span>学习方式</span>
+          <span>属性</span>
+          <span>分类</span>
+          <span>威力</span>
+          <span>命中</span>
+          <span>PP</span>
+        </div>
+        ${entries.map((entry) => {
+          const move = resolveLearnsetMove(entry, moveLookup);
+          const moveRecord = move ? resolveMoveGenerationRecord(move, generation) : undefined;
+          const moveKey = move?.slug || move?.id || entry.moveId || entry.moveNameZh || "";
+          const learnText = describeLearnsetEntry(entry) || "未记录";
+          return `
+            <div class="learnset-row">
+              <span>
+                <button class="text-button" data-open-move="${escapeHtml(moveKey)}">${escapeHtml(entry.moveNameZh || move?.nameZh || entry.moveId || "未知招式")}</button>
+              </span>
+              <span>${escapeHtml(learnText)}</span>
+              <span>${typeChip(moveRecord?.type || move?.type || "")}</span>
+              <span>${escapeHtml(moveRecord?.category || move?.category || "未记录")}</span>
+              <span>${escapeHtml(moveRecord?.power ?? move?.power ?? "-")}</span>
+              <span>${escapeHtml(moveRecord?.accuracy || move?.accuracy || "-")}</span>
+              <span>${escapeHtml(moveRecord?.pp ?? move?.pp ?? "-")}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function resolveMoveGenerationRecord(move, generation) {
@@ -979,7 +1073,7 @@ function resolvePokemonDisplayVariant(detail) {
   };
 }
 
-function renderPokemonDetail(detail) {
+function renderPokemonDetail(detail, allMoves = []) {
   const display = resolvePokemonDisplayVariant(detail);
   const stats = display.stats || {};
   const generations = detail.generationAvailability || [];
@@ -1041,12 +1135,13 @@ function renderPokemonDetail(detail) {
         `).join("")}
       </div>
     </div>
+    ${renderPokemonLearnsetPanel(detail, display, allMoves)}
     <div class="subpanel" style="margin-top: 16px;">
       <strong>形态资料</strong>
       <div class="forms-grid">
         ${display.formOptions.map((form) => `
           <div class="form-card">
-            ${form.images?.official?.url ? `<img src="${escapeHtml(form.images.official.url)}" alt="${escapeHtml(form.images.official.alt || form.nameZh)}" class="mini-image" />` : ""}
+            ${form.images?.official?.url ? `<img src="${escapeHtml(form.images.official.url)}" alt="${escapeHtml(form.images.official.alt || form.nameZh)}" class="mini-image" referrerpolicy="no-referrer" />` : ""}
             <div><strong>${escapeHtml(form.nameZh)}</strong></div>
             <div class="muted">${escapeHtml([form.primaryType, form.secondaryType].filter(Boolean).join(" / ") || "类型未记录")}</div>
             <div class="muted">${escapeHtml((form.abilityIds || []).join(" / ") || "特性未记录")}</div>
@@ -1078,7 +1173,10 @@ async function renderPokedex() {
   if (state.pokedex.type) params.set("type", state.pokedex.type);
   if (state.pokedex.generation) params.set("generation", state.pokedex.generation);
 
-  const list = (await api(`/pokemon?${params.toString()}`)).data;
+  const [list, allMoves] = await Promise.all([
+    api(`/pokemon?${params.toString()}`).then((result) => result.data),
+    api("/moves").then((result) => result.data)
+  ]);
   const families = buildEvolutionFamilies(list);
   const selectedIsVisible = list.some((pokemon) =>
     pokemon.id === state.pokedex.selected || pokemon.slug === state.pokedex.selected
@@ -1124,7 +1222,7 @@ async function renderPokedex() {
         </div>
       </div>
       <div class="panel detail-panel">
-        ${detail ? renderPokemonDetail(detail) : `<div class="detail-empty">请选择一只宝可梦查看详情。</div>`}
+        ${detail ? renderPokemonDetail(detail, allMoves) : `<div class="detail-empty">请选择一只宝可梦查看详情。</div>`}
       </div>
     </section>
   `;
@@ -1165,6 +1263,19 @@ async function renderPokedex() {
     button.addEventListener("click", async () => {
       state.pokedex.imageMode = button.dataset.imageMode;
       await renderPokedex();
+    });
+  });
+  document.querySelectorAll("[data-detail-generation]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      state.pokedex.detailGeneration = button.dataset.detailGeneration;
+      await renderPokedex();
+    });
+  });
+  document.querySelectorAll("[data-open-move]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.moves.selected = button.dataset.openMove;
+      state.moves.query = "";
+      window.location.hash = "#/moves";
     });
   });
 }
@@ -1243,7 +1354,7 @@ async function renderItems() {
             </div>
           </div>
           <div class="media-layout">
-            ${detail.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(detail.image.url)}" alt="${escapeHtml(detail.image.alt || detail.nameZh)}" class="entity-image item-image" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
+            ${detail.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(detail.image.url)}" alt="${escapeHtml(detail.image.alt || detail.nameZh)}" class="entity-image item-image" referrerpolicy="no-referrer" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
             <div class="subpanel">
               <strong>道具图片</strong>
               <p class="panel-subtitle">当前先展示导入数据中的主图，后续可补充不同世代外观或图标资源。</p>
@@ -1349,7 +1460,7 @@ async function renderMoves() {
             </div>
           </div>
           <div class="media-layout">
-            ${detail.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(detail.image.url)}" alt="${escapeHtml(detail.image.alt || detail.nameZh)}" class="entity-image item-image" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
+            ${detail.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(detail.image.url)}" alt="${escapeHtml(detail.image.alt || detail.nameZh)}" class="entity-image item-image" referrerpolicy="no-referrer" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
             <div class="subpanel">
               <strong>当前世代前台摘要</strong>
               <div class="info-stack">
@@ -1449,7 +1560,7 @@ async function renderAbilities() {
             </div>
           </div>
           <div class="media-layout">
-            ${detail.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(detail.image.url)}" alt="${escapeHtml(detail.image.alt || detail.nameZh)}" class="entity-image item-image" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
+            ${detail.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(detail.image.url)}" alt="${escapeHtml(detail.image.alt || detail.nameZh)}" class="entity-image item-image" referrerpolicy="no-referrer" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
             <div class="subpanel">
               <strong>当前摘要</strong>
               <div class="info-stack">
@@ -2006,7 +2117,7 @@ async function renderDamage() {
           <strong>招式摘要</strong>
           ${selectedMove ? `
             <div class="media-layout compact-media">
-              ${selectedMove.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(selectedMove.image.url)}" alt="${escapeHtml(selectedMove.image.alt || selectedMove.nameZh)}" class="entity-image item-image" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
+              ${selectedMove.image?.url ? `<div class="media-viewer"><img src="${escapeHtml(selectedMove.image.url)}" alt="${escapeHtml(selectedMove.image.alt || selectedMove.nameZh)}" class="entity-image item-image" referrerpolicy="no-referrer" /></div>` : `<div class="media-placeholder">暂无图片</div>`}
               <div class="info-stack">
                 <div><strong>${escapeHtml(selectedMove.nameZh)}</strong> · ${escapeHtml(selectedMove.nameEn || "")}</div>
                 <div>当前世代：第 ${escapeHtml(state.damage.moveGeneration)} 世代</div>

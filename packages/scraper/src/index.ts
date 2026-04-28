@@ -1302,43 +1302,41 @@ function buildGenerationAvailability(seedGenerations: number[], regionalDexRecor
 
 async function cachePokemonImagesFromPage(page: RawPage, seed: PokemonSeed, forms?: PokemonForm[]) {
   const resolved = resolvePokemonImageCandidateUrls(page.html, seed, forms);
-  const baseDir = `pokemon/${seed.dexNumber.toString().padStart(4, "0")}-${slugify(seed.nameZh)}`;
-
   const images = {};
 
   if (resolved.official) {
-    const cached = await downloadAssetToCache(resolved.official, `${baseDir}/official`);
+    const url = normalizeMediaUrl(resolved.official);
     images.official = {
-      url: cached.localUrl,
+      url,
       alt: `${seed.nameZh}官方图`,
-      sourceUrl: cached.sourceUrl
+      sourceUrl: url
     };
   }
 
   if (resolved.shinyOfficial) {
-    const cached = await downloadAssetToCache(resolved.shinyOfficial, `${baseDir}/shiny-official`);
+    const url = normalizeMediaUrl(resolved.shinyOfficial);
     images.shinyOfficial = {
-      url: cached.localUrl,
+      url,
       alt: `${seed.nameZh}闪光官方图`,
-      sourceUrl: cached.sourceUrl
+      sourceUrl: url
     };
   }
 
   if (resolved.sprite) {
-    const cached = await downloadAssetToCache(resolved.sprite, `${baseDir}/sprite`);
+    const url = normalizeMediaUrl(resolved.sprite);
     images.sprite = {
-      url: cached.localUrl,
+      url,
       alt: `${seed.nameZh}图像`,
-      sourceUrl: cached.sourceUrl
+      sourceUrl: url
     };
   }
 
   if (resolved.shinySprite) {
-    const cached = await downloadAssetToCache(resolved.shinySprite, `${baseDir}/shiny-sprite`);
+    const url = normalizeMediaUrl(resolved.shinySprite);
     images.shinySprite = {
-      url: cached.localUrl,
+      url,
       alt: `${seed.nameZh}闪光图像`,
-      sourceUrl: cached.sourceUrl
+      sourceUrl: url
     };
   }
 
@@ -1351,20 +1349,20 @@ async function cachePokemonImagesFromPage(page: RawPage, seed: PokemonSeed, form
     const nextImages = { ...(form.images || {}) };
 
     if (candidates.official) {
-      const cached = await downloadAssetToCache(candidates.official, `${baseDir}/${slugify(form.nameZh)}-official`);
+      const url = normalizeMediaUrl(candidates.official);
       nextImages.official = {
-        url: cached.localUrl,
+        url,
         alt: `${form.nameZh}官方图`,
-        sourceUrl: cached.sourceUrl
+        sourceUrl: url
       };
     }
 
     if (candidates.shinyOfficial) {
-      const cached = await downloadAssetToCache(candidates.shinyOfficial, `${baseDir}/${slugify(form.nameZh)}-shiny-official`);
+      const url = normalizeMediaUrl(candidates.shinyOfficial);
       nextImages.shinyOfficial = {
-        url: cached.localUrl,
+        url,
         alt: `${form.nameZh}闪光官方图`,
-        sourceUrl: cached.sourceUrl
+        sourceUrl: url
       };
     }
 

@@ -190,6 +190,65 @@ button.secondary {
   margin-top: 14px;
 }
 
+.learnset-generation-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.learnset-generation-pill {
+  width: auto;
+  padding: 6px 10px;
+  color: var(--ink);
+  background: rgba(138, 166, 90, 0.12);
+}
+
+.learnset-generation-pill.active-pill {
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+}
+
+.learnset-table {
+  display: grid;
+  gap: 6px;
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.learnset-row {
+  display: grid;
+  grid-template-columns: minmax(118px, 1.4fr) minmax(94px, 1fr) minmax(72px, 0.8fr) minmax(72px, 0.8fr) 54px 54px 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+}
+
+.learnset-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--muted);
+  font-weight: 700;
+  background: rgba(247, 244, 233, 0.96);
+  backdrop-filter: blur(8px);
+}
+
+.text-button {
+  width: auto;
+  padding: 0;
+  border-radius: 0;
+  color: var(--accent-strong);
+  background: transparent;
+  font-weight: 700;
+  text-align: left;
+}
+
 .variant-toolbar {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -554,4 +613,7 @@ button.secondary {
   .app-shell { width: min(100vw - 16px, 1200px); padding-top: 12px; }
   .hero, .detail-panel, .team-builder { padding: 18px; }
   .stat-input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .learnset-table { max-height: none; }
+  .learnset-row { grid-template-columns: 1fr 1fr; }
+  .learnset-head { display: none; }
 }
