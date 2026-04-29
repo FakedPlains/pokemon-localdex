@@ -1,5 +1,5 @@
 export async function api(path, options) {
-  const response = await fetch(path, {
+  const response = await fetch(`/api${path}`, {
     headers: { "Content-Type": "application/json" },
     ...options
   });

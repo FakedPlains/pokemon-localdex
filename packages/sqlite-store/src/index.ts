@@ -153,7 +153,7 @@ export type MoveGenerationRecord = {
   type?: string;
   category?: string;
   power?: number;
-  accuracy?: string;
+  accuracy?: number;
   pp?: number;
   description: string;
   notes?: string;
@@ -168,7 +168,7 @@ export type MoveEntry = {
   type?: string;
   category?: string;
   power?: number;
-  accuracy?: string;
+  accuracy?: number;
   pp?: number;
   description?: string;
   effectDetail?: string;
@@ -636,7 +636,7 @@ function hydrateMoveRow(db: DatabaseSync, row: Record<string, unknown>): MoveEnt
     type: row.type_name_zh ? String(row.type_name_zh) : undefined,
     category: row.category ? String(row.category) : undefined,
     power: row.power === null ? undefined : Number(row.power),
-    accuracy: row.accuracy ? String(row.accuracy) : undefined,
+    accuracy: row.accuracy === null || row.accuracy === undefined ? undefined : Number(row.accuracy),
     pp: row.pp === null ? undefined : Number(row.pp),
     description: row.description ? String(row.description) : undefined,
     effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
@@ -771,29 +771,30 @@ export function ensureSchema() {
     CREATE TABLE IF NOT EXISTS moves (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       number INTEGER,
-      name_zh TEXT NOT NULL UNIQUE,
+      name_zh TEXT NOT NULL,
       name_ja TEXT,
       name_en TEXT,
       type_id INTEGER REFERENCES types(id),
       category TEXT,
       power INTEGER,
-      accuracy TEXT,
+      accuracy INTEGER,
       pp INTEGER,
       description TEXT,
       effect_detail TEXT,
       introduced_generation INTEGER REFERENCES generations(id),
       source_url TEXT,
       source_title TEXT,
-      source_fetched_at TEXT
+      source_fetched_at TEXT,
+      UNIQUE (number, name_zh)
     );
     CREATE TABLE IF NOT EXISTS move_generation_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
       generation_id INTEGER NOT NULL REFERENCES generations(id),
-      game_version_code TEXT,
+      game_version_code TEXT NOT NULL DEFAULT '',
       description TEXT,
       notes TEXT,
-      UNIQUE (move_id, generation_id)
+      UNIQUE (move_id, generation_id, game_version_code)
     );
     CREATE TABLE IF NOT EXISTS abilities (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -976,13 +977,63 @@ export function ensureSchema() {
   `);
 
   // 增量迁移：为已有表添加新列（ALTER TABLE ADD COLUMN 在列已存在时会报错，需要 try-catch）
-  const migrations = [
+  const columnMigrations = [
     "ALTER TABLE move_generation_records ADD COLUMN game_version_code TEXT",
     "ALTER TABLE ability_generation_records ADD COLUMN game_version_code TEXT",
   ];
-  for (const sql of migrations) {
+  for (const sql of columnMigrations) {
     try { db.exec(sql); } catch { /* 列已存在，忽略 */ }
   }
+
+  // 结构迁移：moves 表唯一键从 name_zh 改为 (number, name_zh)，accuracy 从 TEXT 改为 INTEGER
+  // move_generation_records 唯一键从 (move_id, generation_id) 改为 (move_id, generation_id, game_version_code)
+  // 检测旧 schema 并重建
+  try {
+    const movesInfo = db.prepare("PRAGMA table_info(moves)").all() as Record<string, unknown>[];
+    const accuracyCol = movesInfo.find((col) => col.name === "accuracy");
+    if (accuracyCol && String(accuracyCol.type).toUpperCase() === "TEXT") {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        DROP TABLE IF EXISTS move_generation_records;
+        DROP TABLE IF EXISTS moves;
+        PRAGMA foreign_keys = ON;
+      `);
+      // 重新创建（会被上面的 CREATE TABLE IF NOT EXISTS 处理，但表已被删除所以需要再次执行）
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS moves (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          number INTEGER,
+          name_zh TEXT NOT NULL,
+          name_ja TEXT,
+          name_en TEXT,
+          type_id INTEGER REFERENCES types(id),
+          category TEXT,
+          power INTEGER,
+          accuracy INTEGER,
+          pp INTEGER,
+          description TEXT,
+          effect_detail TEXT,
+          introduced_generation INTEGER REFERENCES generations(id),
+          source_url TEXT,
+          source_title TEXT,
+          source_fetched_at TEXT,
+          UNIQUE (number, name_zh)
+        );
+        CREATE TABLE IF NOT EXISTS move_generation_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
+          generation_id INTEGER NOT NULL REFERENCES generations(id),
+          game_version_code TEXT NOT NULL DEFAULT '',
+          description TEXT,
+          notes TEXT,
+          UNIQUE (move_id, generation_id, game_version_code)
+        );
+        CREATE INDEX IF NOT EXISTS idx_moves_number ON moves(number);
+        CREATE INDEX IF NOT EXISTS idx_moves_name_zh ON moves(name_zh);
+        CREATE INDEX IF NOT EXISTS idx_moves_type ON moves(type_id);
+      `);
+    }
+  } catch { /* 迁移检测失败时忽略，不影响正常使用 */ }
 
   db.close();
 }
@@ -1104,7 +1155,7 @@ export function importNormalizedDataToSqlite(input: {
       INSERT OR IGNORE INTO moves (number, name_zh, name_ja, name_en, type_id, category, power, accuracy, pp, description, effect_detail, introduced_generation, source_url, source_title, source_fetched_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const findMove = db.prepare("SELECT id FROM moves WHERE name_zh = ?");
+    const findMove = db.prepare("SELECT id FROM moves WHERE number = ? AND name_zh = ?");
     const insertMoveGeneration = db.prepare(`
       INSERT OR REPLACE INTO move_generation_records (move_id, generation_id, game_version_code, description, notes)
       VALUES (?, ?, ?, ?, ?)
@@ -1113,13 +1164,13 @@ export function importNormalizedDataToSqlite(input: {
       const moveTypeId = ensureType(move.type)[0] ?? null;
       const introducedGenerationDbId = ensureGeneration(move.introducedGeneration) ?? null;
       insertMove.run(move.number ?? null, move.nameZh, move.nameJa ?? null, move.nameEn ?? null, moveTypeId, move.category ?? null, move.power ?? null, move.accuracy ?? null, move.pp ?? null, move.description ?? null, move.effectDetail ?? null, introducedGenerationDbId, move.source?.url ?? null, move.source?.title ?? null, move.source?.fetchedAt ?? null);
-      const moveDbId = Number((findMove.get(move.nameZh) as { id: number }).id);
+      const moveDbId = Number((findMove.get(move.number ?? null, move.nameZh) as { id: number }).id);
       moveDbIds.set(move.id, moveDbId);
       moveDbIds.set(move.nameZh, moveDbId);
       insertImages("move", moveDbId, move.image ? { primary: move.image } : undefined);
       for (const record of move.generations || []) {
         const generationDbId = ensureGeneration(record.generation);
-        if (generationDbId) insertMoveGeneration.run(moveDbId, generationDbId, record.gameVersionCode ?? null, record.description ?? "", record.notes ?? null);
+        if (generationDbId) insertMoveGeneration.run(moveDbId, generationDbId, record.gameVersionCode ?? "", record.description ?? "", record.notes ?? null);
       }
     }
 

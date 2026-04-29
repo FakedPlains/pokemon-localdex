@@ -1,17 +1,108 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api.js";
 import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "../utils/constants.js";
-import TypeChip from "../components/TypeChip.jsx";
 import Loading from "../components/Loading.jsx";
 
-export default function MovesPage({ initialSelected }) {
+/* ── 属性颜色映射（用于行底色） ── */
+const TYPE_BG_COLORS = {
+  一般: "rgba(138,138,127,0.10)",
+  火:   "rgba(210,106,46,0.10)",
+  水:   "rgba(59,132,197,0.10)",
+  电:   "rgba(228,192,42,0.10)",
+  草:   "rgba(138,166,90,0.10)",
+  冰:   "rgba(110,190,201,0.10)",
+  格斗: "rgba(180,71,63,0.10)",
+  毒:   "rgba(139,94,167,0.10)",
+  地面: "rgba(182,143,78,0.10)",
+  飞行: "rgba(127,156,214,0.10)",
+  超能力:"rgba(219,99,144,0.10)",
+  虫:   "rgba(122,154,42,0.10)",
+  岩石: "rgba(154,135,82,0.10)",
+  幽灵: "rgba(107,91,149,0.10)",
+  龙:   "rgba(76,98,212,0.10)",
+  恶:   "rgba(90,75,67,0.10)",
+  钢:   "rgba(123,141,161,0.10)",
+  妖精: "rgba(217,141,184,0.10)",
+};
+
+/* ── 分类颜色映射（参考 52Poké Wiki 配色） ── */
+const CATEGORY_COLORS = {
+  物理: "#c92112",
+  特殊: "#4f5870",
+  变化: "#737373",
+};
+
+/* ── 图标路径工具 ── */
+function typeIconSrc(typeName) {
+  return `/assets/type-icons/type-${typeName}@sm.png`;
+}
+function categoryIconSrc(category) {
+  return `/assets/type-icons/category-${category}@sm.png`;
+}
+
+/* ── 属性 Chip（图标 + 文字合并） ── */
+function TypeIconChip({ type }) {
+  if (!type) return null;
+  return (
+    <span className={`type-chip type-${type} mv-icon-chip`}>
+      <img className="mv-chip-icon" src={typeIconSrc(type)} alt="" />
+      {type}
+    </span>
+  );
+}
+
+/* ── 分类 Chip（图标 + 文字合并） ── */
+function CategoryChip({ category }) {
+  if (!category) return <span>—</span>;
+  const bg = CATEGORY_COLORS[category] || "#737373";
+  return (
+    <span className="mv-cat-chip" style={{ background: bg }}>
+      <img className="mv-chip-icon" src={categoryIconSrc(category)} alt="" />
+      {category}
+    </span>
+  );
+}
+
+export default function MovesPage() {
+  const [inputValue, setInputValue] = useState("");
   const [query, setQuery] = useState("");
   const [type, setType] = useState("");
+  const [category, setCategory] = useState("");
   const [generation, setGeneration] = useState("");
-  const [selected, setSelected] = useState(initialSelected || null);
+  const [expanded, setExpanded] = useState(null);
   const [moves, setMoves] = useState([]);
-  const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [visibleLimit, setVisibleLimit] = useState(50);
+  const sentinelRef = useRef(null);
+
+  const composingRef = useRef(false);
+  const debounceRef = useRef(null);
+
+  const handleInputChange = useCallback((e) => {
+    const value = e.target.value;
+    setInputValue(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!composingRef.current) {
+      debounceRef.current = setTimeout(() => setQuery(value), 300);
+    }
+  }, []);
+
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
+  const handleCompositionEnd = useCallback((e) => {
+    composingRef.current = false;
+    const value = e.target.value;
+    setInputValue(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setQuery(value), 300);
+  }, []);
+
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
 
   const fetchMoves = useCallback(async () => {
     setLoading(true);
@@ -25,124 +116,239 @@ export default function MovesPage({ initialSelected }) {
   }, [query, type, generation]);
 
   useEffect(() => { fetchMoves(); }, [fetchMoves]);
+  useEffect(() => { setVisibleLimit(50); }, [query, type, category, generation]);
 
-  // Auto-select
-  useEffect(() => {
-    const isVisible = moves.some((m) => m.id === selected || m.slug === selected);
-    if ((!selected || !isVisible) && moves[0]) {
-      setSelected(moves[0].slug || moves[0].id);
-    } else if (!moves[0]) {
-      setSelected(null);
-    }
-  }, [moves]);
+  /* ── 过滤 + 按 number 排序 ── */
+  const filteredMoves = useMemo(() => {
+    let list = moves;
+    if (category) list = list.filter((m) => m.category === category);
+    return [...list].sort((a, b) => (a.number || 9999) - (b.number || 9999));
+  }, [moves, category]);
 
-  // Fetch detail
+  const visibleMoves = useMemo(() => filteredMoves.slice(0, visibleLimit), [filteredMoves, visibleLimit]);
+
+  /* ── Infinite scroll via IntersectionObserver ── */
   useEffect(() => {
-    if (!selected) { setDetail(null); return; }
-    let cancelled = false;
-    api(`/moves/${encodeURIComponent(selected)}`).then((r) => {
-      if (!cancelled) setDetail(r.data);
-    });
-    return () => { cancelled = true; };
-  }, [selected]);
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleLimit((v) => v + 50);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [filteredMoves]);
+
+  const toggleExpand = useCallback((id) => {
+    setExpanded((prev) => (prev === id ? null : id));
+  }, []);
 
   if (loading && moves.length === 0) return <Loading />;
 
   return (
-    <section className="view-grid items-layout">
-      <div className="panel">
-        <div className="panel-header">
-          <div>
-            <h2 className="panel-title">招式资料</h2>
-            <p className="panel-subtitle">支持按关键字、属性和世代检索，并查看不同世代的威力、PP 和效果差异。</p>
-          </div>
-          <span className="chip">{moves.length} 个招式</span>
+    <section className="mv-page">
+      <div className="panel mv-panel">
+        <div className="mv-header">
+          <h2 className="panel-title">招式资料</h2>
+          <p className="panel-subtitle">
+            共收录 {filteredMoves.length} 个招式，按编号排序。点击展开查看详细效果与世代变更。
+          </p>
         </div>
-        <div className="toolbar">
-          <div className="toolbar-row">
-            <input placeholder="搜索招式名" value={query} onChange={(e) => setQuery(e.target.value)} />
+
+        <div className="mv-toolbar">
+          <div className="mv-search-wrap">
+            <svg className="mv-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8.5" cy="8.5" r="5.5" /><line x1="13" y1="13" x2="17" y2="17" />
+            </svg>
+            <input
+              className="mv-search"
+              placeholder="搜索招式名（中文 / 英文 / 日文）"
+              value={inputValue}
+              onChange={handleInputChange}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+            />
           </div>
-          <div className="toolbar-row">
-            <select value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="">全部属性</option>
-              {ALL_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select value={generation} onChange={(e) => setGeneration(e.target.value)}>
-              <option value="">全部世代</option>
-              {GENERATION_OPTIONS.map((g) => <option key={g} value={g}>第 {g} 世代</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="item-list">
-          {moves.map((move) => (
-            <button
-              key={move.id}
-              className="list-card secondary media-list-card"
-              onClick={() => setSelected(move.slug || move.id)}
+          <div className="mv-filters">
+            <select
+              className="mv-filter-select"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
             >
-              <div className="list-thumb move-thumb">
-                {move.image?.url
-                  ? <img src={move.image.url} alt={move.image.alt || move.nameZh} referrerPolicy="no-referrer" loading="lazy" />
-                  : <span>{move.type || "招式"}</span>}
-              </div>
-              <div className="list-card-body">
-                <div className="card-topline">
-                  <strong>{move.nameZh}</strong>
-                  <span className="chip">{move.type || "未知"} · {move.category || "未分类"}</span>
-                </div>
-                <div className="muted">{move.nameEn || ""}</div>
-                <div>{move.effectSummary || "暂无说明"}</div>
-              </div>
-            </button>
-          ))}
+              <option value="">全部属性</option>
+              {ALL_TYPE_OPTIONS.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <select
+              className="mv-filter-select"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              <option value="">全部分类</option>
+              <option value="物理">物理</option>
+              <option value="特殊">特殊</option>
+              <option value="变化">变化</option>
+            </select>
+            <select
+              className="mv-filter-select"
+              value={generation}
+              onChange={(e) => setGeneration(e.target.value)}
+            >
+              <option value="">全部世代</option>
+              {GENERATION_OPTIONS.map((g) => (
+                <option key={g} value={g}>第 {g} 世代</option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
-      <div className="panel detail-panel">
-        {detail ? (
-          <>
-            <div className="detail-title-row">
-              <div>
-                <div className="muted">{detail.type || "未知"} · {detail.category || "未分类"}</div>
-                <h2>{detail.nameZh}</h2>
-                <div className="muted">{detail.nameEn || ""}</div>
-              </div>
-            </div>
-            <div className="media-layout">
-              {detail.image?.url
-                ? <div className="media-viewer"><img src={detail.image.url} alt={detail.image.alt || detail.nameZh} className="entity-image item-image" referrerPolicy="no-referrer" /></div>
-                : <div className="media-placeholder">暂无图片</div>}
-              <div className="subpanel">
-                <strong>当前世代前台摘要</strong>
-                <div className="info-stack">
-                  <div>威力：{detail.power ?? "-"}</div>
-                  <div>命中：{detail.accuracy || "-"}</div>
-                  <div>PP：{detail.pp ?? "-"}</div>
-                  <div>{detail.effectSummary || "暂无说明"}</div>
-                </div>
-              </div>
-            </div>
-            <div className="subpanel" style={{ marginTop: 16 }}>
-              <strong>按世代效果</strong>
-              <div className="generation-card-grid">
-                {(detail.generations || []).map((record, i) => (
-                  <div key={i} className="meta-card generation-card">
-                    <strong>第 {record.generation} 世代</strong>
-                    <div className="info-stack">
-                      <div>属性：{record.type || detail.type || "未记录"}</div>
-                      <div>分类：{record.category || detail.category || "未记录"}</div>
-                      <div>威力：{record.power ?? detail.power ?? "-"}</div>
-                      <div>命中：{record.accuracy || detail.accuracy || "-"}</div>
-                      <div>PP：{record.pp ?? detail.pp ?? "-"}</div>
-                      <div>{record.effectSummary}</div>
-                      {record.notes && <div className="muted">{record.notes}</div>}
+
+        {/* ── 表头 ── */}
+        <div className="mv-list-head">
+          <span className="mv-col-no">#</span>
+          <span className="mv-col-name">招式名</span>
+          <span className="mv-col-type">属性</span>
+          <span className="mv-col-cat">分类</span>
+          <span className="mv-col-pow">威力</span>
+          <span className="mv-col-acc">命中</span>
+          <span className="mv-col-pp">PP</span>
+          <span className="mv-col-arrow" />
+        </div>
+
+        {visibleMoves.length === 0 && (
+          <div className="mv-empty">没有找到匹配的招式。</div>
+        )}
+
+        <div className="mv-list">
+          {visibleMoves.map((move) => {
+            const isExpanded = expanded === move.id;
+            const rowBg = move.type ? TYPE_BG_COLORS[move.type] : undefined;
+            return (
+              <div
+                key={move.id}
+                className={`mv-row-item${isExpanded ? " mv-row-expanded" : ""}`}
+                style={rowBg && !isExpanded ? { background: rowBg } : undefined}
+              >
+                <button
+                  className="mv-row-header"
+                  onClick={() => toggleExpand(move.id)}
+                  style={rowBg && isExpanded ? { background: rowBg } : undefined}
+                >
+                  <span className="mv-row-left">
+                    <span className="mv-row-number">
+                      {move.number ? String(move.number).padStart(3, "0") : "—"}
+                    </span>
+                    <span className="mv-row-name">{move.nameZh}</span>
+                  </span>
+                  {move.description && (
+                    <span className="mv-row-desc">{move.description}</span>
+                  )}
+                  <span className="mv-row-right">
+                    <span className="mv-row-type">
+                      {move.type ? <TypeIconChip type={move.type} /> : "—"}
+                    </span>
+                    <span className="mv-row-cat">
+                      <CategoryChip category={move.category} />
+                    </span>
+                    <span className="mv-row-pow">{move.power ?? "—"}</span>
+                    <span className="mv-row-acc">{move.accuracy != null ? `${move.accuracy}` : "—"}</span>
+                    <span className="mv-row-pp">{move.pp ?? "—"}</span>
+                    <span className={`mv-row-arrow${isExpanded ? " mv-row-arrow-open" : ""}`}>▾</span>
+                  </span>
+                </button>
+
+                {isExpanded && (
+                  <div className="mv-row-detail">
+                    {/* 名称标签 */}
+                    <div className="mv-detail-names">
+                      {move.nameJa && <span className="mv-name-tag mv-name-ja">{move.nameJa}</span>}
+                      {move.nameEn && <span className="mv-name-tag mv-name-en">{move.nameEn}</span>}
+                      {move.introducedGeneration && (
+                        <span className="mv-name-tag mv-name-gen">第 {move.introducedGeneration} 世代引入</span>
+                      )}
                     </div>
+
+                    {/* 基础数据 */}
+                    <div className="mv-detail-stats-grid">
+                      <div className="mv-detail-stat">
+                        <span className="mv-detail-stat-label">属性</span>
+                        <span className="mv-detail-stat-value">
+                          {move.type ? <TypeIconChip type={move.type} /> : "—"}
+                        </span>
+                      </div>
+                      <div className="mv-detail-stat">
+                        <span className="mv-detail-stat-label">分类</span>
+                        <span className="mv-detail-stat-value">
+                          <CategoryChip category={move.category} />
+                        </span>
+                      </div>
+                      <div className="mv-detail-stat">
+                        <span className="mv-detail-stat-label">威力</span>
+                        <span className="mv-detail-stat-value">{move.power ?? "—"}</span>
+                      </div>
+                      <div className="mv-detail-stat">
+                        <span className="mv-detail-stat-label">命中</span>
+                        <span className="mv-detail-stat-value">{move.accuracy != null ? `${move.accuracy}%` : "—"}</span>
+                      </div>
+                      <div className="mv-detail-stat">
+                        <span className="mv-detail-stat-label">PP</span>
+                        <span className="mv-detail-stat-value">{move.pp ?? "—"}</span>
+                      </div>
+                    </div>
+
+                    {/* 效果说明 */}
+                    <div className="mv-detail-effect">
+                      <div className="mv-detail-effect-title">招式效果</div>
+                      <div className="mv-detail-effect-text">
+                        {move.effectDetail || move.description || "暂无详细说明"}
+                      </div>
+                    </div>
+
+                    {/* 世代变更（过滤掉传说阿尔宙斯 LA） */}
+                    {move.generations?.filter((r) => r.gameVersionCode !== "LA").length > 0 && (
+                      <div className="mv-gen-section">
+                        <div className="mv-gen-title">世代变更</div>
+                        <div className="mv-gen-timeline">
+                          {move.generations.filter((r) => r.gameVersionCode !== "LA").map((record, i) => (
+                            <div key={i} className="mv-gen-item">
+                              <div className="mv-gen-badges">
+                                <div className="mv-gen-badge">
+                                  {record.generation === 99 ? "Champions" : `Gen ${record.generation}`}
+                                </div>
+                                {record.gameVersionName && (
+                                  <div className="mv-gen-version">{record.gameVersionName}</div>
+                                )}
+                              </div>
+                              <div className="mv-gen-text">{record.description}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 来源 */}
+                    {move.source?.url && (
+                      <div className="mv-source">
+                        <a href={move.source.url} target="_blank" rel="noopener noreferrer">
+                          来源：{move.source.title || "52Poké Wiki"}
+                        </a>
+                      </div>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-          </>
-        ) : (
-          <div className="detail-empty">请选择一个招式查看详情。</div>
+            );
+          })}
+        </div>
+
+        {visibleMoves.length < filteredMoves.length && (
+          <div className="mv-load-more" ref={sentinelRef}>
+            <div className="pulse-dot" />
+          </div>
         )}
       </div>
     </section>

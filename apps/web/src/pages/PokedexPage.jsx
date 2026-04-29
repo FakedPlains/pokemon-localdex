@@ -492,7 +492,7 @@ function MovesTab({ detail, display, allMoves, detailGeneration, onDetailGenerat
                   <span><TypeChip type={moveRecord?.type || move?.type || ""} /></span>
                   <span>{moveRecord?.category || move?.category || "—"}</span>
                   <span>{moveRecord?.power ?? move?.power ?? "—"}</span>
-                  <span>{moveRecord?.accuracy || move?.accuracy || "—"}</span>
+                  <span>{moveRecord?.accuracy != null ? `${moveRecord.accuracy}%` : move?.accuracy != null ? `${move.accuracy}%` : "—"}</span>
                   <span>{moveRecord?.pp ?? move?.pp ?? "—"}</span>
                 </div>
               );

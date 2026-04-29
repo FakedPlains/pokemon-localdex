@@ -41,11 +41,12 @@ def connect(db_path: Path) -> sqlite3.Connection:
 # ---------------------------------------------------------------------------
 
 def clear_moves(conn: sqlite3.Connection) -> int:
-    """清除所有招式数据（含 move_generation_records、image_assets）。"""
+    """清除所有招式数据（含 move_generation_records、image_assets、pokemon_moves 引用）。"""
     with conn:
         count = conn.execute("SELECT COUNT(*) FROM moves").fetchone()[0]
+        conn.execute("DELETE FROM pokemon_moves")
         conn.execute("DELETE FROM move_generation_records")
-        conn.execute("DELETE FROM image_assets WHERE owner_type = 'move'")
+        conn.execute("DELETE FROM image_assets WHERE entity_type = 'move'")
         conn.execute("DELETE FROM moves")
     return count
 
@@ -63,7 +64,7 @@ def clear_items(conn: sqlite3.Connection) -> int:
     """清除所有道具数据（含 image_assets）。"""
     with conn:
         count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
-        conn.execute("DELETE FROM image_assets WHERE owner_type = 'item'")
+        conn.execute("DELETE FROM image_assets WHERE entity_type = 'item'")
         conn.execute("DELETE FROM items")
     return count
 
@@ -86,7 +87,7 @@ def clear_pokemon(conn: sqlite3.Connection) -> int:
         conn.execute("DELETE FROM pokemon_abilities")
         conn.execute("DELETE FROM pokemon_base_stats")
         conn.execute("DELETE FROM pokemon_types")
-        conn.execute("DELETE FROM image_assets WHERE owner_type = 'pokemon'")
+        conn.execute("DELETE FROM image_assets WHERE entity_type = 'pokemon'")
         conn.execute("DELETE FROM pokemon")
     return count
 
@@ -274,11 +275,7 @@ def ensure_ability(conn: sqlite3.Connection, name: str) -> int | None:
     if row:
         return int(row["id"])
     result = conn.execute(
-        """
-        INSERT INTO abilities (name_zh)
-        VALUES (?)
-        ON CONFLICT(name_zh) DO NOTHING
-        """,
+        "INSERT INTO abilities (name_zh) VALUES (?)",
         (name,),
     )
     return int(result.lastrowid)
@@ -320,11 +317,7 @@ def ensure_move(conn: sqlite3.Connection, name: str, payload: dict | None = None
     if row:
         return int(row["id"])
     result = conn.execute(
-        """
-        INSERT INTO moves (name_zh)
-        VALUES (?)
-        ON CONFLICT(name_zh) DO NOTHING
-        """,
+        "INSERT INTO moves (name_zh) VALUES (?)",
         (name,),
     )
     return int(result.lastrowid)
@@ -334,7 +327,14 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
     introduced_gen = payload.get("introduced_generation")
     introduced_gen_id = ensure_generation(conn, introduced_gen) if introduced_gen else None
     with conn:
-        row = conn.execute("SELECT id FROM moves WHERE name_zh = ?", (payload["name_zh"],)).fetchone()
+        # 按 number + name_zh 联合唯一键查找
+        row = conn.execute(
+            "SELECT id FROM moves WHERE number = ? AND name_zh = ?",
+            (payload.get("number"), payload["name_zh"]),
+        ).fetchone()
+        if not row:
+            # 回退：仅按 name_zh 查找（兼容旧数据）
+            row = conn.execute("SELECT id FROM moves WHERE name_zh = ?", (payload["name_zh"],)).fetchone()
         if row:
             move_id = int(row["id"])
             conn.execute(
@@ -402,15 +402,14 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
                 """
                 INSERT INTO move_generation_records (move_id, generation_id, game_version_code, description, notes)
                 VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(move_id, generation_id) DO UPDATE SET
-                  game_version_code = excluded.game_version_code,
+                ON CONFLICT(move_id, generation_id, game_version_code) DO UPDATE SET
                   description = excluded.description,
                   notes = excluded.notes
                 """,
                 (
                     move_id,
                     ensure_generation(conn, int(record["generation"])),
-                    record.get("game_version_code"),
+                    record.get("game_version_code") or "",
                     record.get("description") or "",
                     record.get("notes"),
                 ),

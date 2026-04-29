@@ -490,7 +490,7 @@ export default function DamagePage({ teamDraft }) {
                 <div>属性：{selectedMoveRecord?.type || selectedMove.type || moveType || "未记录"}</div>
                 <div>分类：{selectedMoveRecord?.category || selectedMove.category || category || "未记录"}</div>
                 <div>威力：{selectedMoveRecord?.power ?? selectedMove.power ?? power ?? "-"}</div>
-                <div>命中：{selectedMoveRecord?.accuracy || selectedMove.accuracy || "-"}</div>
+                <div>命中：{selectedMoveRecord?.accuracy != null ? `${selectedMoveRecord.accuracy}%` : selectedMove.accuracy != null ? `${selectedMove.accuracy}%` : "-"}</div>
                 <div>{selectedMoveRecord?.effectSummary || selectedMove.effectSummary || "暂无说明"}</div>
                 {!selectedMoveIsLearnable && (
                   <div className="warning-note">当前攻击方在第 {moveGeneration} 世代的可学招式表中未找到这招。</div>

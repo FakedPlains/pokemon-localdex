@@ -48,7 +48,7 @@ class MoveSeed:
     type: str | None = None
     category: str | None = None
     power: int | None = None
-    accuracy: str | None = None
+    accuracy: int | None = None
     pp: int | None = None
     description: str | None = None
 
@@ -100,17 +100,17 @@ def parse_move_list_page(html: str) -> list[MoveSeed]:
             continue
         seeds.append(
             MoveSeed(
-                name_zh=name_zh,
+                name_zh=to_simplified(name_zh) or name_zh,
                 name_ja=name_ja,
                 name_en=name_en,
                 number=int(lines[index]),
                 generation=current_generation,
-                type=type_name,
+                type=to_simplified(type_name),
                 category=parsed_category,
                 power=normalize_power(power),
                 accuracy=format_accuracy(accuracy),
                 pp=normalize_pp(pp),
-                description=summary,
+                description=to_simplified(summary),
                 detail_url=build_move_page_url(name_zh),
             )
         )
@@ -226,17 +226,17 @@ def _parse_move_list_tables(html: str) -> list[MoveSeed]:
             anchor = cells_tags[index["中文名"]].find("a") if index["中文名"] < len(cells_tags) else None
             detail_url = to_absolute_url(str(anchor.get("href"))) if anchor and anchor.get("href") else build_move_page_url(name_zh)
             seeds.append(MoveSeed(
-                name_zh=name_zh,
+                name_zh=to_simplified(name_zh) or name_zh,
                 name_ja=cells[index["日文名"]] if index.get("日文名") is not None and index["日文名"] < len(cells) else None,
                 name_en=cells[index["英文名"]] if index.get("英文名") is not None and index["英文名"] < len(cells) else None,
                 number=number,
                 generation=table_generation,
-                type=cells[index["属性"]] if index["属性"] < len(cells) else None,
+                type=to_simplified(cells[index["属性"]] if index["属性"] < len(cells) else None),
                 category=normalize_category(cells[index["分类"]] if index["分类"] < len(cells) else None),
                 power=normalize_power(cells[index["威力"]] if "威力" in index and index["威力"] < len(cells) else None),
                 accuracy=format_accuracy(cells[index["命中"]] if "命中" in index and index["命中"] < len(cells) else None),
                 pp=normalize_pp(cells[index["PP"]] if "PP" in index and index["PP"] < len(cells) else cells[index["ＰＰ"]] if "ＰＰ" in index and index["ＰＰ"] < len(cells) else None),
-                description=cells[index["说明"]] if "说明" in index and index["说明"] < len(cells) else None,
+                description=to_simplified(cells[index["说明"]] if "说明" in index and index["说明"] < len(cells) else None),
                 detail_url=detail_url,
             ))
     return unique_by_key(seeds, lambda item: item.name_zh)
@@ -317,7 +317,7 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
                     "generation": gen,
                     "description": to_simplified(str(change["summary"])) or str(change["summary"]),
                     "game_version_code": gv_code,
-                    "notes": f"来自 52Poké {heading}章节。",
+                    "notes": to_simplified(f"来自 52Poké {heading}章节。"),
                 }
             break
     image_url = next(
@@ -328,20 +328,24 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
         ),
         None,
     )
+    # 确保所有中文文本都是简体中文
+    name_zh = to_simplified(seed.name_zh) or seed.name_zh
+    type_name = to_simplified(seed.type)
+    category = to_simplified(seed.category)
     return {
         "number": seed.number,
-        "name_zh": seed.name_zh,
+        "name_zh": name_zh,
         "name_ja": name_ja or seed.name_ja,
         "name_en": name_en or seed.name_en,
-        "type": seed.type,
-        "category": seed.category,
+        "type": type_name,
+        "category": category,
         "power": seed.power,
         "accuracy": seed.accuracy,
         "pp": seed.pp,
         "description": description,
         "effect_detail": effect_detail,
         "introduced_generation": seed.generation,
-        "image": ImageAsset(normalize_media_url(image_url), f"{seed.name_zh}招式动画", normalize_media_url(image_url)) if image_url else None,
+        "image": ImageAsset(normalize_media_url(image_url), f"{name_zh}招式动画", normalize_media_url(image_url)) if image_url else None,
         "generations": sorted(generations.values(), key=lambda item: item["generation"]),
         "source": page,
     }

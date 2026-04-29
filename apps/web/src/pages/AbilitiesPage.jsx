@@ -11,7 +11,8 @@ export default function AbilitiesPage() {
   const [abilities, setAbilities] = useState([]);
   const [detailCache, setDetailCache] = useState({});
   const [loading, setLoading] = useState(true);
-  const [visibleLimit, setVisibleLimit] = useState(80);
+  const [visibleLimit, setVisibleLimit] = useState(50);
+  const sentinelRef = useRef(null);
 
   const composingRef = useRef(false);
   const debounceRef = useRef(null);
@@ -64,7 +65,23 @@ export default function AbilitiesPage() {
   }, [query, generation]);
 
   useEffect(() => { fetchAbilities(); }, [fetchAbilities]);
-  useEffect(() => { setVisibleLimit(80); }, [query, generation]);
+  useEffect(() => { setVisibleLimit(50); }, [query, generation]);
+
+  /* ── Infinite scroll via IntersectionObserver ── */
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleLimit((v) => v + 50);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [abilities]);
 
   const visibleAbilities = useMemo(() => abilities.slice(0, visibleLimit), [abilities, visibleLimit]);
 
@@ -94,24 +111,31 @@ export default function AbilitiesPage() {
         </div>
 
         <div className="ab-toolbar">
-          <input
-            className="ab-search"
-            placeholder="搜索特性名（中文 / 英文 / 日文）"
-            value={inputValue}
-            onChange={handleInputChange}
-            onCompositionStart={handleCompositionStart}
-            onCompositionEnd={handleCompositionEnd}
-          />
-          <select
-            className="ab-gen-select"
-            value={generation}
-            onChange={(e) => setGeneration(e.target.value)}
-          >
-            <option value="">全部世代</option>
-            {GENERATION_OPTIONS.map((g) => (
-              <option key={g} value={g}>第 {g} 世代</option>
-            ))}
-          </select>
+          <div className="ab-search-wrap">
+            <svg className="ab-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8.5" cy="8.5" r="5.5" /><line x1="13" y1="13" x2="17" y2="17" />
+            </svg>
+            <input
+              className="ab-search"
+              placeholder="搜索特性名（中文 / 英文 / 日文）"
+              value={inputValue}
+              onChange={handleInputChange}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+            />
+          </div>
+          <div className="ab-filters">
+            <select
+              className="ab-gen-select"
+              value={generation}
+              onChange={(e) => setGeneration(e.target.value)}
+            >
+              <option value="">全部世代</option>
+              {GENERATION_OPTIONS.map((g) => (
+                <option key={g} value={g}>第 {g} 世代</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {visibleAbilities.length === 0 && (
@@ -205,10 +229,8 @@ export default function AbilitiesPage() {
         </div>
 
         {visibleAbilities.length < abilities.length && (
-          <div className="ab-load-more">
-            <button className="secondary" onClick={() => setVisibleLimit((v) => v + 80)}>
-              再显示 {Math.min(80, abilities.length - visibleAbilities.length)} 个特性
-            </button>
+          <div className="ab-load-more" ref={sentinelRef}>
+            <div className="pulse-dot" />
           </div>
         )}
       </div>

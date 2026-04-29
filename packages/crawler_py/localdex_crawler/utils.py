@@ -38,7 +38,7 @@ POKEMON_TYPES = {
     "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
     "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精",
 }
-MOVE_CATEGORIES = {"physical", "special", "status"}
+MOVE_CATEGORIES = {"物理", "特殊", "变化"}
 
 # 游戏版本名 → (世代, game_version_code) 映射
 # 用于解析"特性变更"/"招式变更"章节中的游戏版本子标题
@@ -127,14 +127,14 @@ def normalize_type_name(value: str | None) -> str | None:
 
 
 def normalize_category(value: str | None) -> str | None:
+    """将招式分类标准化为简体中文（物理/特殊/变化）。"""
     text = clean_inline_text(value)
-    if text == "物理":
-        return "physical"
-    if text == "特殊":
-        return "special"
-    if text == "变化":
-        return "status"
-    return text.lower() if text else None
+    mapping = {
+        "物理": "物理", "physical": "物理",
+        "特殊": "特殊", "special": "特殊",
+        "变化": "变化", "變化": "变化", "status": "变化",
+    }
+    return mapping.get(text, mapping.get(text.lower())) if text else None
 
 
 def normalize_power(value: str | None) -> int | None:
@@ -147,11 +147,12 @@ def normalize_pp(value: str | None) -> int | None:
     return int(text) if re.fullmatch(r"\d+", text) else None
 
 
-def format_accuracy(value: str | None) -> str | None:
+def format_accuracy(value: str | None) -> int | None:
+    """将命中率文本转换为整数（不含百分号），非数字返回 None。"""
     text = clean_inline_text(value)
     if not text:
         return None
-    return f"{text}%" if re.fullmatch(r"\d+", text) else text
+    return int(text) if re.fullmatch(r"\d+", text) else None
 
 
 def read_number(value: str | None) -> float | None:
@@ -388,11 +389,36 @@ def _rejoin_split_markers(text: str) -> str:
 
 
 def extract_generation_changes(html: str, heading: str) -> list[dict[str, object]]:
-    section = section_text_by_heading(html, heading)
-    if not section:
+    """从 HTML 中提取世代变更记录。
+
+    直接操作 DOM 而非纯文本，避免 <b>/<a> 等内联标签导致文本被
+    换行分隔从而丢失数值的问题。
+
+    变更章节的典型 HTML 结构：
+      <h3>第六世代</h3>
+      <ul><li>ＰＰ：<b>30</b> → <b>20</b></li></ul>
+      <h3>仅在《传说 阿尔宙斯》中</h3>
+      <table>...</table>
+    """
+    soup = BeautifulSoup(html or "", "html.parser")
+
+    # 找到目标 h2 标题
+    heading_tag = None
+    for tag in soup.find_all("h2"):
+        if heading in tag.get_text(" ", strip=True):
+            heading_tag = tag
+            break
+    if not heading_tag:
         return []
-    # 预处理：合并被换行拆开的书名号标记
-    section = _rejoin_split_markers(section)
+
+    # 收集 h2 到下一个 h2 之间的所有兄弟元素
+    section_elements: list[Tag] = []
+    for sibling in heading_tag.next_siblings:
+        if isinstance(sibling, Tag):
+            if sibling.name == "h2":
+                break
+            section_elements.append(sibling)
+
     records: list[dict[str, object]] = []
     current_generation: int | None = None
     current_game_version: str | None = None
@@ -412,14 +438,48 @@ def extract_generation_changes(html: str, heading: str) -> list[dict[str, object
                 records.append(record)
         buffer = []
 
-    for line in [item.strip() for item in section.splitlines() if item.strip()]:
-        marker = detect_generation_marker(line)
-        if marker:
-            flush()
-            current_generation, current_game_version = marker
+    for elem in section_elements:
+        if elem.name == "h3":
+            # h3 标题：世代标记或游戏版本标记
+            line = clean_inline_text(elem.get_text(" ", strip=True))
+            marker = detect_generation_marker(line)
+            if marker:
+                flush()
+                current_generation, current_game_version = marker
             continue
-        if current_generation and not line.isdigit():
-            buffer.append(line)
+
+        if not current_generation:
+            continue
+
+        if elem.name == "ul":
+            # <ul> 列表：每个 <li> 是一条变更描述
+            for li in elem.find_all("li", recursive=False):
+                text = clean_inline_text(li.get_text(" ", strip=True))
+                if text:
+                    buffer.append(text)
+        elif elem.name == "dl":
+            # <dl> 定义列表：dt + dd 组合
+            for child in elem.children:
+                if isinstance(child, Tag) and child.name in ("dt", "dd"):
+                    text = clean_inline_text(child.get_text(" ", strip=True))
+                    if text:
+                        buffer.append(text)
+        elif elem.name == "table":
+            # 表格（如 LA 版本的详细数据）：提取所有单元格文本
+            rows_text = []
+            for tr in elem.find_all("tr"):
+                cells = [clean_inline_text(td.get_text(" ", strip=True))
+                         for td in tr.find_all(["th", "td"])]
+                row_text = " ".join(c for c in cells if c)
+                if row_text:
+                    rows_text.append(row_text)
+            if rows_text:
+                buffer.append(" ".join(rows_text))
+        elif elem.name in ("p", "div"):
+            text = clean_inline_text(elem.get_text(" ", strip=True))
+            if text:
+                buffer.append(text)
+
     flush()
     return unique_by_key(records, lambda item: f"{item['generation']}|{item.get('game_version_code', '')}|{item['summary']}")
 
