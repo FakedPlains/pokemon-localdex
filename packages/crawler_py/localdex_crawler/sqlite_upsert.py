@@ -35,6 +35,72 @@ def connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+# ---------------------------------------------------------------------------
+# 清除数据（--clean 模式）
+# 外键已设置 ON DELETE CASCADE，删除主表记录时子表自动级联删除。
+# ---------------------------------------------------------------------------
+
+def clear_moves(conn: sqlite3.Connection) -> int:
+    """清除所有招式数据（含 move_generation_records、image_assets）。"""
+    with conn:
+        count = conn.execute("SELECT COUNT(*) FROM moves").fetchone()[0]
+        conn.execute("DELETE FROM move_generation_records")
+        conn.execute("DELETE FROM image_assets WHERE owner_type = 'move'")
+        conn.execute("DELETE FROM moves")
+    return count
+
+
+def clear_abilities(conn: sqlite3.Connection) -> int:
+    """清除所有特性数据（含 ability_generation_records）。"""
+    with conn:
+        count = conn.execute("SELECT COUNT(*) FROM abilities").fetchone()[0]
+        conn.execute("DELETE FROM ability_generation_records")
+        conn.execute("DELETE FROM abilities")
+    return count
+
+
+def clear_items(conn: sqlite3.Connection) -> int:
+    """清除所有道具数据（含 image_assets）。"""
+    with conn:
+        count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        conn.execute("DELETE FROM image_assets WHERE owner_type = 'item'")
+        conn.execute("DELETE FROM items")
+    return count
+
+
+def clear_pokemon(conn: sqlite3.Connection) -> int:
+    """清除所有宝可梦数据（含所有关联子表）。"""
+    with conn:
+        count = conn.execute("SELECT COUNT(*) FROM pokemon").fetchone()[0]
+        conn.execute("DELETE FROM pokemon_moves")
+        conn.execute("DELETE FROM pokemon_evolution_members")
+        conn.execute("DELETE FROM pokemon_form_abilities")
+        conn.execute("DELETE FROM pokemon_form_stats")
+        conn.execute("DELETE FROM pokemon_form_types")
+        conn.execute("DELETE FROM pokemon_forms")
+        conn.execute("DELETE FROM pokemon_generation_abilities")
+        conn.execute("DELETE FROM pokemon_generation_records")
+        conn.execute("DELETE FROM pokemon_generation_regions")
+        conn.execute("DELETE FROM pokemon_generation_stats")
+        conn.execute("DELETE FROM pokemon_generation_types")
+        conn.execute("DELETE FROM pokemon_abilities")
+        conn.execute("DELETE FROM pokemon_base_stats")
+        conn.execute("DELETE FROM pokemon_types")
+        conn.execute("DELETE FROM image_assets WHERE owner_type = 'pokemon'")
+        conn.execute("DELETE FROM pokemon")
+    return count
+
+
+def clear_all(conn: sqlite3.Connection) -> dict[str, int]:
+    """清除所有数据。返回各表删除的记录数。"""
+    return {
+        "moves": clear_moves(conn),
+        "abilities": clear_abilities(conn),
+        "items": clear_items(conn),
+        "pokemon": clear_pokemon(conn),
+    }
+
+
 def select_pokemon(
     conn: sqlite3.Connection,
     start_dex: int | None = None,
@@ -248,25 +314,44 @@ def ensure_generation(conn: sqlite3.Connection, generation: int) -> int:
 
 
 def ensure_move(conn: sqlite3.Connection, name: str, payload: dict | None = None) -> int:
-    legacy_id = (payload or {}).get("legacy_id") or f"move-{slugify(name)}"
-    row = conn.execute("SELECT id FROM moves WHERE legacy_id = ? OR name_zh = ?", (legacy_id, name)).fetchone()
+    if not name:
+        raise ValueError("move name is required")
+    row = conn.execute("SELECT id FROM moves WHERE name_zh = ?", (name,)).fetchone()
     if row:
-        move_id = int(row["id"])
-        if payload:
+        return int(row["id"])
+    result = conn.execute(
+        """
+        INSERT INTO moves (name_zh)
+        VALUES (?)
+        ON CONFLICT(name_zh) DO NOTHING
+        """,
+        (name,),
+    )
+    return int(result.lastrowid)
+
+
+def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
+    introduced_gen = payload.get("introduced_generation")
+    introduced_gen_id = ensure_generation(conn, introduced_gen) if introduced_gen else None
+    with conn:
+        row = conn.execute("SELECT id FROM moves WHERE name_zh = ?", (payload["name_zh"],)).fetchone()
+        if row:
+            move_id = int(row["id"])
             conn.execute(
                 """
                 UPDATE moves
-                SET slug = ?, name_zh = ?, name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
-                    type_id = COALESCE(?, type_id), category = COALESCE(?, category), power = COALESCE(?, power),
-                    accuracy = COALESCE(?, accuracy), pp = COALESCE(?, pp),
-                    effect_summary = COALESCE(?, effect_summary),
+                SET number = COALESCE(?, number),
+                    name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
+                    type_id = COALESCE(?, type_id), category = COALESCE(?, category),
+                    power = COALESCE(?, power), accuracy = COALESCE(?, accuracy), pp = COALESCE(?, pp),
+                    description = COALESCE(?, description), effect_detail = COALESCE(?, effect_detail),
+                    introduced_generation = COALESCE(?, introduced_generation),
                     source_url = COALESCE(?, source_url), source_title = COALESCE(?, source_title),
                     source_fetched_at = COALESCE(?, source_fetched_at)
                 WHERE id = ?
                 """,
                 (
-                    payload.get("slug") or slugify(name),
-                    payload.get("name_zh") or name,
+                    payload.get("number"),
                     payload.get("name_ja"),
                     payload.get("name_en"),
                     ensure_type(conn, payload.get("type")),
@@ -274,69 +359,59 @@ def ensure_move(conn: sqlite3.Connection, name: str, payload: dict | None = None
                     payload.get("power"),
                     payload.get("accuracy"),
                     payload.get("pp"),
-                    payload.get("effect_summary"),
+                    payload.get("description"),
+                    payload.get("effect_detail"),
+                    introduced_gen_id,
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
                     move_id,
                 ),
             )
-        return move_id
-    result = conn.execute(
-        """
-        INSERT INTO moves
-          (legacy_id, slug, name_zh, name_ja, name_en, type_id, category, power, accuracy, pp,
-           effect_summary, source_url, source_title, source_fetched_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            legacy_id,
-            (payload or {}).get("slug") or slugify(name),
-            (payload or {}).get("name_zh") or name,
-            (payload or {}).get("name_ja"),
-            (payload or {}).get("name_en"),
-            ensure_type(conn, (payload or {}).get("type")),
-            (payload or {}).get("category"),
-            (payload or {}).get("power"),
-            (payload or {}).get("accuracy"),
-            (payload or {}).get("pp"),
-            (payload or {}).get("effect_summary"),
-            _source_attr((payload or {}).get("source"), "url"),
-            _source_attr((payload or {}).get("source"), "title"),
-            _source_attr((payload or {}).get("source"), "fetched_at"),
-        ),
-    )
-    return int(result.lastrowid)
-
-
-def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
-    with conn:
-        move_id = ensure_move(conn, str(payload["name_zh"]), payload)
+        else:
+            result = conn.execute(
+                """
+                INSERT INTO moves
+                  (number, name_zh, name_ja, name_en, type_id, category, power, accuracy, pp,
+                   description, effect_detail, introduced_generation,
+                   source_url, source_title, source_fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload.get("number"),
+                    payload["name_zh"],
+                    payload.get("name_ja"),
+                    payload.get("name_en"),
+                    ensure_type(conn, payload.get("type")),
+                    payload.get("category"),
+                    payload.get("power"),
+                    payload.get("accuracy"),
+                    payload.get("pp"),
+                    payload.get("description"),
+                    payload.get("effect_detail"),
+                    introduced_gen_id,
+                    _source_attr(payload.get("source"), "url"),
+                    _source_attr(payload.get("source"), "title"),
+                    _source_attr(payload.get("source"), "fetched_at"),
+                ),
+            )
+            move_id = int(result.lastrowid)
         conn.execute("DELETE FROM move_generation_records WHERE move_id = ?", (move_id,))
         for record in payload.get("generations") or []:
             conn.execute(
                 """
-                INSERT INTO move_generation_records
-                  (move_id, generation_id, type_id, category, power, accuracy, pp, effect_summary, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO move_generation_records (move_id, generation_id, game_version_code, description, notes)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(move_id, generation_id) DO UPDATE SET
-                  type_id = excluded.type_id,
-                  category = excluded.category,
-                  power = excluded.power,
-                  accuracy = excluded.accuracy,
-                  pp = excluded.pp,
-                  effect_summary = excluded.effect_summary,
+                  game_version_code = excluded.game_version_code,
+                  description = excluded.description,
                   notes = excluded.notes
                 """,
                 (
                     move_id,
                     ensure_generation(conn, int(record["generation"])),
-                    ensure_type(conn, record.get("type")),
-                    record.get("category"),
-                    record.get("power"),
-                    record.get("accuracy"),
-                    record.get("pp"),
-                    record.get("effect_summary") or "",
+                    record.get("game_version_code"),
+                    record.get("description") or "",
                     record.get("notes"),
                 ),
             )
@@ -348,14 +423,17 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
     introduced_gen = payload.get("introduced_generation")
     introduced_gen_id = ensure_generation(conn, introduced_gen) if introduced_gen else None
     with conn:
-        row = conn.execute("SELECT id FROM abilities WHERE name_zh = ?", (payload["name_zh"],)).fetchone()
+        # 按 number + name_zh 联合唯一键查找
+        row = conn.execute(
+            "SELECT id FROM abilities WHERE number = ? AND name_zh = ?",
+            (payload.get("number"), payload["name_zh"]),
+        ).fetchone()
         if row:
             ability_id = int(row["id"])
             conn.execute(
                 """
                 UPDATE abilities
-                SET number = COALESCE(?, number),
-                    name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
+                SET name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
                     description = COALESCE(?, description), effect_detail = COALESCE(?, effect_detail),
                     introduced_generation = COALESCE(?, introduced_generation),
                     source_url = COALESCE(?, source_url), source_title = COALESCE(?, source_title),
@@ -363,7 +441,6 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
                 WHERE id = ?
                 """,
                 (
-                    payload.get("number"),
                     payload.get("name_ja"),
                     payload.get("name_en"),
                     payload.get("description"),
@@ -401,15 +478,17 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
         for record in payload.get("generations") or []:
             conn.execute(
                 """
-                INSERT INTO ability_generation_records (ability_id, generation_id, description, notes)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO ability_generation_records (ability_id, generation_id, game_version_code, description, notes)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(ability_id, generation_id) DO UPDATE SET
+                  game_version_code = excluded.game_version_code,
                   description = excluded.description,
                   notes = excluded.notes
                 """,
                 (
                     ability_id,
                     ensure_generation(conn, int(record["generation"])),
+                    record.get("game_version_code"),
                     record.get("description") or "",
                     record.get("notes"),
                 ),
@@ -636,32 +715,7 @@ def upsert_pokemon_learnset(conn: sqlite3.Connection, pokemon_id: int, generatio
             (pokemon_id, generation_id),
         )
         for move in parsed.get("moves") or []:
-            move_id = ensure_move(conn, move["name_zh"], move)
-            conn.execute(
-                """
-                INSERT INTO move_generation_records
-                  (move_id, generation_id, type_id, category, power, accuracy, pp, effect_summary, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(move_id, generation_id) DO UPDATE SET
-                  type_id = COALESCE(excluded.type_id, move_generation_records.type_id),
-                  category = COALESCE(excluded.category, move_generation_records.category),
-                  power = COALESCE(excluded.power, move_generation_records.power),
-                  accuracy = COALESCE(excluded.accuracy, move_generation_records.accuracy),
-                  pp = COALESCE(excluded.pp, move_generation_records.pp),
-                  effect_summary = COALESCE(excluded.effect_summary, move_generation_records.effect_summary)
-                """,
-                (
-                    move_id,
-                    generation_id,
-                    ensure_type(conn, move.get("type")),
-                    move.get("category"),
-                    move.get("power"),
-                    move.get("accuracy"),
-                    move.get("pp"),
-                    move.get("effect_summary") or "来自 52Poké 宝可梦学招式表的基础参数记录。",
-                    None,
-                ),
-            )
+            ensure_move(conn, move["name_zh"])
         for sort_order, record in enumerate(parsed.get("learnset") or [], start=1):
             move_id = ensure_move(conn, record["move_name_zh"])
             conn.execute(

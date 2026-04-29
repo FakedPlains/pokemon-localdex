@@ -120,7 +120,7 @@ export default function AbilitiesPage() {
 
         <div className="ab-list">
           {visibleAbilities.map((ability) => {
-            const key = ability.nameZh;
+            const key = ability.id;
             const isExpanded = expanded === key;
             const detail = detailCache[key];
             return (
@@ -172,7 +172,14 @@ export default function AbilitiesPage() {
                             <div className="ab-gen-timeline">
                               {detail.generations.map((record, i) => (
                                 <div key={i} className="ab-gen-item">
-                                  <div className="ab-gen-badge">Gen {record.generation}</div>
+                                  <div className="ab-gen-badges">
+                                    <div className="ab-gen-badge">
+                                      {record.generation === 99 ? "Champions" : `Gen ${record.generation}`}
+                                    </div>
+                                    {record.gameVersionName && (
+                                      <div className="ab-gen-version">{record.gameVersionName}</div>
+                                    )}
+                                  </div>
                                   <div className="ab-gen-text">{record.description}</div>
                                 </div>
                               ))}

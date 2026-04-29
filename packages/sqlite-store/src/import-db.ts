@@ -1,4 +1,5 @@
-import { importNormalizedDataToSqlite } from "./index.ts";
+import { ensureSchema, getDatabasePath, hasSqliteData } from "./index.ts";
 
-const result = importNormalizedDataToSqlite();
-console.log("sqlite import:", result);
+ensureSchema();
+console.log("schema ensured at:", getDatabasePath());
+console.log("has data:", hasSqliteData());

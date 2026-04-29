@@ -1,30 +1,49 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import {
-  listAbilities,
-  listItems,
-  listMoves,
-  listPokemonEntries,
-  listPokemonSummaries,
-  readTeams,
-  searchAbilities,
-  searchMoves,
-  searchPokemonEntries,
-  saveTeam
-} from "../../../packages/data-model/src/index.ts";
 import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
 import {
   getAbilityFromSqlite,
   getItemFromSqlite,
   getMoveFromSqlite,
   getPokemonFromSqlite,
-  hasSqliteData,
   listAbilitiesFromSqlite,
   listItemsFromSqlite,
   listMovesFromSqlite,
-  listPokemonFromSqlite
+  listPokemonFromSqlite,
+  type BattleTeam
 } from "../../../packages/sqlite-store/src/index.ts";
 import { staticResponse } from "./static.ts";
+
+const TEAMS_FILE = resolve(import.meta.dirname, "../../../data/teams.json");
+
+function readTeams(): BattleTeam[] {
+  if (!existsSync(TEAMS_FILE)) return [];
+  return JSON.parse(readFileSync(TEAMS_FILE, "utf8"));
+}
+
+function saveTeam(input: Partial<BattleTeam>): BattleTeam {
+  const teams = readTeams();
+  const now = new Date().toISOString();
+  const team: BattleTeam = {
+    id: input.id ?? `team_${Date.now()}`,
+    name: input.name ?? "未命名队伍",
+    format: input.format ?? "singles",
+    members: input.members ?? [],
+    createdAt: input.createdAt ?? now,
+    updatedAt: now
+  };
+  const index = teams.findIndex((item) => item.id === team.id);
+  if (index >= 0) {
+    teams[index] = { ...teams[index], ...team, updatedAt: now };
+  } else {
+    teams.push(team);
+  }
+  mkdirSync(dirname(TEAMS_FILE), { recursive: true });
+  writeFileSync(TEAMS_FILE, JSON.stringify(teams, null, 2));
+  return team;
+}
 
 export const app = new Hono();
 
@@ -43,30 +62,21 @@ app.get("/pokemon", (c) => {
   const query = c.req.query("q") || undefined;
   const type = c.req.query("type") || undefined;
   const generation = numberQuery(c, "generation");
-  const data = hasSqliteData()
-    ? listPokemonFromSqlite({ query, type, generation })
-    : query || type || generation
-      ? searchPokemonEntries({ query, type, generation })
-      : listPokemonSummaries();
-
+  const data = listPokemonFromSqlite({ query, type, generation });
   return c.json({ data });
 });
 
 app.get("/pokemon/:id", (c) => {
   const id = c.req.param("id");
-  const entry = hasSqliteData()
-    ? getPokemonFromSqlite(id)
-    : listPokemonEntries().find((item) => item.id === id || item.slug === id);
+  const entry = getPokemonFromSqlite(id);
   return entry ? c.json({ data: entry }) : c.json({ error: "Pokemon not found" }, 404);
 });
 
-app.get("/items", (c) => c.json({ data: hasSqliteData() ? listItemsFromSqlite() : listItems() }));
+app.get("/items", (c) => c.json({ data: listItemsFromSqlite() }));
 
 app.get("/items/:id", (c) => {
   const id = c.req.param("id");
-  const entry = hasSqliteData()
-    ? getItemFromSqlite(id)
-    : listItems().find((item) => item.id === id || item.slug === id);
+  const entry = getItemFromSqlite(id);
   return entry ? c.json({ data: entry }) : c.json({ error: "Item not found" }, 404);
 });
 
@@ -74,38 +84,26 @@ app.get("/moves", (c) => {
   const query = c.req.query("q") || undefined;
   const type = c.req.query("type") || undefined;
   const generation = numberQuery(c, "generation");
-  const data = hasSqliteData()
-    ? listMovesFromSqlite({ query, type, generation })
-    : query || type || generation
-      ? searchMoves({ query, type, generation })
-      : listMoves();
+  const data = listMovesFromSqlite({ query, type, generation });
   return c.json({ data });
 });
 
 app.get("/moves/:id", (c) => {
   const id = c.req.param("id");
-  const entry = hasSqliteData()
-    ? getMoveFromSqlite(id)
-    : listMoves().find((item) => item.id === id || item.slug === id);
+  const entry = getMoveFromSqlite(id);
   return entry ? c.json({ data: entry }) : c.json({ error: "Move not found" }, 404);
 });
 
 app.get("/abilities", (c) => {
   const query = c.req.query("q") || undefined;
   const generation = numberQuery(c, "generation");
-  const data = hasSqliteData()
-    ? listAbilitiesFromSqlite({ query, generation })
-    : query || generation
-      ? searchAbilities({ query, generation })
-      : listAbilities();
+  const data = listAbilitiesFromSqlite({ query, generation });
   return c.json({ data });
 });
 
 app.get("/abilities/:id", (c) => {
   const id = c.req.param("id");
-  const entry = hasSqliteData()
-    ? getAbilityFromSqlite(id)
-    : listAbilities().find((item) => item.id === id || item.slug === id);
+  const entry = getAbilityFromSqlite(id);
   return entry ? c.json({ data: entry }) : c.json({ error: "Ability not found" }, 404);
 });
 

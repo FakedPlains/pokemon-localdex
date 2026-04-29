@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from .fetcher import RawPage
 from .utils import (
@@ -16,6 +16,8 @@ from .utils import (
     build_move_page_url,
     clean_inline_text,
     clean_summary,
+    detect_generation_marker,
+    extract_battle_effect,
     extract_file_name,
     extract_generation_changes,
     extract_image_candidates,
@@ -30,6 +32,7 @@ from .utils import (
     section_text_by_heading,
     slugify,
     to_absolute_url,
+    to_simplified,
     unique_by_key,
 )
 
@@ -38,6 +41,7 @@ from .utils import (
 class MoveSeed:
     name_zh: str
     detail_url: str
+    number: int = 0
     generation: int = 1
     name_ja: str | None = None
     name_en: str | None = None
@@ -46,7 +50,7 @@ class MoveSeed:
     power: int | None = None
     accuracy: str | None = None
     pp: int | None = None
-    effect_summary: str | None = None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -99,17 +103,31 @@ def parse_move_list_page(html: str) -> list[MoveSeed]:
                 name_zh=name_zh,
                 name_ja=name_ja,
                 name_en=name_en,
+                number=int(lines[index]),
                 generation=current_generation,
                 type=type_name,
                 category=parsed_category,
                 power=normalize_power(power),
                 accuracy=format_accuracy(accuracy),
                 pp=normalize_pp(pp),
-                effect_summary=summary,
+                description=summary,
                 detail_url=build_move_page_url(name_zh),
             )
         )
     return unique_by_key(seeds, lambda item: item.name_zh)
+
+
+def _unique_by_number_keep_last(seeds: list[AbilitySeed]) -> list[AbilitySeed]:
+    """按编号去重，如果编号重复则保留最后一条。"""
+    seen: dict[int, int] = {}  # number -> index in result
+    result: list[AbilitySeed] = []
+    for item in seeds:
+        if item.number in seen:
+            result[seen[item.number]] = item
+        else:
+            seen[item.number] = len(result)
+            result.append(item)
+    return result
 
 
 # 特性列表页中 7 个表格对应的世代编号（丰缘=3, 神奥=4, 合众=5, 卡洛斯=6, 阿罗拉=7, 伽勒尔=8, 帕底亚=9）
@@ -138,9 +156,11 @@ def parse_ability_list_page(html: str) -> list[AbilitySeed]:
             name_idx = col.get("中文名", 1)
             if len(cells) <= max(num_idx, name_idx):
                 continue
-            num_str = cells[num_idx]
-            if not re.fullmatch(r"\d{3}", num_str):
+            num_raw = cells[num_idx]
+            num_match = re.match(r"\d{3}", num_raw)
+            if not num_match:
                 continue
+            num_str = num_match.group(0)
             name_zh = cells[name_idx]
             if not _looks_like_chinese_name(name_zh):
                 continue
@@ -157,7 +177,7 @@ def parse_ability_list_page(html: str) -> list[AbilitySeed]:
                     detail_url=detail_url,
                 )
             )
-    return unique_by_key(seeds, lambda item: item.name_zh)
+    return _unique_by_number_keep_last(seeds)
 
 
 def parse_item_list_page(html: str) -> list[ItemSeed]:
@@ -183,7 +203,6 @@ def parse_item_list_page(html: str) -> list[ItemSeed]:
 def _parse_move_list_tables(html: str) -> list[MoveSeed]:
     soup = BeautifulSoup(html or "", "html.parser")
     seeds: list[MoveSeed] = []
-    current_generation = 0
     for table in soup.find_all("table"):
         rows = table.find_all("tr")
         if not rows:
@@ -191,7 +210,8 @@ def _parse_move_list_tables(html: str) -> list[MoveSeed]:
         header = [clean_inline_text(cell.get_text(" ", strip=True)) for cell in rows[0].find_all(["th", "td"])]
         if not {"编号", "中文名", "日文名", "英文名", "属性", "分类"}.issubset(set(header)):
             continue
-        current_generation += 1
+        # 从表格前面的 h2 标题推断世代
+        table_generation = _detect_generation_before_table(table)
         index = {name: header.index(name) for name in header}
         for row in rows[1:]:
             cells_tags = row.find_all(["th", "td"])
@@ -201,22 +221,38 @@ def _parse_move_list_tables(html: str) -> list[MoveSeed]:
             name_zh = cells[index["中文名"]]
             if not _looks_like_chinese_name(name_zh):
                 continue
+            num_str = cells[index["编号"]] if index["编号"] < len(cells) else ""
+            number = int(num_str) if re.fullmatch(r"\d{1,4}", num_str) else 0
             anchor = cells_tags[index["中文名"]].find("a") if index["中文名"] < len(cells_tags) else None
             detail_url = to_absolute_url(str(anchor.get("href"))) if anchor and anchor.get("href") else build_move_page_url(name_zh)
             seeds.append(MoveSeed(
                 name_zh=name_zh,
                 name_ja=cells[index["日文名"]] if index.get("日文名") is not None and index["日文名"] < len(cells) else None,
                 name_en=cells[index["英文名"]] if index.get("英文名") is not None and index["英文名"] < len(cells) else None,
-                generation=current_generation,
+                number=number,
+                generation=table_generation,
                 type=cells[index["属性"]] if index["属性"] < len(cells) else None,
                 category=normalize_category(cells[index["分类"]] if index["分类"] < len(cells) else None),
                 power=normalize_power(cells[index["威力"]] if "威力" in index and index["威力"] < len(cells) else None),
                 accuracy=format_accuracy(cells[index["命中"]] if "命中" in index and index["命中"] < len(cells) else None),
                 pp=normalize_pp(cells[index["PP"]] if "PP" in index and index["PP"] < len(cells) else cells[index["ＰＰ"]] if "ＰＰ" in index and index["ＰＰ"] < len(cells) else None),
-                effect_summary=cells[index["说明"]] if "说明" in index and index["说明"] < len(cells) else None,
+                description=cells[index["说明"]] if "说明" in index and index["说明"] < len(cells) else None,
                 detail_url=detail_url,
             ))
     return unique_by_key(seeds, lambda item: item.name_zh)
+
+
+def _detect_generation_before_table(table) -> int:
+    """从表格前面的 h2 标题推断世代编号。"""
+    for sibling in table.previous_siblings:
+        if not isinstance(sibling, Tag):
+            continue
+        if sibling.name == "h2":
+            text = sibling.get_text(" ", strip=True)
+            marker = detect_generation_marker(text)
+            if marker:
+                return marker[0]
+    return 1
 
 
 def _parse_item_list_tables(html: str) -> list[ItemSeed]:
@@ -259,34 +295,31 @@ def _looks_like_chinese_name(value: str) -> bool:
 def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
     text = normalize_text(page.html)
     name_ja, name_en = extract_intro_names(text, seed.name_zh)
-    effect_summary = (
-        clean_summary(section_text_by_heading(page.html, "招式附加效果"))
-        or clean_summary(seed.effect_summary)
-        or "暂无说明"
+    # "招式附加效果" 章节 = 详细对战效果描述
+    effect_detail = (
+        to_simplified(clean_summary(section_text_by_heading(page.html, "招式附加效果")))
+        or to_simplified(clean_summary(section_text_by_heading(page.html, "招式附加效果")))
+        or None
     )
-    generations: dict[int, dict] = {
-        seed.generation: {
-            "generation": seed.generation,
-            "type": seed.type,
-            "category": seed.category,
-            "power": seed.power,
-            "accuracy": seed.accuracy,
-            "pp": seed.pp,
-            "effect_summary": effect_summary,
-            "notes": None,
-        }
-    }
-    for change in extract_generation_changes(page.html, "招式变更"):
-        generations[int(change["generation"])] = {
-            "generation": int(change["generation"]),
-            "type": seed.type,
-            "category": seed.category,
-            "power": seed.power,
-            "accuracy": seed.accuracy,
-            "pp": seed.pp,
-            "effect_summary": str(change["summary"]),
-            "notes": "来自 52Poké 招式变更章节。",
-        }
+    # 列表页 "说明" 字段 = 简短描述
+    description = to_simplified(seed.description) or "暂无说明"
+    # 只收集 "招式变更" 章节的内容（跨世代变更记录）
+    # wiki 页面标题可能是简体或繁体
+    generations: dict[str, dict] = {}
+    for heading in ("招式变更", "招式變更"):
+        changes = extract_generation_changes(page.html, heading)
+        if changes:
+            for change in changes:
+                gen = int(change["generation"])
+                gv_code = change.get("game_version_code")
+                key = f"{gen}|{gv_code or ''}"
+                generations[key] = {
+                    "generation": gen,
+                    "description": to_simplified(str(change["summary"])) or str(change["summary"]),
+                    "game_version_code": gv_code,
+                    "notes": f"来自 52Poké {heading}章节。",
+                }
+            break
     image_url = next(
         (
             url
@@ -296,8 +329,7 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
         None,
     )
     return {
-        "legacy_id": f"move-{slugify(seed.name_zh)}",
-        "slug": slugify(seed.name_zh),
+        "number": seed.number,
         "name_zh": seed.name_zh,
         "name_ja": name_ja or seed.name_ja,
         "name_en": name_en or seed.name_en,
@@ -306,7 +338,9 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
         "power": seed.power,
         "accuracy": seed.accuracy,
         "pp": seed.pp,
-        "effect_summary": effect_summary,
+        "description": description,
+        "effect_detail": effect_detail,
+        "introduced_generation": seed.generation,
         "image": ImageAsset(normalize_media_url(image_url), f"{seed.name_zh}招式动画", normalize_media_url(image_url)) if image_url else None,
         "generations": sorted(generations.values(), key=lambda item: item["generation"]),
         "source": page,
@@ -316,23 +350,27 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
 def normalize_ability_detail_page(page: RawPage, seed: AbilitySeed) -> dict:
     text = normalize_text(page.html)
     name_ja, name_en = extract_intro_names(text, seed.name_zh)
-    # 详情页 "特性效果" 章节 = 详细对战效果描述
+    # 详情页 "特性效果 > 对战中" = 详细对战效果描述
     effect_detail = (
-        clean_summary(section_text_by_heading(page.html, "特性效果"))
+        to_simplified(clean_summary(extract_battle_effect(page.html, "特性效果")))
         or None
     )
     # 列表页 "说明" 字段 = 简短描述
-    description = seed.description or "暂无说明"
+    description = to_simplified(seed.description) or "暂无说明"
     # 只收集 "特性变更" 章节的内容（跨世代变更记录）
     # wiki 页面标题可能是简体或繁体，也可能叫"效果变更"
-    generations: dict[int, dict] = {}
+    generations: dict[str, dict] = {}
     for heading in ("特性变更", "特性變更", "效果变更", "效果變更"):
         changes = extract_generation_changes(page.html, heading)
         if changes:
             for change in changes:
-                generations[int(change["generation"])] = {
-                    "generation": int(change["generation"]),
-                    "description": str(change["summary"]),
+                gen = int(change["generation"])
+                gv_code = change.get("game_version_code")
+                key = f"{gen}|{gv_code or ''}"
+                generations[key] = {
+                    "generation": gen,
+                    "description": to_simplified(str(change["summary"])) or str(change["summary"]),
+                    "game_version_code": gv_code,
                     "notes": f"来自 52Poké {heading}章节。",
                 }
             break

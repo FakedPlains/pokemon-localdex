@@ -15,10 +15,7 @@ from .utils import (
     extract_file_name,
     extract_image_candidates,
     generation_from_heading,
-    normalize_category,
     normalize_media_url,
-    normalize_power,
-    normalize_pp,
     normalize_text,
     read_number,
     slugify,
@@ -201,20 +198,11 @@ def _parse_learnset_tables(html: str, generation: int) -> dict:
                 "notes": None,
             })
             moves.append({
-                "legacy_id": f"move-{slugify(move_name)}",
-                "slug": slugify(move_name),
                 "name_zh": move_name,
-                "generation": generation,
-                "type": type_token,
-                "category": normalize_category(category_token),
-                "power": normalize_power(power_token),
-                "accuracy": format_accuracy(accuracy_token),
-                "pp": normalize_pp(pp_token),
-                "effect_summary": "来自 52Poké 宝可梦学招式表的基础参数记录。",
             })
     return {
         "learnset": unique_by_key(learnset, lambda item: f"{item['move_name_zh']}|{item['learn_method']}|{item.get('level')}|{item.get('notes')}"),
-        "moves": unique_by_key(moves, lambda item: f"{item['name_zh']}|{item['generation']}"),
+        "moves": unique_by_key(moves, lambda item: item['name_zh']),
     }
 
 
@@ -442,16 +430,7 @@ def _parse_learnset_cells(cells: list[str], method: str, generation: int, notes:
             "notes": notes,
         })
         moves.append({
-            "legacy_id": f"move-{slugify(move_name)}",
-            "slug": slugify(move_name),
             "name_zh": move_name,
-            "generation": generation,
-            "type": type_token,
-            "category": normalize_category(category_token),
-            "power": normalize_power(power_token),
-            "accuracy": format_accuracy(accuracy_token),
-            "pp": normalize_pp(pp_token),
-            "effect_summary": "来自 52Poké 宝可梦学招式表的基础参数记录。",
         })
     return {"learnset": learnset, "moves": moves}
 

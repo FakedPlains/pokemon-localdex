@@ -26,6 +26,11 @@ from .pokemon import (
 from .sqlite_upsert import (
     PokemonRow,
     cache_key,
+    clear_abilities,
+    clear_all,
+    clear_items,
+    clear_moves,
+    clear_pokemon,
     connect,
     pokemon_source_url,
     select_pokemon,
@@ -101,6 +106,7 @@ def add_pokemon_filters(parser: argparse.ArgumentParser) -> None:
 def add_runtime_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--refresh-raw", action="store_true", default=argparse.SUPPRESS, help="Fetch pages even if cache exists.")
     parser.add_argument("--dry-run", action="store_true", default=argparse.SUPPRESS, help="Parse and print without writing SQLite.")
+    parser.add_argument("--clean", action="store_true", default=argparse.SUPPRESS, help="Clear existing data before crawling (delete then re-insert).")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -118,6 +124,12 @@ def main(argv: list[str] | None = None) -> int:
     if command == "learnsets":
         return crawl_learnsets(conn, fetcher, args)
     if command == "all":
+        clean = getattr(args, "clean", False)
+        if clean and not args.dry_run:
+            counts = clear_all(conn)
+            print(f"[clean] Cleared all data: {counts}")
+            # 已经全部清除，子命令不需要再单独清除
+            args.clean = False
         catalog_result = crawl_catalog(conn, fetcher, args)
         pokemon_result = crawl_pokemon(conn, fetcher, args)
         learnset_result = crawl_learnsets(conn, fetcher, args)
@@ -126,8 +138,20 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def crawl_catalog(conn, fetcher: PageFetcher, args) -> int:
+    clean = getattr(args, "clean", False)
     name_filters = parse_name_filters(getattr(args, "name", []))
     totals = {"moves": 0, "abilities": 0, "items": 0}
+
+    if clean and not args.dry_run:
+        if getattr(args, "moves", True):
+            n = clear_moves(conn)
+            print(f"[clean] Deleted {n} moves.")
+        if getattr(args, "abilities", True):
+            n = clear_abilities(conn)
+            print(f"[clean] Deleted {n} abilities.")
+        if getattr(args, "items", True):
+            n = clear_items(conn)
+            print(f"[clean] Deleted {n} items.")
 
     if getattr(args, "moves", True):
         page = fetcher.load_or_fetch("move-list", MOVE_LIST_URL)
@@ -138,10 +162,10 @@ def crawl_catalog(conn, fetcher: PageFetcher, args) -> int:
             detail = fetcher.load_or_fetch(f"move-{slugify(seed.name_zh)}", seed.detail_url)
             payload = normalize_move_detail_page(detail, seed)
             if args.dry_run:
-                print(f"[dry-run] move {seed.name_zh}: generations={len(payload['generations'])}")
+                print(f"[dry-run] move #{payload['number']:03d} {seed.name_zh}: gen={payload['introduced_generation']} changes={len(payload['generations'])}")
             else:
                 upsert_move_detail(conn, payload)
-                print(f"[updated] move {seed.name_zh}: generations={len(payload['generations'])}")
+                print(f"[updated] move #{payload['number']:03d} {seed.name_zh}: gen={payload['introduced_generation']} changes={len(payload['generations'])}")
             totals["moves"] += 1
 
     if getattr(args, "abilities", True):
@@ -179,6 +203,10 @@ def crawl_catalog(conn, fetcher: PageFetcher, args) -> int:
 
 
 def crawl_pokemon(conn, fetcher: PageFetcher, args) -> int:
+    clean = getattr(args, "clean", False)
+    if clean and not args.dry_run:
+        n = clear_pokemon(conn)
+        print(f"[clean] Deleted {n} pokemon.")
     seeds = selected_pokemon_seeds(fetcher, args)
     updated = 0
     for seed in seeds:
@@ -199,6 +227,14 @@ def crawl_pokemon(conn, fetcher: PageFetcher, args) -> int:
 
 
 def crawl_pokemon_abilities(conn, fetcher: PageFetcher, args) -> int:
+    clean = getattr(args, "clean", False)
+    if clean and not args.dry_run:
+        # pokemon-abilities 只清除特性关联数据，不清除宝可梦主表
+        conn.execute("DELETE FROM pokemon_abilities")
+        conn.execute("DELETE FROM pokemon_generation_abilities")
+        conn.execute("DELETE FROM pokemon_form_abilities")
+        conn.commit()
+        print("[clean] Cleared pokemon ability association tables.")
     names = parse_name_filters(args.pokemon)
     rows = select_pokemon(
         conn,
@@ -233,6 +269,11 @@ def crawl_pokemon_abilities(conn, fetcher: PageFetcher, args) -> int:
 
 
 def crawl_learnsets(conn, fetcher: PageFetcher, args) -> int:
+    clean = getattr(args, "clean", False)
+    if clean and not args.dry_run:
+        conn.execute("DELETE FROM pokemon_moves")
+        conn.commit()
+        print("[clean] Cleared pokemon_moves (learnsets).")
     seeds = selected_pokemon_seeds(fetcher, args)
     generations_filter = parse_generations(args.generations)
     updated = 0

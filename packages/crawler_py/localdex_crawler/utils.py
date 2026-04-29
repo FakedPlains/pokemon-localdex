@@ -6,6 +6,17 @@ import unicodedata
 from urllib.parse import quote
 
 from bs4 import BeautifulSoup, Tag
+import opencc
+
+# 繁体→简体转换器（单例）
+_T2S_CONVERTER = opencc.OpenCC("t2s")
+
+
+def to_simplified(text: str | None) -> str | None:
+    """将繁体中文转换为简体中文。"""
+    if not text:
+        return text
+    return _T2S_CONVERTER.convert(text)
 
 
 POKEMON_LIST_URL = "https://wiki.52poke.com/wiki/%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89/%E7%AE%80%E5%8D%95%E7%89%88"
@@ -29,24 +40,37 @@ POKEMON_TYPES = {
 }
 MOVE_CATEGORIES = {"physical", "special", "status"}
 
-# 游戏版本名 → 世代映射（用于解析"特性变更"/"招式变更"章节中的游戏版本子标题）
-GAME_VERSION_GENERATION: dict[str, int] = {
-    "红绿蓝": 1, "紅綠藍": 1, "红绿": 1, "紅綠": 1, "皮卡丘": 1,
-    "金银": 2, "金銀": 2, "水晶": 2,
-    "红宝石": 3, "紅寶石": 3, "蓝宝石": 3, "藍寶石": 3, "绿宝石": 3, "綠寶石": 3,
-    "火红": 3, "火紅": 3, "叶绿": 3, "葉綠": 3,
-    "钻石": 4, "鑽石": 4, "珍珠": 4, "白金": 4,
-    "心金": 4, "魂银": 4, "魂銀": 4,
-    "黑": 5, "白": 5, "黑2": 5, "白2": 5,
-    "X": 6, "Y": 6, "欧米伽红宝石": 6, "歐米伽紅寶石": 6, "阿尔法蓝宝石": 6, "阿爾法藍寶石": 6,
-    "太阳": 7, "太陽": 7, "月亮": 7, "究极之日": 7, "究極之日": 7, "究极之月": 7, "究極之月": 7,
-    "Let's Go! 皮卡丘": 7, "Let's Go! 伊布": 7,
-    "剑": 8, "劍": 8, "盾": 8, "劍／盾": 8, "剑／盾": 8,
-    "晶灿钻石": 8, "晶燦鑽石": 8, "明亮珍珠": 8, "晶灿钻石／明亮珍珠": 8,
-    "传说 阿尔宙斯": 8, "傳說 阿爾宙斯": 8,
-    "朱": 9, "紫": 9, "朱／紫": 9, "零之秘宝": 9,
-    "Champions": 8,
+# 游戏版本名 → (世代, game_version_code) 映射
+# 用于解析"特性变更"/"招式变更"章节中的游戏版本子标题
+GAME_VERSION_INFO: dict[str, tuple[int, str]] = {
+    "红绿蓝": (1, "RG"), "紅綠藍": (1, "RG"), "红绿": (1, "RG"), "紅綠": (1, "RG"),
+    "皮卡丘": (1, "Y"), "黄": (1, "Y"),
+    "金银": (2, "GS"), "金銀": (2, "GS"), "水晶": (2, "C"),
+    "红宝石": (3, "RS"), "紅寶石": (3, "RS"), "蓝宝石": (3, "RS"), "藍寶石": (3, "RS"),
+    "绿宝石": (3, "E"), "綠寶石": (3, "E"),
+    "火红": (3, "FRLG"), "火紅": (3, "FRLG"), "叶绿": (3, "FRLG"), "葉綠": (3, "FRLG"),
+    "钻石": (4, "DP"), "鑽石": (4, "DP"), "珍珠": (4, "DP"),
+    "白金": (4, "Pt"),
+    "心金": (4, "HGSS"), "魂银": (4, "HGSS"), "魂銀": (4, "HGSS"),
+    "黑": (5, "BW"), "白": (5, "BW"), "黑2": (5, "B2W2"), "白2": (5, "B2W2"),
+    "X": (6, "XY"), "Y": (6, "XY"),
+    "欧米伽红宝石": (6, "ORAS"), "歐米伽紅寶石": (6, "ORAS"),
+    "阿尔法蓝宝石": (6, "ORAS"), "阿爾法藍寶石": (6, "ORAS"),
+    "太阳": (7, "SM"), "太陽": (7, "SM"), "月亮": (7, "SM"),
+    "究极之日": (7, "USUM"), "究極之日": (7, "USUM"),
+    "究极之月": (7, "USUM"), "究極之月": (7, "USUM"),
+    "Let's Go! 皮卡丘": (7, "LPLE"), "Let's Go! 伊布": (7, "LPLE"),
+    "剑": (8, "SWSH"), "劍": (8, "SWSH"), "盾": (8, "SWSH"),
+    "劍／盾": (8, "SWSH"), "剑／盾": (8, "SWSH"),
+    "晶灿钻石": (8, "BDSP"), "晶燦鑽石": (8, "BDSP"), "明亮珍珠": (8, "BDSP"),
+    "晶灿钻石／明亮珍珠": (8, "BDSP"),
+    "传说 阿尔宙斯": (8, "LA"), "傳說 阿爾宙斯": (8, "LA"),
+    "朱": (9, "SV"), "紫": (9, "SV"), "朱／紫": (9, "SV"),
+    "零之秘宝": (9, "SVT"),
+    "Champions": (99, "CHAMP"),
 }
+# 向后兼容：仅世代映射
+GAME_VERSION_GENERATION: dict[str, int] = {k: v[0] for k, v in GAME_VERSION_INFO.items()}
 
 CHINESE_GENERATIONS = {
     "一": 1,
@@ -232,6 +256,71 @@ def section_text_by_heading(html: str, heading: str, level: int = 2) -> str:
     return "\n".join(item for item in chunks if item).strip()
 
 
+def extract_battle_effect(html: str, parent_heading: str = "特性效果") -> str:
+    """从特性详情页提取「对战中」的效果描述。
+
+    页面结构有三种情况：
+    1. h2「特性效果」下有 h3「对战中」/「對戰中」子标题 → 只取该 h3 到下一个 h3/h2 之间的内容
+    2. h2「特性效果」下有其他 h3 子标题但没有「对战中」→ 取 h2 到第一个 h3 之间的内容（即对战部分）
+    3. h2「特性效果」下没有任何 h3 子标题 → 取整个 h2 章节内容
+    """
+    soup = BeautifulSoup(html or "", "html.parser")
+
+    # 找到 h2「特性效果」
+    parent_tag = None
+    for tag in soup.find_all("h2"):
+        if parent_heading in tag.get_text(" ", strip=True):
+            parent_tag = tag
+            break
+    if not parent_tag:
+        return ""
+
+    # 先尝试找 h3「对战中」/「對戰中」
+    battle_h3 = None
+    for sibling in parent_tag.next_siblings:
+        if isinstance(sibling, Tag) and sibling.name == "h2":
+            break
+        if isinstance(sibling, Tag) and sibling.name == "h3":
+            heading_text = sibling.get_text(" ", strip=True)
+            if "对战中" in heading_text or "對戰中" in heading_text:
+                battle_h3 = sibling
+                break
+
+    if battle_h3:
+        # 情况 1：取 h3「对战中」到下一个 h3/h2 之间的内容
+        chunks: list[str] = []
+        for sibling in battle_h3.next_siblings:
+            if isinstance(sibling, Tag) and sibling.name in ("h2", "h3"):
+                break
+            if isinstance(sibling, Tag):
+                chunks.append(sibling.get_text("\n", strip=True))
+            elif str(sibling).strip():
+                chunks.append(str(sibling).strip())
+        return "\n".join(item for item in chunks if item).strip()
+
+    # 没有「对战中」h3，检查是否有其他 h3 子标题
+    has_h3 = False
+    for sibling in parent_tag.next_siblings:
+        if isinstance(sibling, Tag) and sibling.name == "h2":
+            break
+        if isinstance(sibling, Tag) and sibling.name == "h3":
+            has_h3 = True
+            break
+
+    chunks = []
+    for sibling in parent_tag.next_siblings:
+        if isinstance(sibling, Tag) and sibling.name == "h2":
+            break
+        if has_h3 and isinstance(sibling, Tag) and sibling.name == "h3":
+            # 情况 2：遇到第一个 h3 就停止（h3 之前的内容就是对战效果）
+            break
+        if isinstance(sibling, Tag):
+            chunks.append(sibling.get_text("\n", strip=True))
+        elif str(sibling).strip():
+            chunks.append(str(sibling).strip())
+    return "\n".join(item for item in chunks if item).strip()
+
+
 def extract_intro_names(text: str, fallback_name_zh: str) -> tuple[str | None, str | None]:
     escaped = re.escape(fallback_name_zh)
     matched = re.search(
@@ -243,36 +332,70 @@ def extract_intro_names(text: str, fallback_name_zh: str) -> tuple[str | None, s
     return matched.group(1).strip(), matched.group(2).strip()
 
 
-def generation_from_game_version(line: str) -> int | None:
-    """从游戏版本名（如"《白金》"、"《劍／盾》"）推断世代编号。"""
+def generation_from_game_version(line: str) -> tuple[int, str] | None:
+    """从游戏版本名（如"《白金》"、"《劍／盾》"）推断 (世代编号, game_version_code)。
+
+    只有当行的主要内容就是版本名时才识别为标记。
+    如果行中除了版本名还有大量其他文字，则不视为标记行。
+    """
     matched = re.search(r"[《「](.+?)[》」]", line)
     if not matched:
         return None
     version_name = matched.group(1).strip()
+    # 去掉版本名及书名号后，检查剩余内容长度
+    remaining = line[:matched.start()] + line[matched.end():]
+    remaining = re.sub(r"[\s《》「」]+", "", remaining)
+    # 如果剩余内容超过 4 个字符，说明这行不是纯标题行
+    if len(remaining) > 4:
+        return None
     # 先尝试完整匹配
-    if version_name in GAME_VERSION_GENERATION:
-        return GAME_VERSION_GENERATION[version_name]
+    if version_name in GAME_VERSION_INFO:
+        return GAME_VERSION_INFO[version_name]
     # 再尝试部分匹配（如"劍／盾"匹配"劍"）
-    for key, gen in GAME_VERSION_GENERATION.items():
+    for key, info in GAME_VERSION_INFO.items():
         if key in version_name or version_name in key:
-            return gen
+            return info
     return None
 
 
-def detect_generation_marker(line: str) -> int | None:
-    """从行文本中检测世代标记，支持"第X世代"和游戏版本名两种格式。"""
+def detect_generation_marker(line: str) -> tuple[int, str | None] | None:
+    """从行文本中检测世代标记，支持"第X世代"和游戏版本名两种格式。
+    返回 (generation, game_version_code) 或 None。
+    世代格式时 game_version_code 为 None。
+    """
     generation = generation_from_heading(line)
     if generation:
-        return generation
-    return generation_from_game_version(line)
+        return (generation, None)
+    result = generation_from_game_version(line)
+    if result:
+        return result
+    return None
+
+
+def _rejoin_split_markers(text: str) -> str:
+    """将被换行拆开的书名号标记和分数合并回来。
+
+    例如 "《\\n黑２／白２\\n》\\n描述" -> "《黑２／白２》\\n描述"
+    例如 "1\\n⁄\\n16" -> "1⁄16"
+    """
+    # 合并 《...》 中被换行拆开的内容
+    text = re.sub(r"《\s*\n\s*(.+?)\s*\n\s*》", r"《\1》", text)
+    # 合并 「...」 中被换行拆开的内容
+    text = re.sub(r"「\s*\n\s*(.+?)\s*\n\s*」", r"「\1」", text)
+    # 合并被换行拆开的分数：数字\n⁄\n数字 -> 数字⁄数字
+    text = re.sub(r"(\d+)\s*\n\s*⁄\s*\n\s*(\d+)", r"\1⁄\2", text)
+    return text
 
 
 def extract_generation_changes(html: str, heading: str) -> list[dict[str, object]]:
     section = section_text_by_heading(html, heading)
     if not section:
         return []
+    # 预处理：合并被换行拆开的书名号标记
+    section = _rejoin_split_markers(section)
     records: list[dict[str, object]] = []
     current_generation: int | None = None
+    current_game_version: str | None = None
     buffer: list[str] = []
 
     def flush() -> None:
@@ -280,19 +403,25 @@ def extract_generation_changes(html: str, heading: str) -> list[dict[str, object
         if current_generation and buffer:
             summary = clean_summary(" ".join(buffer), 500)
             if summary:
-                records.append({"generation": current_generation, "summary": summary})
+                record: dict[str, object] = {
+                    "generation": current_generation,
+                    "summary": summary,
+                }
+                if current_game_version:
+                    record["game_version_code"] = current_game_version
+                records.append(record)
         buffer = []
 
     for line in [item.strip() for item in section.splitlines() if item.strip()]:
-        generation = detect_generation_marker(line)
-        if generation:
+        marker = detect_generation_marker(line)
+        if marker:
             flush()
-            current_generation = generation
+            current_generation, current_game_version = marker
             continue
         if current_generation and not line.isdigit():
             buffer.append(line)
     flush()
-    return unique_by_key(records, lambda item: f"{item['generation']}|{item['summary']}")
+    return unique_by_key(records, lambda item: f"{item['generation']}|{item.get('game_version_code', '')}|{item['summary']}")
 
 
 def unique_by_key(items, key_fn):

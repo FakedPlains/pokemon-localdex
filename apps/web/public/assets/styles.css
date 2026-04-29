@@ -1783,6 +1783,13 @@ button.secondary {
   border: 1px solid rgba(31, 42, 31, 0.05);
 }
 
+.ab-gen-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
 .ab-gen-badge {
   display: inline-flex;
   align-items: center;
@@ -1795,6 +1802,20 @@ button.secondary {
   letter-spacing: 0.02em;
   background: linear-gradient(135deg, rgba(138, 166, 90, 0.18), rgba(138, 166, 90, 0.08));
   color: #3d5a1e;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ab-gen-version {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: linear-gradient(135deg, rgba(90, 130, 180, 0.16), rgba(90, 130, 180, 0.06));
+  color: #2a4a6e;
   white-space: nowrap;
   flex-shrink: 0;
 }

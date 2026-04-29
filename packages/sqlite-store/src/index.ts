@@ -1,17 +1,226 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import {
-  listAbilities,
-  listItems,
-  listMoves,
-  listPokemonEntries,
-  type AbilityEntry,
-  type ImageAsset,
-  type ItemEntry,
-  type MoveEntry,
-  type PokemonEntry
-} from "../../data-model/src/index.ts";
+
+// ── Type definitions (previously from data-model) ──
+
+export type StatBlock = {
+  hp: number;
+  atk: number;
+  def: number;
+  spa: number;
+  spd: number;
+  spe: number;
+};
+
+export type SourceMeta = {
+  url: string;
+  title: string;
+  fetchedAt: string;
+};
+
+export type ImageAsset = {
+  url: string;
+  alt?: string;
+  sourceUrl?: string;
+};
+
+export type PokemonImageSet = {
+  official?: ImageAsset;
+  shinyOfficial?: ImageAsset;
+  sprite?: ImageAsset;
+  shinySprite?: ImageAsset;
+};
+
+export type PokemonEvolutionMember = {
+  id: string;
+  legacyId?: string;
+  dexNumber: number;
+  slug: string;
+  nameZh: string;
+  nameEn?: string;
+  primaryType?: string;
+  secondaryType?: string;
+  stageLabel?: string;
+  image?: ImageAsset;
+};
+
+export type PokemonSummary = {
+  id: string;
+  legacyId?: string;
+  dexNumber: number;
+  slug: string;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  generations: number[];
+  primaryType?: string;
+  secondaryType?: string;
+};
+
+export type ItemEntry = {
+  id: string;
+  legacyId?: string;
+  slug: string;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  category?: string;
+  effectSummary?: string;
+  image?: ImageAsset;
+  source?: SourceMeta;
+};
+
+export type GenderRatio = {
+  male?: string;
+  female?: string;
+  genderless?: boolean;
+};
+
+export type PokemonForm = {
+  id: string;
+  legacyId?: string;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  primaryType?: string;
+  secondaryType?: string;
+  abilityIds?: string[];
+  baseStats?: StatBlock;
+  introducedGeneration?: number;
+  isMega?: boolean;
+  notes?: string;
+  images?: PokemonImageSet;
+};
+
+export type RegionalDexRecord = {
+  region: string;
+  dexNumber?: string;
+};
+
+export type GenerationAvailability = {
+  generation: number;
+  regions?: RegionalDexRecord[];
+};
+
+export type PokemonLearnsetRecord = {
+  moveId: string;
+  moveNameZh?: string;
+  learnMethod?: "level-up" | "tm" | "hm" | "egg" | "tutor" | "event" | "evolution" | "other";
+  level?: number;
+  notes?: string;
+};
+
+export type PokemonGenerationRecord = {
+  generation: number;
+  label?: string;
+  primaryType?: string;
+  secondaryType?: string;
+  abilityIds?: string[];
+  hiddenAbilityId?: string;
+  baseStats?: StatBlock;
+  moveIds?: string[];
+  learnset?: PokemonLearnsetRecord[];
+  notes?: string;
+};
+
+export type PokemonEntry = PokemonSummary & {
+  category?: string;
+  abilities?: string[];
+  hiddenAbility?: string;
+  abilityIds?: string[];
+  hiddenAbilityId?: string;
+  moveIds?: string[];
+  evolutionChain?: PokemonEvolutionMember[];
+  heightM?: number;
+  weightKg?: number;
+  color?: string;
+  catchRate?: number;
+  genderRatio?: GenderRatio;
+  baseStats?: StatBlock;
+  images?: PokemonImageSet;
+  forms?: PokemonForm[];
+  generationAvailability?: GenerationAvailability[];
+  generationRecords?: PokemonGenerationRecord[];
+  source?: SourceMeta;
+  parseNote?: string;
+};
+
+export type MoveGenerationRecord = {
+  generation: number;
+  gameVersionCode?: string;
+  gameVersionName?: string;
+  type?: string;
+  category?: string;
+  power?: number;
+  accuracy?: string;
+  pp?: number;
+  description: string;
+  notes?: string;
+};
+
+export type MoveEntry = {
+  id: string;
+  number?: number;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  type?: string;
+  category?: string;
+  power?: number;
+  accuracy?: string;
+  pp?: number;
+  description?: string;
+  effectDetail?: string;
+  introducedGeneration?: number;
+  image?: ImageAsset;
+  generations: MoveGenerationRecord[];
+  source?: SourceMeta;
+};
+
+export type AbilityGenerationRecord = {
+  generation: number;
+  gameVersionCode?: string;
+  gameVersionName?: string;
+  description: string;
+  notes?: string;
+};
+
+export type AbilityEntry = {
+  id: string;
+  number?: number;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  description?: string;
+  effectDetail?: string;
+  introducedGeneration?: number;
+  image?: ImageAsset;
+  generations: AbilityGenerationRecord[];
+  source?: SourceMeta;
+};
+
+export type TeamMember = {
+  slot: number;
+  pokemonId: string;
+  nameZh?: string;
+  level: number;
+  itemId?: string;
+  abilityId?: string;
+  nature?: string;
+  moves: string[];
+  ivs: Partial<StatBlock>;
+  evs: Partial<StatBlock>;
+};
+
+export type BattleTeam = {
+  id: string;
+  name: string;
+  format: string;
+  members: TeamMember[];
+  createdAt: string;
+  updatedAt: string;
+};
 
 const ROOT = resolve(import.meta.dirname, "../../../");
 const GENERATIONS = [
@@ -23,8 +232,24 @@ const GENERATIONS = [
   [6, "第六世代", "Generation VI"],
   [7, "第七世代", "Generation VII"],
   [8, "第八世代", "Generation VIII"],
-  [9, "第九世代", "Generation IX"]
+  [9, "第九世代", "Generation IX"],
+  [99, "Champions", "Champions"]
 ] as const;
+const GAME_VERSIONS: Array<[string, string, number]> = [
+  ["RG", "红/绿", 1], ["B", "蓝", 1], ["Y", "黄", 1],
+  ["GS", "金/银", 2], ["C", "水晶", 2],
+  ["RS", "红宝石/蓝宝石", 3], ["E", "绿宝石", 3], ["FRLG", "火红/叶绿", 3],
+  ["DP", "钻石/珍珠", 4], ["Pt", "白金", 4], ["HGSS", "心金/魂银", 4],
+  ["BW", "黑/白", 5], ["B2W2", "黑2/白2", 5],
+  ["XY", "X/Y", 6], ["ORAS", "欧米伽红宝石/阿尔法蓝宝石", 6],
+  ["SM", "太阳/月亮", 7], ["USUM", "究极之日/究极之月", 7], ["LPLE", "Let's Go 皮卡丘/伊布", 7],
+  ["SWSH", "剑/盾", 8], ["SWSHE", "剑/盾 铠之孤岛+冠之雪原", 8], ["BDSP", "晶灿钻石/明亮珍珠", 8], ["LA", "传说 阿尔宙斯", 8],
+  ["SV", "朱/紫", 9], ["SVT", "朱/紫 零之秘宝", 9], ["ZA", "传说 Z-A", 9],
+  ["CHAMP", "冠军", 99],
+];
+const GAME_VERSION_NAMES = new Map<string, string>(
+  GAME_VERSIONS.map(([code, nameZh]) => [code, nameZh])
+);
 const TYPE_NAMES = [
   "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
   "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精"
@@ -396,17 +621,15 @@ function mapItemRow(db: DatabaseSync, row: Record<string, unknown>): ItemEntry {
 function hydrateMoveRow(db: DatabaseSync, row: Record<string, unknown>): MoveEntry {
   const images = imageRows(db, "move", String(row.id), null);
   const generations = db.prepare(`
-    SELECT mgr.*, g.number AS generation_number, t.name_zh AS type_name_zh
+    SELECT mgr.*, g.number AS generation_number
     FROM move_generation_records mgr
     JOIN generations g ON g.id = mgr.generation_id
-    LEFT JOIN types t ON t.id = mgr.type_id
     WHERE mgr.move_id = ?
     ORDER BY g.number ASC
   `).all(String(row.id)) as Record<string, unknown>[];
   return {
     id: String(row.id),
-    legacyId: row.legacy_id ? String(row.legacy_id) : undefined,
-    slug: String(row.slug),
+    number: row.number === null || row.number === undefined ? undefined : Number(row.number),
     nameZh: String(row.name_zh),
     nameJa: row.name_ja ? String(row.name_ja) : undefined,
     nameEn: row.name_en ? String(row.name_en) : undefined,
@@ -415,22 +638,24 @@ function hydrateMoveRow(db: DatabaseSync, row: Record<string, unknown>): MoveEnt
     power: row.power === null ? undefined : Number(row.power),
     accuracy: row.accuracy ? String(row.accuracy) : undefined,
     pp: row.pp === null ? undefined : Number(row.pp),
-    effectSummary: row.effect_summary ? String(row.effect_summary) : undefined,
+    description: row.description ? String(row.description) : undefined,
+    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
+    introducedGeneration: row.introduced_generation_number === null || row.introduced_generation_number === undefined ? undefined : Number(row.introduced_generation_number),
     image: images[0] ? {
       url: String(images[0].url),
       alt: images[0].alt ? String(images[0].alt) : undefined,
       sourceUrl: images[0].source_url ? String(images[0].source_url) : undefined
     } : undefined,
-    generations: generations.map((generation) => ({
-      generation: Number(generation.generation_number),
-      type: generation.type_name_zh ? String(generation.type_name_zh) : undefined,
-      category: generation.category ? String(generation.category) : undefined,
-      power: generation.power === null ? undefined : Number(generation.power),
-      accuracy: generation.accuracy ? String(generation.accuracy) : undefined,
-      pp: generation.pp === null ? undefined : Number(generation.pp),
-      effectSummary: generation.effect_summary ? String(generation.effect_summary) : "",
-      notes: generation.notes ? String(generation.notes) : undefined
-    })),
+    generations: generations.map((generation) => {
+      const code = generation.game_version_code ? String(generation.game_version_code) : undefined;
+      return {
+        generation: Number(generation.generation_number),
+        gameVersionCode: code,
+        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
+        description: generation.description ? String(generation.description) : "",
+        notes: generation.notes ? String(generation.notes) : undefined
+      };
+    }),
     source: sourceFromRow(row)
   };
 }
@@ -458,11 +683,16 @@ function hydrateAbilityRow(db: DatabaseSync, row: Record<string, unknown>): Abil
       alt: images[0].alt ? String(images[0].alt) : undefined,
       sourceUrl: images[0].source_url ? String(images[0].source_url) : undefined
     } : undefined,
-    generations: generations.map((generation) => ({
-      generation: Number(generation.generation_number),
-      description: generation.description ? String(generation.description) : "",
-      notes: generation.notes ? String(generation.notes) : undefined
-    })),
+    generations: generations.map((generation) => {
+      const code = generation.game_version_code ? String(generation.game_version_code) : undefined;
+      return {
+        generation: Number(generation.generation_number),
+        gameVersionCode: code,
+        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
+        description: generation.description ? String(generation.description) : "",
+        notes: generation.notes ? String(generation.notes) : undefined
+      };
+    }),
     source: sourceFromRow(row)
   };
 }
@@ -480,7 +710,287 @@ export function openDatabase() {
   return new DatabaseSync(resolveDatabasePath(), { timeout: 3000 });
 }
 
+/**
+ * 安全地确保数据库 schema 存在（增量式，不会删除已有数据）。
+ * 只创建不存在的表和索引，并填充维度数据（世代、属性、游戏版本）。
+ */
 export function ensureSchema() {
+  const db = openDatabase();
+  db.exec(`
+    PRAGMA foreign_keys = OFF;
+
+    -- 清理已废弃的旧表
+    DROP TABLE IF EXISTS pokemon_learnsets;
+
+    CREATE TABLE IF NOT EXISTS generations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      number INTEGER NOT NULL UNIQUE,
+      name_zh TEXT NOT NULL,
+      name_en TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS game_versions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      name_zh TEXT NOT NULL,
+      generation_id INTEGER NOT NULL REFERENCES generations(id)
+    );
+    CREATE TABLE IF NOT EXISTS types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      legacy_id TEXT NOT NULL UNIQUE,
+      name_zh TEXT NOT NULL UNIQUE,
+      name_en TEXT
+    );
+    CREATE TABLE IF NOT EXISTS pokemon (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      legacy_id TEXT NOT NULL UNIQUE,
+      dex_number INTEGER NOT NULL,
+      slug TEXT NOT NULL,
+      name_zh TEXT NOT NULL,
+      name_ja TEXT,
+      name_en TEXT,
+      category TEXT,
+      hidden_ability TEXT,
+      height_m REAL,
+      weight_kg REAL,
+      color TEXT,
+      catch_rate INTEGER,
+      male_ratio TEXT,
+      female_ratio TEXT,
+      genderless INTEGER,
+      introduced_generation INTEGER,
+      source_url TEXT,
+      source_title TEXT,
+      source_fetched_at TEXT,
+      parse_note TEXT
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_base_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL UNIQUE REFERENCES pokemon(id) ON DELETE CASCADE,
+      hp INTEGER, atk INTEGER, def INTEGER, spa INTEGER, spd INTEGER, spe INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS moves (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      number INTEGER,
+      name_zh TEXT NOT NULL UNIQUE,
+      name_ja TEXT,
+      name_en TEXT,
+      type_id INTEGER REFERENCES types(id),
+      category TEXT,
+      power INTEGER,
+      accuracy TEXT,
+      pp INTEGER,
+      description TEXT,
+      effect_detail TEXT,
+      introduced_generation INTEGER REFERENCES generations(id),
+      source_url TEXT,
+      source_title TEXT,
+      source_fetched_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS move_generation_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
+      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      game_version_code TEXT,
+      description TEXT,
+      notes TEXT,
+      UNIQUE (move_id, generation_id)
+    );
+    CREATE TABLE IF NOT EXISTS abilities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      number INTEGER,
+      name_zh TEXT NOT NULL,
+      name_ja TEXT,
+      name_en TEXT,
+      description TEXT,
+      effect_detail TEXT,
+      introduced_generation INTEGER REFERENCES generations(id),
+      source_url TEXT,
+      source_title TEXT,
+      source_fetched_at TEXT,
+      UNIQUE (number, name_zh)
+    );
+    CREATE TABLE IF NOT EXISTS ability_generation_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ability_id INTEGER NOT NULL REFERENCES abilities(id) ON DELETE CASCADE,
+      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      game_version_code TEXT,
+      description TEXT,
+      notes TEXT,
+      UNIQUE (ability_id, generation_id)
+    );
+    CREATE TABLE IF NOT EXISTS items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      legacy_id TEXT NOT NULL UNIQUE,
+      slug TEXT NOT NULL,
+      name_zh TEXT NOT NULL,
+      name_ja TEXT,
+      name_en TEXT,
+      category TEXT,
+      effect_summary TEXT,
+      source_url TEXT,
+      source_title TEXT,
+      source_fetched_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS image_assets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      entity_type TEXT NOT NULL,
+      entity_id INTEGER NOT NULL,
+      form_id INTEGER,
+      image_kind TEXT NOT NULL,
+      url TEXT NOT NULL,
+      alt TEXT,
+      source_url TEXT,
+      UNIQUE (entity_type, entity_id, form_id, image_kind)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_generation_regions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      region TEXT,
+      dex_number TEXT,
+      UNIQUE (pokemon_id, generation_id, region)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      type_id INTEGER NOT NULL REFERENCES types(id),
+      slot INTEGER NOT NULL,
+      UNIQUE (pokemon_id, slot)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_abilities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      ability_id INTEGER REFERENCES abilities(id),
+      ability_key TEXT NOT NULL,
+      slot INTEGER NOT NULL,
+      is_hidden INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (pokemon_id, ability_key, slot)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_generation_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      label TEXT,
+      notes TEXT,
+      UNIQUE (pokemon_id, generation_id)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_generation_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      type_id INTEGER NOT NULL REFERENCES types(id),
+      slot INTEGER NOT NULL,
+      UNIQUE (pokemon_id, generation_id, slot)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_generation_abilities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      ability_id INTEGER REFERENCES abilities(id),
+      ability_key TEXT NOT NULL,
+      slot INTEGER NOT NULL,
+      is_hidden INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (pokemon_id, generation_id, ability_key, slot)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_generation_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      hp INTEGER, atk INTEGER, def INTEGER, spa INTEGER, spd INTEGER, spe INTEGER,
+      UNIQUE (pokemon_id, generation_id)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_moves (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      move_id INTEGER REFERENCES moves(id),
+      move_key TEXT NOT NULL,
+      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      game_version_code TEXT,
+      move_name_zh TEXT,
+      learn_method TEXT,
+      level INTEGER,
+      notes TEXT,
+      sort_order INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_forms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      legacy_id TEXT NOT NULL UNIQUE,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      name_zh TEXT NOT NULL,
+      introduced_generation INTEGER REFERENCES generations(id),
+      is_mega INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      sort_order INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_form_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL UNIQUE REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+      hp INTEGER, atk INTEGER, def INTEGER, spa INTEGER, spd INTEGER, spe INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_form_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+      type_id INTEGER NOT NULL REFERENCES types(id),
+      slot INTEGER NOT NULL,
+      UNIQUE (form_id, slot)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_form_abilities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+      ability_id INTEGER REFERENCES abilities(id),
+      ability_key TEXT NOT NULL,
+      slot INTEGER NOT NULL,
+      UNIQUE (form_id, ability_key, slot)
+    );
+    CREATE TABLE IF NOT EXISTS pokemon_evolution_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      related_pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      stage_label TEXT,
+      sort_order INTEGER NOT NULL,
+      UNIQUE (pokemon_id, related_pokemon_id, sort_order)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pokemon_dex_number ON pokemon(dex_number);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_legacy_id ON pokemon(legacy_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_name_zh ON pokemon(name_zh);
+    CREATE INDEX IF NOT EXISTS idx_moves_number ON moves(number);
+    CREATE INDEX IF NOT EXISTS idx_moves_name_zh ON moves(name_zh);
+    CREATE INDEX IF NOT EXISTS idx_moves_type ON moves(type_id);
+    CREATE INDEX IF NOT EXISTS idx_abilities_number ON abilities(number);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_regions_generation ON pokemon_generation_regions(generation_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_types_type ON pokemon_types(type_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_abilities_pokemon ON pokemon_abilities(pokemon_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_generation_records_generation ON pokemon_generation_records(generation_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_generation_types_pokemon_generation ON pokemon_generation_types(pokemon_id, generation_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_generation_abilities_pokemon_generation ON pokemon_generation_abilities(pokemon_id, generation_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_generation_stats_pokemon_generation ON pokemon_generation_stats(pokemon_id, generation_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_moves_pokemon_generation ON pokemon_moves(pokemon_id, generation_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_moves_move ON pokemon_moves(move_id);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_moves_method ON pokemon_moves(learn_method);
+    CREATE INDEX IF NOT EXISTS idx_image_assets_entity ON image_assets(entity_type, entity_id);
+    CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
+    CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
+    CREATE INDEX IF NOT EXISTS idx_game_versions_generation ON game_versions(generation_id);
+    PRAGMA foreign_keys = ON;
+  `);
+
+  // 增量迁移：为已有表添加新列（ALTER TABLE ADD COLUMN 在列已存在时会报错，需要 try-catch）
+  const migrations = [
+    "ALTER TABLE move_generation_records ADD COLUMN game_version_code TEXT",
+    "ALTER TABLE ability_generation_records ADD COLUMN game_version_code TEXT",
+  ];
+  for (const sql of migrations) {
+    try { db.exec(sql); } catch { /* 列已存在，忽略 */ }
+  }
+
+  db.close();
+}
+
+/**
+ * 破坏性重建：删除所有表后重新创建。仅在明确需要全量重建时使用。
+ */
+export function resetSchema() {
   const db = openDatabase();
   db.exec(`
     PRAGMA foreign_keys = OFF;
@@ -506,268 +1016,22 @@ export function ensureSchema() {
     DROP TABLE IF EXISTS moves;
     DROP TABLE IF EXISTS abilities;
     DROP TABLE IF EXISTS pokemon;
+    DROP TABLE IF EXISTS game_versions;
     DROP TABLE IF EXISTS types;
     DROP TABLE IF EXISTS generations;
-
-    CREATE TABLE generations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      number INTEGER NOT NULL UNIQUE,
-      name_zh TEXT NOT NULL,
-      name_en TEXT NOT NULL
-    );
-    CREATE TABLE types (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
-      name_zh TEXT NOT NULL UNIQUE,
-      name_en TEXT
-    );
-    CREATE TABLE pokemon (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
-      dex_number INTEGER NOT NULL,
-      slug TEXT NOT NULL,
-      name_zh TEXT NOT NULL,
-      name_ja TEXT,
-      name_en TEXT,
-      category TEXT,
-      hidden_ability TEXT,
-      height_m REAL,
-      weight_kg REAL,
-      color TEXT,
-      catch_rate INTEGER,
-      male_ratio TEXT,
-      female_ratio TEXT,
-      genderless INTEGER,
-      introduced_generation INTEGER,
-      source_url TEXT,
-      source_title TEXT,
-      source_fetched_at TEXT,
-      parse_note TEXT
-    );
-    CREATE TABLE pokemon_base_stats (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL UNIQUE REFERENCES pokemon(id) ON DELETE CASCADE,
-      hp INTEGER, atk INTEGER, def INTEGER, spa INTEGER, spd INTEGER, spe INTEGER
-    );
-    CREATE TABLE moves (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
-      slug TEXT NOT NULL,
-      name_zh TEXT NOT NULL,
-      name_ja TEXT,
-      name_en TEXT,
-      type_id INTEGER REFERENCES types(id),
-      category TEXT,
-      power INTEGER,
-      accuracy TEXT,
-      pp INTEGER,
-      effect_summary TEXT,
-      source_url TEXT,
-      source_title TEXT,
-      source_fetched_at TEXT
-    );
-    CREATE TABLE move_generation_records (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      type_id INTEGER REFERENCES types(id),
-      category TEXT,
-      power INTEGER,
-      accuracy TEXT,
-      pp INTEGER,
-      effect_summary TEXT,
-      notes TEXT,
-      UNIQUE (move_id, generation_id)
-    );
-    CREATE TABLE abilities (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      number INTEGER,
-      name_zh TEXT NOT NULL UNIQUE,
-      name_ja TEXT,
-      name_en TEXT,
-      description TEXT,
-      effect_detail TEXT,
-      introduced_generation INTEGER REFERENCES generations(id),
-      source_url TEXT,
-      source_title TEXT,
-      source_fetched_at TEXT
-    );
-    CREATE TABLE ability_generation_records (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      ability_id INTEGER NOT NULL REFERENCES abilities(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      description TEXT,
-      notes TEXT,
-      UNIQUE (ability_id, generation_id)
-    );
-    CREATE TABLE items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
-      slug TEXT NOT NULL,
-      name_zh TEXT NOT NULL,
-      name_ja TEXT,
-      name_en TEXT,
-      category TEXT,
-      effect_summary TEXT,
-      source_url TEXT,
-      source_title TEXT,
-      source_fetched_at TEXT
-    );
-    CREATE TABLE image_assets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL,
-      entity_id INTEGER NOT NULL,
-      form_id INTEGER,
-      image_kind TEXT NOT NULL,
-      url TEXT NOT NULL,
-      alt TEXT,
-      source_url TEXT,
-      UNIQUE (entity_type, entity_id, form_id, image_kind)
-    );
-    CREATE TABLE pokemon_generation_regions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      region TEXT,
-      dex_number TEXT,
-      UNIQUE (pokemon_id, generation_id, region)
-    );
-    CREATE TABLE pokemon_types (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      type_id INTEGER NOT NULL REFERENCES types(id),
-      slot INTEGER NOT NULL,
-      UNIQUE (pokemon_id, slot)
-    );
-    CREATE TABLE pokemon_abilities (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      ability_id INTEGER REFERENCES abilities(id),
-      ability_key TEXT NOT NULL,
-      slot INTEGER NOT NULL,
-      is_hidden INTEGER NOT NULL DEFAULT 0,
-      UNIQUE (pokemon_id, ability_key, slot)
-    );
-    CREATE TABLE pokemon_generation_records (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      label TEXT,
-      notes TEXT,
-      UNIQUE (pokemon_id, generation_id)
-    );
-    CREATE TABLE pokemon_generation_types (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      type_id INTEGER NOT NULL REFERENCES types(id),
-      slot INTEGER NOT NULL,
-      UNIQUE (pokemon_id, generation_id, slot)
-    );
-    CREATE TABLE pokemon_generation_abilities (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      ability_id INTEGER REFERENCES abilities(id),
-      ability_key TEXT NOT NULL,
-      slot INTEGER NOT NULL,
-      is_hidden INTEGER NOT NULL DEFAULT 0,
-      UNIQUE (pokemon_id, generation_id, ability_key, slot)
-    );
-    CREATE TABLE pokemon_generation_stats (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      hp INTEGER, atk INTEGER, def INTEGER, spa INTEGER, spd INTEGER, spe INTEGER,
-      UNIQUE (pokemon_id, generation_id)
-    );
-    CREATE TABLE pokemon_moves (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      move_id INTEGER REFERENCES moves(id),
-      move_key TEXT NOT NULL,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      game_version_code TEXT,
-      move_name_zh TEXT,
-      learn_method TEXT,
-      level INTEGER,
-      notes TEXT,
-      sort_order INTEGER NOT NULL
-    );
-    CREATE TABLE pokemon_forms (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      name_zh TEXT NOT NULL,
-      introduced_generation INTEGER REFERENCES generations(id),
-      is_mega INTEGER NOT NULL DEFAULT 0,
-      notes TEXT,
-      sort_order INTEGER NOT NULL
-    );
-    CREATE TABLE pokemon_form_stats (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      form_id INTEGER NOT NULL UNIQUE REFERENCES pokemon_forms(id) ON DELETE CASCADE,
-      hp INTEGER, atk INTEGER, def INTEGER, spa INTEGER, spd INTEGER, spe INTEGER
-    );
-    CREATE TABLE pokemon_form_types (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
-      type_id INTEGER NOT NULL REFERENCES types(id),
-      slot INTEGER NOT NULL,
-      UNIQUE (form_id, slot)
-    );
-    CREATE TABLE pokemon_form_abilities (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
-      ability_id INTEGER REFERENCES abilities(id),
-      ability_key TEXT NOT NULL,
-      slot INTEGER NOT NULL,
-      UNIQUE (form_id, ability_key, slot)
-    );
-    CREATE TABLE pokemon_evolution_members (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      related_pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      stage_label TEXT,
-      sort_order INTEGER NOT NULL,
-      UNIQUE (pokemon_id, related_pokemon_id, sort_order)
-    );
-
-    CREATE INDEX idx_pokemon_dex_number ON pokemon(dex_number);
-    CREATE INDEX idx_pokemon_legacy_id ON pokemon(legacy_id);
-    CREATE INDEX idx_pokemon_name_zh ON pokemon(name_zh);
-    CREATE INDEX idx_moves_legacy_id ON moves(legacy_id);
-    CREATE INDEX idx_moves_name_zh ON moves(name_zh);
-    CREATE INDEX idx_moves_type ON moves(type_id);
-    CREATE INDEX idx_abilities_number ON abilities(number);
-    CREATE INDEX idx_pokemon_regions_generation ON pokemon_generation_regions(generation_id);
-    CREATE INDEX idx_pokemon_types_type ON pokemon_types(type_id);
-    CREATE INDEX idx_pokemon_abilities_pokemon ON pokemon_abilities(pokemon_id);
-    CREATE INDEX idx_pokemon_generation_records_generation ON pokemon_generation_records(generation_id);
-    CREATE INDEX idx_pokemon_generation_types_pokemon_generation ON pokemon_generation_types(pokemon_id, generation_id);
-    CREATE INDEX idx_pokemon_generation_abilities_pokemon_generation ON pokemon_generation_abilities(pokemon_id, generation_id);
-    CREATE INDEX idx_pokemon_generation_stats_pokemon_generation ON pokemon_generation_stats(pokemon_id, generation_id);
-    CREATE INDEX idx_pokemon_moves_pokemon_generation ON pokemon_moves(pokemon_id, generation_id);
-    CREATE INDEX idx_pokemon_moves_move ON pokemon_moves(move_id);
-    CREATE INDEX idx_pokemon_moves_method ON pokemon_moves(learn_method);
-    CREATE INDEX idx_image_assets_entity ON image_assets(entity_type, entity_id);
-    CREATE INDEX idx_items_name_zh ON items(name_zh);
-    CREATE INDEX idx_items_category ON items(category);
     PRAGMA foreign_keys = ON;
   `);
   db.close();
+  ensureSchema();
 }
 
-export function importNormalizedDataToSqlite(input?: {
-  pokemonEntries?: PokemonEntry[];
-  items?: ItemEntry[];
-  moves?: MoveEntry[];
-  abilities?: AbilityEntry[];
+export function importNormalizedDataToSqlite(input: {
+  pokemonEntries: PokemonEntry[];
+  items: ItemEntry[];
+  moves: MoveEntry[];
+  abilities: AbilityEntry[];
 }) {
-  const pokemonEntries = input?.pokemonEntries ?? listPokemonEntries();
-  const items = input?.items ?? listItems();
-  const moves = input?.moves ?? listMoves();
-  const abilities = input?.abilities ?? listAbilities();
+  const { pokemonEntries, items, moves, abilities } = input;
   ensureSchema();
   const db = openDatabase();
   db.exec("BEGIN");
@@ -779,13 +1043,17 @@ export function importNormalizedDataToSqlite(input?: {
     const abilityDbIds = new Map<string, number>();
     const pokemonDbIds = new Map<string, number>();
 
+    const generationsMap = new Map(GENERATIONS.map(([num, zh, en]) => [num, { zh, en }]));
     const insertGeneration = db.prepare("INSERT OR IGNORE INTO generations (number, name_zh, name_en) VALUES (?, ?, ?)");
     const findGeneration = db.prepare("SELECT id FROM generations WHERE number = ?");
     const ensureGeneration = (generation: number | undefined) => {
       if (!generation) return undefined;
       const cached = generationDbIds.get(generation);
       if (cached) return cached;
-      insertGeneration.run(generation, `第 ${generation} 世代`, `Generation ${generation}`);
+      const known = generationsMap.get(generation);
+      const nameZh = known?.zh ?? `第${generation}世代`;
+      const nameEn = known?.en ?? `Generation ${generation}`;
+      insertGeneration.run(generation, nameZh, nameEn);
       const row = findGeneration.get(generation) as { id: number };
       generationDbIds.set(generation, Number(row.id));
       return Number(row.id);
@@ -808,6 +1076,18 @@ export function importNormalizedDataToSqlite(input?: {
       return ids;
     };
     for (const generation of GENERATIONS) insertGeneration.run(...generation);
+    // 确保所有世代 id 都已缓存
+    for (const [num] of GENERATIONS) ensureGeneration(num);
+
+    // 填充游戏版本
+    const insertGameVersion = db.prepare(
+      "INSERT OR IGNORE INTO game_versions (code, name_zh, generation_id) VALUES (?, ?, ?)"
+    );
+    for (const [code, nameZh, genNum] of GAME_VERSIONS) {
+      const genId = generationDbIds.get(genNum);
+      if (genId) insertGameVersion.run(code, nameZh, genId);
+    }
+
     for (const type of TYPE_NAMES) ensureType(type);
 
     const insertImage = db.prepare(`
@@ -821,26 +1101,25 @@ export function importNormalizedDataToSqlite(input?: {
     };
 
     const insertMove = db.prepare(`
-      INSERT OR IGNORE INTO moves (legacy_id, slug, name_zh, name_ja, name_en, type_id, category, power, accuracy, pp, effect_summary, source_url, source_title, source_fetched_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR IGNORE INTO moves (number, name_zh, name_ja, name_en, type_id, category, power, accuracy, pp, description, effect_detail, introduced_generation, source_url, source_title, source_fetched_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const findMove = db.prepare("SELECT id FROM moves WHERE legacy_id = ?");
+    const findMove = db.prepare("SELECT id FROM moves WHERE name_zh = ?");
     const insertMoveGeneration = db.prepare(`
-      INSERT OR REPLACE INTO move_generation_records (move_id, generation_id, type_id, category, power, accuracy, pp, effect_summary, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO move_generation_records (move_id, generation_id, game_version_code, description, notes)
+      VALUES (?, ?, ?, ?, ?)
     `);
     for (const move of moves) {
       const moveTypeId = ensureType(move.type)[0] ?? null;
-      insertMove.run(move.id, move.slug, move.nameZh, move.nameJa ?? null, move.nameEn ?? null, moveTypeId, move.category ?? null, move.power ?? null, move.accuracy ?? null, move.pp ?? null, move.effectSummary ?? null, move.source?.url ?? null, move.source?.title ?? null, move.source?.fetchedAt ?? null);
-      const moveDbId = Number((findMove.get(move.id) as { id: number }).id);
+      const introducedGenerationDbId = ensureGeneration(move.introducedGeneration) ?? null;
+      insertMove.run(move.number ?? null, move.nameZh, move.nameJa ?? null, move.nameEn ?? null, moveTypeId, move.category ?? null, move.power ?? null, move.accuracy ?? null, move.pp ?? null, move.description ?? null, move.effectDetail ?? null, introducedGenerationDbId, move.source?.url ?? null, move.source?.title ?? null, move.source?.fetchedAt ?? null);
+      const moveDbId = Number((findMove.get(move.nameZh) as { id: number }).id);
       moveDbIds.set(move.id, moveDbId);
-      moveDbIds.set(move.slug, moveDbId);
       moveDbIds.set(move.nameZh, moveDbId);
       insertImages("move", moveDbId, move.image ? { primary: move.image } : undefined);
       for (const record of move.generations || []) {
         const generationDbId = ensureGeneration(record.generation);
-        const recordTypeId = ensureType(record.type)[0] ?? null;
-        if (generationDbId) insertMoveGeneration.run(moveDbId, generationDbId, recordTypeId, record.category ?? null, record.power ?? null, record.accuracy ?? null, record.pp ?? null, record.effectSummary ?? "", record.notes ?? null);
+        if (generationDbId) insertMoveGeneration.run(moveDbId, generationDbId, record.gameVersionCode ?? null, record.description ?? "", record.notes ?? null);
       }
     }
 
@@ -848,21 +1127,22 @@ export function importNormalizedDataToSqlite(input?: {
       INSERT OR IGNORE INTO abilities (number, name_zh, name_ja, name_en, description, effect_detail, introduced_generation, source_url, source_title, source_fetched_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const findAbility = db.prepare("SELECT id FROM abilities WHERE name_zh = ?");
+    const findAbility = db.prepare("SELECT id FROM abilities WHERE number = ? AND name_zh = ?");
     const insertAbilityGeneration = db.prepare(`
-      INSERT OR REPLACE INTO ability_generation_records (ability_id, generation_id, description, notes)
-      VALUES (?, ?, ?, ?)
+      INSERT OR REPLACE INTO ability_generation_records (ability_id, generation_id, game_version_code, description, notes)
+      VALUES (?, ?, ?, ?, ?)
     `);
     for (const ability of abilities) {
       const introducedGenerationDbId = ensureGeneration(ability.introducedGeneration) ?? null;
       insertAbility.run(ability.number ?? null, ability.nameZh, ability.nameJa ?? null, ability.nameEn ?? null, ability.description ?? null, ability.effectDetail ?? null, introducedGenerationDbId, ability.source?.url ?? null, ability.source?.title ?? null, ability.source?.fetchedAt ?? null);
-      const abilityDbId = Number((findAbility.get(ability.nameZh) as { id: number }).id);
+      const row = findAbility.get(ability.number ?? null, ability.nameZh) as { id: number };
+      const abilityDbId = Number(row.id);
       abilityDbIds.set(ability.id, abilityDbId);
       abilityDbIds.set(ability.nameZh, abilityDbId);
       insertImages("ability", abilityDbId, ability.image ? { primary: ability.image } : undefined);
       for (const record of ability.generations || []) {
         const generationDbId = ensureGeneration(record.generation);
-        if (generationDbId) insertAbilityGeneration.run(abilityDbId, generationDbId, record.description ?? "", record.notes ?? null);
+        if (generationDbId) insertAbilityGeneration.run(abilityDbId, generationDbId, record.gameVersionCode ?? null, record.description ?? "", record.notes ?? null);
       }
     }
 
@@ -1020,9 +1300,11 @@ export function importNormalizedDataToSqlite(input?: {
 export function hasSqliteData() {
   if (!hasDatabaseFile()) return false;
   const db = openDatabase();
-  const pokemonCount = db.prepare("SELECT COUNT(*) AS count FROM pokemon").get() as { count: number };
+  const row = db.prepare(
+    "SELECT (SELECT COUNT(*) FROM pokemon) + (SELECT COUNT(*) FROM moves) + (SELECT COUNT(*) FROM abilities) AS total"
+  ).get() as { total: number };
   db.close();
-  return pokemonCount.count > 0;
+  return row.total > 0;
 }
 
 export function listPokemonFromSqlite(filters?: { query?: string; type?: string; generation?: number }) {
@@ -1093,9 +1375,9 @@ export function listMovesFromSqlite(filters?: { query?: string; type?: string; g
   const conditions: string[] = [];
   const params: Array<string | number> = [];
   if (filters?.query) {
-    conditions.push("(m.name_zh LIKE ? OR m.name_ja LIKE ? OR m.name_en LIKE ? OR m.slug LIKE ? OR m.legacy_id LIKE ? OR CAST(m.id AS TEXT) LIKE ?)");
+    conditions.push("(m.name_zh LIKE ? OR m.name_ja LIKE ? OR m.name_en LIKE ? OR CAST(m.id AS TEXT) LIKE ?)");
     const value = `%${filters.query}%`;
-    params.push(value, value, value, value, value, value);
+    params.push(value, value, value, value);
   }
   if (filters?.type) {
     conditions.push("t.name_zh = ?");
@@ -1107,9 +1389,10 @@ export function listMovesFromSqlite(filters?: { query?: string; type?: string; g
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const rows = db.prepare(`
-    SELECT m.*, t.name_zh AS type_name_zh
+    SELECT m.*, t.name_zh AS type_name_zh, g.number AS introduced_generation_number
     FROM moves m
     LEFT JOIN types t ON t.id = m.type_id
+    LEFT JOIN generations g ON g.id = m.introduced_generation
     ${where}
     ORDER BY m.name_zh ASC
   `).all(...params) as Record<string, unknown>[];
@@ -1121,12 +1404,13 @@ export function listMovesFromSqlite(filters?: { query?: string; type?: string; g
 export function getMoveFromSqlite(idOrSlug: string) {
   const db = openDatabase();
   const row = db.prepare(`
-    SELECT m.*, t.name_zh AS type_name_zh
+    SELECT m.*, t.name_zh AS type_name_zh, g.number AS introduced_generation_number
     FROM moves m
     LEFT JOIN types t ON t.id = m.type_id
-    WHERE m.id = ? OR m.legacy_id = ? OR m.slug = ? OR m.name_zh = ?
+    LEFT JOIN generations g ON g.id = m.introduced_generation
+    WHERE m.id = ? OR m.name_zh = ?
     LIMIT 1
-  `).get(idOrSlug, idOrSlug, idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
+  `).get(idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
   const result = row ? hydrateMoveRow(db, row) : undefined;
   db.close();
   return result;
