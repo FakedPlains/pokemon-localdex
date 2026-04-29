@@ -181,18 +181,19 @@ export type MoveEntry = {
 
 export type AbilityGenerationRecord = {
   generation: number;
-  effectSummary: string;
+  description: string;
   notes?: string;
 };
 
 export type AbilityEntry = {
   id: string;
-  legacyId?: string;
-  slug: string;
+  number?: number;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
-  effectSummary?: string;
+  description?: string;
+  effectDetail?: string;
+  introducedGeneration?: number;
   image?: ImageAsset;
   generations: AbilityGenerationRecord[];
   source?: SourceMeta;

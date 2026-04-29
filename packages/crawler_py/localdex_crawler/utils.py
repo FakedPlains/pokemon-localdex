@@ -28,6 +28,26 @@ POKEMON_TYPES = {
     "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精",
 }
 MOVE_CATEGORIES = {"physical", "special", "status"}
+
+# 游戏版本名 → 世代映射（用于解析"特性变更"/"招式变更"章节中的游戏版本子标题）
+GAME_VERSION_GENERATION: dict[str, int] = {
+    "红绿蓝": 1, "紅綠藍": 1, "红绿": 1, "紅綠": 1, "皮卡丘": 1,
+    "金银": 2, "金銀": 2, "水晶": 2,
+    "红宝石": 3, "紅寶石": 3, "蓝宝石": 3, "藍寶石": 3, "绿宝石": 3, "綠寶石": 3,
+    "火红": 3, "火紅": 3, "叶绿": 3, "葉綠": 3,
+    "钻石": 4, "鑽石": 4, "珍珠": 4, "白金": 4,
+    "心金": 4, "魂银": 4, "魂銀": 4,
+    "黑": 5, "白": 5, "黑2": 5, "白2": 5,
+    "X": 6, "Y": 6, "欧米伽红宝石": 6, "歐米伽紅寶石": 6, "阿尔法蓝宝石": 6, "阿爾法藍寶石": 6,
+    "太阳": 7, "太陽": 7, "月亮": 7, "究极之日": 7, "究極之日": 7, "究极之月": 7, "究極之月": 7,
+    "Let's Go! 皮卡丘": 7, "Let's Go! 伊布": 7,
+    "剑": 8, "劍": 8, "盾": 8, "劍／盾": 8, "剑／盾": 8,
+    "晶灿钻石": 8, "晶燦鑽石": 8, "明亮珍珠": 8, "晶灿钻石／明亮珍珠": 8,
+    "传说 阿尔宙斯": 8, "傳說 阿爾宙斯": 8,
+    "朱": 9, "紫": 9, "朱／紫": 9, "零之秘宝": 9,
+    "Champions": 8,
+}
+
 CHINESE_GENERATIONS = {
     "一": 1,
     "二": 2,
@@ -223,6 +243,30 @@ def extract_intro_names(text: str, fallback_name_zh: str) -> tuple[str | None, s
     return matched.group(1).strip(), matched.group(2).strip()
 
 
+def generation_from_game_version(line: str) -> int | None:
+    """从游戏版本名（如"《白金》"、"《劍／盾》"）推断世代编号。"""
+    matched = re.search(r"[《「](.+?)[》」]", line)
+    if not matched:
+        return None
+    version_name = matched.group(1).strip()
+    # 先尝试完整匹配
+    if version_name in GAME_VERSION_GENERATION:
+        return GAME_VERSION_GENERATION[version_name]
+    # 再尝试部分匹配（如"劍／盾"匹配"劍"）
+    for key, gen in GAME_VERSION_GENERATION.items():
+        if key in version_name or version_name in key:
+            return gen
+    return None
+
+
+def detect_generation_marker(line: str) -> int | None:
+    """从行文本中检测世代标记，支持"第X世代"和游戏版本名两种格式。"""
+    generation = generation_from_heading(line)
+    if generation:
+        return generation
+    return generation_from_game_version(line)
+
+
 def extract_generation_changes(html: str, heading: str) -> list[dict[str, object]]:
     section = section_text_by_heading(html, heading)
     if not section:
@@ -240,7 +284,7 @@ def extract_generation_changes(html: str, heading: str) -> list[dict[str, object
         buffer = []
 
     for line in [item.strip() for item in section.splitlines() if item.strip()]:
-        generation = generation_from_heading(line)
+        generation = detect_generation_marker(line)
         if generation:
             flush()
             current_generation = generation

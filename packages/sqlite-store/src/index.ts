@@ -182,6 +182,23 @@ function getPokemonAbilityIds(db: DatabaseSync, pokemonId: string, generationId:
   return rows.map((row) => String(row.ability_ref));
 }
 
+function getPokemonAbilityNames(db: DatabaseSync, pokemonId: string, generationId: number | null = null, hidden = false) {
+  const table = generationId === null ? "pokemon_abilities" : "pokemon_generation_abilities";
+  const generationJoin = generationId === null ? "" : `JOIN generations g ON g.id = ${table}.generation_id`;
+  const generationFilter = generationId === null ? "1 = 1" : "g.number = ?";
+  const rows = db.prepare(`
+    SELECT COALESCE(a.name_zh, ${table}.ability_key) AS ability_name, ${table}.slot
+    FROM ${table}
+    LEFT JOIN abilities a ON a.id = ${table}.ability_id
+    ${generationJoin}
+    WHERE ${table}.pokemon_id = ?
+      AND ${generationFilter}
+      AND ${table}.is_hidden = ?
+  ORDER BY ${table}.slot ASC
+  `).all(...(generationId === null ? [pokemonId, hidden ? 1 : 0] : [pokemonId, generationId, hidden ? 1 : 0])) as Record<string, unknown>[];
+  return rows.map((row) => String(row.ability_name));
+}
+
 function getPokemonGenerationTypes(db: DatabaseSync, pokemonId: string, generation: number) {
   const rows = db.prepare(`
     SELECT t.name_zh, pgt.slot
@@ -248,11 +265,12 @@ function getPokemonForms(db: DatabaseSync, pokemonId: string): PokemonEntry["for
       primaryType: types[0] ? String(types[0].name_zh) : undefined,
       secondaryType: types[1] ? String(types[1].name_zh) : undefined,
       abilityIds: db.prepare(`
-        SELECT COALESCE(CAST(ability_id AS TEXT), ability_key) AS ability_ref
-        FROM pokemon_form_abilities
-        WHERE form_id = ?
-        ORDER BY slot ASC
-      `).all(formId).map((abilityRow: any) => String(abilityRow.ability_ref))
+        SELECT COALESCE(a.name_zh, pfa.ability_key) AS ability_name
+        FROM pokemon_form_abilities pfa
+        LEFT JOIN abilities a ON a.id = pfa.ability_id
+        WHERE pfa.form_id = ?
+        ORDER BY pfa.slot ASC
+      `).all(formId).map((abilityRow: any) => String(abilityRow.ability_name))
     };
   });
 }
@@ -277,15 +295,15 @@ function getPokemonGenerationRecords(db: DatabaseSync, pokemonId: string): Pokem
       WHERE pm.pokemon_id = ? AND g.number = ?
       ORDER BY sort_order ASC, move_name_zh ASC
     `).all(pokemonId, generation) as Record<string, unknown>[];
-    const abilityIds = getPokemonAbilityIds(db, pokemonId, generation, false);
-    const hiddenAbilityIds = getPokemonAbilityIds(db, pokemonId, generation, true);
+    const abilityNames = getPokemonAbilityNames(db, pokemonId, generation, false);
+    const hiddenAbilityNames = getPokemonAbilityNames(db, pokemonId, generation, true);
     return {
       generation,
       label: row.label ? String(row.label) : undefined,
       primaryType: types[0],
       secondaryType: types[1],
-      abilityIds,
-      hiddenAbilityId: hiddenAbilityIds[0],
+      abilityIds: abilityNames,
+      hiddenAbilityId: hiddenAbilityNames[0],
       baseStats: statBlockFromRow(row),
       moveIds: [...new Set(learnset.map((entry) => String(entry.move_ref)))],
       learnset: learnset.map((entry) => ({
@@ -338,8 +356,9 @@ function hydratePokemonRow(db: DatabaseSync, row: Record<string, unknown>, detai
   pokemon.primaryType = types[0];
   pokemon.secondaryType = types[1];
   pokemon.abilityIds = getPokemonAbilityIds(db, pokemon.id);
-  pokemon.abilities = pokemon.abilityIds;
+  pokemon.abilities = getPokemonAbilityNames(db, pokemon.id);
   pokemon.hiddenAbilityId = getPokemonAbilityIds(db, pokemon.id, null, true)[0];
+  pokemon.hiddenAbility = getPokemonAbilityNames(db, pokemon.id, null, true)[0];
   pokemon.images = toImageSet(imageRows(db, "pokemon", pokemon.id, null));
   pokemon.generationAvailability = getPokemonGenerationAvailability(db, pokemon.id);
   pokemon.generations = pokemon.generationAvailability?.map((item) => item.generation) ?? [];
@@ -427,12 +446,13 @@ function hydrateAbilityRow(db: DatabaseSync, row: Record<string, unknown>): Abil
   `).all(String(row.id)) as Record<string, unknown>[];
   return {
     id: String(row.id),
-    legacyId: row.legacy_id ? String(row.legacy_id) : undefined,
-    slug: String(row.slug),
+    number: row.number === null || row.number === undefined ? undefined : Number(row.number),
     nameZh: String(row.name_zh),
     nameJa: row.name_ja ? String(row.name_ja) : undefined,
     nameEn: row.name_en ? String(row.name_en) : undefined,
-    effectSummary: row.effect_summary ? String(row.effect_summary) : undefined,
+    description: row.description ? String(row.description) : undefined,
+    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
+    introducedGeneration: row.introduced_generation_number === null || row.introduced_generation_number === undefined ? undefined : Number(row.introduced_generation_number),
     image: images[0] ? {
       url: String(images[0].url),
       alt: images[0].alt ? String(images[0].alt) : undefined,
@@ -440,7 +460,7 @@ function hydrateAbilityRow(db: DatabaseSync, row: Record<string, unknown>): Abil
     } : undefined,
     generations: generations.map((generation) => ({
       generation: Number(generation.generation_number),
-      effectSummary: generation.effect_summary ? String(generation.effect_summary) : "",
+      description: generation.description ? String(generation.description) : "",
       notes: generation.notes ? String(generation.notes) : undefined
     })),
     source: sourceFromRow(row)
@@ -518,6 +538,7 @@ export function ensureSchema() {
       male_ratio TEXT,
       female_ratio TEXT,
       genderless INTEGER,
+      introduced_generation INTEGER,
       source_url TEXT,
       source_title TEXT,
       source_fetched_at TEXT,
@@ -560,12 +581,13 @@ export function ensureSchema() {
     );
     CREATE TABLE abilities (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
-      slug TEXT NOT NULL,
-      name_zh TEXT NOT NULL,
+      number INTEGER,
+      name_zh TEXT NOT NULL UNIQUE,
       name_ja TEXT,
       name_en TEXT,
-      effect_summary TEXT,
+      description TEXT,
+      effect_detail TEXT,
+      introduced_generation INTEGER REFERENCES generations(id),
       source_url TEXT,
       source_title TEXT,
       source_fetched_at TEXT
@@ -574,7 +596,7 @@ export function ensureSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ability_id INTEGER NOT NULL REFERENCES abilities(id) ON DELETE CASCADE,
       generation_id INTEGER NOT NULL REFERENCES generations(id),
-      effect_summary TEXT,
+      description TEXT,
       notes TEXT,
       UNIQUE (ability_id, generation_id)
     );
@@ -717,8 +739,7 @@ export function ensureSchema() {
     CREATE INDEX idx_moves_legacy_id ON moves(legacy_id);
     CREATE INDEX idx_moves_name_zh ON moves(name_zh);
     CREATE INDEX idx_moves_type ON moves(type_id);
-    CREATE INDEX idx_abilities_legacy_id ON abilities(legacy_id);
-    CREATE INDEX idx_abilities_name_zh ON abilities(name_zh);
+    CREATE INDEX idx_abilities_number ON abilities(number);
     CREATE INDEX idx_pokemon_regions_generation ON pokemon_generation_regions(generation_id);
     CREATE INDEX idx_pokemon_types_type ON pokemon_types(type_id);
     CREATE INDEX idx_pokemon_abilities_pokemon ON pokemon_abilities(pokemon_id);
@@ -824,24 +845,24 @@ export function importNormalizedDataToSqlite(input?: {
     }
 
     const insertAbility = db.prepare(`
-      INSERT OR IGNORE INTO abilities (legacy_id, slug, name_zh, name_ja, name_en, effect_summary, source_url, source_title, source_fetched_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR IGNORE INTO abilities (number, name_zh, name_ja, name_en, description, effect_detail, introduced_generation, source_url, source_title, source_fetched_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const findAbility = db.prepare("SELECT id FROM abilities WHERE legacy_id = ?");
+    const findAbility = db.prepare("SELECT id FROM abilities WHERE name_zh = ?");
     const insertAbilityGeneration = db.prepare(`
-      INSERT OR REPLACE INTO ability_generation_records (ability_id, generation_id, effect_summary, notes)
+      INSERT OR REPLACE INTO ability_generation_records (ability_id, generation_id, description, notes)
       VALUES (?, ?, ?, ?)
     `);
     for (const ability of abilities) {
-      insertAbility.run(ability.id, ability.slug, ability.nameZh, ability.nameJa ?? null, ability.nameEn ?? null, ability.effectSummary ?? null, ability.source?.url ?? null, ability.source?.title ?? null, ability.source?.fetchedAt ?? null);
-      const abilityDbId = Number((findAbility.get(ability.id) as { id: number }).id);
+      const introducedGenerationDbId = ensureGeneration(ability.introducedGeneration) ?? null;
+      insertAbility.run(ability.number ?? null, ability.nameZh, ability.nameJa ?? null, ability.nameEn ?? null, ability.description ?? null, ability.effectDetail ?? null, introducedGenerationDbId, ability.source?.url ?? null, ability.source?.title ?? null, ability.source?.fetchedAt ?? null);
+      const abilityDbId = Number((findAbility.get(ability.nameZh) as { id: number }).id);
       abilityDbIds.set(ability.id, abilityDbId);
-      abilityDbIds.set(ability.slug, abilityDbId);
       abilityDbIds.set(ability.nameZh, abilityDbId);
       insertImages("ability", abilityDbId, ability.image ? { primary: ability.image } : undefined);
       for (const record of ability.generations || []) {
         const generationDbId = ensureGeneration(record.generation);
-        if (generationDbId) insertAbilityGeneration.run(abilityDbId, generationDbId, record.effectSummary ?? "", record.notes ?? null);
+        if (generationDbId) insertAbilityGeneration.run(abilityDbId, generationDbId, record.description ?? "", record.notes ?? null);
       }
     }
 
@@ -1021,7 +1042,7 @@ export function listPokemonFromSqlite(filters?: { query?: string; type?: string;
     params.push(filters.type, filters.type);
   }
   if (filters?.generation) {
-    conditions.push("EXISTS (SELECT 1 FROM pokemon_generation_regions pgr JOIN generations g ON g.id = pgr.generation_id WHERE pgr.pokemon_id = p.id AND g.number = ?)");
+    conditions.push("p.introduced_generation = ?");
     params.push(filters.generation);
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -1116,24 +1137,36 @@ export function listAbilitiesFromSqlite(filters?: { query?: string; generation?:
   const conditions: string[] = [];
   const params: Array<string | number> = [];
   if (filters?.query) {
-    conditions.push("(a.name_zh LIKE ? OR a.name_ja LIKE ? OR a.name_en LIKE ? OR a.slug LIKE ? OR a.legacy_id LIKE ? OR CAST(a.id AS TEXT) LIKE ?)");
+    conditions.push("(a.name_zh LIKE ? OR a.name_ja LIKE ? OR a.name_en LIKE ?)");
     const value = `%${filters.query}%`;
-    params.push(value, value, value, value, value, value);
+    params.push(value, value, value);
   }
   if (filters?.generation) {
     conditions.push("EXISTS (SELECT 1 FROM ability_generation_records agr JOIN generations g ON g.id = agr.generation_id WHERE agr.ability_id = a.id AND g.number = ?)");
     params.push(filters.generation);
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const rows = db.prepare(`SELECT * FROM abilities a ${where} ORDER BY name_zh ASC`).all(...params) as Record<string, unknown>[];
+  const rows = db.prepare(`
+    SELECT a.*, g.number AS introduced_generation_number
+    FROM abilities a
+    LEFT JOIN generations g ON g.id = a.introduced_generation
+    ${where}
+    ORDER BY a.number ASC, a.name_zh ASC
+  `).all(...params) as Record<string, unknown>[];
   const result = rows.map((row) => hydrateAbilityRow(db, row));
   db.close();
   return result;
 }
 
-export function getAbilityFromSqlite(idOrSlug: string) {
+export function getAbilityFromSqlite(idOrName: string) {
   const db = openDatabase();
-  const row = db.prepare("SELECT * FROM abilities WHERE id = ? OR legacy_id = ? OR slug = ? OR name_zh = ? LIMIT 1").get(idOrSlug, idOrSlug, idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
+  const row = db.prepare(`
+    SELECT a.*, g.number AS introduced_generation_number
+    FROM abilities a
+    LEFT JOIN generations g ON g.id = a.introduced_generation
+    WHERE a.id = ? OR a.name_zh = ?
+    LIMIT 1
+  `).get(idOrName, idOrName) as Record<string, unknown> | undefined;
   const result = row ? hydrateAbilityRow(db, row) : undefined;
   db.close();
   return result;

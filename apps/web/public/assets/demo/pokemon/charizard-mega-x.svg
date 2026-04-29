@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240">
-  <rect width="320" height="240" rx="28" fill="#253247"/>
-  <path d="M78 168c26-58 58-88 82-88s56 30 82 88H78z" fill="#8fcce0"/>
-  <path d="M68 108l56 26-26 22-54-14zm184 0l-56 26 26 22 54-14z" fill="#35c0d4"/>
-  <circle cx="126" cy="114" r="10" fill="#f0f9ff"/>
-  <circle cx="194" cy="114" r="10" fill="#f0f9ff"/>
-  <text x="160" y="222" text-anchor="middle" font-size="20" fill="#f0f9ff" font-family="Arial">超级喷火龙X</text>
-</svg>

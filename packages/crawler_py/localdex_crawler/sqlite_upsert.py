@@ -202,18 +202,18 @@ def ensure_ability(conn: sqlite3.Connection, name: str) -> int | None:
     if not name:
         return None
     row = conn.execute(
-        "SELECT id FROM abilities WHERE name_zh = ? OR legacy_id = ?",
-        (name, f"ability-{slugify(name)}"),
+        "SELECT id FROM abilities WHERE name_zh = ?",
+        (name,),
     ).fetchone()
     if row:
         return int(row["id"])
     result = conn.execute(
         """
-        INSERT INTO abilities (legacy_id, slug, name_zh)
-        VALUES (?, ?, ?)
-        ON CONFLICT(legacy_id) DO UPDATE SET name_zh = excluded.name_zh
+        INSERT INTO abilities (name_zh)
+        VALUES (?)
+        ON CONFLICT(name_zh) DO NOTHING
         """,
-        (f"ability-{slugify(name)}", slugify(name), name),
+        (name,),
     )
     return int(result.lastrowid)
 
@@ -345,26 +345,30 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
 
 
 def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
-    legacy_id = payload.get("legacy_id") or f"ability-{slugify(payload['name_zh'])}"
+    introduced_gen = payload.get("introduced_generation")
+    introduced_gen_id = ensure_generation(conn, introduced_gen) if introduced_gen else None
     with conn:
-        row = conn.execute("SELECT id FROM abilities WHERE legacy_id = ? OR name_zh = ?", (legacy_id, payload["name_zh"])).fetchone()
+        row = conn.execute("SELECT id FROM abilities WHERE name_zh = ?", (payload["name_zh"],)).fetchone()
         if row:
             ability_id = int(row["id"])
             conn.execute(
                 """
                 UPDATE abilities
-                SET slug = ?, name_zh = ?, name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
-                    effect_summary = COALESCE(?, effect_summary),
+                SET number = COALESCE(?, number),
+                    name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
+                    description = COALESCE(?, description), effect_detail = COALESCE(?, effect_detail),
+                    introduced_generation = COALESCE(?, introduced_generation),
                     source_url = COALESCE(?, source_url), source_title = COALESCE(?, source_title),
                     source_fetched_at = COALESCE(?, source_fetched_at)
                 WHERE id = ?
                 """,
                 (
-                    payload.get("slug") or slugify(payload["name_zh"]),
-                    payload["name_zh"],
+                    payload.get("number"),
                     payload.get("name_ja"),
                     payload.get("name_en"),
-                    payload.get("effect_summary"),
+                    payload.get("description"),
+                    payload.get("effect_detail"),
+                    introduced_gen_id,
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
@@ -375,16 +379,18 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
             result = conn.execute(
                 """
                 INSERT INTO abilities
-                  (legacy_id, slug, name_zh, name_ja, name_en, effect_summary, source_url, source_title, source_fetched_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  (number, name_zh, name_ja, name_en, description, effect_detail,
+                   introduced_generation, source_url, source_title, source_fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    legacy_id,
-                    payload.get("slug") or slugify(payload["name_zh"]),
+                    payload.get("number"),
                     payload["name_zh"],
                     payload.get("name_ja"),
                     payload.get("name_en"),
-                    payload.get("effect_summary"),
+                    payload.get("description"),
+                    payload.get("effect_detail"),
+                    introduced_gen_id,
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
@@ -395,16 +401,16 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
         for record in payload.get("generations") or []:
             conn.execute(
                 """
-                INSERT INTO ability_generation_records (ability_id, generation_id, effect_summary, notes)
+                INSERT INTO ability_generation_records (ability_id, generation_id, description, notes)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(ability_id, generation_id) DO UPDATE SET
-                  effect_summary = excluded.effect_summary,
+                  description = excluded.description,
                   notes = excluded.notes
                 """,
                 (
                     ability_id,
                     ensure_generation(conn, int(record["generation"])),
-                    record.get("effect_summary") or "",
+                    record.get("description") or "",
                     record.get("notes"),
                 ),
             )
@@ -470,6 +476,7 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
         row = conn.execute("SELECT id FROM pokemon WHERE legacy_id = ? OR dex_number = ?", (legacy_id, payload["dex_number"])).fetchone()
         if row:
             pokemon_id = int(row["id"])
+            introduced_gen = min(payload.get("generations") or [0]) or None
             conn.execute(
                 """
                 UPDATE pokemon
@@ -478,6 +485,7 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     height_m = COALESCE(?, height_m), weight_kg = COALESCE(?, weight_kg),
                     color = COALESCE(?, color), catch_rate = COALESCE(?, catch_rate),
                     male_ratio = COALESCE(?, male_ratio), female_ratio = COALESCE(?, female_ratio),
+                    introduced_generation = COALESCE(?, introduced_generation),
                     source_url = COALESCE(?, source_url), source_title = COALESCE(?, source_title),
                     source_fetched_at = COALESCE(?, source_fetched_at)
                 WHERE id = ?
@@ -495,6 +503,7 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     payload.get("catch_rate"),
                     (payload.get("gender_ratio") or {}).get("male"),
                     (payload.get("gender_ratio") or {}).get("female"),
+                    introduced_gen,
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
@@ -502,13 +511,14 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
                 ),
             )
         else:
+            introduced_gen = min(payload.get("generations") or [0]) or None
             result = conn.execute(
                 """
                 INSERT INTO pokemon
                   (legacy_id, dex_number, slug, name_zh, name_ja, name_en, category, hidden_ability,
                    height_m, weight_kg, color, catch_rate, male_ratio, female_ratio, genderless,
-                   source_url, source_title, source_fetched_at, parse_note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL)
+                   introduced_generation, source_url, source_title, source_fetched_at, parse_note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NULL)
                 """,
                 (
                     legacy_id,
@@ -525,6 +535,7 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     payload.get("catch_rate"),
                     (payload.get("gender_ratio") or {}).get("male"),
                     (payload.get("gender_ratio") or {}).get("female"),
+                    introduced_gen,
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
