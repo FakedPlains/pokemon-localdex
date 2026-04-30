@@ -1,123 +1,116 @@
 # Pokemon LocalDex
 
-一个面向本地部署的宝可梦资料库项目，目标支持：
+一个面向本地部署的宝可梦资料库，数据统一来源于 [52Poké Wiki](https://wiki.52poke.com/)，支持 PC 网页端和手机 H5 访问。
 
-- PC 网页端
-- 手机 H5 / App 容器
-- 宝可梦、道具、招式、特性、世代资料查询
-- 自定义队伍保存
-- 对战伤害计算
-- 数据统一来源于 52Poké Wiki
+## 功能概览
 
-## 架构
+Pokemon LocalDex 提供宝可梦系列游戏的完整资料查询、队伍构筑和伤害计算能力。所有数据通过爬虫从 52Poké Wiki 采集，存储在本地 SQLite 数据库中，无需联网即可使用。
 
-采用 Python 爬虫 + SQLite 存储 + Hono API + React SPA 的四层结构：
+## 快速开始
 
-```text
-pokemon-localdex/
-  apps/
-    api/        Hono API 服务（托管 SPA 静态资源）
-    web/        React SPA 客户端（Vite 构建）
-  packages/
-    battle-core 伤害计算与队伍规则核心
-    crawler_py  Python 爬虫（52Poké 数据采集 → SQLite）
-    sqlite-store SQLite 建表、查询适配与类型定义
-  scripts/
-    crawl-52poke-db.py  爬虫入口脚本
-  data/
-    raw/        原始抓取页面缓存（gitignored）
-    sqlite/     本地 SQLite 数据库（gitignored）
+### 环境要求
+
+- Node.js >= 22（使用了实验性 SQLite 支持）
+- Python >= 3.10（爬虫依赖）
+
+### 安装依赖
+
+```bash
+npm install
+pip install -r packages/crawler_py/requirements.txt
 ```
 
-## 运行
-
-### 1. 爬取数据
+### 爬取数据
 
 ```bash
 # 全量爬取（宝可梦、招式、特性、道具）
 npm run crawl:all
 
-# 单独爬取
+# 单独爬取某一类
 npm run crawl:pokemon
 npm run crawl:abilities
 npm run crawl:moves
 npm run crawl:items
-npm run crawl:catalog
-
-# 清除数据后重新爬取
-python3 scripts/crawl-52poke-db.py all --clean
 ```
 
-### 2. 启动 API
+### 启动服务
 
 ```bash
+# 启动 API 服务（默认 127.0.0.1:3030）
 npm run dev:api
-```
 
-默认监听 `127.0.0.1:3030`。如果你需要改端口或监听地址：
-
-```bash
-HOST=127.0.0.1 PORT=3031 npm run dev:api
-```
-
-### 3. 启动 Web 开发服务器
-
-```bash
+# 启动前端开发服务器（默认 localhost:5173）
 npm run dev:web
 ```
 
-### 4. 验证
+### 验证
 
 ```bash
-npm run check:sqlite   # 检查 SQLite 数据
+npm run check:sqlite   # 检查 SQLite 数据完整性
 npm run check:api      # API smoke test
 npm run check:damage   # 伤害计算验证
 ```
 
-## API 接口
+## 已有功能
 
-- `GET /pokemon` — 宝可梦列表（支持 `?q=&type=&generation=` 筛选）
-- `GET /pokemon/:id` — 宝可梦详情
-- `GET /items` — 道具列表
-- `GET /items/:id` — 道具详情
-- `GET /moves` — 招式列表（支持 `?q=&type=&generation=` 筛选）
-- `GET /moves/:id` — 招式详情
-- `GET /abilities` — 特性列表（支持 `?q=&generation=` 筛选）
-- `GET /abilities/:id` — 特性详情
-- `GET /teams` — 队伍列表
-- `POST /teams` — 保存队伍
-- `POST /battle/damage` — 伤害计算
+### 图鉴浏览
+
+全国图鉴列表，支持按名称/编号搜索、属性筛选和世代筛选。点击宝可梦可查看详情，包括普通/闪光图片切换、多形态切换（超级进化、地区形态、面具形态等）、种族值雷达图、能力值计算器（支持性格/IV/EV 调节）、按世代可学招式表，以及进化链展示。种族值标签页支持世代切换，可查看不同世代的种族值变化。
+
+### 招式查询
+
+完整招式列表，支持按名称搜索和属性筛选。招式详情展示威力、命中、PP、效果描述，以及各世代的参数变化记录。
+
+### 特性查询
+
+完整特性列表，支持按名称搜索。特性详情展示效果描述和各世代的效果变化记录。
+
+### 道具查询
+
+道具列表与详情，展示道具图片、分类和效果说明。
+
+### 队伍构筑
+
+6 槽队伍编辑器，支持为每个成员配置性格、等级、特性、携带道具和四个招式。队伍数据保存在本地 JSON 文件中，支持载入已保存队伍继续编辑。
+
+### 伤害计算
+
+独立选择攻击方和防御方，手动配置等级、招式威力、属性相克等参数进行伤害计算。支持从当前队伍快速导入宝可梦配置，选择攻击方后会按该宝可梦在当前世代可学的招式自动过滤候选。
+
+### 数据采集
+
+Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、935 个招式、314 个特性的完整数据，支持增量更新和全量重建两种模式。
+
+## 后续规划
+
+### 近期
+
+- 属性克制表可视化，展示完整的 18 属性相克关系
+- 特性拥有者列表：在特性详情页展示拥有该特性的宝可梦
+- 招式学习者列表：在招式详情页展示可学习该招式的宝可梦
+- 道具数据补全，扩充道具采集覆盖范围
+
+### 中期
+
+- 伤害计算器增强：接入属性克制、性格修正、道具和特性对伤害的联动影响
+- 队伍分析：属性覆盖率、弱点分布、速度线对比
+- 世代差异提示：在详情页高亮标注跨世代变化的字段
+
+### 远期
+
+- 移动端适配优化，提供更好的手机 H5 体验
+- 离线 PWA 支持，完全脱离网络使用
+- 多语言支持（日文、英文）
+
+## 文档
+
+详细的技术文档位于 `docs/` 目录：
+
+- [系统架构](docs/architecture.md) — 整体架构设计、分层职责和数据流
+- [数据库设计](docs/database.md) — SQLite 表结构、索引和关系说明
+- [API 接口](docs/api.md) — RESTful API 端点、参数和响应格式
+- [爬虫指南](docs/crawler.md) — 爬虫命令、参数和运行流程
 
 ## 数据来源
 
-- 线上原始数据来源：`https://wiki.52poke.com/`
-- 爬虫将原始 HTML 缓存到 `data/raw/`，解析后写入 `data/sqlite/localdex.sqlite`
-- 宝可梦和道具图片使用 52Poké 在线图片 URL
-
-## SQLite 说明
-
-- 默认数据库路径：`data/sqlite/localdex.sqlite`
-- 所有核心表的 `id` 使用 `INTEGER PRIMARY KEY AUTOINCREMENT`
-- 外键关系使用自增整数 ID，API 查询兼容数字 ID、`legacy_id`、`slug` 和中文名
-- 特性表以 `(number, name_zh)` 作为唯一键
-
-### 主要表结构
-
-- `pokemon`、`moves`、`abilities`、`items`：主表
-- `types`、`generations`、`game_versions`：字典表
-- `image_assets`：统一图片表
-- `pokemon_forms`、`pokemon_form_stats`、`pokemon_form_types`、`pokemon_form_abilities`：形态资料
-- `pokemon_evolution_members`：进化链
-- `pokemon_moves`：按世代可学招式
-- `move_generation_records`、`ability_generation_records`：招式/特性世代差异
-- `pokemon_generation_records`、`pokemon_generation_types`、`pokemon_generation_abilities`、`pokemon_generation_stats`：宝可梦世代差异
-
-## Web 界面
-
-当前已有 React SPA 前端，由 `apps/api` 托管静态资源，包含：
-
-- 图鉴搜索页：支持关键字、属性、世代筛选
-- 宝可梦详情页：展示图片、种族值、世代与地区图鉴
-- 道具页、招式页、特性页：搜索和世代差异查看
-- 队伍页：6 槽成员编辑、性格/等级/特性/道具/招式输入
-- 伤害页：独立选择攻守双方并计算伤害
+所有数据来源于 [52Poké Wiki](https://wiki.52poke.com/)，宝可梦和道具图片使用 52Poké 在线图片 URL。
