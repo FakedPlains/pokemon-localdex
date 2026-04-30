@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../utils/api.js";
+import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS, STAT_KEYS } from "../utils/constants.js";
 import {
-  buildEvolutionFamilies,
   getPokemonPreviewImage,
   resolvePokemonDisplayVariant,
   getPokemonLearnsetEntries,
@@ -27,14 +27,32 @@ export default function PokedexPage() {
   const [detail, setDetail] = useState(null);
   const [detailGeneration, setDetailGeneration] = useState("");
 
-  const [list, setList] = useState([]);
   const [allMoves, setAllMoves] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   const detailRef = useRef(null);
   const activeCardRef = useRef(null);
+  const listContainerRef = useRef(null);
+  const cleanupRef = useRef(null);
+  const prevSlugRef = useRef(null);
   const composingRef = useRef(false);
   const debounceRef = useRef(null);
+
+  // 构建分页请求路径
+  const pokemonPath = useMemo(() => {
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (type) params.set("type", type);
+    if (generation) params.set("generation", generation);
+    const qs = params.toString();
+    return qs ? `/pokemon?${qs}` : "/pokemon";
+  }, [query, type, generation]);
+
+  const { data: list, total, loading, hasMore, sentinelRef, loadingMore } = useInfiniteApi(pokemonPath, { pageSize: 60 });
+
+  // 全量加载 moves（详情面板招式表需要）
+  useEffect(() => {
+    api("/moves").then((r) => setAllMoves(r.data));
+  }, []);
 
   const handleInputChange = useCallback((e) => {
     const value = e.target.value;
@@ -58,23 +76,6 @@ export default function PokedexPage() {
     debounceRef.current = setTimeout(() => setQuery(value), 300);
   }, []);
 
-  const fetchList = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (type) params.set("type", type);
-    if (generation) params.set("generation", generation);
-    const [listResult, movesResult] = await Promise.all([
-      api(`/pokemon?${params.toString()}`),
-      api("/moves")
-    ]);
-    setList(listResult.data);
-    setAllMoves(movesResult.data);
-    setLoading(false);
-  }, [query, type, generation]);
-
-  useEffect(() => { fetchList(); }, [fetchList]);
-
   // Cleanup debounce timer
   useEffect(() => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
@@ -97,11 +98,40 @@ export default function PokedexPage() {
     return () => { cancelled = true; };
   }, [selectedSlug]);
 
-  // Scroll active card into view in the list
+  // Scroll the selected/previously-selected card into view after layout transitions.
+  // When opening detail: scroll the active card to center in compact list.
+  // When closing detail: scroll the previously-selected card to center in grid list.
   useEffect(() => {
-    if (selectedSlug && activeCardRef.current) {
-      setTimeout(() => activeCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
-    }
+    const slugToScrollTo = selectedSlug || prevSlugRef.current;
+    // Update prevSlugRef for next transition
+    prevSlugRef.current = selectedSlug;
+    if (!slugToScrollTo) return;
+    let cancelled = false;
+
+    // Wait for React render + framer-motion layout animation + CSS transition to settle
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      const container = document.querySelector(".dex-list");
+      // When opening: find by .dex-item-active; when closing: find by layoutId data attribute
+      const card = selectedSlug
+        ? document.querySelector(".dex-item-active")
+        : document.querySelector(`[data-slug="${CSS.escape(slugToScrollTo)}"]`);
+      if (!card || !container) return;
+
+      const cardRect = card.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const currentOffset = cardRect.top - containerRect.top + container.scrollTop;
+
+      // Scroll so the card is roughly centered in the visible area
+      const targetScroll = currentOffset - container.clientHeight / 2 + card.offsetHeight / 2;
+      container.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
+    }, 600);
+
+    cleanupRef.current = timer;
+    return () => {
+      cancelled = true;
+      clearTimeout(cleanupRef.current);
+    };
   }, [selectedSlug]);
 
   // Scroll detail panel to top when detail changes
@@ -119,19 +149,6 @@ export default function PokedexPage() {
     setSelectedSlug(null);
   }, []);
 
-  const families = useMemo(() => buildEvolutionFamilies(list), [list]);
-
-  // Flatten families into a single list of members
-  const allMembers = useMemo(() => {
-    const members = [];
-    families.forEach((family) => {
-      family.chain.forEach((member) => {
-        members.push(member);
-      });
-    });
-    return members;
-  }, [families]);
-
   if (loading && list.length === 0) return <Loading />;
 
   const hasSelection = selectedSlug !== null;
@@ -145,7 +162,7 @@ export default function PokedexPage() {
             <h2 className="panel-title">全国图鉴</h2>
             <p className="panel-subtitle">点击宝可梦查看详情，包括特性、种族值计算器和招式表。</p>
           </div>
-          <span className="chip">{list.length} 只宝可梦</span>
+          <span className="chip">{total > 0 ? `${list.length} / ${total}` : `${list.length}`} 只宝可梦</span>
         </div>
         <div className="dex-toolbar">
           <div className="dex-search-wrap">
@@ -178,9 +195,9 @@ export default function PokedexPage() {
       <div className="dex-body">
         {/* Left: Pokemon list */}
         <div className={`dex-list-panel panel ${hasSelection ? "dex-list-panel-narrow" : ""}`}>
-          <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
-            {allMembers.length === 0 && <div className="dex-empty">没有匹配的宝可梦。</div>}
-            {allMembers.map((member) => {
+          <div ref={listContainerRef} className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
+            {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
+            {list.map((member) => {
               const slug = member.slug || member.id;
               const isActive = selectedSlug === slug;
               const image = getPokemonPreviewImage(member);
@@ -190,6 +207,7 @@ export default function PokedexPage() {
                   layoutId={`dex-item-${slug}`}
                   key={slug}
                   ref={isActive ? activeCardRef : undefined}
+                  data-slug={slug}
                   className={`dex-item ${hasSelection ? "dex-item-compact" : ""} ${isActive ? "dex-item-active" : ""}`}
                   onClick={() => handleSelect(slug)}
                   transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
@@ -211,6 +229,11 @@ export default function PokedexPage() {
                 </motion.button>
               );
             })}
+            {hasMore && (
+              <div className="dex-load-more" ref={sentinelRef}>
+                <div className="pulse-dot" />
+              </div>
+            )}
           </div>
         </div>
 

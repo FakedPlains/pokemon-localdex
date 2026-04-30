@@ -69,6 +69,14 @@ apiRoutes.get("/pokemon", (c) => {
   const query = c.req.query("q") || undefined;
   const type = c.req.query("type") || undefined;
   const generation = numberQuery(c, "generation");
+  const limit = numberQuery(c, "limit");
+  const offset = numberQuery(c, "offset") ?? 0;
+
+  if (limit !== undefined) {
+    const result = listPokemonFromSqlite({ query, type, generation, limit, offset });
+    const { items, total } = result as { items: unknown[]; total: number };
+    return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
+  }
   const data = listPokemonFromSqlite({ query, type, generation });
   return c.json({ data });
 });
@@ -101,8 +109,17 @@ apiRoutes.get("/items/:id", (c) => {
 apiRoutes.get("/moves", (c) => {
   const query = c.req.query("q") || undefined;
   const type = c.req.query("type") || undefined;
+  const category = c.req.query("category") || undefined;
   const generation = numberQuery(c, "generation");
-  const data = listMovesFromSqlite({ query, type, generation });
+  const limit = numberQuery(c, "limit");
+  const offset = numberQuery(c, "offset") ?? 0;
+
+  if (limit !== undefined) {
+    const result = listMovesFromSqlite({ query, type, category, generation, limit, offset });
+    const { items, total } = result as { items: unknown[]; total: number };
+    return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
+  }
+  const data = listMovesFromSqlite({ query, type, category, generation });
   return c.json({ data });
 });
 
@@ -115,6 +132,14 @@ apiRoutes.get("/moves/:id", (c) => {
 apiRoutes.get("/abilities", (c) => {
   const query = c.req.query("q") || undefined;
   const generation = numberQuery(c, "generation");
+  const limit = numberQuery(c, "limit");
+  const offset = numberQuery(c, "offset") ?? 0;
+
+  if (limit !== undefined) {
+    const result = listAbilitiesFromSqlite({ query, generation, limit, offset });
+    const { items, total } = result as { items: unknown[]; total: number };
+    return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
+  }
   const data = listAbilitiesFromSqlite({ query, generation });
   return c.json({ data });
 });

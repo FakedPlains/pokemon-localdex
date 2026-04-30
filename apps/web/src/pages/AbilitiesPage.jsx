@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api.js";
+import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import { GENERATION_OPTIONS } from "../utils/constants.js";
 import Loading from "../components/Loading.jsx";
 
@@ -8,11 +9,7 @@ export default function AbilitiesPage() {
   const [query, setQuery] = useState("");
   const [generation, setGeneration] = useState("");
   const [expanded, setExpanded] = useState(null);
-  const [abilities, setAbilities] = useState([]);
   const [detailCache, setDetailCache] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [visibleLimit, setVisibleLimit] = useState(50);
-  const sentinelRef = useRef(null);
 
   const composingRef = useRef(false);
   const debounceRef = useRef(null);
@@ -54,36 +51,16 @@ export default function AbilitiesPage() {
     };
   }, []);
 
-  const fetchAbilities = useCallback(async () => {
-    setLoading(true);
+  // 构建分页请求路径
+  const abilitiesPath = useMemo(() => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     if (generation) params.set("generation", generation);
-    const result = await api(`/abilities?${params.toString()}`);
-    setAbilities(result.data);
-    setLoading(false);
+    const qs = params.toString();
+    return qs ? `/abilities?${qs}` : "/abilities";
   }, [query, generation]);
 
-  useEffect(() => { fetchAbilities(); }, [fetchAbilities]);
-  useEffect(() => { setVisibleLimit(50); }, [query, generation]);
-
-  /* ── Infinite scroll via IntersectionObserver ── */
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleLimit((v) => v + 50);
-        }
-      },
-      { rootMargin: "200px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [abilities]);
-
-  const visibleAbilities = useMemo(() => abilities.slice(0, visibleLimit), [abilities, visibleLimit]);
+  const { data: abilities, total, loading, hasMore, sentinelRef } = useInfiniteApi(abilitiesPath, { pageSize: 50 });
 
   const toggleExpand = useCallback((slug) => {
     if (expanded === slug) {
@@ -106,7 +83,7 @@ export default function AbilitiesPage() {
         <div className="ab-header">
           <h2 className="panel-title">特性资料</h2>
           <p className="panel-subtitle">
-            共收录 {abilities.length} 个特性，按编号排序。点击展开查看详细效果与世代变更。
+            共收录 {total > 0 ? total : abilities.length} 个特性，按编号排序。点击展开查看详细效果与世代变更。
           </p>
         </div>
 
@@ -138,12 +115,12 @@ export default function AbilitiesPage() {
           </div>
         </div>
 
-        {visibleAbilities.length === 0 && (
+        {abilities.length === 0 && !loading && (
           <div className="ab-empty">没有找到匹配的特性。</div>
         )}
 
         <div className="ab-list">
-          {visibleAbilities.map((ability) => {
+          {abilities.map((ability) => {
             const key = ability.id;
             const isExpanded = expanded === key;
             const detail = detailCache[key];
@@ -228,7 +205,7 @@ export default function AbilitiesPage() {
           })}
         </div>
 
-        {visibleAbilities.length < abilities.length && (
+        {hasMore && (
           <div className="ab-load-more" ref={sentinelRef}>
             <div className="pulse-dot" />
           </div>

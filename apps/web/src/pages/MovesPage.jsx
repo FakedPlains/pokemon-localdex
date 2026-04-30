@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api.js";
+import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "../utils/constants.js";
 import Loading from "../components/Loading.jsx";
 
@@ -70,10 +71,6 @@ export default function MovesPage() {
   const [category, setCategory] = useState("");
   const [generation, setGeneration] = useState("");
   const [expanded, setExpanded] = useState(null);
-  const [moves, setMoves] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [visibleLimit, setVisibleLimit] = useState(50);
-  const sentinelRef = useRef(null);
 
   const composingRef = useRef(false);
   const debounceRef = useRef(null);
@@ -104,44 +101,18 @@ export default function MovesPage() {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, []);
 
-  const fetchMoves = useCallback(async () => {
-    setLoading(true);
+  // 构建分页请求路径（所有筛选条件都由服务端处理）
+  const movesPath = useMemo(() => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     if (type) params.set("type", type);
+    if (category) params.set("category", category);
     if (generation) params.set("generation", generation);
-    const result = await api(`/moves?${params.toString()}`);
-    setMoves(result.data);
-    setLoading(false);
-  }, [query, type, generation]);
+    const qs = params.toString();
+    return qs ? `/moves?${qs}` : "/moves";
+  }, [query, type, category, generation]);
 
-  useEffect(() => { fetchMoves(); }, [fetchMoves]);
-  useEffect(() => { setVisibleLimit(50); }, [query, type, category, generation]);
-
-  /* ── 过滤 + 按 number 排序 ── */
-  const filteredMoves = useMemo(() => {
-    let list = moves;
-    if (category) list = list.filter((m) => m.category === category);
-    return [...list].sort((a, b) => (a.number || 9999) - (b.number || 9999));
-  }, [moves, category]);
-
-  const visibleMoves = useMemo(() => filteredMoves.slice(0, visibleLimit), [filteredMoves, visibleLimit]);
-
-  /* ── Infinite scroll via IntersectionObserver ── */
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleLimit((v) => v + 50);
-        }
-      },
-      { rootMargin: "200px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [filteredMoves]);
+  const { data: moves, total, loading, hasMore, sentinelRef, loadingMore } = useInfiniteApi(movesPath, { pageSize: 50 });
 
   const toggleExpand = useCallback((id) => {
     setExpanded((prev) => (prev === id ? null : id));
@@ -155,7 +126,7 @@ export default function MovesPage() {
         <div className="mv-header">
           <h2 className="panel-title">招式资料</h2>
           <p className="panel-subtitle">
-            共收录 {filteredMoves.length} 个招式，按编号排序。点击展开查看详细效果与世代变更。
+            共收录 {total > 0 ? total : moves.length} 个招式，按编号排序。点击展开查看详细效果与世代变更。
           </p>
         </div>
 
@@ -219,12 +190,12 @@ export default function MovesPage() {
           <span className="mv-col-arrow" />
         </div>
 
-        {visibleMoves.length === 0 && (
+        {moves.length === 0 && !loading && (
           <div className="mv-empty">没有找到匹配的招式。</div>
         )}
 
         <div className="mv-list">
-          {visibleMoves.map((move) => {
+          {moves.map((move) => {
             const isExpanded = expanded === move.id;
             const rowBg = move.type ? TYPE_BG_COLORS[move.type] : undefined;
             return (
@@ -345,7 +316,7 @@ export default function MovesPage() {
           })}
         </div>
 
-        {visibleMoves.length < filteredMoves.length && (
+        {hasMore && (
           <div className="mv-load-more" ref={sentinelRef}>
             <div className="pulse-dot" />
           </div>

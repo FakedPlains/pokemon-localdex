@@ -913,7 +913,10 @@ function sourceFromRow(row: Record<string, unknown>): SourceMeta | undefined {
 /**
  * 列表查询：单次 JOIN 获取所有宝可梦的默认形态信息。
  */
-export function listPokemonFromSqlite(filters?: { query?: string; type?: string; generation?: number }) {
+export type PaginationParams = { offset?: number; limit?: number };
+export type PaginatedResult<T> = { items: T[]; total: number };
+
+export function listPokemonFromSqlite(filters?: { query?: string; type?: string; generation?: number } & PaginationParams) {
   const db = openDatabase();
   const conditions: string[] = [];
   const params: Array<string | number> = [];
@@ -939,8 +942,25 @@ export function listPokemonFromSqlite(filters?: { query?: string; type?: string;
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const usePagination = filters?.limit !== undefined;
+
+  // 分页模式下先获取总数
+  let total = 0;
+  if (usePagination) {
+    const countRow = db.prepare(`
+      SELECT COUNT(*) AS cnt
+      FROM pokemon p
+      JOIN pokemon_forms pf ON pf.pokemon_id = p.id AND pf.is_default = 1
+      ${where}
+    `).get(...params) as Record<string, unknown>;
+    total = Number(countRow.cnt);
+  }
 
   // 主查询：pokemon + 默认形态 + 最新种族值（generation_end IS NULL 表示最新世代）
+  const limitClause = usePagination
+    ? `LIMIT ${Number(filters!.limit)} OFFSET ${Number(filters?.offset ?? 0)}`
+    : "";
+
   const rows = db.prepare(`
     SELECT
       p.id, p.dex_number, p.slug, p.name_zh, p.name_ja, p.name_en,
@@ -951,9 +971,10 @@ export function listPokemonFromSqlite(filters?: { query?: string; type?: string;
     LEFT JOIN pokemon_form_stats pfs ON pfs.form_id = pf.id AND pfs.generation_end IS NULL
     ${where}
     ORDER BY p.dex_number ASC
+    ${limitClause}
   `).all(...params) as Record<string, unknown>[];
 
-  if (rows.length === 0) { db.close(); return []; }
+  if (rows.length === 0) { db.close(); return usePagination ? { items: [], total } as PaginatedResult<PokemonSummary & { _chainId?: number }> : []; }
 
   // 批量获取所有默认形态的属性
   const formIds = rows.map((r) => Number(r.form_id));
@@ -1040,7 +1061,7 @@ export function listPokemonFromSqlite(filters?: { query?: string; type?: string;
 
   db.close();
 
-  return rows.map((row) => {
+  const items = rows.map((row) => {
     const fid = Number(row.form_id);
     const pid = Number(row.id);
     const types = typeMap.get(fid) || [];
@@ -1064,6 +1085,8 @@ export function listPokemonFromSqlite(filters?: { query?: string; type?: string;
       _chainId: chainMap.get(pid),
     } as PokemonSummary & { _chainId?: number };
   });
+
+  return usePagination ? { items, total } as PaginatedResult<PokemonSummary & { _chainId?: number }> : items;
 }
 
 /**
@@ -1389,7 +1412,7 @@ function hydrateMoveRow(db: DatabaseSync, row: Record<string, unknown>): MoveEnt
   };
 }
 
-export function listMovesFromSqlite(filters?: { query?: string; type?: string; generation?: number }) {
+export function listMovesFromSqlite(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams) {
   const db = openDatabase();
   const conditions: string[] = [];
   const params: Array<string | number> = [];
@@ -1402,20 +1425,37 @@ export function listMovesFromSqlite(filters?: { query?: string; type?: string; g
     conditions.push("m.type_name = ?");
     params.push(filters.type);
   }
+  if (filters?.category) {
+    conditions.push("m.category = ?");
+    params.push(filters.category);
+  }
   if (filters?.generation) {
     conditions.push("EXISTS (SELECT 1 FROM move_generation_records mgr WHERE mgr.move_id = m.id AND mgr.generation = ?)");
     params.push(filters.generation);
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const usePagination = filters?.limit !== undefined;
+
+  let total = 0;
+  if (usePagination) {
+    const countRow = db.prepare(`SELECT COUNT(*) AS cnt FROM moves m ${where}`).get(...params) as Record<string, unknown>;
+    total = Number(countRow.cnt);
+  }
+
+  const limitClause = usePagination
+    ? `LIMIT ${Number(filters!.limit)} OFFSET ${Number(filters?.offset ?? 0)}`
+    : "";
+
   const rows = db.prepare(`
     SELECT m.*
     FROM moves m
     ${where}
     ORDER BY m.name_zh ASC
+    ${limitClause}
   `).all(...params) as Record<string, unknown>[];
-  const result = rows.map((r) => hydrateMoveRow(db, r));
+  const items = rows.map((r) => hydrateMoveRow(db, r));
   db.close();
-  return result;
+  return usePagination ? { items, total } as PaginatedResult<MoveEntry> : items;
 }
 
 export function getMoveFromSqlite(idOrSlug: string) {
@@ -1464,7 +1504,7 @@ function hydrateAbilityRow(db: DatabaseSync, row: Record<string, unknown>): Abil
   };
 }
 
-export function listAbilitiesFromSqlite(filters?: { query?: string; generation?: number }) {
+export function listAbilitiesFromSqlite(filters?: { query?: string; generation?: number } & PaginationParams) {
   const db = openDatabase();
   const conditions: string[] = [];
   const params: Array<string | number> = [];
@@ -1478,15 +1518,28 @@ export function listAbilitiesFromSqlite(filters?: { query?: string; generation?:
     params.push(filters.generation);
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const usePagination = filters?.limit !== undefined;
+
+  let total = 0;
+  if (usePagination) {
+    const countRow = db.prepare(`SELECT COUNT(*) AS cnt FROM abilities a ${where}`).get(...params) as Record<string, unknown>;
+    total = Number(countRow.cnt);
+  }
+
+  const limitClause = usePagination
+    ? `LIMIT ${Number(filters!.limit)} OFFSET ${Number(filters?.offset ?? 0)}`
+    : "";
+
   const rows = db.prepare(`
     SELECT a.*
     FROM abilities a
     ${where}
     ORDER BY a.number ASC, a.name_zh ASC
+    ${limitClause}
   `).all(...params) as Record<string, unknown>[];
-  const result = rows.map((r) => hydrateAbilityRow(db, r));
+  const items = rows.map((r) => hydrateAbilityRow(db, r));
   db.close();
-  return result;
+  return usePagination ? { items, total } as PaginatedResult<AbilityEntry> : items;
 }
 
 export function getAbilityFromSqlite(idOrName: string) {
