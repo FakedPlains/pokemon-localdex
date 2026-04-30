@@ -30,8 +30,15 @@ yarn-error.log*
 /tmp/
 /dist/
 
+# Empty placeholder DB files
+/data/localdex.db
+/data/localdex.sqlite
+/packages/crawler_py/localdex.db
+/packages/sqlite-store/pokemon.db
+
 # Generated 52Poke import/cache artifacts
 /data/raw/
+/packages/crawler_py/data/raw/
 /apps/web/public/assets/cache/
 !/apps/web/public/assets/cache/
 apps/web/public/assets/cache/*

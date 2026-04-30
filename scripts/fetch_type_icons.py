@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import io
 import os
-import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -144,56 +143,9 @@ def main():
         saved_files[type_name] = str(main_file.relative_to(PROJECT_ROOT))
         print(f"  ✓ {type_name}: type-{type_name}.png / @sm / @lg")
 
-    # 4. 连接数据库，写入 image_assets
-    print(f"\n{'=' * 60}")
-    print("写入数据库...")
-    print("=" * 60)
-
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    cursor = conn.cursor()
-
-    # 获取 types 表中的属性 ID
-    cursor.execute("SELECT id, name_zh FROM types ORDER BY id")
-    type_rows = cursor.fetchall()
-    type_id_map = {name_zh: type_id for type_id, name_zh in type_rows}
-
-    inserted = 0
-    for type_name in SPRITE_ORDER:
-        type_id = type_id_map.get(type_name)
-        if not type_id:
-            print(f"  ⚠ 属性 '{type_name}' 在数据库中未找到，跳过")
-            continue
-
-        local_path = saved_files.get(type_name)
-        if not local_path:
-            continue
-
-        # 存储 icon（@2x 版本作为主图标）
-        cursor.execute("""
-            INSERT INTO image_assets (entity_type, entity_id, form_id, image_kind, url, alt, source_url)
-            VALUES ('type', ?, NULL, 'icon', ?, ?, ?)
-            ON CONFLICT(entity_type, entity_id, form_id, image_kind) DO UPDATE SET
-                url = excluded.url,
-                alt = excluded.alt,
-                source_url = excluded.source_url
-        """, (
-            type_id,
-            local_path,
-            f"{type_name}属性图标",
-            SPRITE_URL,
-        ))
-        inserted += 1
-        print(f"  ✓ {type_name} (type_id={type_id})")
-
-    conn.commit()
-    conn.close()
-
     print(f"\n{'=' * 60}")
     print(f"完成！")
     print(f"  切割图标: {len(icons)} 个属性")
-    print(f"  数据库记录: {inserted} 条")
     print(f"  图标目录: {ICONS_DIR}")
     print("=" * 60)
 

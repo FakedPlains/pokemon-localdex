@@ -5,6 +5,8 @@ import re
 
 from bs4 import BeautifulSoup, Tag
 
+from .utils import to_simplified
+
 
 CHINESE_GENERATIONS = {
     "一": 1,
@@ -57,6 +59,7 @@ def extract_ability_names(fragment: Tag | str) -> list[str]:
         title_name = title.removesuffix("（特性）").strip()
         label = clean_text(anchor.get_text(" ", strip=True))
         name = label if label and not re.search(r"[()[\]{}]", label) else title_name
+        name = to_simplified(name) or name
         if name and name not in SKIP_ABILITY_LABELS:
             names.append(name)
     return dedupe(names)

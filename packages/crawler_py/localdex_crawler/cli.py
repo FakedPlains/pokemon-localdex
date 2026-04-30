@@ -230,11 +230,9 @@ def crawl_pokemon_abilities(conn, fetcher: PageFetcher, args) -> int:
     clean = getattr(args, "clean", False)
     if clean and not args.dry_run:
         # pokemon-abilities 只清除特性关联数据，不清除宝可梦主表
-        conn.execute("DELETE FROM pokemon_abilities")
-        conn.execute("DELETE FROM pokemon_generation_abilities")
         conn.execute("DELETE FROM pokemon_form_abilities")
         conn.commit()
-        print("[clean] Cleared pokemon ability association tables.")
+        print("[clean] Cleared pokemon_form_abilities table.")
     names = parse_name_filters(args.pokemon)
     rows = select_pokemon(
         conn,
@@ -262,7 +260,7 @@ def crawl_pokemon_abilities(conn, fetcher: PageFetcher, args) -> int:
         print(
             f"[updated] #{row.dex_number:04d} {row.name_zh}: "
             f"abilities={summary.abilities or '-'} hidden={summary.hidden_ability or '-'} "
-            f"generationRecords={summary.generation_count}"
+            f"forms={summary.form_count}"
         )
     print(f"Pokemon abilities finished. matched={len(rows)} updated={updated} dryRun={args.dry_run}")
     return 0
@@ -271,15 +269,15 @@ def crawl_pokemon_abilities(conn, fetcher: PageFetcher, args) -> int:
 def crawl_learnsets(conn, fetcher: PageFetcher, args) -> int:
     clean = getattr(args, "clean", False)
     if clean and not args.dry_run:
-        conn.execute("DELETE FROM pokemon_moves")
+        conn.execute("DELETE FROM pokemon_learnsets")
         conn.commit()
-        print("[clean] Cleared pokemon_moves (learnsets).")
+        print("[clean] Cleared pokemon_learnsets.")
     seeds = selected_pokemon_seeds(fetcher, args)
     generations_filter = parse_generations(args.generations)
     updated = 0
     entries = 0
     for seed in seeds:
-        row = conn.execute("SELECT id FROM pokemon WHERE legacy_id = ? OR dex_number = ?", (f"pokemon-{seed.dex_number:04d}", seed.dex_number)).fetchone()
+        row = conn.execute("SELECT id FROM pokemon WHERE slug = ? OR dex_number = ?", (slugify(seed.name_zh), seed.dex_number)).fetchone()
         if not row and not args.dry_run:
             detail = fetcher.load_or_fetch(pokemon_cache_key(seed.dex_number), seed.detail_url)
             pokemon_id = upsert_pokemon_detail(conn, normalize_pokemon_detail_page(detail, seed))

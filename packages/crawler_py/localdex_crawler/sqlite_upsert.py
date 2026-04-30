@@ -7,13 +7,12 @@ from urllib.parse import quote
 
 from .fetcher import RawPage
 from .html_tools import ParsedPokemonAbilities
-from .utils import ImageAsset, normalize_type_name, slugify
+from .utils import normalize_type_name, slugify
 
 
 @dataclass(frozen=True)
 class PokemonRow:
     id: int
-    legacy_id: str
     dex_number: int
     name_zh: str
     source_url: str | None
@@ -24,7 +23,7 @@ class UpsertSummary:
     pokemon: PokemonRow
     abilities: list[str]
     hidden_ability: str | None
-    generation_count: int
+    form_count: int
     unknown_abilities: list[str]
 
 
@@ -37,16 +36,13 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 # ---------------------------------------------------------------------------
 # 清除数据（--clean 模式）
-# 外键已设置 ON DELETE CASCADE，删除主表记录时子表自动级联删除。
 # ---------------------------------------------------------------------------
 
 def clear_moves(conn: sqlite3.Connection) -> int:
-    """清除所有招式数据（含 move_generation_records、image_assets、pokemon_moves 引用）。"""
+    """清除所有招式数据（含 move_generation_records）。"""
     with conn:
         count = conn.execute("SELECT COUNT(*) FROM moves").fetchone()[0]
-        conn.execute("DELETE FROM pokemon_moves")
         conn.execute("DELETE FROM move_generation_records")
-        conn.execute("DELETE FROM image_assets WHERE entity_type = 'move'")
         conn.execute("DELETE FROM moves")
     return count
 
@@ -61,10 +57,9 @@ def clear_abilities(conn: sqlite3.Connection) -> int:
 
 
 def clear_items(conn: sqlite3.Connection) -> int:
-    """清除所有道具数据（含 image_assets）。"""
+    """清除所有道具数据。"""
     with conn:
         count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
-        conn.execute("DELETE FROM image_assets WHERE entity_type = 'item'")
         conn.execute("DELETE FROM items")
     return count
 
@@ -73,21 +68,14 @@ def clear_pokemon(conn: sqlite3.Connection) -> int:
     """清除所有宝可梦数据（含所有关联子表）。"""
     with conn:
         count = conn.execute("SELECT COUNT(*) FROM pokemon").fetchone()[0]
-        conn.execute("DELETE FROM pokemon_moves")
-        conn.execute("DELETE FROM pokemon_evolution_members")
+        conn.execute("DELETE FROM pokemon_learnsets")
+        conn.execute("DELETE FROM evolution_chains")
+        conn.execute("DELETE FROM pokemon_form_images")
         conn.execute("DELETE FROM pokemon_form_abilities")
-        conn.execute("DELETE FROM pokemon_form_stats")
         conn.execute("DELETE FROM pokemon_form_types")
+        conn.execute("DELETE FROM pokemon_form_stats")
         conn.execute("DELETE FROM pokemon_forms")
-        conn.execute("DELETE FROM pokemon_generation_abilities")
-        conn.execute("DELETE FROM pokemon_generation_records")
         conn.execute("DELETE FROM pokemon_generation_regions")
-        conn.execute("DELETE FROM pokemon_generation_stats")
-        conn.execute("DELETE FROM pokemon_generation_types")
-        conn.execute("DELETE FROM pokemon_abilities")
-        conn.execute("DELETE FROM pokemon_base_stats")
-        conn.execute("DELETE FROM pokemon_types")
-        conn.execute("DELETE FROM image_assets WHERE entity_type = 'pokemon'")
         conn.execute("DELETE FROM pokemon")
     return count
 
@@ -119,11 +107,11 @@ def select_pokemon(
         params.append(end_dex)
     if names:
         placeholders = ",".join("?" for _ in names)
-        clauses.append(f"(name_zh IN ({placeholders}) OR legacy_id IN ({placeholders}))")
+        clauses.append(f"(name_zh IN ({placeholders}) OR slug IN ({placeholders}))")
         params.extend(names)
         params.extend(names)
 
-    sql = "SELECT id, legacy_id, dex_number, name_zh, source_url FROM pokemon"
+    sql = "SELECT id, dex_number, name_zh, source_url FROM pokemon"
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     sql += " ORDER BY dex_number ASC, id ASC"
@@ -135,7 +123,6 @@ def select_pokemon(
     return [
         PokemonRow(
             id=int(row["id"]),
-            legacy_id=str(row["legacy_id"]),
             dex_number=int(row["dex_number"]),
             name_zh=str(row["name_zh"]),
             source_url=row["source_url"],
@@ -149,8 +136,263 @@ def pokemon_source_url(row: PokemonRow) -> str:
 
 
 def cache_key(row: PokemonRow) -> str:
-    return row.legacy_id or f"pokemon-{row.dex_number:04d}"
+    return f"pokemon-{row.dex_number:04d}"
 
+
+# ---------------------------------------------------------------------------
+# Pokemon upsert (form-centric architecture)
+# ---------------------------------------------------------------------------
+
+def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
+    """
+    写入宝可梦主表 + 形态 + 形态属性/特性/种族值/图片 + 世代可用性。
+    payload 由 normalize_pokemon_detail_page() 生成。
+    """
+    slug = payload["slug"]
+    with conn:
+        row = conn.execute(
+            "SELECT id FROM pokemon WHERE slug = ? OR dex_number = ?",
+            (slug, payload["dex_number"]),
+        ).fetchone()
+        if row:
+            pokemon_id = int(row["id"])
+            introduced_gen = min(payload.get("generations") or [0]) or None
+            conn.execute(
+                """
+                UPDATE pokemon
+                SET slug = ?, name_zh = ?, name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
+                    category = COALESCE(?, category),
+                    height_m = COALESCE(?, height_m), weight_kg = COALESCE(?, weight_kg),
+                    introduced_generation = COALESCE(?, introduced_generation),
+                    source_url = COALESCE(?, source_url), source_title = COALESCE(?, source_title),
+                    source_fetched_at = COALESCE(?, source_fetched_at)
+                WHERE id = ?
+                """,
+                (
+                    slug,
+                    payload["name_zh"],
+                    payload.get("name_ja"),
+                    payload.get("name_en"),
+                    payload.get("category"),
+                    payload.get("height_m"),
+                    payload.get("weight_kg"),
+                    introduced_gen,
+                    _source_attr(payload.get("source"), "url"),
+                    _source_attr(payload.get("source"), "title"),
+                    _source_attr(payload.get("source"), "fetched_at"),
+                    pokemon_id,
+                ),
+            )
+        else:
+            introduced_gen = min(payload.get("generations") or [0]) or None
+            result = conn.execute(
+                """
+                INSERT INTO pokemon
+                  (dex_number, slug, name_zh, name_ja, name_en, category,
+                   height_m, weight_kg,
+                   introduced_generation, source_url, source_title, source_fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload["dex_number"],
+                    slug,
+                    payload["name_zh"],
+                    payload.get("name_ja"),
+                    payload.get("name_en"),
+                    payload.get("category"),
+                    payload.get("height_m"),
+                    payload.get("weight_kg"),
+                    introduced_gen,
+                    _source_attr(payload.get("source"), "url"),
+                    _source_attr(payload.get("source"), "title"),
+                    _source_attr(payload.get("source"), "fetched_at"),
+                ),
+            )
+            pokemon_id = int(result.lastrowid)
+
+        # 写入形态及其关联数据
+        _upsert_pokemon_forms(conn, pokemon_id, payload)
+
+        # 写入世代可用性
+        _upsert_generation_regions(conn, pokemon_id, payload)
+
+    return pokemon_id
+
+
+def _upsert_pokemon_forms(conn: sqlite3.Connection, pokemon_id: int, payload: dict) -> None:
+    """写入形态 + 形态属性/特性/种族值/图片。
+
+    每个形态只有一条 pokemon_forms 记录。世代变体信息写入子表：
+    - pokemon_form_stats: 每个世代变体一条记录（generation_start/generation_end）
+    - pokemon_form_types: 每个世代变体一组记录
+    - pokemon_form_abilities: 每个世代变体一组记录
+    """
+    # 清除旧的形态数据（级联删除子表）
+    conn.execute("DELETE FROM pokemon_forms WHERE pokemon_id = ?", (pokemon_id,))
+
+    forms = payload.get("forms") or []
+    if not forms:
+        # 没有显式形态数据，创建一个默认形态
+        forms = [{
+            "form_key": "default",
+            "name_zh": payload["name_zh"],
+            "form_type": "default",
+            "is_default": True,
+            "sort_order": 0,
+            "primary_type": payload.get("primary_type"),
+            "secondary_type": payload.get("secondary_type"),
+            "abilities": payload.get("abilities") or [],
+            "hidden_ability": payload.get("hidden_ability"),
+            "base_stats": payload.get("base_stats"),
+            "images": payload.get("images") or {},
+        }]
+
+    for form in forms:
+        result = conn.execute(
+            """
+            INSERT INTO pokemon_forms
+              (pokemon_id, form_key, name_zh, form_type, is_default, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pokemon_id,
+                form.get("form_key") or "default",
+                form["name_zh"],
+                form.get("form_type") or "default",
+                1 if form.get("is_default") else 0,
+                form.get("sort_order", 0),
+            ),
+        )
+        form_id = int(result.lastrowid)
+
+        # 种族值（可能有多个世代变体）
+        stat_variants = form.get("stat_variants") or []
+        if stat_variants:
+            for variant in stat_variants:
+                gen_start = variant.get("generation_start")
+                gen_end = variant.get("generation_end")
+                conn.execute(
+                    """
+                    INSERT INTO pokemon_form_stats
+                      (form_id, generation_start, generation_end, hp, atk, def, spa, spd, spe)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (form_id, gen_start, gen_end,
+                     variant["hp"], variant["atk"], variant["def"],
+                     variant["spa"], variant["spd"], variant["spe"]),
+                )
+        else:
+            # 单一种族值（无世代变体）
+            stats = form.get("base_stats")
+            if stats:
+                conn.execute(
+                    """
+                    INSERT INTO pokemon_form_stats
+                      (form_id, generation_start, generation_end, hp, atk, def, spa, spd, spe)
+                    VALUES (?, NULL, NULL, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (form_id, stats["hp"], stats["atk"], stats["def"],
+                     stats["spa"], stats["spd"], stats["spe"]),
+                )
+
+        # 属性（直接存储汉字，不再关联 types 表）
+        # 目前属性没有世代变体，generation_start/generation_end 为 NULL
+        for slot, type_name in enumerate([form.get("primary_type"), form.get("secondary_type")], start=1):
+            normalized = normalize_type_name(type_name)
+            if normalized:
+                conn.execute(
+                    """
+                    INSERT INTO pokemon_form_types
+                      (form_id, type_name, slot, generation_start, generation_end)
+                    VALUES (?, ?, ?, NULL, NULL)
+                    """,
+                    (form_id, normalized, slot),
+                )
+
+        # 特性（目前没有世代变体，generation_start/generation_end 为 NULL）
+        slot = 1
+        for ability_name in form.get("abilities") or []:
+            ability_id = _lookup_ability_id(conn, ability_name)
+            conn.execute(
+                """
+                INSERT INTO pokemon_form_abilities
+                  (form_id, ability_id, ability_name_zh, slot, is_hidden,
+                   generation_start, generation_end)
+                VALUES (?, ?, ?, ?, 0, NULL, NULL)
+                """,
+                (form_id, ability_id, ability_name, slot),
+            )
+            slot += 1
+        hidden = form.get("hidden_ability")
+        if hidden:
+            ability_id = _lookup_ability_id(conn, hidden)
+            conn.execute(
+                """
+                INSERT INTO pokemon_form_abilities
+                  (form_id, ability_id, ability_name_zh, slot, is_hidden,
+                   generation_start, generation_end)
+                VALUES (?, ?, ?, ?, 1, NULL, NULL)
+                """,
+                (form_id, ability_id, hidden, slot),
+            )
+
+        # 图片
+        for kind, image in (form.get("images") or {}).items():
+            if image and hasattr(image, "url") and image.url:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO pokemon_form_images (form_id, image_kind, url, alt)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (form_id, kind, image.url, image.alt),
+                )
+            elif isinstance(image, dict) and image.get("url"):
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO pokemon_form_images (form_id, image_kind, url, alt)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (form_id, kind, image["url"], image.get("alt")),
+                )
+
+
+def _upsert_generation_regions(conn: sqlite3.Connection, pokemon_id: int, payload: dict) -> None:
+    """写入世代可用性。"""
+    conn.execute("DELETE FROM pokemon_generation_regions WHERE pokemon_id = ?", (pokemon_id,))
+    for record in payload.get("generation_availability") or []:
+        generation = int(record["generation"])
+        for region in record.get("regions") or []:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO pokemon_generation_regions
+                  (pokemon_id, generation, region, regional_dex_number)
+                VALUES (?, ?, ?, ?)
+                """,
+                (pokemon_id, generation, region.get("region"), region.get("dex_number")),
+            )
+        if not record.get("regions"):
+            # 即使没有地区记录，也要记录世代可用性
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO pokemon_generation_regions
+                  (pokemon_id, generation, region, regional_dex_number)
+                VALUES (?, ?, NULL, NULL)
+                """,
+                (pokemon_id, generation),
+            )
+
+
+def _lookup_ability_id(conn: sqlite3.Connection, name: str) -> int | None:
+    """查找特性 ID（不自动创建）。"""
+    if not name:
+        return None
+    row = conn.execute("SELECT id FROM abilities WHERE name_zh = ?", (name,)).fetchone()
+    return int(row["id"]) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Pokemon abilities (focused updater for pokemon-abilities command)
+# ---------------------------------------------------------------------------
 
 def upsert_pokemon_abilities(
     conn: sqlite3.Connection,
@@ -158,156 +400,151 @@ def upsert_pokemon_abilities(
     page: RawPage,
     parsed: ParsedPokemonAbilities,
 ) -> UpsertSummary:
+    """更新宝可梦的特性信息（写入默认形态的 pokemon_form_abilities）。"""
     unknown: list[str] = []
-    generation_records = build_generation_ability_records(
-        generations=available_generations(conn, pokemon.id),
-        abilities=parsed.abilities,
-        hidden_ability=parsed.hidden_ability,
-        changes=parsed.changes,
-    )
 
     with conn:
         conn.execute(
             """
             UPDATE pokemon
-            SET hidden_ability = ?, source_url = ?, source_title = ?, source_fetched_at = ?
+            SET source_url = ?, source_title = ?, source_fetched_at = ?
             WHERE id = ?
             """,
-            (parsed.hidden_ability, page.url, page.title, page.fetched_at, pokemon.id),
+            (page.url, page.title, page.fetched_at, pokemon.id),
         )
-        conn.execute("DELETE FROM pokemon_abilities WHERE pokemon_id = ?", (pokemon.id,))
-        conn.execute("DELETE FROM pokemon_generation_abilities WHERE pokemon_id = ?", (pokemon.id,))
 
+        # 找到默认形态
+        default_form = conn.execute(
+            "SELECT id FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 LIMIT 1",
+            (pokemon.id,),
+        ).fetchone()
+
+        if not default_form:
+            # 如果没有默认形态，创建一个
+            result = conn.execute(
+                """
+                INSERT INTO pokemon_forms (pokemon_id, form_key, name_zh, form_type, is_default, sort_order)
+                VALUES (?, 'default', ?, 'default', 1, 0)
+                """,
+                (pokemon.id, pokemon.name_zh),
+            )
+            form_id = int(result.lastrowid)
+        else:
+            form_id = int(default_form["id"])
+
+        # 清除旧特性
+        conn.execute("DELETE FROM pokemon_form_abilities WHERE form_id = ?", (form_id,))
+
+        # 写入新特性
         for slot, ability in enumerate(parsed.abilities, start=1):
-            ability_id = ensure_ability(conn, ability)
+            ability_id = _lookup_ability_id(conn, ability)
             if ability_id is None:
                 unknown.append(ability)
-            insert_ability_reference(conn, pokemon.id, ability_id, ability, slot, False)
+            conn.execute(
+                """
+                INSERT INTO pokemon_form_abilities (form_id, ability_id, ability_name_zh, slot, is_hidden)
+                VALUES (?, ?, ?, ?, 0)
+                """,
+                (form_id, ability_id, ability, slot),
+            )
 
         if parsed.hidden_ability:
-            ability_id = ensure_ability(conn, parsed.hidden_ability)
+            ability_id = _lookup_ability_id(conn, parsed.hidden_ability)
             if ability_id is None:
                 unknown.append(parsed.hidden_ability)
-            insert_ability_reference(conn, pokemon.id, ability_id, parsed.hidden_ability, 99, True)
-
-        for generation, record in generation_records.items():
-            generation_id = ensure_generation_record(conn, pokemon.id, generation)
-            for slot, ability in enumerate(record["abilities"], start=1):
-                ability_id = ensure_ability(conn, ability)
-                if ability_id is None:
-                    unknown.append(ability)
-                insert_generation_ability_reference(
-                    conn, pokemon.id, generation_id, ability_id, ability, slot, False
-                )
-            hidden = record.get("hidden")
-            if hidden:
-                ability_id = ensure_ability(conn, hidden)
-                if ability_id is None:
-                    unknown.append(hidden)
-                insert_generation_ability_reference(
-                    conn, pokemon.id, generation_id, ability_id, hidden, 99, True
-                )
+            conn.execute(
+                """
+                INSERT INTO pokemon_form_abilities (form_id, ability_id, ability_name_zh, slot, is_hidden)
+                VALUES (?, ?, ?, ?, 1)
+                """,
+                (form_id, ability_id, parsed.hidden_ability, len(parsed.abilities) + 1),
+            )
 
     return UpsertSummary(
         pokemon=pokemon,
         abilities=parsed.abilities,
         hidden_ability=parsed.hidden_ability,
-        generation_count=len(generation_records),
+        form_count=1,
         unknown_abilities=sorted(set(unknown)),
     )
 
 
-def available_generations(conn: sqlite3.Connection, pokemon_id: int) -> list[int]:
-    rows = conn.execute(
-        """
-        SELECT DISTINCT g.number
-        FROM pokemon_generation_records pgr
-        JOIN generations g ON g.id = pgr.generation_id
-        WHERE pgr.pokemon_id = ?
-        UNION
-        SELECT DISTINCT g.number
-        FROM pokemon_generation_regions pgr
-        JOIN generations g ON g.id = pgr.generation_id
-        WHERE pgr.pokemon_id = ?
-        ORDER BY number ASC
-        """,
-        (pokemon_id, pokemon_id),
-    ).fetchall()
-    generations = [int(row["number"]) for row in rows]
-    return generations or list(range(1, 10))
+# ---------------------------------------------------------------------------
+# Learnset upsert (new pokemon_learnsets table)
+# ---------------------------------------------------------------------------
 
-
-def build_generation_ability_records(
-    generations: list[int],
-    abilities: list[str],
-    hidden_ability: str | None,
-    changes,
-) -> dict[int, dict[str, object]]:
-    records: dict[int, dict[str, object]] = {}
-    for generation in sorted(set(generations)):
-        if generation < 3:
-            continue
-        change = next(
-            (
-                item
-                for item in changes
-                if generation >= 3 and generation < item.before_generation
-            ),
-            None,
+def upsert_pokemon_learnset(
+    conn: sqlite3.Connection,
+    pokemon_id: int,
+    generation: int,
+    parsed: dict,
+    form_key: str = "default",
+) -> int:
+    """写入宝可梦招式学习列表到 pokemon_learnsets 表。"""
+    with conn:
+        # 清除该宝可梦在该世代 + 形态的旧招式
+        conn.execute(
+            "DELETE FROM pokemon_learnsets WHERE pokemon_id = ? AND generation = ? AND form_key = ?",
+            (pokemon_id, generation, form_key),
         )
-        generation_abilities = [change.ability] if change else abilities
-        generation_hidden = hidden_ability if generation >= 5 and not change else None
-        if generation_abilities or generation_hidden:
-            records[generation] = {
-                "abilities": generation_abilities,
-                "hidden": generation_hidden,
-            }
-    return records
+        # 确保所有招式存在
+        for move in parsed.get("moves") or []:
+            ensure_move(conn, move["name_zh"])
+        # 写入招式学习记录
+        for sort_order, record in enumerate(parsed.get("learnset") or [], start=1):
+            move_id = _lookup_move_id(conn, record["move_name_zh"])
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO pokemon_learnsets
+                  (pokemon_id, form_key, move_id, move_name_zh, generation,
+                   game_version_code, learn_method, level, tm_number, sort_order, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    pokemon_id,
+                    form_key,
+                    move_id,
+                    record["move_name_zh"],
+                    generation,
+                    record.get("game_version_code"),
+                    record.get("learn_method"),
+                    record.get("level"),
+                    record.get("tm_number"),
+                    sort_order,
+                    record.get("notes"),
+                ),
+            )
+    return len(parsed.get("learnset") or [])
 
+
+def _lookup_move_id(conn: sqlite3.Connection, name: str) -> int | None:
+    """查找招式 ID。"""
+    if not name:
+        return None
+    row = conn.execute("SELECT id FROM moves WHERE name_zh = ?", (name,)).fetchone()
+    return int(row["id"]) if row else None
+
+
+# ---------------------------------------------------------------------------
+# Catalog upsert (moves, abilities, items) — 保持不变
+# ---------------------------------------------------------------------------
 
 def ensure_ability(conn: sqlite3.Connection, name: str) -> int | None:
     if not name:
         return None
-    row = conn.execute(
-        "SELECT id FROM abilities WHERE name_zh = ?",
-        (name,),
-    ).fetchone()
+    row = conn.execute("SELECT id FROM abilities WHERE name_zh = ?", (name,)).fetchone()
     if row:
         return int(row["id"])
-    result = conn.execute(
-        "INSERT INTO abilities (name_zh) VALUES (?)",
-        (name,),
-    )
+    result = conn.execute("INSERT INTO abilities (name_zh) VALUES (?)", (name,))
     return int(result.lastrowid)
 
 
-def ensure_type(conn: sqlite3.Connection, name: str | None) -> int | None:
-    normalized = normalize_type_name(name)
-    if not normalized:
-        return None
-    row = conn.execute("SELECT id FROM types WHERE name_zh = ?", (normalized,)).fetchone()
-    if row:
-        return int(row["id"])
-    result = conn.execute(
-        """
-        INSERT INTO types (legacy_id, name_zh)
-        VALUES (?, ?)
-        ON CONFLICT(legacy_id) DO UPDATE SET name_zh = excluded.name_zh
-        """,
-        (f"type-{normalized}", normalized),
-    )
-    return int(result.lastrowid)
+def ensure_type(conn: sqlite3.Connection, name: str | None) -> str | None:
+    """标准化属性名称。types 表已废弃，直接返回标准化后的汉字。"""
+    return normalize_type_name(name)
 
 
-def ensure_generation(conn: sqlite3.Connection, generation: int) -> int:
-    row = conn.execute("SELECT id FROM generations WHERE number = ?", (generation,)).fetchone()
-    if row:
-        return int(row["id"])
-    result = conn.execute(
-        "INSERT INTO generations (number, name_zh, name_en) VALUES (?, ?, ?)",
-        (generation, f"第{generation}世代", f"Generation {generation}"),
-    )
-    return int(result.lastrowid)
+# ensure_generation 已废弃 — generations 表不再使用，世代直接存储为整数
 
 
 def ensure_move(conn: sqlite3.Connection, name: str, payload: dict | None = None) -> int:
@@ -316,24 +553,18 @@ def ensure_move(conn: sqlite3.Connection, name: str, payload: dict | None = None
     row = conn.execute("SELECT id FROM moves WHERE name_zh = ?", (name,)).fetchone()
     if row:
         return int(row["id"])
-    result = conn.execute(
-        "INSERT INTO moves (name_zh) VALUES (?)",
-        (name,),
-    )
+    result = conn.execute("INSERT INTO moves (name_zh) VALUES (?)", (name,))
     return int(result.lastrowid)
 
 
 def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
     introduced_gen = payload.get("introduced_generation")
-    introduced_gen_id = ensure_generation(conn, introduced_gen) if introduced_gen else None
     with conn:
-        # 按 number + name_zh 联合唯一键查找
         row = conn.execute(
             "SELECT id FROM moves WHERE number = ? AND name_zh = ?",
             (payload.get("number"), payload["name_zh"]),
         ).fetchone()
         if not row:
-            # 回退：仅按 name_zh 查找（兼容旧数据）
             row = conn.execute("SELECT id FROM moves WHERE name_zh = ?", (payload["name_zh"],)).fetchone()
         if row:
             move_id = int(row["id"])
@@ -342,7 +573,7 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
                 UPDATE moves
                 SET number = COALESCE(?, number),
                     name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
-                    type_id = COALESCE(?, type_id), category = COALESCE(?, category),
+                    type_name = COALESCE(?, type_name), category = COALESCE(?, category),
                     power = COALESCE(?, power), accuracy = COALESCE(?, accuracy), pp = COALESCE(?, pp),
                     description = COALESCE(?, description), effect_detail = COALESCE(?, effect_detail),
                     introduced_generation = COALESCE(?, introduced_generation),
@@ -361,7 +592,7 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     payload.get("pp"),
                     payload.get("description"),
                     payload.get("effect_detail"),
-                    introduced_gen_id,
+                    introduced_gen,
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
@@ -372,7 +603,7 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
             result = conn.execute(
                 """
                 INSERT INTO moves
-                  (number, name_zh, name_ja, name_en, type_id, category, power, accuracy, pp,
+                  (number, name_zh, name_ja, name_en, type_name, category, power, accuracy, pp,
                    description, effect_detail, introduced_generation,
                    source_url, source_title, source_fetched_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -389,7 +620,7 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     payload.get("pp"),
                     payload.get("description"),
                     payload.get("effect_detail"),
-                    introduced_gen_id,
+                    introduced_gen,
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
@@ -400,29 +631,27 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
         for record in payload.get("generations") or []:
             conn.execute(
                 """
-                INSERT INTO move_generation_records (move_id, generation_id, game_version_code, description, notes)
+                INSERT INTO move_generation_records (move_id, generation, game_version_code, description, notes)
                 VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(move_id, generation_id, game_version_code) DO UPDATE SET
+                ON CONFLICT(move_id, generation, game_version_code) DO UPDATE SET
                   description = excluded.description,
                   notes = excluded.notes
                 """,
                 (
                     move_id,
-                    ensure_generation(conn, int(record["generation"])),
+                    int(record["generation"]),
                     record.get("game_version_code") or "",
                     record.get("description") or "",
                     record.get("notes"),
                 ),
             )
-        upsert_image(conn, "move", move_id, "primary", payload.get("image"))
+        
     return move_id
 
 
 def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
     introduced_gen = payload.get("introduced_generation")
-    introduced_gen_id = ensure_generation(conn, introduced_gen) if introduced_gen else None
     with conn:
-        # 按 number + name_zh 联合唯一键查找
         row = conn.execute(
             "SELECT id FROM abilities WHERE number = ? AND name_zh = ?",
             (payload.get("number"), payload["name_zh"]),
@@ -444,7 +673,7 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     payload.get("name_en"),
                     payload.get("description"),
                     payload.get("effect_detail"),
-                    introduced_gen_id,
+                    introduced_gen,
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
@@ -466,7 +695,7 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     payload.get("name_en"),
                     payload.get("description"),
                     payload.get("effect_detail"),
-                    introduced_gen_id,
+                    introduced_gen,
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
@@ -477,16 +706,16 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
         for record in payload.get("generations") or []:
             conn.execute(
                 """
-                INSERT INTO ability_generation_records (ability_id, generation_id, game_version_code, description, notes)
+                INSERT INTO ability_generation_records (ability_id, generation, game_version_code, description, notes)
                 VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(ability_id, generation_id) DO UPDATE SET
+                ON CONFLICT(ability_id, generation) DO UPDATE SET
                   game_version_code = excluded.game_version_code,
                   description = excluded.description,
                   notes = excluded.notes
                 """,
                 (
                     ability_id,
-                    ensure_generation(conn, int(record["generation"])),
+                    int(record["generation"]),
                     record.get("game_version_code"),
                     record.get("description") or "",
                     record.get("notes"),
@@ -544,234 +773,13 @@ def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
                 ),
             )
             item_id = int(result.lastrowid)
-        upsert_image(conn, "item", item_id, "primary", payload.get("image"))
+        
     return item_id
 
 
-def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
-    legacy_id = payload["legacy_id"]
-    with conn:
-        row = conn.execute("SELECT id FROM pokemon WHERE legacy_id = ? OR dex_number = ?", (legacy_id, payload["dex_number"])).fetchone()
-        if row:
-            pokemon_id = int(row["id"])
-            introduced_gen = min(payload.get("generations") or [0]) or None
-            conn.execute(
-                """
-                UPDATE pokemon
-                SET slug = ?, name_zh = ?, name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
-                    category = COALESCE(?, category), hidden_ability = COALESCE(?, hidden_ability),
-                    height_m = COALESCE(?, height_m), weight_kg = COALESCE(?, weight_kg),
-                    color = COALESCE(?, color), catch_rate = COALESCE(?, catch_rate),
-                    male_ratio = COALESCE(?, male_ratio), female_ratio = COALESCE(?, female_ratio),
-                    introduced_generation = COALESCE(?, introduced_generation),
-                    source_url = COALESCE(?, source_url), source_title = COALESCE(?, source_title),
-                    source_fetched_at = COALESCE(?, source_fetched_at)
-                WHERE id = ?
-                """,
-                (
-                    payload["slug"],
-                    payload["name_zh"],
-                    payload.get("name_ja"),
-                    payload.get("name_en"),
-                    payload.get("category"),
-                    payload.get("hidden_ability"),
-                    payload.get("height_m"),
-                    payload.get("weight_kg"),
-                    payload.get("color"),
-                    payload.get("catch_rate"),
-                    (payload.get("gender_ratio") or {}).get("male"),
-                    (payload.get("gender_ratio") or {}).get("female"),
-                    introduced_gen,
-                    _source_attr(payload.get("source"), "url"),
-                    _source_attr(payload.get("source"), "title"),
-                    _source_attr(payload.get("source"), "fetched_at"),
-                    pokemon_id,
-                ),
-            )
-        else:
-            introduced_gen = min(payload.get("generations") or [0]) or None
-            result = conn.execute(
-                """
-                INSERT INTO pokemon
-                  (legacy_id, dex_number, slug, name_zh, name_ja, name_en, category, hidden_ability,
-                   height_m, weight_kg, color, catch_rate, male_ratio, female_ratio, genderless,
-                   introduced_generation, source_url, source_title, source_fetched_at, parse_note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, NULL)
-                """,
-                (
-                    legacy_id,
-                    payload["dex_number"],
-                    payload["slug"],
-                    payload["name_zh"],
-                    payload.get("name_ja"),
-                    payload.get("name_en"),
-                    payload.get("category"),
-                    payload.get("hidden_ability"),
-                    payload.get("height_m"),
-                    payload.get("weight_kg"),
-                    payload.get("color"),
-                    payload.get("catch_rate"),
-                    (payload.get("gender_ratio") or {}).get("male"),
-                    (payload.get("gender_ratio") or {}).get("female"),
-                    introduced_gen,
-                    _source_attr(payload.get("source"), "url"),
-                    _source_attr(payload.get("source"), "title"),
-                    _source_attr(payload.get("source"), "fetched_at"),
-                ),
-            )
-            pokemon_id = int(result.lastrowid)
-        upsert_pokemon_core_relations(conn, pokemon_id, payload)
-    return pokemon_id
-
-
-def upsert_pokemon_core_relations(conn: sqlite3.Connection, pokemon_id: int, payload: dict) -> None:
-    conn.execute("DELETE FROM pokemon_types WHERE pokemon_id = ?", (pokemon_id,))
-    for slot, type_name in enumerate([payload.get("primary_type"), payload.get("secondary_type")], start=1):
-        type_id = ensure_type(conn, type_name)
-        if type_id:
-            conn.execute(
-                "INSERT OR IGNORE INTO pokemon_types (pokemon_id, type_id, slot) VALUES (?, ?, ?)",
-                (pokemon_id, type_id, slot),
-            )
-
-    stats = payload.get("base_stats")
-    if stats:
-        conn.execute(
-            """
-            INSERT INTO pokemon_base_stats (pokemon_id, hp, atk, def, spa, spd, spe)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(pokemon_id) DO UPDATE SET
-              hp = excluded.hp, atk = excluded.atk, def = excluded.def,
-              spa = excluded.spa, spd = excluded.spd, spe = excluded.spe
-            """,
-            (pokemon_id, stats["hp"], stats["atk"], stats["def"], stats["spa"], stats["spd"], stats["spe"]),
-        )
-
-    for kind, image in (payload.get("images") or {}).items():
-        upsert_image(conn, "pokemon", pokemon_id, kind, image)
-
-    upsert_pokemon_forms(conn, pokemon_id, payload)
-
-    conn.execute("DELETE FROM pokemon_generation_regions WHERE pokemon_id = ?", (pokemon_id,))
-    for record in payload.get("generation_availability") or []:
-        generation_id = ensure_generation_record(conn, pokemon_id, int(record["generation"]))
-        for region in record.get("regions") or []:
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO pokemon_generation_regions (pokemon_id, generation_id, region, dex_number)
-                VALUES (?, ?, ?, ?)
-                """,
-                (pokemon_id, generation_id, region.get("region"), region.get("dex_number")),
-            )
-
-    parsed = ParsedPokemonAbilities(
-        abilities=payload.get("abilities") or [],
-        hidden_ability=payload.get("hidden_ability"),
-        changes=payload.get("ability_changes") or [],
-    )
-    # Reuse the focused ability updater so slot and generation semantics stay in one place.
-    row = conn.execute(
-        "SELECT id, legacy_id, dex_number, name_zh, source_url FROM pokemon WHERE id = ?",
-        (pokemon_id,),
-    ).fetchone()
-    if row:
-        upsert_pokemon_abilities(
-            conn,
-            PokemonRow(int(row["id"]), str(row["legacy_id"]), int(row["dex_number"]), str(row["name_zh"]), row["source_url"]),
-            payload["source"],
-            parsed,
-        )
-
-
-def upsert_pokemon_forms(conn: sqlite3.Connection, pokemon_id: int, payload: dict) -> None:
-    conn.execute("DELETE FROM pokemon_forms WHERE pokemon_id = ?", (pokemon_id,))
-    form_images = payload.get("form_images") or {}
-    for sort_order, form in enumerate(payload.get("forms") or [], start=1):
-        result = conn.execute(
-            """
-            INSERT INTO pokemon_forms
-              (legacy_id, pokemon_id, name_zh, introduced_generation, is_mega, notes, sort_order)
-            VALUES (?, ?, ?, NULL, ?, NULL, ?)
-            """,
-            (
-                form.get("legacy_id") or f"{payload['slug']}-{slugify(form['name_zh'])}",
-                pokemon_id,
-                form["name_zh"],
-                1 if "超级" in form["name_zh"] else 0,
-                sort_order,
-            ),
-        )
-        form_id = int(result.lastrowid)
-        for kind, image in (form_images.get(form["name_zh"]) or {}).items():
-            upsert_image(conn, "pokemon", pokemon_id, kind, image, form_id=form_id)
-
-
-def upsert_pokemon_learnset(conn: sqlite3.Connection, pokemon_id: int, generation: int, parsed: dict) -> int:
-    with conn:
-        generation_id = ensure_generation_record(conn, pokemon_id, generation)
-        conn.execute(
-            "DELETE FROM pokemon_moves WHERE pokemon_id = ? AND generation_id = ?",
-            (pokemon_id, generation_id),
-        )
-        for move in parsed.get("moves") or []:
-            ensure_move(conn, move["name_zh"])
-        for sort_order, record in enumerate(parsed.get("learnset") or [], start=1):
-            move_id = ensure_move(conn, record["move_name_zh"])
-            conn.execute(
-                """
-                INSERT INTO pokemon_moves
-                  (pokemon_id, move_id, move_key, generation_id, game_version_code, move_name_zh, learn_method, level, notes, sort_order)
-                VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
-                """,
-                (
-                    pokemon_id,
-                    move_id,
-                    record["move_key"],
-                    generation_id,
-                    record["move_name_zh"],
-                    record.get("learn_method"),
-                    record.get("level"),
-                    record.get("notes"),
-                    sort_order,
-                ),
-            )
-    return len(parsed.get("learnset") or [])
-
-
-def upsert_image(
-    conn: sqlite3.Connection,
-    entity_type: str,
-    entity_id: int,
-    image_kind: str,
-    image: ImageAsset | None,
-    form_id: int | None = None,
-) -> None:
-    if not image or not image.url:
-        return
-    if form_id is None:
-        conn.execute(
-            """
-            DELETE FROM image_assets
-            WHERE entity_type = ? AND entity_id = ? AND form_id IS NULL AND image_kind = ?
-            """,
-            (entity_type, entity_id, image_kind),
-        )
-    else:
-        conn.execute(
-            """
-            DELETE FROM image_assets
-            WHERE entity_type = ? AND entity_id = ? AND form_id = ? AND image_kind = ?
-            """,
-            (entity_type, entity_id, form_id, image_kind),
-        )
-    conn.execute(
-        """
-        INSERT INTO image_assets (entity_type, entity_id, form_id, image_kind, url, alt, source_url)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (entity_type, entity_id, form_id, image_kind, image.url, image.alt, image.source_url),
-    )
-
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _source_attr(source, attr: str):
     if not source:
@@ -779,52 +787,3 @@ def _source_attr(source, attr: str):
     if attr == "fetched_at":
         return getattr(source, "fetched_at", None)
     return getattr(source, attr, None)
-
-
-def ensure_generation_record(conn: sqlite3.Connection, pokemon_id: int, generation: int) -> int:
-    generation_id = ensure_generation(conn, generation)
-    conn.execute(
-        """
-        INSERT INTO pokemon_generation_records (pokemon_id, generation_id, label, notes)
-        VALUES (?, ?, NULL, NULL)
-        ON CONFLICT(pokemon_id, generation_id) DO NOTHING
-        """,
-        (pokemon_id, generation_id),
-    )
-    return generation_id
-
-
-def insert_ability_reference(
-    conn: sqlite3.Connection,
-    pokemon_id: int,
-    ability_id: int | None,
-    ability_key: str,
-    slot: int,
-    hidden: bool,
-) -> None:
-    conn.execute(
-        """
-        INSERT INTO pokemon_abilities (pokemon_id, ability_id, ability_key, slot, is_hidden)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (pokemon_id, ability_id, ability_key, slot, 1 if hidden else 0),
-    )
-
-
-def insert_generation_ability_reference(
-    conn: sqlite3.Connection,
-    pokemon_id: int,
-    generation_id: int,
-    ability_id: int | None,
-    ability_key: str,
-    slot: int,
-    hidden: bool,
-) -> None:
-    conn.execute(
-        """
-        INSERT INTO pokemon_generation_abilities
-          (pokemon_id, generation_id, ability_id, ability_key, slot, is_hidden)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (pokemon_id, generation_id, ability_id, ability_key, slot, 1 if hidden else 0),
-    )

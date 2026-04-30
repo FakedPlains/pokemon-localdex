@@ -107,13 +107,9 @@ export function resolveMoveGenerationRecord(move, generation) {
 }
 
 export function resolvePokemonGenerationRecord(pokemon, generation) {
-  const target = Number(generation || 9);
-  const records = [...(pokemon?.generationRecords || [])].sort((a, b) => a.generation - b.generation);
-  if (records.length === 0) return undefined;
-  const exact = records.find((r) => r.generation === target);
-  if (exact) return exact;
-  const previous = [...records].reverse().find((r) => r.generation <= target);
-  return previous || records[records.length - 1];
+  // Legacy: generationRecords no longer exist in form-centric API.
+  // Return undefined — callers should use forms[] instead.
+  return undefined;
 }
 
 export function getPokemonLearnsetEntries(pokemon, generation) {
@@ -192,30 +188,75 @@ export function buildEvolutionFamilies(pokemonList) {
 export function buildPokemonGenerationOptions(detail) {
   const values = new Set();
   for (const g of detail.generations || []) values.add(Number(g));
-  for (const g of detail.generationAvailability || []) values.add(Number(g.generation));
-  for (const r of detail.generationRecords || []) values.add(Number(r.generation));
   return [...values].filter(Boolean).sort((a, b) => a - b);
 }
 
-export function buildPokemonFormOptions(detail) {
-  const forms = (detail.forms || []).filter((form) =>
-    form?.nameZh &&
-    form.nameZh !== detail.nameZh &&
-    (form.baseStats || form.images || form.primaryType || form.secondaryType || form.abilityIds?.length || form.isMega)
-  );
+/**
+ * 根据世代从 variants 数组中选择匹配的变体。
+ * variants 中每个元素有 generationStart/generationEnd 字段。
+ * 返回匹配的变体，如果没有匹配则返回 undefined。
+ */
+function _resolveVariantForGeneration(variants, gen) {
+  if (!variants || variants.length === 0) return undefined;
+  if (!gen) return variants.find((v) => !v.generationEnd) || variants[variants.length - 1];
+  const matched = variants.find((v) => {
+    const gs = v.generationStart;
+    const ge = v.generationEnd;
+    if (gs && ge) return gen >= gs && gen <= ge;
+    if (gs) return gen >= gs;
+    if (ge) return gen <= ge;
+    return true;
+  });
+  return matched || variants.find((v) => !v.generationEnd) || variants[variants.length - 1];
+}
 
-  return [
-    {
-      id: "base",
-      nameZh: "普通形态",
-      images: detail.images,
-      baseStats: detail.baseStats,
+export function buildPokemonFormOptions(detail, generation) {
+  const forms = detail.forms || [];
+  if (forms.length === 0) {
+    // Fallback: synthesize a single "default" form from top-level fields
+    return [{
+      id: "default",
+      formKey: "default",
+      nameZh: detail.nameZh || "普通形态",
+      formType: "default",
+      isDefault: true,
       primaryType: detail.primaryType,
       secondaryType: detail.secondaryType,
-      abilityIds: detail.abilityIds
-    },
-    ...forms
-  ];
+      abilities: (detail.abilities || []).map((a) => ({ nameZh: a, isHidden: false })),
+      baseStats: detail.baseStats,
+      images: detail.images ? { official: detail.image } : undefined
+    }];
+  }
+
+  const gen = Number(generation || 0);
+
+  // 每个形态只有一条记录，直接映射
+  return forms.map((form) => {
+    const resolved = { ...form, id: form.formKey || form.nameZh };
+
+    // 如果有世代种族值变体，根据当前世代选择
+    if (form.statVariants && form.statVariants.length > 0) {
+      const sv = _resolveVariantForGeneration(form.statVariants, gen);
+      if (sv) resolved.baseStats = sv.baseStats;
+    }
+
+    // 如果有世代属性变体，根据当前世代选择
+    if (form.typeVariants && form.typeVariants.length > 0) {
+      const tv = _resolveVariantForGeneration(form.typeVariants, gen);
+      if (tv) {
+        resolved.primaryType = tv.primaryType;
+        resolved.secondaryType = tv.secondaryType;
+      }
+    }
+
+    // 如果有世代特性变体，根据当前世代选择
+    if (form.abilityVariants && form.abilityVariants.length > 0) {
+      const av = _resolveVariantForGeneration(form.abilityVariants, gen);
+      if (av) resolved.abilities = av.abilities;
+    }
+
+    return resolved;
+  });
 }
 
 export function resolvePokemonDisplayVariant(detail, detailGeneration, detailForm, globalGeneration) {
@@ -228,34 +269,42 @@ export function resolvePokemonDisplayVariant(detail, detailGeneration, detailFor
     generation = (requested && genOptions.includes(requested)) ? requested : genOptions[genOptions.length - 1];
   }
 
-  const records = [...(detail.generationRecords || [])].sort((a, b) => a.generation - b.generation);
-  const generationRecord = generation && records.length > 0
-    ? (records.find((r) => r.generation === generation) || [...records].reverse().find((r) => r.generation <= generation) || records[records.length - 1])
-    : undefined;
-
-  const formOptions = buildPokemonFormOptions(detail);
+  const formOptions = buildPokemonFormOptions(detail, generation);
   const selectedForm = formOptions.find((f) => f.id === detailForm) || formOptions[0];
-  const stats = selectedForm.baseStats || generationRecord?.baseStats || detail.baseStats || {};
-  const primaryType = selectedForm.primaryType || generationRecord?.primaryType || detail.primaryType;
-  const secondaryType = selectedForm.secondaryType || generationRecord?.secondaryType || detail.secondaryType;
-  const abilityText = selectedForm.abilityIds?.length
-    ? selectedForm.abilityIds.join(" / ")
-    : generationRecord?.abilityIds?.length
-      ? generationRecord.abilityIds.join(" / ")
-      : (detail.abilities || []).join(" / ");
+
+  const stats = selectedForm.baseStats || detail.baseStats || {};
+  const primaryType = selectedForm.primaryType || detail.primaryType;
+  const secondaryType = selectedForm.secondaryType || detail.secondaryType;
+
+  // Build ability text from form's abilities array [{nameZh, isHidden}]
+  const formAbilities = selectedForm.abilities || [];
+  const hasOwnAbilities = formAbilities.length > 0;
+  const normalAbilities = formAbilities.filter((a) => !a.isHidden).map((a) => a.nameZh);
+  const hiddenAbilities = formAbilities.filter((a) => a.isHidden).map((a) => a.nameZh);
+  const abilityText = normalAbilities.length > 0
+    ? normalAbilities.join(" / ")
+    : (detail.abilities || []).join(" / ");
+  // Only fallback to top-level hiddenAbility when the form has no own abilities data.
+  // Mega / Gmax forms define their own abilities array; if it contains no hidden entry
+  // that means the form genuinely has no hidden ability — don't inherit the base form's.
+  const hiddenAbilityText = hasOwnAbilities
+    ? (hiddenAbilities.length > 0 ? hiddenAbilities.join(" / ") : "无")
+    : (detail.hiddenAbility || "无");
+
+  // Resolve images: form images → top-level image fallback
+  const images = selectedForm.images || (detail.image ? { official: detail.image } : undefined);
 
   return {
     generation,
-    generationRecord,
     form: selectedForm,
     formOptions,
     generationOptions: genOptions,
     stats,
-    images: selectedForm.images || detail.images,
+    images,
     primaryType,
     secondaryType,
     abilityText,
-    hiddenAbilityText: generationRecord?.hiddenAbilityId || detail.hiddenAbility || "无"
+    hiddenAbilityText
   };
 }
 

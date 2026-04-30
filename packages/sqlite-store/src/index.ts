@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-// ── Type definitions (previously from data-model) ──
+// ── Type definitions ──
 
 export type StatBlock = {
   hp: number;
@@ -22,128 +22,86 @@ export type SourceMeta = {
 export type ImageAsset = {
   url: string;
   alt?: string;
-  sourceUrl?: string;
 };
 
-export type PokemonImageSet = {
-  official?: ImageAsset;
-  shinyOfficial?: ImageAsset;
-  sprite?: ImageAsset;
-  shinySprite?: ImageAsset;
+export type FormStatVariant = {
+  generationStart?: number;
+  generationEnd?: number;
+  baseStats: StatBlock;
 };
 
-export type PokemonEvolutionMember = {
-  id: string;
-  legacyId?: string;
-  dexNumber: number;
-  slug: string;
-  nameZh: string;
-  nameEn?: string;
+export type FormTypeVariant = {
+  generationStart?: number;
+  generationEnd?: number;
   primaryType?: string;
   secondaryType?: string;
-  stageLabel?: string;
-  image?: ImageAsset;
+};
+
+export type FormAbilityVariant = {
+  generationStart?: number;
+  generationEnd?: number;
+  abilities: Array<{ nameZh: string; isHidden: boolean }>;
+};
+
+export type PokemonFormEntry = {
+  formKey: string;
+  nameZh: string;
+  formType: string;
+  isDefault: boolean;
+  sortOrder: number;
+  primaryType?: string;
+  secondaryType?: string;
+  abilities: Array<{ nameZh: string; isHidden: boolean }>;
+  baseStats?: StatBlock;
+  images: Record<string, ImageAsset>;
+  /** Generation-specific stat variants (when stats changed across generations) */
+  statVariants?: FormStatVariant[];
+  /** Generation-specific type variants (when types changed across generations) */
+  typeVariants?: FormTypeVariant[];
+  /** Generation-specific ability variants (when abilities changed across generations) */
+  abilityVariants?: FormAbilityVariant[];
+};
+
+export type EvolutionStep = {
+  fromPokemonId?: number;
+  fromNameZh?: string;
+  fromFormKey?: string;
+  toPokemonId: number;
+  toNameZh: string;
+  toFormKey?: string;
+  stage: number;
+  method?: string;
+  condition?: string;
+  item?: string;
+  level?: number;
+  toTypes?: string[];
+  toImage?: ImageAsset;
 };
 
 export type PokemonSummary = {
-  id: string;
-  legacyId?: string;
+  id: number;
   dexNumber: number;
   slug: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
-  generations: number[];
   primaryType?: string;
   secondaryType?: string;
-};
-
-export type ItemEntry = {
-  id: string;
-  legacyId?: string;
-  slug: string;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  category?: string;
-  effectSummary?: string;
+  abilities: string[];
+  hiddenAbility?: string;
+  baseStats?: StatBlock;
   image?: ImageAsset;
-  source?: SourceMeta;
-};
-
-export type GenderRatio = {
-  male?: string;
-  female?: string;
-  genderless?: boolean;
-};
-
-export type PokemonForm = {
-  id: string;
-  legacyId?: string;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  primaryType?: string;
-  secondaryType?: string;
-  abilityIds?: string[];
-  baseStats?: StatBlock;
-  introducedGeneration?: number;
-  isMega?: boolean;
-  notes?: string;
-  images?: PokemonImageSet;
-};
-
-export type RegionalDexRecord = {
-  region: string;
-  dexNumber?: string;
-};
-
-export type GenerationAvailability = {
-  generation: number;
-  regions?: RegionalDexRecord[];
-};
-
-export type PokemonLearnsetRecord = {
-  moveId: string;
-  moveNameZh?: string;
-  learnMethod?: "level-up" | "tm" | "hm" | "egg" | "tutor" | "event" | "evolution" | "other";
-  level?: number;
-  notes?: string;
-};
-
-export type PokemonGenerationRecord = {
-  generation: number;
-  label?: string;
-  primaryType?: string;
-  secondaryType?: string;
-  abilityIds?: string[];
-  hiddenAbilityId?: string;
-  baseStats?: StatBlock;
-  moveIds?: string[];
-  learnset?: PokemonLearnsetRecord[];
-  notes?: string;
+  shinyImage?: ImageAsset;
+  generations: number[];
 };
 
 export type PokemonEntry = PokemonSummary & {
   category?: string;
-  abilities?: string[];
-  hiddenAbility?: string;
-  abilityIds?: string[];
-  hiddenAbilityId?: string;
-  moveIds?: string[];
-  evolutionChain?: PokemonEvolutionMember[];
   heightM?: number;
   weightKg?: number;
-  color?: string;
-  catchRate?: number;
-  genderRatio?: GenderRatio;
-  baseStats?: StatBlock;
-  images?: PokemonImageSet;
-  forms?: PokemonForm[];
-  generationAvailability?: GenerationAvailability[];
-  generationRecords?: PokemonGenerationRecord[];
+  forms: PokemonFormEntry[];
+  evolutionChain: EvolutionStep[];
   source?: SourceMeta;
-  parseNote?: string;
 };
 
 export type MoveGenerationRecord = {
@@ -173,7 +131,6 @@ export type MoveEntry = {
   description?: string;
   effectDetail?: string;
   introducedGeneration?: number;
-  image?: ImageAsset;
   generations: MoveGenerationRecord[];
   source?: SourceMeta;
 };
@@ -195,20 +152,44 @@ export type AbilityEntry = {
   description?: string;
   effectDetail?: string;
   introducedGeneration?: number;
-  image?: ImageAsset;
   generations: AbilityGenerationRecord[];
   source?: SourceMeta;
 };
 
+export type ItemEntry = {
+  id: string;
+  slug: string;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  category?: string;
+  effectSummary?: string;
+  source?: SourceMeta;
+};
+
+export type LearnsetRecord = {
+  moveId?: number;
+  moveNameZh: string;
+  learnMethod: string;
+  level?: number;
+  tmNumber?: string;
+  moveType?: string;
+  moveCategory?: string;
+  movePower?: number;
+  moveAccuracy?: number;
+  movePP?: number;
+};
+
 export type TeamMember = {
   slot: number;
-  pokemonId: string;
+  pokemonId: number;
+  formKey: string;
   nameZh?: string;
   level: number;
-  itemId?: string;
-  abilityId?: string;
+  itemId?: number;
+  abilityId?: number;
   nature?: string;
-  moves: string[];
+  moves: (number | null)[];
   ivs: Partial<StatBlock>;
   evs: Partial<StatBlock>;
 };
@@ -222,7 +203,10 @@ export type BattleTeam = {
   updatedAt: string;
 };
 
+// ── Constants ──
+
 const ROOT = resolve(import.meta.dirname, "../../../");
+
 const GENERATIONS = [
   [1, "第一世代", "Generation I"],
   [2, "第二世代", "Generation II"],
@@ -233,8 +217,9 @@ const GENERATIONS = [
   [7, "第七世代", "Generation VII"],
   [8, "第八世代", "Generation VIII"],
   [9, "第九世代", "Generation IX"],
-  [99, "Champions", "Champions"]
+  [99, "Champions", "Champions"],
 ] as const;
+
 const GAME_VERSIONS: Array<[string, string, number]> = [
   ["RG", "红/绿", 1], ["B", "蓝", 1], ["Y", "黄", 1],
   ["GS", "金/银", 2], ["C", "水晶", 2],
@@ -247,23 +232,22 @@ const GAME_VERSIONS: Array<[string, string, number]> = [
   ["SV", "朱/紫", 9], ["SVT", "朱/紫 零之秘宝", 9], ["ZA", "传说 Z-A", 9],
   ["CHAMP", "冠军", 99],
 ];
+
 const GAME_VERSION_NAMES = new Map<string, string>(
   GAME_VERSIONS.map(([code, nameZh]) => [code, nameZh])
 );
+
 const TYPE_NAMES = [
   "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
-  "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精"
+  "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精",
 ];
+
 const TYPE_ALIASES: Record<string, string> = {
-  電: "电",
-  飛行: "飞行",
-  蟲: "虫",
-  龍: "龙",
-  惡: "恶",
-  鋼: "钢",
-  格鬥: "格斗",
-  幽靈: "幽灵"
+  電: "电", 飛行: "飞行", 蟲: "虫", 龍: "龙",
+  惡: "恶", 鋼: "钢", 格鬥: "格斗", 幽靈: "幽灵",
 };
+
+// ── Helpers ──
 
 function resolveDatabasePath() {
   return process.env.LOCALDEX_DB_PATH
@@ -288,13 +272,12 @@ function splitTypeNames(type: string | undefined) {
   const normalized = normalizeTypeName(type);
   if (!normalized) return [];
   if (TYPE_NAMES.includes(normalized)) return [normalized];
-
   const compact = normalized.replace(/\s+/g, "");
   const result: string[] = [];
   let rest = compact;
-  const candidates = [...TYPE_NAMES, ...Object.keys(TYPE_ALIASES)].sort((left, right) => right.length - left.length);
+  const candidates = [...TYPE_NAMES, ...Object.keys(TYPE_ALIASES)].sort((a, b) => b.length - a.length);
   while (rest) {
-    const match = candidates.find((candidate) => rest.startsWith(candidate));
+    const match = candidates.find((c) => rest.startsWith(c));
     if (!match) break;
     result.push(normalizeTypeName(match));
     rest = rest.slice(match.length);
@@ -302,500 +285,454 @@ function splitTypeNames(type: string | undefined) {
   return rest ? [normalized] : [...new Set(result)];
 }
 
-function statBlockFromRow(row: Record<string, unknown>): PokemonEntry["baseStats"] {
-  if (row.hp === null || row.hp === undefined) return undefined;
-  return {
-    hp: Number(row.hp),
-    atk: Number(row.atk),
-    def: Number(row.def),
-    spa: Number(row.spa),
-    spd: Number(row.spd),
-    spe: Number(row.spe)
-  };
-}
+// ── Database ──
 
-function sourceFromRow(row: Record<string, unknown>) {
-  return row.source_url || row.source_title || row.source_fetched_at
-    ? {
-        url: row.source_url ? String(row.source_url) : "",
-        title: row.source_title ? String(row.source_title) : "",
-        fetchedAt: row.source_fetched_at ? String(row.source_fetched_at) : ""
-      }
-    : undefined;
-}
+export function getDatabasePath() { return resolveDatabasePath(); }
+export function hasDatabaseFile() { return existsSync(resolveDatabasePath()); }
 
-function toImageSet(rows: Record<string, unknown>[]) {
-  const images: Record<string, ImageAsset> = {};
-  for (const row of rows) {
-    images[String(row.image_kind)] = {
-      url: String(row.url),
-      alt: row.alt ? String(row.alt) : undefined,
-      sourceUrl: row.source_url ? String(row.source_url) : undefined
-    };
-  }
-  return Object.keys(images).length > 0 ? images as PokemonEntry["images"] : undefined;
-}
-
-function imageRows(db: DatabaseSync, entityType: string, entityId: string | number, formId?: string | number | null) {
-  const formClause = formId === undefined
-    ? ""
-    : formId === null
-      ? "AND form_id IS NULL"
-      : "AND form_id = ?";
-  const params = formId === undefined ? [entityType, entityId] : formId === null ? [entityType, entityId] : [entityType, entityId, formId];
-  return db.prepare(`
-    SELECT image_kind, url, alt, source_url
-    FROM image_assets
-    WHERE entity_type = ? AND entity_id = ? ${formClause}
-    ORDER BY image_kind ASC
-  `).all(...params) as Record<string, unknown>[];
-}
-
-function mapPokemonBase(row: Record<string, unknown>): PokemonEntry {
-  return {
-    id: String(row.id),
-    legacyId: row.legacy_id ? String(row.legacy_id) : undefined,
-    dexNumber: Number(row.dex_number),
-    slug: String(row.slug),
-    nameZh: String(row.name_zh),
-    nameJa: row.name_ja ? String(row.name_ja) : undefined,
-    nameEn: row.name_en ? String(row.name_en) : undefined,
-    generations: [],
-    category: row.category ? String(row.category) : undefined,
-    hiddenAbility: row.hidden_ability ? String(row.hidden_ability) : undefined,
-    heightM: row.height_m === null ? undefined : Number(row.height_m),
-    weightKg: row.weight_kg === null ? undefined : Number(row.weight_kg),
-    color: row.color ? String(row.color) : undefined,
-    catchRate: row.catch_rate === null ? undefined : Number(row.catch_rate),
-    genderRatio: row.male_ratio || row.female_ratio || row.genderless
-      ? {
-          male: row.male_ratio ? String(row.male_ratio) : undefined,
-          female: row.female_ratio ? String(row.female_ratio) : undefined,
-          genderless: row.genderless ? Boolean(row.genderless) : undefined
-        }
-      : undefined,
-    baseStats: statBlockFromRow(row),
-    source: sourceFromRow(row),
-    parseNote: row.parse_note ? String(row.parse_note) : undefined
-  };
-}
-
-function getPokemonTypes(db: DatabaseSync, pokemonId: string) {
-  const rows = db.prepare(`
-    SELECT t.name_zh, pt.slot
-    FROM pokemon_types pt
-    JOIN types t ON t.id = pt.type_id
-    WHERE pt.pokemon_id = ?
-    ORDER BY pt.slot ASC
-  `).all(pokemonId) as Record<string, unknown>[];
-  return rows.map((row) => String(row.name_zh));
-}
-
-function getPokemonAbilityIds(db: DatabaseSync, pokemonId: string, generationId: number | null = null, hidden = false) {
-  const table = generationId === null ? "pokemon_abilities" : "pokemon_generation_abilities";
-  const generationJoin = generationId === null ? "" : `JOIN generations g ON g.id = ${table}.generation_id`;
-  const generationFilter = generationId === null ? "1 = 1" : "g.number = ?";
-  const rows = db.prepare(`
-    SELECT COALESCE(CAST(ability_id AS TEXT), ability_key) AS ability_ref, slot
-    FROM ${table}
-    ${generationJoin}
-    WHERE pokemon_id = ?
-      AND ${generationFilter}
-      AND is_hidden = ?
-  ORDER BY slot ASC
-  `).all(...(generationId === null ? [pokemonId, hidden ? 1 : 0] : [pokemonId, generationId, hidden ? 1 : 0])) as Record<string, unknown>[];
-  return rows.map((row) => String(row.ability_ref));
-}
-
-function getPokemonAbilityNames(db: DatabaseSync, pokemonId: string, generationId: number | null = null, hidden = false) {
-  const table = generationId === null ? "pokemon_abilities" : "pokemon_generation_abilities";
-  const generationJoin = generationId === null ? "" : `JOIN generations g ON g.id = ${table}.generation_id`;
-  const generationFilter = generationId === null ? "1 = 1" : "g.number = ?";
-  const rows = db.prepare(`
-    SELECT COALESCE(a.name_zh, ${table}.ability_key) AS ability_name, ${table}.slot
-    FROM ${table}
-    LEFT JOIN abilities a ON a.id = ${table}.ability_id
-    ${generationJoin}
-    WHERE ${table}.pokemon_id = ?
-      AND ${generationFilter}
-      AND ${table}.is_hidden = ?
-  ORDER BY ${table}.slot ASC
-  `).all(...(generationId === null ? [pokemonId, hidden ? 1 : 0] : [pokemonId, generationId, hidden ? 1 : 0])) as Record<string, unknown>[];
-  return rows.map((row) => String(row.ability_name));
-}
-
-function getPokemonGenerationTypes(db: DatabaseSync, pokemonId: string, generation: number) {
-  const rows = db.prepare(`
-    SELECT t.name_zh, pgt.slot
-    FROM pokemon_generation_types pgt
-    JOIN generations g ON g.id = pgt.generation_id
-    JOIN types t ON t.id = pgt.type_id
-    WHERE pgt.pokemon_id = ? AND g.number = ?
-    ORDER BY pgt.slot ASC
-  `).all(pokemonId, generation) as Record<string, unknown>[];
-  return rows.map((row) => String(row.name_zh));
-}
-
-function getPokemonGenerationAvailability(db: DatabaseSync, pokemonId: string): PokemonEntry["generationAvailability"] {
-  const rows = db.prepare(`
-    SELECT g.number AS generation_number, pgr.region, pgr.dex_number
-    FROM pokemon_generation_regions pgr
-    JOIN generations g ON g.id = pgr.generation_id
-    WHERE pokemon_id = ?
-    ORDER BY g.number ASC, pgr.region ASC
-  `).all(pokemonId) as Record<string, unknown>[];
-  const byGeneration = new Map<number, NonNullable<PokemonEntry["generationAvailability"]>[number]>();
-  for (const row of rows) {
-    const generation = Number(row.generation_number);
-    const record = byGeneration.get(generation) ?? { generation, regions: [] };
-    if (row.region) {
-      record.regions?.push({
-        region: String(row.region),
-        dexNumber: row.dex_number ? String(row.dex_number) : undefined
-      });
-    }
-    byGeneration.set(generation, record);
-  }
-  return [...byGeneration.values()];
-}
-
-function getPokemonForms(db: DatabaseSync, pokemonId: string): PokemonEntry["forms"] {
-  const rows = db.prepare(`
-    SELECT pf.*, g.number AS introduced_generation_number, fs.hp, fs.atk, fs.def, fs.spa, fs.spd, fs.spe
-    FROM pokemon_forms pf
-    LEFT JOIN pokemon_form_stats fs ON fs.form_id = pf.id
-    LEFT JOIN generations g ON g.id = pf.introduced_generation
-    WHERE pf.pokemon_id = ?
-    ORDER BY pf.sort_order ASC, pf.name_zh ASC
-  `).all(pokemonId) as Record<string, unknown>[];
-
-  return rows.map((row) => {
-    const formId = String(row.id);
-    const types = db.prepare(`
-      SELECT t.name_zh
-      FROM pokemon_form_types pft
-      JOIN types t ON t.id = pft.type_id
-      WHERE pft.form_id = ?
-      ORDER BY pft.slot ASC
-    `).all(formId) as Record<string, unknown>[];
-    return {
-      id: formId,
-      legacyId: row.legacy_id ? String(row.legacy_id) : undefined,
-      nameZh: String(row.name_zh),
-      introducedGeneration: row.introduced_generation_number === null ? undefined : Number(row.introduced_generation_number),
-      isMega: Boolean(row.is_mega),
-      notes: row.notes ? String(row.notes) : undefined,
-      images: toImageSet(imageRows(db, "pokemon", pokemonId, formId)),
-      baseStats: statBlockFromRow(row),
-      primaryType: types[0] ? String(types[0].name_zh) : undefined,
-      secondaryType: types[1] ? String(types[1].name_zh) : undefined,
-      abilityIds: db.prepare(`
-        SELECT COALESCE(a.name_zh, pfa.ability_key) AS ability_name
-        FROM pokemon_form_abilities pfa
-        LEFT JOIN abilities a ON a.id = pfa.ability_id
-        WHERE pfa.form_id = ?
-        ORDER BY pfa.slot ASC
-      `).all(formId).map((abilityRow: any) => String(abilityRow.ability_name))
-    };
-  });
-}
-
-function getPokemonGenerationRecords(db: DatabaseSync, pokemonId: string): PokemonEntry["generationRecords"] {
-  const rows = db.prepare(`
-    SELECT pgr.*, g.number AS generation_number, pgs.hp, pgs.atk, pgs.def, pgs.spa, pgs.spd, pgs.spe
-    FROM pokemon_generation_records pgr
-    JOIN generations g ON g.id = pgr.generation_id
-    LEFT JOIN pokemon_generation_stats pgs ON pgs.pokemon_id = pgr.pokemon_id AND pgs.generation_id = pgr.generation_id
-    WHERE pgr.pokemon_id = ?
-    ORDER BY g.number ASC
-  `).all(pokemonId) as Record<string, unknown>[];
-
-  return rows.map((row) => {
-    const generation = Number(row.generation_number);
-    const types = getPokemonGenerationTypes(db, pokemonId, generation);
-    const learnset = db.prepare(`
-      SELECT COALESCE(CAST(pm.move_id AS TEXT), pm.move_key) AS move_ref, pm.move_name_zh, pm.learn_method, pm.level, pm.notes
-      FROM pokemon_moves pm
-      JOIN generations g ON g.id = pm.generation_id
-      WHERE pm.pokemon_id = ? AND g.number = ?
-      ORDER BY sort_order ASC, move_name_zh ASC
-    `).all(pokemonId, generation) as Record<string, unknown>[];
-    const abilityNames = getPokemonAbilityNames(db, pokemonId, generation, false);
-    const hiddenAbilityNames = getPokemonAbilityNames(db, pokemonId, generation, true);
-    return {
-      generation,
-      label: row.label ? String(row.label) : undefined,
-      primaryType: types[0],
-      secondaryType: types[1],
-      abilityIds: abilityNames,
-      hiddenAbilityId: hiddenAbilityNames[0],
-      baseStats: statBlockFromRow(row),
-      moveIds: [...new Set(learnset.map((entry) => String(entry.move_ref)))],
-      learnset: learnset.map((entry) => ({
-        moveId: String(entry.move_ref),
-        moveNameZh: entry.move_name_zh ? String(entry.move_name_zh) : undefined,
-        learnMethod: entry.learn_method ? String(entry.learn_method) as NonNullable<NonNullable<PokemonEntry["generationRecords"]>[number]["learnset"]>[number]["learnMethod"] : undefined,
-        level: entry.level === null ? undefined : Number(entry.level),
-        notes: entry.notes ? String(entry.notes) : undefined
-      })),
-      notes: row.notes ? String(row.notes) : undefined
-    };
-  });
-}
-
-function getEvolutionChain(db: DatabaseSync, pokemonId: string): PokemonEntry["evolutionChain"] {
-  const rows = db.prepare(`
-    SELECT pem.stage_label, pem.sort_order, p.id, p.legacy_id, p.dex_number, p.slug, p.name_zh, p.name_en,
-      img.url AS image_url, img.alt AS image_alt, img.source_url AS image_source_url
-    FROM pokemon_evolution_members pem
-    JOIN pokemon p ON p.id = pem.related_pokemon_id
-    LEFT JOIN image_assets img ON img.entity_type = 'pokemon' AND img.entity_id = p.id AND img.form_id IS NULL AND img.image_kind = 'official'
-    WHERE pem.pokemon_id = ?
-    ORDER BY pem.sort_order ASC
-  `).all(pokemonId) as Record<string, unknown>[];
-
-  return rows.map((row) => {
-    const types = getPokemonTypes(db, String(row.id));
-    return {
-      id: String(row.id),
-      legacyId: row.legacy_id ? String(row.legacy_id) : undefined,
-      dexNumber: Number(row.dex_number),
-      slug: String(row.slug),
-      nameZh: String(row.name_zh),
-      nameEn: row.name_en ? String(row.name_en) : undefined,
-      primaryType: types[0],
-      secondaryType: types[1],
-      stageLabel: row.stage_label ? String(row.stage_label) : undefined,
-      image: row.image_url ? {
-        url: String(row.image_url),
-        alt: row.image_alt ? String(row.image_alt) : undefined,
-        sourceUrl: row.image_source_url ? String(row.image_source_url) : undefined
-      } : undefined
-    };
-  });
-}
-
-function hydratePokemonRow(db: DatabaseSync, row: Record<string, unknown>, detail = false): PokemonEntry {
-  const pokemon = mapPokemonBase(row);
-  const types = getPokemonTypes(db, pokemon.id);
-  pokemon.primaryType = types[0];
-  pokemon.secondaryType = types[1];
-  pokemon.abilityIds = getPokemonAbilityIds(db, pokemon.id);
-  pokemon.abilities = getPokemonAbilityNames(db, pokemon.id);
-  pokemon.hiddenAbilityId = getPokemonAbilityIds(db, pokemon.id, null, true)[0];
-  pokemon.hiddenAbility = getPokemonAbilityNames(db, pokemon.id, null, true)[0];
-  pokemon.images = toImageSet(imageRows(db, "pokemon", pokemon.id, null));
-  pokemon.generationAvailability = getPokemonGenerationAvailability(db, pokemon.id);
-  pokemon.generations = pokemon.generationAvailability?.map((item) => item.generation) ?? [];
-  pokemon.evolutionChain = getEvolutionChain(db, pokemon.id);
-
-  if (detail) {
-    pokemon.forms = getPokemonForms(db, pokemon.id);
-    pokemon.generationRecords = getPokemonGenerationRecords(db, pokemon.id);
-    pokemon.moveIds = [...new Set(pokemon.generationRecords?.flatMap((record) => record.moveIds || []) ?? [])];
-  }
-
-  return pokemon;
-}
-
-function mapItemRow(db: DatabaseSync, row: Record<string, unknown>): ItemEntry {
-  const images = imageRows(db, "item", String(row.id), null);
-  return {
-    id: String(row.id),
-    legacyId: row.legacy_id ? String(row.legacy_id) : undefined,
-    slug: String(row.slug),
-    nameZh: String(row.name_zh),
-    nameJa: row.name_ja ? String(row.name_ja) : undefined,
-    nameEn: row.name_en ? String(row.name_en) : undefined,
-    category: row.category ? String(row.category) : undefined,
-    effectSummary: row.effect_summary ? String(row.effect_summary) : undefined,
-    image: images[0] ? {
-      url: String(images[0].url),
-      alt: images[0].alt ? String(images[0].alt) : undefined,
-      sourceUrl: images[0].source_url ? String(images[0].source_url) : undefined
-    } : undefined,
-    source: sourceFromRow(row)
-  };
-}
-
-function hydrateMoveRow(db: DatabaseSync, row: Record<string, unknown>): MoveEntry {
-  const images = imageRows(db, "move", String(row.id), null);
-  const generations = db.prepare(`
-    SELECT mgr.*, g.number AS generation_number
-    FROM move_generation_records mgr
-    JOIN generations g ON g.id = mgr.generation_id
-    WHERE mgr.move_id = ?
-    ORDER BY g.number ASC
-  `).all(String(row.id)) as Record<string, unknown>[];
-  return {
-    id: String(row.id),
-    number: row.number === null || row.number === undefined ? undefined : Number(row.number),
-    nameZh: String(row.name_zh),
-    nameJa: row.name_ja ? String(row.name_ja) : undefined,
-    nameEn: row.name_en ? String(row.name_en) : undefined,
-    type: row.type_name_zh ? String(row.type_name_zh) : undefined,
-    category: row.category ? String(row.category) : undefined,
-    power: row.power === null ? undefined : Number(row.power),
-    accuracy: row.accuracy === null || row.accuracy === undefined ? undefined : Number(row.accuracy),
-    pp: row.pp === null ? undefined : Number(row.pp),
-    description: row.description ? String(row.description) : undefined,
-    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
-    introducedGeneration: row.introduced_generation_number === null || row.introduced_generation_number === undefined ? undefined : Number(row.introduced_generation_number),
-    image: images[0] ? {
-      url: String(images[0].url),
-      alt: images[0].alt ? String(images[0].alt) : undefined,
-      sourceUrl: images[0].source_url ? String(images[0].source_url) : undefined
-    } : undefined,
-    generations: generations.map((generation) => {
-      const code = generation.game_version_code ? String(generation.game_version_code) : undefined;
-      return {
-        generation: Number(generation.generation_number),
-        gameVersionCode: code,
-        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
-        description: generation.description ? String(generation.description) : "",
-        notes: generation.notes ? String(generation.notes) : undefined
-      };
-    }),
-    source: sourceFromRow(row)
-  };
-}
-
-function hydrateAbilityRow(db: DatabaseSync, row: Record<string, unknown>): AbilityEntry {
-  const images = imageRows(db, "ability", String(row.id), null);
-  const generations = db.prepare(`
-    SELECT agr.*, g.number AS generation_number
-    FROM ability_generation_records agr
-    JOIN generations g ON g.id = agr.generation_id
-    WHERE agr.ability_id = ?
-    ORDER BY g.number ASC
-  `).all(String(row.id)) as Record<string, unknown>[];
-  return {
-    id: String(row.id),
-    number: row.number === null || row.number === undefined ? undefined : Number(row.number),
-    nameZh: String(row.name_zh),
-    nameJa: row.name_ja ? String(row.name_ja) : undefined,
-    nameEn: row.name_en ? String(row.name_en) : undefined,
-    description: row.description ? String(row.description) : undefined,
-    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
-    introducedGeneration: row.introduced_generation_number === null || row.introduced_generation_number === undefined ? undefined : Number(row.introduced_generation_number),
-    image: images[0] ? {
-      url: String(images[0].url),
-      alt: images[0].alt ? String(images[0].alt) : undefined,
-      sourceUrl: images[0].source_url ? String(images[0].source_url) : undefined
-    } : undefined,
-    generations: generations.map((generation) => {
-      const code = generation.game_version_code ? String(generation.game_version_code) : undefined;
-      return {
-        generation: Number(generation.generation_number),
-        gameVersionCode: code,
-        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
-        description: generation.description ? String(generation.description) : "",
-        notes: generation.notes ? String(generation.notes) : undefined
-      };
-    }),
-    source: sourceFromRow(row)
-  };
-}
-
-export function getDatabasePath() {
-  return resolveDatabasePath();
-}
-
-export function hasDatabaseFile() {
-  return existsSync(resolveDatabasePath());
-}
+let _migrationDone = false;
 
 export function openDatabase() {
   ensureDbDir();
-  return new DatabaseSync(resolveDatabasePath(), { timeout: 3000 });
+  const db = new DatabaseSync(resolveDatabasePath(), { timeout: 3000 });
+  if (!_migrationDone) {
+    _migrationDone = true;
+    _migrateOldSchema(db);
+  }
+  return db;
 }
 
 /**
- * 安全地确保数据库 schema 存在（增量式，不会删除已有数据）。
- * 只创建不存在的表和索引，并填充维度数据（世代、属性、游戏版本）。
+ * 轻量级迁移：检测旧的列结构并自动迁移。
+ * 在首次打开数据库时自动执行。
+ *
+ * 迁移内容：
+ * 1. pokemon_form_types: type_id → type_name（属性汉字）
+ * 2. moves: type_id → type_name
+ * 3. 所有表: generation_id → generation（世代数字）
+ */
+function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
+  // ── 迁移 1: pokemon_form_types type_id → type_name ──
+  try {
+    const cols = db.prepare("PRAGMA table_info(pokemon_form_types)").all() as Record<string, unknown>[];
+    if (cols.length > 0) {
+      const colNames = cols.map((c) => String(c.name));
+      if (colNames.includes("type_id") && !colNames.includes("type_name")) {
+        db.exec(`
+          PRAGMA foreign_keys = OFF;
+          CREATE TABLE IF NOT EXISTS _pft_backup AS
+            SELECT pft.id, pft.form_id, t.name_zh AS type_name, pft.slot
+            FROM pokemon_form_types pft
+            LEFT JOIN types t ON t.id = pft.type_id;
+          DROP TABLE pokemon_form_types;
+          CREATE TABLE pokemon_form_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+            type_name TEXT NOT NULL,
+            slot INTEGER NOT NULL,
+            UNIQUE (form_id, slot)
+          );
+          INSERT INTO pokemon_form_types (id, form_id, type_name, slot)
+            SELECT id, form_id, COALESCE(type_name, ''), slot FROM _pft_backup;
+          DROP TABLE _pft_backup;
+          PRAGMA foreign_keys = ON;
+        `);
+      }
+    }
+  } catch { /* table doesn't exist yet */ }
+
+  // ── 迁移 2: moves type_id → type_name ──
+  try {
+    const cols = db.prepare("PRAGMA table_info(moves)").all() as Record<string, unknown>[];
+    if (cols.length > 0) {
+      const colNames = cols.map((c) => String(c.name));
+      if (colNames.includes("type_id") && !colNames.includes("type_name")) {
+        db.exec(`
+          PRAGMA foreign_keys = OFF;
+          ALTER TABLE moves ADD COLUMN type_name TEXT;
+          UPDATE moves SET type_name = (SELECT t.name_zh FROM types t WHERE t.id = moves.type_id);
+          PRAGMA foreign_keys = ON;
+        `);
+      }
+    }
+  } catch { /* table doesn't exist yet */ }
+
+  // ── 迁移 3: generation_id → generation（所有相关表）──
+  // 辅助函数：检测表是否有 generation_id 列
+  const _hasCol = (table: string, col: string) => {
+    try {
+      const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Record<string, unknown>[];
+      return cols.some((c) => String(c.name) === col);
+    } catch { return false; }
+  };
+
+  // pokemon: introduced_generation_id → introduced_generation
+  if (_hasCol("pokemon", "introduced_generation_id") && !_hasCol("pokemon", "introduced_generation")) {
+    try {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        ALTER TABLE pokemon ADD COLUMN introduced_generation INTEGER;
+        UPDATE pokemon SET introduced_generation = (SELECT g.number FROM generations g WHERE g.id = pokemon.introduced_generation_id);
+        PRAGMA foreign_keys = ON;
+      `);
+    } catch { /* column may already exist */ }
+  }
+
+  // pokemon_forms: 移除废弃的 generation_start/generation_end 列
+  // 世代变体信息已迁移到子表（pokemon_form_stats/types/abilities）
+  if (_hasCol("pokemon_forms", "generation_start")) {
+    try {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        CREATE TABLE _pf_backup AS
+          SELECT id, pokemon_id, form_key, name_zh, form_type, is_default, sort_order
+          FROM pokemon_forms;
+        DROP TABLE pokemon_forms;
+        CREATE TABLE pokemon_forms (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+          form_key TEXT NOT NULL,
+          name_zh TEXT NOT NULL,
+          form_type TEXT NOT NULL DEFAULT 'default',
+          is_default INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          UNIQUE (pokemon_id, form_key)
+        );
+        INSERT INTO pokemon_forms (id, pokemon_id, form_key, name_zh, form_type, is_default, sort_order)
+          SELECT id, pokemon_id, form_key, name_zh, form_type, is_default, sort_order FROM _pf_backup;
+        DROP TABLE _pf_backup;
+        PRAGMA foreign_keys = ON;
+      `);
+    } catch { /* table doesn't exist or already migrated */ }
+  }
+
+  // pokemon_generation_regions: generation_id → generation
+  if (_hasCol("pokemon_generation_regions", "generation_id") && !_hasCol("pokemon_generation_regions", "generation")) {
+    try {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        ALTER TABLE pokemon_generation_regions ADD COLUMN generation INTEGER;
+        UPDATE pokemon_generation_regions SET generation = (SELECT g.number FROM generations g WHERE g.id = pokemon_generation_regions.generation_id);
+        UPDATE pokemon_generation_regions SET generation = 0 WHERE generation IS NULL;
+        PRAGMA foreign_keys = ON;
+      `);
+    } catch { /* column may already exist */ }
+  }
+
+  // pokemon_learnsets: generation_id → generation
+  if (_hasCol("pokemon_learnsets", "generation_id") && !_hasCol("pokemon_learnsets", "generation")) {
+    try {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        ALTER TABLE pokemon_learnsets ADD COLUMN generation INTEGER;
+        UPDATE pokemon_learnsets SET generation = (SELECT g.number FROM generations g WHERE g.id = pokemon_learnsets.generation_id);
+        UPDATE pokemon_learnsets SET generation = 0 WHERE generation IS NULL;
+        PRAGMA foreign_keys = ON;
+      `);
+    } catch { /* column may already exist */ }
+  }
+
+  // move_generation_records: generation_id → generation
+  if (_hasCol("move_generation_records", "generation_id") && !_hasCol("move_generation_records", "generation")) {
+    try {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        ALTER TABLE move_generation_records ADD COLUMN generation INTEGER;
+        UPDATE move_generation_records SET generation = (SELECT g.number FROM generations g WHERE g.id = move_generation_records.generation_id);
+        UPDATE move_generation_records SET generation = 0 WHERE generation IS NULL;
+        PRAGMA foreign_keys = ON;
+      `);
+    } catch { /* column may already exist */ }
+  }
+
+  // ability_generation_records: generation_id → generation
+  if (_hasCol("ability_generation_records", "generation_id") && !_hasCol("ability_generation_records", "generation")) {
+    try {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        ALTER TABLE ability_generation_records ADD COLUMN generation INTEGER;
+        UPDATE ability_generation_records SET generation = (SELECT g.number FROM generations g WHERE g.id = ability_generation_records.generation_id);
+        UPDATE ability_generation_records SET generation = 0 WHERE generation IS NULL;
+        PRAGMA foreign_keys = ON;
+      `);
+    } catch { /* column may already exist */ }
+  }
+
+  // moves.introduced_generation: 如果存的是 generations.id 而非世代数字，需要转换
+  // 检测方式：如果 generations 表存在且 moves.introduced_generation 的值与 generations.id 匹配
+  try {
+    const genExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='generations'").get();
+    if (genExists) {
+      // 检查是否有 moves 的 introduced_generation 值对应 generations.id
+      const sample = db.prepare(`
+        SELECT m.introduced_generation, g.number
+        FROM moves m
+        JOIN generations g ON g.id = m.introduced_generation
+        WHERE m.introduced_generation IS NOT NULL
+        LIMIT 1
+      `).get() as Record<string, unknown> | undefined;
+      if (sample && Number(sample.introduced_generation) !== Number(sample.number)) {
+        // 值是 ID 而非世代数字，需要转换
+        db.exec(`
+          UPDATE moves SET introduced_generation = (
+            SELECT g.number FROM generations g WHERE g.id = moves.introduced_generation
+          ) WHERE introduced_generation IS NOT NULL;
+        `);
+      }
+      // 同样处理 abilities.introduced_generation
+      const abSample = db.prepare(`
+        SELECT a.introduced_generation, g.number
+        FROM abilities a
+        JOIN generations g ON g.id = a.introduced_generation
+        WHERE a.introduced_generation IS NOT NULL
+        LIMIT 1
+      `).get() as Record<string, unknown> | undefined;
+      if (abSample && Number(abSample.introduced_generation) !== Number(abSample.number)) {
+        db.exec(`
+          UPDATE abilities SET introduced_generation = (
+            SELECT g.number FROM generations g WHERE g.id = abilities.introduced_generation
+          ) WHERE introduced_generation IS NOT NULL;
+        `);
+      }
+    }
+  } catch { /* generations table doesn't exist, no migration needed */ }
+}
+
+/**
+ * 增量式确保 schema 存在。保留已有数据（moves, abilities 等）。
+ * 如果检测到旧版 pokemon_forms 表结构，自动迁移。
  */
 export function ensureSchema() {
   const db = openDatabase();
+
+  // 检测旧表结构并迁移
+  try {
+    const cols = db.prepare("PRAGMA table_info(pokemon_forms)").all() as Record<string, unknown>[];
+    if (cols.length > 0) {
+      const colNames = cols.map((c) => String(c.name));
+      if (!colNames.includes("form_key")) {
+        // 旧表结构，需要迁移 pokemon 相关表
+        db.exec(`
+          PRAGMA foreign_keys = OFF;
+          DROP TABLE IF EXISTS pokemon_moves;
+          DROP TABLE IF EXISTS pokemon_evolution_members;
+          DROP TABLE IF EXISTS pokemon_form_abilities;
+          DROP TABLE IF EXISTS pokemon_form_types;
+          DROP TABLE IF EXISTS pokemon_form_stats;
+          DROP TABLE IF EXISTS pokemon_form_images;
+          DROP TABLE IF EXISTS pokemon_forms;
+          DROP TABLE IF EXISTS pokemon_abilities;
+          DROP TABLE IF EXISTS pokemon_types;
+          DROP TABLE IF EXISTS pokemon_generation_regions;
+          DROP TABLE IF EXISTS pokemon_generation_abilities;
+          DROP TABLE IF EXISTS pokemon_generation_types;
+          DROP TABLE IF EXISTS pokemon_generation_stats;
+          DROP TABLE IF EXISTS pokemon_generation_records;
+          DROP TABLE IF EXISTS pokemon_base_stats;
+          DROP TABLE IF EXISTS evolution_chains;
+          DROP TABLE IF EXISTS pokemon_learnsets;
+          DROP TABLE IF EXISTS pokemon;
+          PRAGMA foreign_keys = ON;
+        `);
+      }
+    }
+  } catch { /* table doesn't exist yet, that's fine */ }
+
+  // type_id → type_name 和 generation_id → generation 的迁移
+  // 已在 _migrateOldSchema() 中处理（openDatabase 首次调用时自动执行）
+
+  // ── 迁移: pokemon_form_stats/types/abilities 添加 generation_start/generation_end ──
+  // 旧表没有这些列且 UNIQUE 约束不同，需要 drop 重建
+  try {
+    const statCols = db.prepare("PRAGMA table_info(pokemon_form_stats)").all() as Record<string, unknown>[];
+    if (statCols.length > 0) {
+      const colNames = statCols.map((c) => String(c.name));
+      if (!colNames.includes("generation_start")) {
+        db.exec(`
+          PRAGMA foreign_keys = OFF;
+          DROP TABLE IF EXISTS pokemon_form_stats;
+          DROP TABLE IF EXISTS pokemon_form_types;
+          DROP TABLE IF EXISTS pokemon_form_abilities;
+          PRAGMA foreign_keys = ON;
+        `);
+      }
+    }
+  } catch { /* table doesn't exist yet */ }
+
+  // image_assets 表已废弃，清理旧表
+  try {
+    db.exec(`DROP TABLE IF EXISTS image_assets; DROP TABLE IF EXISTS _image_assets_backup;`);
+  } catch { /* table doesn't exist */ }
+
   db.exec(`
     PRAGMA foreign_keys = OFF;
 
-    -- 清理已废弃的旧表
-    DROP TABLE IF EXISTS pokemon_learnsets;
+    -- ============================================================
+    -- generations / game_versions / types 表已废弃
+    -- 世代直接以数字存储，游戏版本以 code 存储，属性以汉字存储
+    -- ============================================================
 
-    CREATE TABLE IF NOT EXISTS generations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      number INTEGER NOT NULL UNIQUE,
-      name_zh TEXT NOT NULL,
-      name_en TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS game_versions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      code TEXT NOT NULL UNIQUE,
-      name_zh TEXT NOT NULL,
-      generation_id INTEGER NOT NULL REFERENCES generations(id)
-    );
-    CREATE TABLE IF NOT EXISTS types (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
-      name_zh TEXT NOT NULL UNIQUE,
-      name_en TEXT
-    );
+    -- ============================================================
+    -- 宝可梦主表（精简）
+    -- ============================================================
     CREATE TABLE IF NOT EXISTS pokemon (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
       dex_number INTEGER NOT NULL,
-      slug TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
       name_zh TEXT NOT NULL,
       name_ja TEXT,
       name_en TEXT,
       category TEXT,
-      hidden_ability TEXT,
       height_m REAL,
       weight_kg REAL,
-      color TEXT,
-      catch_rate INTEGER,
-      male_ratio TEXT,
-      female_ratio TEXT,
-      genderless INTEGER,
       introduced_generation INTEGER,
       source_url TEXT,
       source_title TEXT,
-      source_fetched_at TEXT,
-      parse_note TEXT
+      source_fetched_at TEXT
     );
-    CREATE TABLE IF NOT EXISTS pokemon_base_stats (
+
+    -- ============================================================
+    -- 宝可梦形态（核心：形态优先架构）
+    -- ============================================================
+    CREATE TABLE IF NOT EXISTS pokemon_forms (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL UNIQUE REFERENCES pokemon(id) ON DELETE CASCADE,
-      hp INTEGER, atk INTEGER, def INTEGER, spa INTEGER, spd INTEGER, spe INTEGER
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      form_key TEXT NOT NULL,
+      name_zh TEXT NOT NULL,
+      form_type TEXT NOT NULL DEFAULT 'default',
+      is_default INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (pokemon_id, form_key)
     );
+
+    CREATE TABLE IF NOT EXISTS pokemon_form_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+      generation_start INTEGER,
+      generation_end INTEGER,
+      hp INTEGER NOT NULL, atk INTEGER NOT NULL, def INTEGER NOT NULL,
+      spa INTEGER NOT NULL, spd INTEGER NOT NULL, spe INTEGER NOT NULL,
+      UNIQUE (form_id, generation_start)
+    );
+
+    CREATE TABLE IF NOT EXISTS pokemon_form_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+      type_name TEXT NOT NULL,
+      slot INTEGER NOT NULL,
+      generation_start INTEGER,
+      generation_end INTEGER,
+      UNIQUE (form_id, slot, generation_start)
+    );
+
+    CREATE TABLE IF NOT EXISTS pokemon_form_abilities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+      ability_id INTEGER REFERENCES abilities(id),
+      ability_name_zh TEXT NOT NULL,
+      slot INTEGER NOT NULL,
+      is_hidden INTEGER NOT NULL DEFAULT 0,
+      generation_start INTEGER,
+      generation_end INTEGER,
+      UNIQUE (form_id, slot, generation_start)
+    );
+
+    CREATE TABLE IF NOT EXISTS pokemon_form_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+      image_kind TEXT NOT NULL,
+      url TEXT NOT NULL,
+      alt TEXT,
+      UNIQUE (form_id, image_kind)
+    );
+
+    -- ============================================================
+    -- 进化链（含进化条件）
+    -- ============================================================
+    CREATE TABLE IF NOT EXISTS evolution_chains (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chain_id INTEGER NOT NULL,
+      from_pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE CASCADE,
+      to_pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      from_form_key TEXT,
+      to_form_key TEXT,
+      stage INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      evolution_method TEXT,
+      evolution_condition TEXT,
+      evolution_item TEXT,
+      evolution_level INTEGER,
+      notes TEXT
+    );
+
+    -- ============================================================
+    -- 宝可梦世代可用性
+    -- ============================================================
+    CREATE TABLE IF NOT EXISTS pokemon_generation_regions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      generation INTEGER NOT NULL,
+      region TEXT,
+      regional_dex_number TEXT,
+      UNIQUE (pokemon_id, generation, region)
+    );
+
+    -- ============================================================
+    -- 招式学习
+    -- ============================================================
+    CREATE TABLE IF NOT EXISTS pokemon_learnsets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+      form_key TEXT NOT NULL DEFAULT 'default',
+      move_id INTEGER REFERENCES moves(id),
+      move_name_zh TEXT NOT NULL,
+      generation INTEGER NOT NULL,
+      game_version_code TEXT,
+      learn_method TEXT NOT NULL,
+      level INTEGER,
+      tm_number TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      notes TEXT,
+      UNIQUE (pokemon_id, form_key, move_name_zh, generation,
+              game_version_code, learn_method, level)
+    );
+
+    -- ============================================================
+    -- 招式表
+    -- ============================================================
     CREATE TABLE IF NOT EXISTS moves (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       number INTEGER,
       name_zh TEXT NOT NULL,
       name_ja TEXT,
       name_en TEXT,
-      type_id INTEGER REFERENCES types(id),
+      type_name TEXT,
       category TEXT,
       power INTEGER,
       accuracy INTEGER,
       pp INTEGER,
       description TEXT,
       effect_detail TEXT,
-      introduced_generation INTEGER REFERENCES generations(id),
+      introduced_generation INTEGER,
       source_url TEXT,
       source_title TEXT,
       source_fetched_at TEXT,
       UNIQUE (number, name_zh)
     );
+
     CREATE TABLE IF NOT EXISTS move_generation_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      generation INTEGER NOT NULL,
       game_version_code TEXT NOT NULL DEFAULT '',
       description TEXT,
       notes TEXT,
-      UNIQUE (move_id, generation_id, game_version_code)
+      UNIQUE (move_id, generation, game_version_code)
     );
+
+    -- ============================================================
+    -- 特性表
+    -- ============================================================
     CREATE TABLE IF NOT EXISTS abilities (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       number INTEGER,
@@ -804,21 +741,26 @@ export function ensureSchema() {
       name_en TEXT,
       description TEXT,
       effect_detail TEXT,
-      introduced_generation INTEGER REFERENCES generations(id),
+      introduced_generation INTEGER,
       source_url TEXT,
       source_title TEXT,
       source_fetched_at TEXT,
       UNIQUE (number, name_zh)
     );
+
     CREATE TABLE IF NOT EXISTS ability_generation_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ability_id INTEGER NOT NULL REFERENCES abilities(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
+      generation INTEGER NOT NULL,
       game_version_code TEXT,
       description TEXT,
       notes TEXT,
-      UNIQUE (ability_id, generation_id)
+      UNIQUE (ability_id, generation)
     );
+
+    -- ============================================================
+    -- 道具表
+    -- ============================================================
     CREATE TABLE IF NOT EXISTS items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       legacy_id TEXT NOT NULL UNIQUE,
@@ -832,220 +774,57 @@ export function ensureSchema() {
       source_title TEXT,
       source_fetched_at TEXT
     );
-    CREATE TABLE IF NOT EXISTS image_assets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL,
-      entity_id INTEGER NOT NULL,
-      form_id INTEGER,
-      image_kind TEXT NOT NULL,
-      url TEXT NOT NULL,
-      alt TEXT,
-      source_url TEXT,
-      UNIQUE (entity_type, entity_id, form_id, image_kind)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_generation_regions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      region TEXT,
-      dex_number TEXT,
-      UNIQUE (pokemon_id, generation_id, region)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_types (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      type_id INTEGER NOT NULL REFERENCES types(id),
-      slot INTEGER NOT NULL,
-      UNIQUE (pokemon_id, slot)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_abilities (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      ability_id INTEGER REFERENCES abilities(id),
-      ability_key TEXT NOT NULL,
-      slot INTEGER NOT NULL,
-      is_hidden INTEGER NOT NULL DEFAULT 0,
-      UNIQUE (pokemon_id, ability_key, slot)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_generation_records (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      label TEXT,
-      notes TEXT,
-      UNIQUE (pokemon_id, generation_id)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_generation_types (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      type_id INTEGER NOT NULL REFERENCES types(id),
-      slot INTEGER NOT NULL,
-      UNIQUE (pokemon_id, generation_id, slot)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_generation_abilities (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      ability_id INTEGER REFERENCES abilities(id),
-      ability_key TEXT NOT NULL,
-      slot INTEGER NOT NULL,
-      is_hidden INTEGER NOT NULL DEFAULT 0,
-      UNIQUE (pokemon_id, generation_id, ability_key, slot)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_generation_stats (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      hp INTEGER, atk INTEGER, def INTEGER, spa INTEGER, spd INTEGER, spe INTEGER,
-      UNIQUE (pokemon_id, generation_id)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_moves (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      move_id INTEGER REFERENCES moves(id),
-      move_key TEXT NOT NULL,
-      generation_id INTEGER NOT NULL REFERENCES generations(id),
-      game_version_code TEXT,
-      move_name_zh TEXT,
-      learn_method TEXT,
-      level INTEGER,
-      notes TEXT,
-      sort_order INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_forms (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      name_zh TEXT NOT NULL,
-      introduced_generation INTEGER REFERENCES generations(id),
-      is_mega INTEGER NOT NULL DEFAULT 0,
-      notes TEXT,
-      sort_order INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_form_stats (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      form_id INTEGER NOT NULL UNIQUE REFERENCES pokemon_forms(id) ON DELETE CASCADE,
-      hp INTEGER, atk INTEGER, def INTEGER, spa INTEGER, spd INTEGER, spe INTEGER
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_form_types (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
-      type_id INTEGER NOT NULL REFERENCES types(id),
-      slot INTEGER NOT NULL,
-      UNIQUE (form_id, slot)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_form_abilities (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
-      ability_id INTEGER REFERENCES abilities(id),
-      ability_key TEXT NOT NULL,
-      slot INTEGER NOT NULL,
-      UNIQUE (form_id, ability_key, slot)
-    );
-    CREATE TABLE IF NOT EXISTS pokemon_evolution_members (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      related_pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-      stage_label TEXT,
-      sort_order INTEGER NOT NULL,
-      UNIQUE (pokemon_id, related_pokemon_id, sort_order)
-    );
 
-    CREATE INDEX IF NOT EXISTS idx_pokemon_dex_number ON pokemon(dex_number);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_legacy_id ON pokemon(legacy_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_name_zh ON pokemon(name_zh);
-    CREATE INDEX IF NOT EXISTS idx_moves_number ON moves(number);
+    -- ============================================================
+    -- 索引
+    -- ============================================================
+    CREATE INDEX IF NOT EXISTS idx_pokemon_dex ON pokemon(dex_number);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_name ON pokemon(name_zh);
+    CREATE INDEX IF NOT EXISTS idx_pokemon_slug ON pokemon(slug);
+
+    CREATE INDEX IF NOT EXISTS idx_forms_pokemon ON pokemon_forms(pokemon_id);
+    CREATE INDEX IF NOT EXISTS idx_forms_default ON pokemon_forms(pokemon_id, is_default);
+    CREATE INDEX IF NOT EXISTS idx_form_types_form ON pokemon_form_types(form_id);
+    CREATE INDEX IF NOT EXISTS idx_form_abilities_form ON pokemon_form_abilities(form_id);
+    CREATE INDEX IF NOT EXISTS idx_form_stats_form ON pokemon_form_stats(form_id);
+    CREATE INDEX IF NOT EXISTS idx_form_images_form ON pokemon_form_images(form_id);
+
+    CREATE INDEX IF NOT EXISTS idx_evo_chain ON evolution_chains(chain_id);
+    CREATE INDEX IF NOT EXISTS idx_evo_to ON evolution_chains(to_pokemon_id);
+
+    CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon ON pokemon_learnsets(pokemon_id, form_key);
+    CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon_gen ON pokemon_learnsets(pokemon_id, generation);
+    CREATE INDEX IF NOT EXISTS idx_learnsets_move ON pokemon_learnsets(move_id);
+
+    CREATE INDEX IF NOT EXISTS idx_regions_pokemon ON pokemon_generation_regions(pokemon_id);
+
     CREATE INDEX IF NOT EXISTS idx_moves_name_zh ON moves(name_zh);
-    CREATE INDEX IF NOT EXISTS idx_moves_type ON moves(type_id);
+    CREATE INDEX IF NOT EXISTS idx_moves_type ON moves(type_name);
+    CREATE INDEX IF NOT EXISTS idx_moves_number ON moves(number);
+    CREATE INDEX IF NOT EXISTS idx_abilities_name ON abilities(name_zh);
     CREATE INDEX IF NOT EXISTS idx_abilities_number ON abilities(number);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_regions_generation ON pokemon_generation_regions(generation_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_types_type ON pokemon_types(type_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_abilities_pokemon ON pokemon_abilities(pokemon_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_generation_records_generation ON pokemon_generation_records(generation_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_generation_types_pokemon_generation ON pokemon_generation_types(pokemon_id, generation_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_generation_abilities_pokemon_generation ON pokemon_generation_abilities(pokemon_id, generation_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_generation_stats_pokemon_generation ON pokemon_generation_stats(pokemon_id, generation_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_moves_pokemon_generation ON pokemon_moves(pokemon_id, generation_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_moves_move ON pokemon_moves(move_id);
-    CREATE INDEX IF NOT EXISTS idx_pokemon_moves_method ON pokemon_moves(learn_method);
-    CREATE INDEX IF NOT EXISTS idx_image_assets_entity ON image_assets(entity_type, entity_id);
     CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
-    CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
-    CREATE INDEX IF NOT EXISTS idx_game_versions_generation ON game_versions(generation_id);
+
     PRAGMA foreign_keys = ON;
   `);
 
-  // 增量迁移：为已有表添加新列（ALTER TABLE ADD COLUMN 在列已存在时会报错，需要 try-catch）
-  const columnMigrations = [
-    "ALTER TABLE move_generation_records ADD COLUMN game_version_code TEXT",
-    "ALTER TABLE ability_generation_records ADD COLUMN game_version_code TEXT",
-  ];
-  for (const sql of columnMigrations) {
-    try { db.exec(sql); } catch { /* 列已存在，忽略 */ }
-  }
-
-  // 结构迁移：moves 表唯一键从 name_zh 改为 (number, name_zh)，accuracy 从 TEXT 改为 INTEGER
-  // move_generation_records 唯一键从 (move_id, generation_id) 改为 (move_id, generation_id, game_version_code)
-  // 检测旧 schema 并重建
-  try {
-    const movesInfo = db.prepare("PRAGMA table_info(moves)").all() as Record<string, unknown>[];
-    const accuracyCol = movesInfo.find((col) => col.name === "accuracy");
-    if (accuracyCol && String(accuracyCol.type).toUpperCase() === "TEXT") {
-      db.exec(`
-        PRAGMA foreign_keys = OFF;
-        DROP TABLE IF EXISTS move_generation_records;
-        DROP TABLE IF EXISTS moves;
-        PRAGMA foreign_keys = ON;
-      `);
-      // 重新创建（会被上面的 CREATE TABLE IF NOT EXISTS 处理，但表已被删除所以需要再次执行）
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS moves (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          number INTEGER,
-          name_zh TEXT NOT NULL,
-          name_ja TEXT,
-          name_en TEXT,
-          type_id INTEGER REFERENCES types(id),
-          category TEXT,
-          power INTEGER,
-          accuracy INTEGER,
-          pp INTEGER,
-          description TEXT,
-          effect_detail TEXT,
-          introduced_generation INTEGER REFERENCES generations(id),
-          source_url TEXT,
-          source_title TEXT,
-          source_fetched_at TEXT,
-          UNIQUE (number, name_zh)
-        );
-        CREATE TABLE IF NOT EXISTS move_generation_records (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
-          generation_id INTEGER NOT NULL REFERENCES generations(id),
-          game_version_code TEXT NOT NULL DEFAULT '',
-          description TEXT,
-          notes TEXT,
-          UNIQUE (move_id, generation_id, game_version_code)
-        );
-        CREATE INDEX IF NOT EXISTS idx_moves_number ON moves(number);
-        CREATE INDEX IF NOT EXISTS idx_moves_name_zh ON moves(name_zh);
-        CREATE INDEX IF NOT EXISTS idx_moves_type ON moves(type_id);
-      `);
-    }
-  } catch { /* 迁移检测失败时忽略，不影响正常使用 */ }
+  // generations / game_versions / types 表已废弃，不再填充维度数据。
+  // 世代直接以数字存储，游戏版本以 code 存储，属性以汉字存储。
 
   db.close();
 }
 
 /**
- * 破坏性重建：删除所有表后重新创建。仅在明确需要全量重建时使用。
+ * 迁移旧 schema 到新 schema。保留 moves/abilities/items 数据，
+ * 删除旧的 pokemon 相关表。
  */
-export function resetSchema() {
+export function migrateSchema() {
   const db = openDatabase();
   db.exec(`
     PRAGMA foreign_keys = OFF;
-    DROP TABLE IF EXISTS pokemon_learnsets;
+
+    -- 删除旧的 pokemon 相关表
+    DROP TABLE IF EXISTS pokemon_learnsets_old;
     DROP TABLE IF EXISTS pokemon_moves;
     DROP TABLE IF EXISTS pokemon_evolution_members;
     DROP TABLE IF EXISTS pokemon_form_abilities;
@@ -1060,365 +839,554 @@ export function resetSchema() {
     DROP TABLE IF EXISTS pokemon_generation_stats;
     DROP TABLE IF EXISTS pokemon_generation_records;
     DROP TABLE IF EXISTS pokemon_base_stats;
+    DROP TABLE IF EXISTS evolution_chains;
+    DROP TABLE IF EXISTS pokemon_learnsets;
+    DROP TABLE IF EXISTS pokemon_form_images;
+    DROP TABLE IF EXISTS pokemon;
+
+    PRAGMA foreign_keys = ON;
+  `);
+  db.close();
+
+  // 重新创建所有表
+  ensureSchema();
+}
+
+/**
+ * 完全重建：删除所有表后重新创建。
+ */
+export function resetSchema() {
+  const db = openDatabase();
+  db.exec(`
+    PRAGMA foreign_keys = OFF;
+    DROP TABLE IF EXISTS pokemon_learnsets;
+    DROP TABLE IF EXISTS evolution_chains;
+    DROP TABLE IF EXISTS pokemon_form_images;
+    DROP TABLE IF EXISTS pokemon_form_abilities;
+    DROP TABLE IF EXISTS pokemon_form_types;
+    DROP TABLE IF EXISTS pokemon_form_stats;
+    DROP TABLE IF EXISTS pokemon_forms;
+    DROP TABLE IF EXISTS pokemon_generation_regions;
     DROP TABLE IF EXISTS move_generation_records;
     DROP TABLE IF EXISTS ability_generation_records;
-    DROP TABLE IF EXISTS image_assets;
     DROP TABLE IF EXISTS items;
     DROP TABLE IF EXISTS moves;
     DROP TABLE IF EXISTS abilities;
     DROP TABLE IF EXISTS pokemon;
-    DROP TABLE IF EXISTS game_versions;
-    DROP TABLE IF EXISTS types;
-    DROP TABLE IF EXISTS generations;
+    DROP TABLE IF EXISTS game_versions;  -- legacy, no longer used
+    DROP TABLE IF EXISTS types;  -- legacy, no longer used
+    DROP TABLE IF EXISTS generations;  -- legacy, no longer used
+    -- 旧表清理
+    DROP TABLE IF EXISTS pokemon_moves;
+    DROP TABLE IF EXISTS pokemon_evolution_members;
+    DROP TABLE IF EXISTS pokemon_abilities;
+    DROP TABLE IF EXISTS pokemon_types;
+    DROP TABLE IF EXISTS pokemon_generation_regions;
+    DROP TABLE IF EXISTS pokemon_generation_abilities;
+    DROP TABLE IF EXISTS pokemon_generation_types;
+    DROP TABLE IF EXISTS pokemon_generation_stats;
+    DROP TABLE IF EXISTS pokemon_generation_records;
+    DROP TABLE IF EXISTS pokemon_base_stats;
+    DROP TABLE IF EXISTS image_assets;
+    DROP TABLE IF EXISTS _image_assets_backup;
     PRAGMA foreign_keys = ON;
   `);
   db.close();
   ensureSchema();
 }
 
-export function importNormalizedDataToSqlite(input: {
-  pokemonEntries: PokemonEntry[];
-  items: ItemEntry[];
-  moves: MoveEntry[];
-  abilities: AbilityEntry[];
-}) {
-  const { pokemonEntries, items, moves, abilities } = input;
-  ensureSchema();
-  const db = openDatabase();
-  db.exec("BEGIN");
+// ── Query helpers ──
 
-  try {
-    const generationDbIds = new Map<number, number>();
-    const typeDbIds = new Map<string, number>();
-    const moveDbIds = new Map<string, number>();
-    const abilityDbIds = new Map<string, number>();
-    const pokemonDbIds = new Map<string, number>();
-
-    const generationsMap = new Map(GENERATIONS.map(([num, zh, en]) => [num, { zh, en }]));
-    const insertGeneration = db.prepare("INSERT OR IGNORE INTO generations (number, name_zh, name_en) VALUES (?, ?, ?)");
-    const findGeneration = db.prepare("SELECT id FROM generations WHERE number = ?");
-    const ensureGeneration = (generation: number | undefined) => {
-      if (!generation) return undefined;
-      const cached = generationDbIds.get(generation);
-      if (cached) return cached;
-      const known = generationsMap.get(generation);
-      const nameZh = known?.zh ?? `第${generation}世代`;
-      const nameEn = known?.en ?? `Generation ${generation}`;
-      insertGeneration.run(generation, nameZh, nameEn);
-      const row = findGeneration.get(generation) as { id: number };
-      generationDbIds.set(generation, Number(row.id));
-      return Number(row.id);
-    };
-    const insertType = db.prepare("INSERT OR IGNORE INTO types (legacy_id, name_zh) VALUES (?, ?)");
-    const findType = db.prepare("SELECT id FROM types WHERE name_zh = ?");
-    const ensureType = (type: string | undefined) => {
-      const ids: number[] = [];
-      for (const name of splitTypeNames(type)) {
-        const cached = typeDbIds.get(name);
-        if (cached) {
-          ids.push(cached);
-          continue;
-        }
-        insertType.run(typeLegacyId(name), name);
-        const row = findType.get(name) as { id: number };
-        typeDbIds.set(name, Number(row.id));
-        ids.push(Number(row.id));
-      }
-      return ids;
-    };
-    for (const generation of GENERATIONS) insertGeneration.run(...generation);
-    // 确保所有世代 id 都已缓存
-    for (const [num] of GENERATIONS) ensureGeneration(num);
-
-    // 填充游戏版本
-    const insertGameVersion = db.prepare(
-      "INSERT OR IGNORE INTO game_versions (code, name_zh, generation_id) VALUES (?, ?, ?)"
-    );
-    for (const [code, nameZh, genNum] of GAME_VERSIONS) {
-      const genId = generationDbIds.get(genNum);
-      if (genId) insertGameVersion.run(code, nameZh, genId);
-    }
-
-    for (const type of TYPE_NAMES) ensureType(type);
-
-    const insertImage = db.prepare(`
-      INSERT OR REPLACE INTO image_assets (entity_type, entity_id, form_id, image_kind, url, alt, source_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    const insertImages = (entityType: string, entityId: number, images?: Record<string, ImageAsset>, formId: number | null = null) => {
-      for (const [kind, image] of Object.entries(images || {})) {
-        if (image?.url) insertImage.run(entityType, entityId, formId, kind, image.url, image.alt ?? null, image.sourceUrl ?? null);
-      }
-    };
-
-    const insertMove = db.prepare(`
-      INSERT OR IGNORE INTO moves (number, name_zh, name_ja, name_en, type_id, category, power, accuracy, pp, description, effect_detail, introduced_generation, source_url, source_title, source_fetched_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const findMove = db.prepare("SELECT id FROM moves WHERE number = ? AND name_zh = ?");
-    const insertMoveGeneration = db.prepare(`
-      INSERT OR REPLACE INTO move_generation_records (move_id, generation_id, game_version_code, description, notes)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-    for (const move of moves) {
-      const moveTypeId = ensureType(move.type)[0] ?? null;
-      const introducedGenerationDbId = ensureGeneration(move.introducedGeneration) ?? null;
-      insertMove.run(move.number ?? null, move.nameZh, move.nameJa ?? null, move.nameEn ?? null, moveTypeId, move.category ?? null, move.power ?? null, move.accuracy ?? null, move.pp ?? null, move.description ?? null, move.effectDetail ?? null, introducedGenerationDbId, move.source?.url ?? null, move.source?.title ?? null, move.source?.fetchedAt ?? null);
-      const moveDbId = Number((findMove.get(move.number ?? null, move.nameZh) as { id: number }).id);
-      moveDbIds.set(move.id, moveDbId);
-      moveDbIds.set(move.nameZh, moveDbId);
-      insertImages("move", moveDbId, move.image ? { primary: move.image } : undefined);
-      for (const record of move.generations || []) {
-        const generationDbId = ensureGeneration(record.generation);
-        if (generationDbId) insertMoveGeneration.run(moveDbId, generationDbId, record.gameVersionCode ?? "", record.description ?? "", record.notes ?? null);
-      }
-    }
-
-    const insertAbility = db.prepare(`
-      INSERT OR IGNORE INTO abilities (number, name_zh, name_ja, name_en, description, effect_detail, introduced_generation, source_url, source_title, source_fetched_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const findAbility = db.prepare("SELECT id FROM abilities WHERE number = ? AND name_zh = ?");
-    const insertAbilityGeneration = db.prepare(`
-      INSERT OR REPLACE INTO ability_generation_records (ability_id, generation_id, game_version_code, description, notes)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-    for (const ability of abilities) {
-      const introducedGenerationDbId = ensureGeneration(ability.introducedGeneration) ?? null;
-      insertAbility.run(ability.number ?? null, ability.nameZh, ability.nameJa ?? null, ability.nameEn ?? null, ability.description ?? null, ability.effectDetail ?? null, introducedGenerationDbId, ability.source?.url ?? null, ability.source?.title ?? null, ability.source?.fetchedAt ?? null);
-      const row = findAbility.get(ability.number ?? null, ability.nameZh) as { id: number };
-      const abilityDbId = Number(row.id);
-      abilityDbIds.set(ability.id, abilityDbId);
-      abilityDbIds.set(ability.nameZh, abilityDbId);
-      insertImages("ability", abilityDbId, ability.image ? { primary: ability.image } : undefined);
-      for (const record of ability.generations || []) {
-        const generationDbId = ensureGeneration(record.generation);
-        if (generationDbId) insertAbilityGeneration.run(abilityDbId, generationDbId, record.gameVersionCode ?? null, record.description ?? "", record.notes ?? null);
-      }
-    }
-
-    const insertItem = db.prepare(`
-      INSERT OR IGNORE INTO items (legacy_id, slug, name_zh, name_ja, name_en, category, effect_summary, source_url, source_title, source_fetched_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const findItem = db.prepare("SELECT id FROM items WHERE legacy_id = ?");
-    for (const item of items) {
-      insertItem.run(item.id, item.slug, item.nameZh, item.nameJa ?? null, item.nameEn ?? null, item.category ?? null, item.effectSummary ?? null, item.source?.url ?? null, item.source?.title ?? null, item.source?.fetchedAt ?? null);
-      insertImages("item", Number((findItem.get(item.id) as { id: number }).id), item.image ? { primary: item.image } : undefined);
-    }
-
-    const insertPokemon = db.prepare(`
-      INSERT INTO pokemon (legacy_id, dex_number, slug, name_zh, name_ja, name_en, category, hidden_ability, height_m, weight_kg, color, catch_rate, male_ratio, female_ratio, genderless, source_url, source_title, source_fetched_at, parse_note)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const insertBaseStats = db.prepare("INSERT INTO pokemon_base_stats (pokemon_id, hp, atk, def, spa, spd, spe) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const insertPokemonType = db.prepare("INSERT OR IGNORE INTO pokemon_types (pokemon_id, type_id, slot) VALUES (?, ?, ?)");
-    const insertPokemonAbility = db.prepare("INSERT OR IGNORE INTO pokemon_abilities (pokemon_id, ability_id, ability_key, slot, is_hidden) VALUES (?, ?, ?, ?, ?)");
-    const insertRegion = db.prepare("INSERT OR IGNORE INTO pokemon_generation_regions (pokemon_id, generation_id, region, dex_number) VALUES (?, ?, ?, ?)");
-    const insertGenerationRecord = db.prepare(`
-      INSERT OR REPLACE INTO pokemon_generation_records (pokemon_id, generation_id, label, notes)
-      VALUES (?, ?, ?, ?)
-    `);
-    const insertGenerationType = db.prepare("INSERT OR IGNORE INTO pokemon_generation_types (pokemon_id, generation_id, type_id, slot) VALUES (?, ?, ?, ?)");
-    const insertGenerationAbility = db.prepare("INSERT OR IGNORE INTO pokemon_generation_abilities (pokemon_id, generation_id, ability_id, ability_key, slot, is_hidden) VALUES (?, ?, ?, ?, ?, ?)");
-    const insertGenerationStats = db.prepare("INSERT OR REPLACE INTO pokemon_generation_stats (pokemon_id, generation_id, hp, atk, def, spa, spd, spe) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    const insertPokemonMove = db.prepare(`
-      INSERT INTO pokemon_moves (pokemon_id, move_id, move_key, generation_id, game_version_code, move_name_zh, learn_method, level, notes, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const insertForm = db.prepare("INSERT INTO pokemon_forms (legacy_id, pokemon_id, name_zh, introduced_generation, is_mega, notes, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const insertFormStats = db.prepare("INSERT INTO pokemon_form_stats (form_id, hp, atk, def, spa, spd, spe) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    const insertFormType = db.prepare("INSERT OR IGNORE INTO pokemon_form_types (form_id, type_id, slot) VALUES (?, ?, ?)");
-    const insertFormAbility = db.prepare("INSERT OR IGNORE INTO pokemon_form_abilities (form_id, ability_id, ability_key, slot) VALUES (?, ?, ?, ?)");
-    const insertEvolutionMember = db.prepare("INSERT OR IGNORE INTO pokemon_evolution_members (pokemon_id, related_pokemon_id, stage_label, sort_order) VALUES (?, ?, ?, ?)");
-
-    const resolveMoveDbId = (key: string | undefined) => key ? moveDbIds.get(key) : undefined;
-    const resolveAbilityDbId = (key: string | undefined) => key ? abilityDbIds.get(key) : undefined;
-    const isKnownAbility = (key: string | undefined): key is string => Boolean(key && resolveAbilityDbId(key));
-    const insertAbilityReference = (pokemonDbId: number, abilityKey: string, slot: number, hidden: boolean) => {
-      insertPokemonAbility.run(pokemonDbId, resolveAbilityDbId(abilityKey) ?? null, abilityKey, slot, hidden ? 1 : 0);
-    };
-    const insertGenerationAbilityReference = (pokemonDbId: number, generationDbId: number, abilityKey: string, slot: number, hidden: boolean) => {
-      insertGenerationAbility.run(pokemonDbId, generationDbId, resolveAbilityDbId(abilityKey) ?? null, abilityKey, slot, hidden ? 1 : 0);
-    };
-
-    for (const pokemon of pokemonEntries) {
-      const pokemonResult = insertPokemon.run(pokemon.id, pokemon.dexNumber, pokemon.slug, pokemon.nameZh, pokemon.nameJa ?? null, pokemon.nameEn ?? null, pokemon.category ?? null, pokemon.hiddenAbility ?? null, pokemon.heightM ?? null, pokemon.weightKg ?? null, pokemon.color ?? null, pokemon.catchRate ?? null, pokemon.genderRatio?.male ?? null, pokemon.genderRatio?.female ?? null, pokemon.genderRatio?.genderless ? 1 : null, pokemon.source?.url ?? null, pokemon.source?.title ?? null, pokemon.source?.fetchedAt ?? null, pokemon.parseNote ?? null);
-      const pokemonDbId = Number(pokemonResult.lastInsertRowid);
-      pokemonDbIds.set(pokemon.id, pokemonDbId);
-      pokemonDbIds.set(pokemon.slug, pokemonDbId);
-      pokemonDbIds.set(pokemon.nameZh, pokemonDbId);
-      if (pokemon.baseStats) insertBaseStats.run(pokemonDbId, pokemon.baseStats.hp, pokemon.baseStats.atk, pokemon.baseStats.def, pokemon.baseStats.spa, pokemon.baseStats.spd, pokemon.baseStats.spe);
-      insertImages("pokemon", pokemonDbId, pokemon.images);
-
-      splitTypeNames(pokemon.primaryType).forEach((type, index) => {
-        const typeDbId = ensureType(type)[0];
-        if (typeDbId) insertPokemonType.run(pokemonDbId, typeDbId, index + 1);
-      });
-      splitTypeNames(pokemon.secondaryType).forEach((type, index) => {
-        const typeDbId = ensureType(type)[0];
-        if (typeDbId) insertPokemonType.run(pokemonDbId, typeDbId, index + 2);
-      });
-      const baseHiddenAbilityKey = [pokemon.hiddenAbilityId, pokemon.hiddenAbility].find(isKnownAbility);
-      const baseAbilityKeys = [...new Set([...(pokemon.abilityIds || []), ...(pokemon.abilities || [])])]
-        .filter(isKnownAbility)
-        .filter((abilityKey) => abilityKey !== baseHiddenAbilityKey);
-      baseAbilityKeys.forEach((abilityId, index) => insertAbilityReference(pokemonDbId, abilityId, index + 1, false));
-      if (baseHiddenAbilityKey) insertAbilityReference(pokemonDbId, baseHiddenAbilityKey, 99, true);
-
-      for (const availability of pokemon.generationAvailability || []) {
-        const generationDbId = ensureGeneration(availability.generation);
-        if (!generationDbId) continue;
-        if (availability.regions?.length) {
-          availability.regions.forEach((region) => insertRegion.run(pokemonDbId, generationDbId, region.region, region.dexNumber ?? null));
-        } else {
-          insertRegion.run(pokemonDbId, generationDbId, null, null);
-        }
-      }
-
-      const recordsByGeneration = new Map<number, NonNullable<PokemonEntry["generationRecords"]>[number]>();
-      for (const record of pokemon.generationRecords || []) recordsByGeneration.set(record.generation, record);
-      for (const availability of pokemon.generationAvailability || []) {
-        if (!recordsByGeneration.has(availability.generation)) recordsByGeneration.set(availability.generation, { generation: availability.generation });
-      }
-
-      for (const record of [...recordsByGeneration.values()].sort((left, right) => left.generation - right.generation)) {
-        const generationDbId = ensureGeneration(record.generation);
-        if (!generationDbId) continue;
-        const recordTypes = [...splitTypeNames(record.primaryType), ...splitTypeNames(record.secondaryType)].slice(0, 2);
-        const effectiveTypes = recordTypes.length
-          ? recordTypes
-          : [...splitTypeNames(pokemon.primaryType), ...splitTypeNames(pokemon.secondaryType)].slice(0, 2);
-        insertGenerationRecord.run(pokemonDbId, generationDbId, record.label ?? null, record.notes ?? null);
-        effectiveTypes.forEach((type, index) => {
-          const typeDbId = ensureType(type)[0];
-          if (typeDbId) insertGenerationType.run(pokemonDbId, generationDbId, typeDbId, index + 1);
-        });
-        const stats = record.baseStats || pokemon.baseStats;
-        if (stats) insertGenerationStats.run(pokemonDbId, generationDbId, stats.hp, stats.atk, stats.def, stats.spa, stats.spd, stats.spe);
-        const recordHasExplicitAbilities = Array.isArray(record.abilityIds);
-        const knownRecordAbilityKeys = (record.abilityIds || []).filter(isKnownAbility);
-        const effectiveAbilityKeys = recordHasExplicitAbilities
-          ? knownRecordAbilityKeys.length ? knownRecordAbilityKeys : record.generation >= 3 ? baseAbilityKeys : []
-          : record.generation >= 3
-            ? baseAbilityKeys
-            : [];
-        effectiveAbilityKeys.forEach((abilityId, index) => insertGenerationAbilityReference(pokemonDbId, generationDbId, abilityId, index + 1, false));
-        const recordHiddenAbilityKey = [record.hiddenAbilityId, record.generation >= 5 ? baseHiddenAbilityKey : undefined].find(isKnownAbility);
-        if (recordHiddenAbilityKey) insertGenerationAbilityReference(pokemonDbId, generationDbId, recordHiddenAbilityKey, 99, true);
-        for (const [index, learnset] of (record.learnset || []).entries()) {
-          const moveDbId = resolveMoveDbId(learnset.moveId) ?? resolveMoveDbId(learnset.moveNameZh);
-          insertPokemonMove.run(pokemonDbId, moveDbId ?? null, learnset.moveId || learnset.moveNameZh || "", generationDbId, null, learnset.moveNameZh ?? null, learnset.learnMethod ?? null, learnset.level ?? null, learnset.notes ?? null, index);
-        }
-      }
-
-      for (const [index, form] of (pokemon.forms || []).entries()) {
-        const formId = `${pokemon.id}-form-${index + 1}-${form.id || "variant"}`;
-        const introducedGenerationDbId = ensureGeneration(form.introducedGeneration) ?? null;
-        const formResult = insertForm.run(formId, pokemonDbId, form.nameZh, introducedGenerationDbId, form.isMega ? 1 : 0, form.notes ?? null, index);
-        const formDbId = Number(formResult.lastInsertRowid);
-        insertImages("pokemon", pokemonDbId, form.images, formDbId);
-        if (form.baseStats) insertFormStats.run(formDbId, form.baseStats.hp, form.baseStats.atk, form.baseStats.def, form.baseStats.spa, form.baseStats.spd, form.baseStats.spe);
-        [...splitTypeNames(form.primaryType), ...splitTypeNames(form.secondaryType)].slice(0, 2).forEach((type, slot) => {
-          const typeDbId = ensureType(type)[0];
-          if (typeDbId) insertFormType.run(formDbId, typeDbId, slot + 1);
-        });
-        (form.abilityIds || []).forEach((abilityId, slot) => insertFormAbility.run(formDbId, resolveAbilityDbId(abilityId) ?? null, abilityId, slot + 1));
-      }
-
-    }
-
-    for (const pokemon of pokemonEntries) {
-      const pokemonDbId = pokemonDbIds.get(pokemon.id);
-      if (!pokemonDbId) continue;
-      for (const [index, member] of (pokemon.evolutionChain || []).entries()) {
-        const relatedPokemonDbId = member.id ? pokemonDbIds.get(member.id) : undefined;
-        if (relatedPokemonDbId) insertEvolutionMember.run(pokemonDbId, relatedPokemonDbId, member.stageLabel ?? null, index);
-      }
-    }
-
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    db.close();
-    throw error;
-  }
-
-  db.close();
-  return { pokemonCount: pokemonEntries.length, itemCount: items.length, moveCount: moves.length, abilityCount: abilities.length, databasePath: resolveDatabasePath() };
+function statBlockFromRow(row: Record<string, unknown>): StatBlock | undefined {
+  if (row.hp === null || row.hp === undefined) return undefined;
+  return { hp: Number(row.hp), atk: Number(row.atk), def: Number(row.def), spa: Number(row.spa), spd: Number(row.spd), spe: Number(row.spe) };
 }
 
-export function hasSqliteData() {
-  if (!hasDatabaseFile()) return false;
-  const db = openDatabase();
-  const row = db.prepare(
-    "SELECT (SELECT COUNT(*) FROM pokemon) + (SELECT COUNT(*) FROM moves) + (SELECT COUNT(*) FROM abilities) AS total"
-  ).get() as { total: number };
-  db.close();
-  return row.total > 0;
+function sourceFromRow(row: Record<string, unknown>): SourceMeta | undefined {
+  return row.source_url || row.source_title || row.source_fetched_at
+    ? { url: String(row.source_url ?? ""), title: String(row.source_title ?? ""), fetchedAt: String(row.source_fetched_at ?? "") }
+    : undefined;
 }
 
+// ── Pokemon queries (N+1 eliminated) ──
+
+/**
+ * 列表查询：单次 JOIN 获取所有宝可梦的默认形态信息。
+ */
 export function listPokemonFromSqlite(filters?: { query?: string; type?: string; generation?: number }) {
   const db = openDatabase();
   const conditions: string[] = [];
   const params: Array<string | number> = [];
+
   if (filters?.query) {
-    conditions.push("(p.name_zh LIKE ? OR p.name_ja LIKE ? OR p.name_en LIKE ? OR p.slug LIKE ? OR p.legacy_id LIKE ? OR CAST(p.id AS TEXT) LIKE ?)");
-    const value = `%${filters.query}%`;
-    params.push(value, value, value, value, value, value);
+    conditions.push("(p.name_zh LIKE ? OR p.name_ja LIKE ? OR p.name_en LIKE ? OR p.slug LIKE ? OR CAST(p.dex_number AS TEXT) LIKE ?)");
+    const v = `%${filters.query}%`;
+    params.push(v, v, v, v, v);
   }
   if (filters?.type) {
-    conditions.push(`(
-      EXISTS (SELECT 1 FROM pokemon_types pt JOIN types t ON t.id = pt.type_id WHERE pt.pokemon_id = p.id AND t.name_zh = ?)
-      OR EXISTS (SELECT 1 FROM pokemon_generation_types pgt JOIN types gt ON gt.id = pgt.type_id WHERE pgt.pokemon_id = p.id AND gt.name_zh = ?)
+    conditions.push(`EXISTS (
+      SELECT 1 FROM pokemon_form_types pft2
+      WHERE pft2.form_id = pf.id AND pft2.type_name = ?
     )`);
-    params.push(filters.type, filters.type);
+    params.push(filters.type);
   }
   if (filters?.generation) {
-    conditions.push("p.introduced_generation = ?");
+    conditions.push(`EXISTS (
+      SELECT 1 FROM pokemon_generation_regions pgr
+      WHERE pgr.pokemon_id = p.id AND pgr.generation = ?
+    )`);
     params.push(filters.generation);
   }
+
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  // 主查询：pokemon + 默认形态 + 最新种族值（generation_end IS NULL 表示最新世代）
   const rows = db.prepare(`
-    SELECT p.*, bs.hp, bs.atk, bs.def, bs.spa, bs.spd, bs.spe
+    SELECT
+      p.id, p.dex_number, p.slug, p.name_zh, p.name_ja, p.name_en,
+      pf.id AS form_id,
+      pfs.hp, pfs.atk, pfs.def, pfs.spa, pfs.spd, pfs.spe
     FROM pokemon p
-    LEFT JOIN pokemon_base_stats bs ON bs.pokemon_id = p.id
+    JOIN pokemon_forms pf ON pf.pokemon_id = p.id AND pf.is_default = 1
+    LEFT JOIN pokemon_form_stats pfs ON pfs.form_id = pf.id AND pfs.generation_end IS NULL
     ${where}
     ORDER BY p.dex_number ASC
   `).all(...params) as Record<string, unknown>[];
-  const result = rows.map((row) => hydratePokemonRow(db, row));
+
+  if (rows.length === 0) { db.close(); return []; }
+
+  // 批量获取所有默认形态的属性
+  const formIds = rows.map((r) => Number(r.form_id));
+  const placeholders = formIds.map(() => "?").join(",");
+
+  const typeRows = db.prepare(`
+    SELECT pft.form_id, pft.type_name, pft.slot
+    FROM pokemon_form_types pft
+    WHERE pft.form_id IN (${placeholders})
+    ORDER BY pft.form_id, pft.slot
+  `).all(...formIds) as Record<string, unknown>[];
+
+  const typeMap = new Map<number, string[]>();
+  for (const r of typeRows) {
+    const fid = Number(r.form_id);
+    if (!typeMap.has(fid)) typeMap.set(fid, []);
+    typeMap.get(fid)!.push(String(r.type_name));
+  }
+
+  // 批量获取所有默认形态的特性
+  const abilityRows = db.prepare(`
+    SELECT pfa.form_id, pfa.ability_name_zh, pfa.is_hidden
+    FROM pokemon_form_abilities pfa
+    WHERE pfa.form_id IN (${placeholders})
+    ORDER BY pfa.form_id, pfa.slot
+  `).all(...formIds) as Record<string, unknown>[];
+
+  const abilityMap = new Map<number, { abilities: string[]; hidden?: string }>();
+  for (const r of abilityRows) {
+    const fid = Number(r.form_id);
+    if (!abilityMap.has(fid)) abilityMap.set(fid, { abilities: [] });
+    const entry = abilityMap.get(fid)!;
+    if (Number(r.is_hidden)) {
+      entry.hidden = String(r.ability_name_zh);
+    } else {
+      entry.abilities.push(String(r.ability_name_zh));
+    }
+  }
+
+  // 批量获取所有默认形态的图片
+  const imageRows = db.prepare(`
+    SELECT pfi.form_id, pfi.image_kind, pfi.url, pfi.alt
+    FROM pokemon_form_images pfi
+    WHERE pfi.form_id IN (${placeholders})
+  `).all(...formIds) as Record<string, unknown>[];
+
+  const imageMap = new Map<number, Record<string, ImageAsset>>();
+  for (const r of imageRows) {
+    const fid = Number(r.form_id);
+    if (!imageMap.has(fid)) imageMap.set(fid, {});
+    imageMap.get(fid)![String(r.image_kind)] = { url: String(r.url), alt: r.alt ? String(r.alt) : undefined };
+  }
+
+  // 批量获取世代可用性
+  const pokemonIds = rows.map((r) => Number(r.id));
+  const pPlaceholders = pokemonIds.map(() => "?").join(",");
+  const genRows = db.prepare(`
+    SELECT pgr.pokemon_id, pgr.generation
+    FROM pokemon_generation_regions pgr
+    WHERE pgr.pokemon_id IN (${pPlaceholders})
+    ORDER BY pgr.pokemon_id, pgr.generation
+  `).all(...pokemonIds) as Record<string, unknown>[];
+
+  const genMap = new Map<number, number[]>();
+  for (const r of genRows) {
+    const pid = Number(r.pokemon_id);
+    if (!genMap.has(pid)) genMap.set(pid, []);
+    const num = Number(r.generation);
+    if (!genMap.get(pid)!.includes(num)) genMap.get(pid)!.push(num);
+  }
+
+  // 批量获取进化链（用于列表页分组）
+  const evoRows = db.prepare(`
+    SELECT ec.chain_id, ec.to_pokemon_id, ec.stage, ec.sort_order
+    FROM evolution_chains ec
+    WHERE ec.to_pokemon_id IN (${pPlaceholders})
+    ORDER BY ec.chain_id, ec.sort_order
+  `).all(...pokemonIds) as Record<string, unknown>[];
+
+  const chainMap = new Map<number, number>(); // pokemonId -> chainId
+  for (const r of evoRows) {
+    chainMap.set(Number(r.to_pokemon_id), Number(r.chain_id));
+  }
+
   db.close();
-  return result;
+
+  return rows.map((row) => {
+    const fid = Number(row.form_id);
+    const pid = Number(row.id);
+    const types = typeMap.get(fid) || [];
+    const ab = abilityMap.get(fid) || { abilities: [] };
+    const imgs = imageMap.get(fid) || {};
+    return {
+      id: pid,
+      dexNumber: Number(row.dex_number),
+      slug: String(row.slug),
+      nameZh: String(row.name_zh),
+      nameJa: row.name_ja ? String(row.name_ja) : undefined,
+      nameEn: row.name_en ? String(row.name_en) : undefined,
+      primaryType: types[0],
+      secondaryType: types[1],
+      abilities: ab.abilities,
+      hiddenAbility: ab.hidden,
+      baseStats: statBlockFromRow(row),
+      image: imgs.official,
+      shinyImage: imgs.shiny,
+      generations: genMap.get(pid) || [],
+      _chainId: chainMap.get(pid),
+    } as PokemonSummary & { _chainId?: number };
+  });
 }
 
+/**
+ * 详情查询：获取宝可梦的完整信息（所有形态 + 进化链）。
+ */
 export function getPokemonFromSqlite(idOrSlug: string) {
   const db = openDatabase();
+
+  // 查询 1: 基础信息
   const row = db.prepare(`
-    SELECT p.*, bs.hp, bs.atk, bs.def, bs.spa, bs.spd, bs.spe
+    SELECT p.*
     FROM pokemon p
-    LEFT JOIN pokemon_base_stats bs ON bs.pokemon_id = p.id
-    WHERE p.id = ? OR p.legacy_id = ? OR p.slug = ? OR p.name_zh = ?
+    WHERE p.id = ? OR p.slug = ? OR p.name_zh = ? OR CAST(p.dex_number AS TEXT) = ?
     LIMIT 1
   `).get(idOrSlug, idOrSlug, idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
-  const result = row ? hydratePokemonRow(db, row, true) : undefined;
+
+  if (!row) { db.close(); return undefined; }
+
+  const pokemonId = Number(row.id);
+
+  // 查询 2: 所有形态
+  const formRows = db.prepare(`
+    SELECT pf.*
+    FROM pokemon_forms pf
+    WHERE pf.pokemon_id = ?
+    ORDER BY pf.sort_order ASC
+  `).all(pokemonId) as Record<string, unknown>[];
+
+  const formIds = formRows.map((f) => Number(f.id));
+  const fPlaceholders = formIds.map(() => "?").join(",") || "NULL";
+
+  // 批量获取形态种族值（可能有多条，按世代区分）
+  const fsRows = formIds.length ? db.prepare(`
+    SELECT pfs.form_id, pfs.generation_start, pfs.generation_end,
+           pfs.hp, pfs.atk, pfs.def, pfs.spa, pfs.spd, pfs.spe
+    FROM pokemon_form_stats pfs
+    WHERE pfs.form_id IN (${fPlaceholders})
+    ORDER BY pfs.form_id, pfs.generation_start ASC
+  `).all(...formIds) as Record<string, unknown>[] : [];
+
+  const fsMap = new Map<number, Array<{ genStart?: number; genEnd?: number; stats: StatBlock }>>();
+  for (const r of fsRows) {
+    const fid = Number(r.form_id);
+    if (!fsMap.has(fid)) fsMap.set(fid, []);
+    fsMap.get(fid)!.push({
+      genStart: r.generation_start !== null && r.generation_start !== undefined ? Number(r.generation_start) : undefined,
+      genEnd: r.generation_end !== null && r.generation_end !== undefined ? Number(r.generation_end) : undefined,
+      stats: statBlockFromRow(r)!,
+    });
+  }
+
+  // 批量获取形态属性（可能有多条，按世代区分）
+  const ftRows = formIds.length ? db.prepare(`
+    SELECT pft.form_id, pft.type_name, pft.slot, pft.generation_start, pft.generation_end
+    FROM pokemon_form_types pft
+    WHERE pft.form_id IN (${fPlaceholders})
+    ORDER BY pft.form_id, pft.generation_start ASC, pft.slot
+  `).all(...formIds) as Record<string, unknown>[] : [];
+
+  const ftMap = new Map<number, Array<{ genStart?: number; genEnd?: number; types: string[] }>>();
+  for (const r of ftRows) {
+    const fid = Number(r.form_id);
+    const genStart = r.generation_start !== null && r.generation_start !== undefined ? Number(r.generation_start) : undefined;
+    const genEnd = r.generation_end !== null && r.generation_end !== undefined ? Number(r.generation_end) : undefined;
+    if (!ftMap.has(fid)) ftMap.set(fid, []);
+    const arr = ftMap.get(fid)!;
+    // Group by generation range
+    let group = arr.find((g) => g.genStart === genStart && g.genEnd === genEnd);
+    if (!group) {
+      group = { genStart, genEnd, types: [] };
+      arr.push(group);
+    }
+    group.types.push(String(r.type_name));
+  }
+
+  // 批量获取形态特性（可能有多条，按世代区分）
+  const faRows = formIds.length ? db.prepare(`
+    SELECT pfa.form_id, pfa.ability_name_zh, pfa.is_hidden, pfa.slot,
+           pfa.generation_start, pfa.generation_end
+    FROM pokemon_form_abilities pfa
+    WHERE pfa.form_id IN (${fPlaceholders})
+    ORDER BY pfa.form_id, pfa.generation_start ASC, pfa.slot
+  `).all(...formIds) as Record<string, unknown>[] : [];
+
+  const faMap = new Map<number, Array<{ genStart?: number; genEnd?: number; abilities: Array<{ nameZh: string; isHidden: boolean }> }>>();
+  for (const r of faRows) {
+    const fid = Number(r.form_id);
+    const genStart = r.generation_start !== null && r.generation_start !== undefined ? Number(r.generation_start) : undefined;
+    const genEnd = r.generation_end !== null && r.generation_end !== undefined ? Number(r.generation_end) : undefined;
+    if (!faMap.has(fid)) faMap.set(fid, []);
+    const arr = faMap.get(fid)!;
+    let group = arr.find((g) => g.genStart === genStart && g.genEnd === genEnd);
+    if (!group) {
+      group = { genStart, genEnd, abilities: [] };
+      arr.push(group);
+    }
+    group.abilities.push({ nameZh: String(r.ability_name_zh), isHidden: Boolean(Number(r.is_hidden)) });
+  }
+
+  // 批量获取形态图片
+  const fiRows = formIds.length ? db.prepare(`
+    SELECT pfi.form_id, pfi.image_kind, pfi.url, pfi.alt
+    FROM pokemon_form_images pfi
+    WHERE pfi.form_id IN (${fPlaceholders})
+  `).all(...formIds) as Record<string, unknown>[] : [];
+
+  const fiMap = new Map<number, Record<string, ImageAsset>>();
+  for (const r of fiRows) {
+    const fid = Number(r.form_id);
+    if (!fiMap.has(fid)) fiMap.set(fid, {});
+    fiMap.get(fid)![String(r.image_kind)] = { url: String(r.url), alt: r.alt ? String(r.alt) : undefined };
+  }
+
+  const forms: PokemonFormEntry[] = formRows.map((f) => {
+    const fid = Number(f.id);
+    // Resolve stats: pick the latest (no generation_end) or the first entry
+    const statEntries = fsMap.get(fid) || [];
+    const latestStat = statEntries.find((s) => s.genEnd === undefined) || statEntries[0];
+    // Resolve types: pick the latest or the first entry
+    const typeEntries = ftMap.get(fid) || [];
+    const latestType = typeEntries.find((t) => t.genEnd === undefined) || typeEntries[0];
+    // Resolve abilities: pick the latest or the first entry
+    const abilityEntries = faMap.get(fid) || [];
+    const latestAbility = abilityEntries.find((a) => a.genEnd === undefined) || abilityEntries[0];
+
+    const entry: PokemonFormEntry = {
+      formKey: String(f.form_key),
+      nameZh: String(f.name_zh),
+      formType: String(f.form_type),
+      isDefault: Boolean(Number(f.is_default)),
+      sortOrder: Number(f.sort_order),
+      primaryType: latestType?.types[0],
+      secondaryType: latestType?.types[1],
+      abilities: latestAbility?.abilities || [],
+      baseStats: latestStat?.stats,
+      images: fiMap.get(fid) || {},
+    };
+
+    // Attach generation variants if there are multiple entries
+    if (statEntries.length > 1) {
+      entry.statVariants = statEntries.map((s) => ({
+        generationStart: s.genStart,
+        generationEnd: s.genEnd,
+        baseStats: s.stats,
+      }));
+    }
+    if (typeEntries.length > 1) {
+      entry.typeVariants = typeEntries.map((t) => ({
+        generationStart: t.genStart,
+        generationEnd: t.genEnd,
+        primaryType: t.types[0],
+        secondaryType: t.types[1],
+      }));
+    }
+    if (abilityEntries.length > 1) {
+      entry.abilityVariants = abilityEntries.map((a) => ({
+        generationStart: a.genStart,
+        generationEnd: a.genEnd,
+        abilities: a.abilities,
+      }));
+    }
+
+    return entry;
+  });
+
+  // 查询 3: 进化链
+  // 先找到该宝可梦所属的 chain_id
+  const chainRow = db.prepare(`
+    SELECT chain_id FROM evolution_chains WHERE to_pokemon_id = ? LIMIT 1
+  `).get(pokemonId) as Record<string, unknown> | undefined;
+
+  let evolutionChain: EvolutionStep[] = [];
+  if (chainRow) {
+    const chainId = Number(chainRow.chain_id);
+    const evoRows = db.prepare(`
+      SELECT ec.*,
+        pf.name_zh AS from_name, pt.name_zh AS to_name,
+        fi_to.url AS to_image_url, fi_to.alt AS to_image_alt
+      FROM evolution_chains ec
+      LEFT JOIN pokemon pf ON pf.id = ec.from_pokemon_id
+      LEFT JOIN pokemon pt ON pt.id = ec.to_pokemon_id
+      LEFT JOIN pokemon_forms pf_to ON pf_to.pokemon_id = ec.to_pokemon_id AND pf_to.is_default = 1
+      LEFT JOIN pokemon_form_images fi_to ON fi_to.form_id = pf_to.id AND fi_to.image_kind = 'official'
+      WHERE ec.chain_id = ?
+      ORDER BY ec.sort_order ASC
+    `).all(chainId) as Record<string, unknown>[];
+
+    evolutionChain = evoRows.map((e) => {
+      // 获取 to_pokemon 的属性
+      const toFormRow = db.prepare(`
+        SELECT pf.id FROM pokemon_forms pf WHERE pf.pokemon_id = ? AND pf.is_default = 1 LIMIT 1
+      `).get(Number(e.to_pokemon_id)) as Record<string, unknown> | undefined;
+      let toTypes: string[] = [];
+      if (toFormRow) {
+        const tRows = db.prepare(`
+          SELECT pft.type_name FROM pokemon_form_types pft
+          WHERE pft.form_id = ? ORDER BY pft.slot
+        `).all(Number(toFormRow.id)) as Record<string, unknown>[];
+        toTypes = tRows.map((t) => String(t.type_name));
+      }
+      return {
+        fromPokemonId: e.from_pokemon_id ? Number(e.from_pokemon_id) : undefined,
+        fromNameZh: e.from_name ? String(e.from_name) : undefined,
+        fromFormKey: e.from_form_key ? String(e.from_form_key) : undefined,
+        toPokemonId: Number(e.to_pokemon_id),
+        toNameZh: String(e.to_name),
+        toFormKey: e.to_form_key ? String(e.to_form_key) : undefined,
+        stage: Number(e.stage),
+        method: e.evolution_method ? String(e.evolution_method) : undefined,
+        condition: e.evolution_condition ? String(e.evolution_condition) : undefined,
+        item: e.evolution_item ? String(e.evolution_item) : undefined,
+        level: e.evolution_level !== null ? Number(e.evolution_level) : undefined,
+        toTypes,
+        toImage: e.to_image_url ? { url: String(e.to_image_url), alt: e.to_image_alt ? String(e.to_image_alt) : undefined } : undefined,
+      };
+    });
+  }
+
+  // 查询 4: 世代可用性
+  const genRegRows = db.prepare(`
+    SELECT pgr.generation FROM pokemon_generation_regions pgr
+    WHERE pgr.pokemon_id = ?
+    ORDER BY pgr.generation
+  `).all(pokemonId) as Record<string, unknown>[];
+  const generations = [...new Set(genRegRows.map((r) => Number(r.generation)))];
+
   db.close();
+
+  // 组装默认形态信息到顶层
+  const defaultForm = forms.find((f) => f.isDefault) || forms[0];
+
+  const result: PokemonEntry = {
+    id: pokemonId,
+    dexNumber: Number(row.dex_number),
+    slug: String(row.slug),
+    nameZh: String(row.name_zh),
+    nameJa: row.name_ja ? String(row.name_ja) : undefined,
+    nameEn: row.name_en ? String(row.name_en) : undefined,
+    primaryType: defaultForm?.primaryType,
+    secondaryType: defaultForm?.secondaryType,
+    abilities: defaultForm?.abilities.filter((a) => !a.isHidden).map((a) => a.nameZh) || [],
+    hiddenAbility: defaultForm?.abilities.find((a) => a.isHidden)?.nameZh,
+    baseStats: defaultForm?.baseStats,
+    image: defaultForm?.images.official,
+    shinyImage: defaultForm?.images.shiny,
+    generations,
+    category: row.category ? String(row.category) : undefined,
+    heightM: row.height_m !== null ? Number(row.height_m) : undefined,
+    weightKg: row.weight_kg !== null ? Number(row.weight_kg) : undefined,
+    forms,
+    evolutionChain,
+    source: sourceFromRow(row),
+  };
+
   return result;
 }
 
-export function listItemsFromSqlite() {
+/**
+ * 获取宝可梦的招式学习列表（按世代 + 形态）。
+ */
+export function getPokemonLearnset(pokemonId: number, generation: number, formKey = "default") {
   const db = openDatabase();
-  const rows = db.prepare("SELECT * FROM items ORDER BY category ASC, name_zh ASC").all() as Record<string, unknown>[];
-  const result = rows.map((row) => mapItemRow(db, row));
+  const rows = db.prepare(`
+    SELECT pl.move_name_zh, pl.learn_method, pl.level, pl.tm_number, pl.notes,
+      m.type_name, m.category AS move_category,
+      m.power AS move_power, m.accuracy AS move_accuracy, m.pp AS move_pp, m.id AS move_id
+    FROM pokemon_learnsets pl
+    LEFT JOIN moves m ON m.id = pl.move_id
+    WHERE pl.pokemon_id = ? AND pl.generation = ? AND pl.form_key = ?
+    ORDER BY pl.learn_method, pl.sort_order
+  `).all(pokemonId, generation, formKey) as Record<string, unknown>[];
   db.close();
-  return result;
+
+  return rows.map((r) => ({
+    moveId: r.move_id !== null ? Number(r.move_id) : undefined,
+    moveNameZh: String(r.move_name_zh),
+    learnMethod: String(r.learn_method),
+    level: r.level !== null ? Number(r.level) : undefined,
+    tmNumber: r.tm_number ? String(r.tm_number) : undefined,
+    moveType: r.type_name ? String(r.type_name) : undefined,
+    moveCategory: r.move_category ? String(r.move_category) : undefined,
+    movePower: r.move_power !== null ? Number(r.move_power) : undefined,
+    moveAccuracy: r.move_accuracy !== null ? Number(r.move_accuracy) : undefined,
+    movePP: r.move_pp !== null ? Number(r.move_pp) : undefined,
+  } as LearnsetRecord));
 }
 
-export function getItemFromSqlite(idOrSlug: string) {
-  const db = openDatabase();
-  const row = db.prepare("SELECT * FROM items WHERE id = ? OR legacy_id = ? OR slug = ? OR name_zh = ? LIMIT 1").get(idOrSlug, idOrSlug, idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
-  const result = row ? mapItemRow(db, row) : undefined;
-  db.close();
-  return result;
+// ── Move queries ──
+
+function hydrateMoveRow(db: DatabaseSync, row: Record<string, unknown>): MoveEntry {
+  const generations = db.prepare(`
+    SELECT mgr.*
+    FROM move_generation_records mgr
+    WHERE mgr.move_id = ?
+    ORDER BY mgr.generation ASC
+  `).all(String(row.id)) as Record<string, unknown>[];
+
+  return {
+    id: String(row.id),
+    number: row.number !== null && row.number !== undefined ? Number(row.number) : undefined,
+    nameZh: String(row.name_zh),
+    nameJa: row.name_ja ? String(row.name_ja) : undefined,
+    nameEn: row.name_en ? String(row.name_en) : undefined,
+    type: row.type_name ? String(row.type_name) : undefined,
+    category: row.category ? String(row.category) : undefined,
+    power: row.power !== null ? Number(row.power) : undefined,
+    accuracy: row.accuracy !== null && row.accuracy !== undefined ? Number(row.accuracy) : undefined,
+    pp: row.pp !== null ? Number(row.pp) : undefined,
+    description: row.description ? String(row.description) : undefined,
+    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
+    introducedGeneration: row.introduced_generation !== null && row.introduced_generation !== undefined ? Number(row.introduced_generation) : undefined,
+    generations: generations.map((g) => {
+      const code = g.game_version_code ? String(g.game_version_code) : undefined;
+      return {
+        generation: Number(g.generation),
+        gameVersionCode: code,
+        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
+        description: g.description ? String(g.description) : "",
+        notes: g.notes ? String(g.notes) : undefined,
+      };
+    }),
+    source: sourceFromRow(row),
+  };
 }
 
 export function listMovesFromSqlite(filters?: { query?: string; type?: string; generation?: number }) {
@@ -1427,27 +1395,25 @@ export function listMovesFromSqlite(filters?: { query?: string; type?: string; g
   const params: Array<string | number> = [];
   if (filters?.query) {
     conditions.push("(m.name_zh LIKE ? OR m.name_ja LIKE ? OR m.name_en LIKE ? OR CAST(m.id AS TEXT) LIKE ?)");
-    const value = `%${filters.query}%`;
-    params.push(value, value, value, value);
+    const v = `%${filters.query}%`;
+    params.push(v, v, v, v);
   }
   if (filters?.type) {
-    conditions.push("t.name_zh = ?");
+    conditions.push("m.type_name = ?");
     params.push(filters.type);
   }
   if (filters?.generation) {
-    conditions.push("EXISTS (SELECT 1 FROM move_generation_records mgr JOIN generations g ON g.id = mgr.generation_id WHERE mgr.move_id = m.id AND g.number = ?)");
+    conditions.push("EXISTS (SELECT 1 FROM move_generation_records mgr WHERE mgr.move_id = m.id AND mgr.generation = ?)");
     params.push(filters.generation);
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const rows = db.prepare(`
-    SELECT m.*, t.name_zh AS type_name_zh, g.number AS introduced_generation_number
+    SELECT m.*
     FROM moves m
-    LEFT JOIN types t ON t.id = m.type_id
-    LEFT JOIN generations g ON g.id = m.introduced_generation
     ${where}
     ORDER BY m.name_zh ASC
   `).all(...params) as Record<string, unknown>[];
-  const result = rows.map((row) => hydrateMoveRow(db, row));
+  const result = rows.map((r) => hydrateMoveRow(db, r));
   db.close();
   return result;
 }
@@ -1455,10 +1421,8 @@ export function listMovesFromSqlite(filters?: { query?: string; type?: string; g
 export function getMoveFromSqlite(idOrSlug: string) {
   const db = openDatabase();
   const row = db.prepare(`
-    SELECT m.*, t.name_zh AS type_name_zh, g.number AS introduced_generation_number
+    SELECT m.*
     FROM moves m
-    LEFT JOIN types t ON t.id = m.type_id
-    LEFT JOIN generations g ON g.id = m.introduced_generation
     WHERE m.id = ? OR m.name_zh = ?
     LIMIT 1
   `).get(idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
@@ -1467,28 +1431,60 @@ export function getMoveFromSqlite(idOrSlug: string) {
   return result;
 }
 
+// ── Ability queries ──
+
+function hydrateAbilityRow(db: DatabaseSync, row: Record<string, unknown>): AbilityEntry {
+  const generations = db.prepare(`
+    SELECT agr.*
+    FROM ability_generation_records agr
+    WHERE agr.ability_id = ?
+    ORDER BY agr.generation ASC
+  `).all(String(row.id)) as Record<string, unknown>[];
+
+  return {
+    id: String(row.id),
+    number: row.number !== null && row.number !== undefined ? Number(row.number) : undefined,
+    nameZh: String(row.name_zh),
+    nameJa: row.name_ja ? String(row.name_ja) : undefined,
+    nameEn: row.name_en ? String(row.name_en) : undefined,
+    description: row.description ? String(row.description) : undefined,
+    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
+    introducedGeneration: row.introduced_generation !== null && row.introduced_generation !== undefined ? Number(row.introduced_generation) : undefined,
+    generations: generations.map((g) => {
+      const code = g.game_version_code ? String(g.game_version_code) : undefined;
+      return {
+        generation: Number(g.generation),
+        gameVersionCode: code,
+        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
+        description: g.description ? String(g.description) : "",
+        notes: g.notes ? String(g.notes) : undefined,
+      };
+    }),
+    source: sourceFromRow(row),
+  };
+}
+
 export function listAbilitiesFromSqlite(filters?: { query?: string; generation?: number }) {
   const db = openDatabase();
   const conditions: string[] = [];
   const params: Array<string | number> = [];
   if (filters?.query) {
     conditions.push("(a.name_zh LIKE ? OR a.name_ja LIKE ? OR a.name_en LIKE ?)");
-    const value = `%${filters.query}%`;
-    params.push(value, value, value);
+    const v = `%${filters.query}%`;
+    params.push(v, v, v);
   }
   if (filters?.generation) {
-    conditions.push("EXISTS (SELECT 1 FROM ability_generation_records agr JOIN generations g ON g.id = agr.generation_id WHERE agr.ability_id = a.id AND g.number = ?)");
+    conditions.push("EXISTS (SELECT 1 FROM ability_generation_records agr WHERE agr.ability_id = a.id AND agr.generation = ?)");
     params.push(filters.generation);
   }
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const rows = db.prepare(`
-    SELECT a.*, g.number AS introduced_generation_number
+    SELECT a.*
     FROM abilities a
-    LEFT JOIN generations g ON g.id = a.introduced_generation
     ${where}
     ORDER BY a.number ASC, a.name_zh ASC
   `).all(...params) as Record<string, unknown>[];
-  const result = rows.map((row) => hydrateAbilityRow(db, row));
+  const result = rows.map((r) => hydrateAbilityRow(db, r));
   db.close();
   return result;
 }
@@ -1496,9 +1492,8 @@ export function listAbilitiesFromSqlite(filters?: { query?: string; generation?:
 export function getAbilityFromSqlite(idOrName: string) {
   const db = openDatabase();
   const row = db.prepare(`
-    SELECT a.*, g.number AS introduced_generation_number
+    SELECT a.*
     FROM abilities a
-    LEFT JOIN generations g ON g.id = a.introduced_generation
     WHERE a.id = ? OR a.name_zh = ?
     LIMIT 1
   `).get(idOrName, idOrName) as Record<string, unknown> | undefined;
@@ -1506,3 +1501,59 @@ export function getAbilityFromSqlite(idOrName: string) {
   db.close();
   return result;
 }
+
+// ── Item queries ──
+
+export function listItemsFromSqlite() {
+  const db = openDatabase();
+  const rows = db.prepare("SELECT * FROM items ORDER BY category ASC, name_zh ASC").all() as Record<string, unknown>[];
+  db.close();
+  return rows.map((row) => ({
+    id: String(row.id),
+    slug: String(row.slug),
+    nameZh: String(row.name_zh),
+    nameJa: row.name_ja ? String(row.name_ja) : undefined,
+    nameEn: row.name_en ? String(row.name_en) : undefined,
+    category: row.category ? String(row.category) : undefined,
+    effectSummary: row.effect_summary ? String(row.effect_summary) : undefined,
+    source: sourceFromRow(row),
+  } as ItemEntry));
+}
+
+export function getItemFromSqlite(idOrSlug: string) {
+  const db = openDatabase();
+  const row = db.prepare("SELECT * FROM items WHERE id = ? OR legacy_id = ? OR slug = ? OR name_zh = ? LIMIT 1").get(idOrSlug, idOrSlug, idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
+  if (!row) { db.close(); return undefined; }
+  db.close();
+  return {
+    id: String(row.id),
+    slug: String(row.slug),
+    nameZh: String(row.name_zh),
+    nameJa: row.name_ja ? String(row.name_ja) : undefined,
+    nameEn: row.name_en ? String(row.name_en) : undefined,
+    category: row.category ? String(row.category) : undefined,
+    effectSummary: row.effect_summary ? String(row.effect_summary) : undefined,
+    source: sourceFromRow(row),
+  } as ItemEntry;
+}
+
+// ── Utility ──
+
+export function hasSqliteData() {
+  if (!hasDatabaseFile()) return false;
+  const db = openDatabase();
+  try {
+    const row = db.prepare(
+      "SELECT (SELECT COUNT(*) FROM pokemon) + (SELECT COUNT(*) FROM moves) + (SELECT COUNT(*) FROM abilities) AS total"
+    ).get() as { total: number };
+    db.close();
+    return row.total > 0;
+  } catch {
+    db.close();
+    return false;
+  }
+}
+
+// ── Export helpers for crawler ──
+
+export { normalizeTypeName, splitTypeNames, typeLegacyId, GENERATIONS, GAME_VERSIONS, TYPE_NAMES, TYPE_ALIASES };

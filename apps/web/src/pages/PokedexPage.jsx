@@ -1,19 +1,17 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../utils/api.js";
-import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS, STAT_KEYS, LEARN_METHOD_LABELS } from "../utils/constants.js";
+import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS, STAT_KEYS } from "../utils/constants.js";
 import {
   buildEvolutionFamilies,
   getPokemonPreviewImage,
   resolvePokemonDisplayVariant,
-  buildPokemonGenerationOptions,
   getPokemonLearnsetEntries,
   sortLearnsetEntries,
   buildMoveLookup,
   resolveLearnsetMove,
   resolveMoveGenerationRecord,
-  describeLearnsetEntry,
-  getTypeChips
+  describeLearnsetEntry
 } from "../utils/helpers.js";
 import TypeChip from "../components/TypeChip.jsx";
 import StatCalculator from "../components/StatCalculator.jsx";
@@ -21,10 +19,11 @@ import Loading from "../components/Loading.jsx";
 
 /* ─── Main Page ─── */
 export default function PokedexPage() {
+  const [inputValue, setInputValue] = useState("");
   const [query, setQuery] = useState("");
   const [type, setType] = useState("");
   const [generation, setGeneration] = useState("");
-  const [expandedSlug, setExpandedSlug] = useState(null);
+  const [selectedSlug, setSelectedSlug] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailGeneration, setDetailGeneration] = useState("");
 
@@ -32,7 +31,32 @@ export default function PokedexPage() {
   const [allMoves, setAllMoves] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const drawerRef = useRef(null);
+  const detailRef = useRef(null);
+  const activeCardRef = useRef(null);
+  const composingRef = useRef(false);
+  const debounceRef = useRef(null);
+
+  const handleInputChange = useCallback((e) => {
+    const value = e.target.value;
+    setInputValue(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!composingRef.current) {
+      debounceRef.current = setTimeout(() => setQuery(value), 300);
+    }
+  }, []);
+
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
+  const handleCompositionEnd = useCallback((e) => {
+    composingRef.current = false;
+    const value = e.target.value;
+    setInputValue(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setQuery(value), 300);
+  }, []);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -51,37 +75,66 @@ export default function PokedexPage() {
 
   useEffect(() => { fetchList(); }, [fetchList]);
 
-  // Close drawer when filters change
-  useEffect(() => { setExpandedSlug(null); setDetail(null); }, [query, type, generation]);
-
-  // Fetch detail when a card is expanded
+  // Cleanup debounce timer
   useEffect(() => {
-    if (!expandedSlug) { setDetail(null); return; }
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
+
+  // Close detail when filters change
+  useEffect(() => { setSelectedSlug(null); setDetail(null); }, [query, type, generation]);
+
+  // Fetch detail when a card is selected
+  useEffect(() => {
+    if (!selectedSlug) { setDetail(null); return; }
     let cancelled = false;
     setDetail(null);
-    api(`/pokemon/${encodeURIComponent(expandedSlug)}`).then((r) => {
+    api(`/pokemon/${encodeURIComponent(selectedSlug)}`).then((r) => {
       if (!cancelled) {
         setDetail(r.data);
         setDetailGeneration("");
       }
     });
     return () => { cancelled = true; };
-  }, [expandedSlug]);
+  }, [selectedSlug]);
 
-  // Scroll drawer into view
+  // Scroll active card into view in the list
   useEffect(() => {
-    if (detail && drawerRef.current) {
-      setTimeout(() => drawerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 120);
+    if (selectedSlug && activeCardRef.current) {
+      setTimeout(() => activeCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
+    }
+  }, [selectedSlug]);
+
+  // Scroll detail panel to top when detail changes
+  useEffect(() => {
+    if (detail && detailRef.current) {
+      detailRef.current.scrollTop = 0;
     }
   }, [detail]);
 
-  const handleToggle = useCallback((slug) => {
-    setExpandedSlug((prev) => (prev === slug ? null : slug));
+  const handleSelect = useCallback((slug) => {
+    setSelectedSlug((prev) => (prev === slug ? null : slug));
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setSelectedSlug(null);
   }, []);
 
   const families = useMemo(() => buildEvolutionFamilies(list), [list]);
 
+  // Flatten families into a single list of members
+  const allMembers = useMemo(() => {
+    const members = [];
+    families.forEach((family) => {
+      family.chain.forEach((member) => {
+        members.push(member);
+      });
+    });
+    return members;
+  }, [families]);
+
   if (loading && list.length === 0) return <Loading />;
+
+  const hasSelection = selectedSlug !== null;
 
   return (
     <div className="dex-page">
@@ -90,90 +143,111 @@ export default function PokedexPage() {
         <div className="dex-header-top">
           <div>
             <h2 className="panel-title">全国图鉴</h2>
-            <p className="panel-subtitle">点击宝可梦卡片展开详情，查看特性、种族值计算器和招式表。</p>
+            <p className="panel-subtitle">点击宝可梦查看详情，包括特性、种族值计算器和招式表。</p>
           </div>
           <span className="chip">{list.length} 只宝可梦</span>
         </div>
-        <div className="dex-filters">
-          <input
-            className="dex-search"
-            placeholder="搜索名称 / 编号…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="">全部属性</option>
-            {ALL_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <select value={generation} onChange={(e) => setGeneration(e.target.value)}>
-            <option value="">全部世代</option>
-            {GENERATION_OPTIONS.map((g) => <option key={g} value={g}>第 {g} 世代</option>)}
-          </select>
+        <div className="dex-toolbar">
+          <div className="dex-search-wrap">
+            <svg className="dex-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8.5" cy="8.5" r="5.5" /><line x1="13" y1="13" x2="17" y2="17" />
+            </svg>
+            <input
+              className="dex-search"
+              placeholder="搜索名称 / 编号…"
+              value={inputValue}
+              onChange={handleInputChange}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
+            />
+          </div>
+          <div className="dex-filters">
+            <select value={type} onChange={(e) => setType(e.target.value)}>
+              <option value="">全部属性</option>
+              {ALL_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select value={generation} onChange={(e) => setGeneration(e.target.value)}>
+              <option value="">全部世代</option>
+              {GENERATION_OPTIONS.map((g) => <option key={g} value={g}>第 {g} 世代</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Card grid */}
-      <div className="dex-grid">
-        {families.length === 0 && <div className="dex-empty">没有匹配的宝可梦。</div>}
-        {families.map((family) => {
-          // For each family, render each member as a card
-          return family.chain.map((member) => {
-            const slug = member.slug || member.id;
-            const isExpanded = expandedSlug === slug;
-            const image = getPokemonPreviewImage(member);
-            return (
-              <div key={slug} className="dex-card-wrapper" style={isExpanded ? { gridColumn: "1 / -1" } : undefined}>
-                <button
-                  className={`dex-card ${isExpanded ? "dex-card-active" : ""}`}
-                  onClick={() => handleToggle(slug)}
+      {/* Master-Detail body */}
+      <div className="dex-body">
+        {/* Left: Pokemon list */}
+        <div className={`dex-list-panel panel ${hasSelection ? "dex-list-panel-narrow" : ""}`}>
+          <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
+            {allMembers.length === 0 && <div className="dex-empty">没有匹配的宝可梦。</div>}
+            {allMembers.map((member) => {
+              const slug = member.slug || member.id;
+              const isActive = selectedSlug === slug;
+              const image = getPokemonPreviewImage(member);
+              return (
+                <motion.button
+                  layout
+                  layoutId={`dex-item-${slug}`}
+                  key={slug}
+                  ref={isActive ? activeCardRef : undefined}
+                  className={`dex-item ${hasSelection ? "dex-item-compact" : ""} ${isActive ? "dex-item-active" : ""}`}
+                  onClick={() => handleSelect(slug)}
+                  transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
                 >
-                  <div className="dex-card-img-wrap">
+                  <div className="dex-item-img">
                     {image?.url
                       ? <img src={image.url} alt={image.alt || member.nameZh} referrerPolicy="no-referrer" loading="lazy" />
                       : <span className="dex-card-placeholder">?</span>}
                   </div>
-                  <span className="dex-card-dex">#{String(member.dexNumber || "?").padStart(4, "0")}</span>
-                  <strong className="dex-card-name">{member.nameZh}</strong>
-                  <span className="dex-card-en">{member.nameEn || ""}</span>
-                  <div className="dex-card-types">
+                  <div className="dex-item-info">
+                    <span className="dex-item-dex">#{String(member.dexNumber || "?").padStart(4, "0")}</span>
+                    <strong className="dex-item-name">{member.nameZh}</strong>
+                    <span className="dex-item-en">{member.nameEn || ""}</span>
+                  </div>
+                  <div className="dex-item-types">
                     <TypeChip type={member.primaryType} />
                     <TypeChip type={member.secondaryType} />
                   </div>
-                </button>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
 
-                {/* Drawer */}
-                <AnimatePresence>
-                  {isExpanded && (
-                    <motion.div
-                      ref={drawerRef}
-                      className="dex-drawer"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-                    >
-                      <div className="dex-drawer-inner">
-                        {detail ? (
-                          <DrawerContent
-                            detail={detail}
-                            allMoves={allMoves}
-                            detailGeneration={detailGeneration}
-                            onDetailGenerationChange={setDetailGeneration}
-                          />
-                        ) : (
-                          <div className="dex-drawer-loading">
-                            <div className="pulse-dot" />
-                            <span>加载详情…</span>
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          });
-        })}
+        {/* Right: Detail panel */}
+        <AnimatePresence mode="wait">
+          {hasSelection && (
+            <motion.div
+              key="detail-panel"
+              className="dex-detail-panel panel"
+              ref={detailRef}
+              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {/* Close button */}
+              <button className="dex-detail-close" onClick={handleClose} title="关闭详情">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="4" y1="4" x2="14" y2="14" /><line x1="14" y1="4" x2="4" y2="14" />
+                </svg>
+              </button>
+              {detail ? (
+                <DrawerContent
+                  detail={detail}
+                  allMoves={allMoves}
+                  detailGeneration={detailGeneration}
+                  onDetailGenerationChange={setDetailGeneration}
+                />
+              ) : (
+                <div className="dex-drawer-loading">
+                  <div className="pulse-dot" />
+                  <span>加载详情…</span>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -181,23 +255,32 @@ export default function PokedexPage() {
 
 /* ─── Drawer Content with Tabs ─── */
 function DrawerContent({ detail, allMoves, detailGeneration, onDetailGenerationChange }) {
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("stats");
   const [imageMode, setImageMode] = useState("official");
+  const [detailForm, setDetailForm] = useState("default");
+
+  // Reset tab & form when detail changes
+  useEffect(() => {
+    setTab("stats");
+    setImageMode("official");
+    setDetailForm("default");
+  }, [detail]);
 
   const display = useMemo(
-    () => resolvePokemonDisplayVariant(detail, detailGeneration, "base", ""),
-    [detail, detailGeneration]
+    () => resolvePokemonDisplayVariant(detail, detailGeneration, detailForm, ""),
+    [detail, detailGeneration, detailForm]
   );
 
+  const generations = detail.generations || [];
+
   const tabs = [
-    { key: "overview", label: "概览" },
-    { key: "stats", label: "种族值 & 能力值" },
+    { key: "stats", label: "种族值" },
     { key: "moves", label: "招式表" }
   ];
 
   return (
     <div className="drawer-content">
-      {/* Top: image + basic info side by side */}
+      {/* Hero: image + basic info */}
       <div className="drawer-hero">
         <div className="drawer-img-box">
           <DrawerImage images={display.images} mode={imageMode} onModeChange={setImageMode} />
@@ -216,22 +299,55 @@ function DrawerContent({ detail, allMoves, detailGeneration, onDetailGenerationC
             <MetaPill label="分类" value={detail.category} />
             <MetaPill label="身高" value={detail.heightM ? `${detail.heightM}m` : null} />
             <MetaPill label="体重" value={detail.weightKg ? `${detail.weightKg}kg` : null} />
-            <MetaPill label="捕获率" value={detail.catchRate} />
-            <MetaPill label="颜色" value={detail.color} />
           </div>
           <div className="drawer-abilities">
             <span className="drawer-ability-label">特性</span>
-            {(detail.abilities || []).map((a, i) => (
+            {display.abilityText && display.abilityText.split(" / ").map((a, i) => (
               <span key={i} className="drawer-ability-chip">{a}</span>
             ))}
-            {detail.hiddenAbility && (
+            {display.hiddenAbilityText && display.hiddenAbilityText !== "无" && (
               <span className="drawer-ability-chip drawer-ability-hidden" title="隐藏特性">
-                {detail.hiddenAbility} ✦
+                {display.hiddenAbilityText} ✦
               </span>
             )}
           </div>
+          {/* Form selector — single source of truth */}
+          {display.formOptions.length > 1 && (
+            <div className="drawer-form-selector">
+              <span className="drawer-ability-label">形态</span>
+              <div className="drawer-form-chips">
+                {display.formOptions.map((form) => (
+                  <button
+                    key={form.id}
+                    className={`drawer-form-chip ${form.id === display.form.id ? "drawer-form-chip-active" : ""}`}
+                    onClick={() => setDetailForm(form.id)}
+                  >
+                    {form.nameZh}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Generation & source pills */}
+      {(generations.length > 0 || detail.source?.url) && (
+        <div className="drawer-extra">
+          {generations.length > 0 && (
+            <div className="drawer-gen-row">
+              {generations.map((g) => (
+                <span key={g} className="drawer-gen-pill">第 {g} 世代</span>
+              ))}
+            </div>
+          )}
+          {detail.source?.url && (
+            <a href={detail.source.url} target="_blank" rel="noopener noreferrer" className="drawer-source-link">
+              {detail.source.title || "数据来源"}
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="drawer-tabs">
@@ -256,8 +372,14 @@ function DrawerContent({ detail, allMoves, detailGeneration, onDetailGenerationC
           transition={{ duration: 0.2 }}
           className="drawer-tab-body"
         >
-          {tab === "overview" && <OverviewTab detail={detail} display={display} />}
-          {tab === "stats" && <StatsTab detail={detail} display={display} />}
+          {tab === "stats" && (
+            <StatsTab
+              detail={detail}
+              display={display}
+              detailGeneration={detailGeneration}
+              onDetailGenerationChange={onDetailGenerationChange}
+            />
+          )}
           {tab === "moves" && (
             <MovesTab
               detail={detail}
@@ -303,83 +425,97 @@ function MetaPill({ label, value }) {
   );
 }
 
-/* ─── Overview Tab ─── */
-function OverviewTab({ detail, display }) {
-  const generations = detail.generationAvailability || [];
-  const formOptions = display.formOptions || [];
-
-  return (
-    <div className="tab-overview">
-      {/* Forms */}
-      {formOptions.length > 1 && (
-        <div className="ov-section">
-          <h4 className="ov-heading">形态</h4>
-          <div className="ov-forms-grid">
-            {formOptions.map((form) => (
-              <div key={form.id} className="ov-form-card">
-                {form.images?.official?.url && (
-                  <img src={form.images.official.url} alt={form.nameZh} className="ov-form-img" referrerPolicy="no-referrer" />
-                )}
-                <strong>{form.nameZh}</strong>
-                <span className="muted">{[form.primaryType, form.secondaryType].filter(Boolean).join(" / ")}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Generation availability */}
-      <div className="ov-section">
-        <h4 className="ov-heading">世代与地区图鉴</h4>
-        <div className="ov-gen-list">
-          {generations.length > 0
-            ? generations.map((g, i) => (
-              <span key={i} className="ov-gen-pill">
-                第 {g.generation} 世代
-                {(g.regions || []).length > 0 && (
-                  <span className="ov-gen-regions">
-                    {g.regions.map((r) => `${r.region}${r.dexNumber ? ` #${r.dexNumber}` : ""}`).join("、")}
-                  </span>
-                )}
-              </span>
-            ))
-            : <span className="muted">暂无世代记录</span>}
-        </div>
-      </div>
-
-      {/* Generation records */}
-      {(detail.generationRecords || []).length > 0 && (
-        <div className="ov-section">
-          <h4 className="ov-heading">按世代记录</h4>
-          <div className="ov-gen-records">
-            {detail.generationRecords.map((record, i) => (
-              <div key={i} className="ov-gen-record-card">
-                <strong>第 {record.generation} 世代</strong>
-                <div className="ov-record-body">
-                  <span>属性：{[record.primaryType, record.secondaryType].filter(Boolean).join(" / ") || "—"}</span>
-                  <span>特性：{(record.abilityIds || []).join(" / ") || "—"}</span>
-                  <span>隐藏特性：{record.hiddenAbilityId || "无"}</span>
-                  <span>招式数：{record.learnset?.length || record.moveIds?.length || 0}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ─── Stats Tab ─── */
-function StatsTab({ detail, display }) {
+function StatsTab({ detail, display, detailGeneration, onDetailGenerationChange }) {
   const stats = display.stats || {};
+
+  // 获取当前形态的 statVariants
+  const currentForm = display.form || {};
+  const statVariants = currentForm.statVariants || [];
+  const hasStatVariants = statVariants.length > 1;
+
+  // 构建世代段切换选项：每个 variant 对应一个按钮
+  const variantButtons = useMemo(() => {
+    if (!hasStatVariants) return [];
+    return statVariants.map((v, i) => {
+      const gs = v.generationStart;
+      const ge = v.generationEnd;
+      let label;
+      if (gs && ge) label = gs === ge ? `第 ${gs} 世代` : `第 ${gs}–${ge} 世代`;
+      else if (gs) label = ge === undefined ? `第 ${gs} 世代起` : `第 ${gs}–${ge} 世代`;
+      else if (ge) label = `第 ${ge} 世代及之前`;
+      else label = `变体 ${i + 1}`;
+      return { ...v, label, index: i };
+    });
+  }, [statVariants, hasStatVariants]);
+
+  // 判断当前选中的是哪个 variant
+  const activeVariantIndex = useMemo(() => {
+    if (!hasStatVariants) return -1;
+    const gen = display.generation;
+    for (let i = 0; i < statVariants.length; i++) {
+      const v = statVariants[i];
+      const gs = v.generationStart;
+      const ge = v.generationEnd;
+      if (gs && ge && gen >= gs && gen <= ge) return i;
+      if (gs && !ge && gen >= gs) return i;
+      if (!gs && ge && gen <= ge) return i;
+      if (!gs && !ge) return i;
+    }
+    return statVariants.length - 1;
+  }, [statVariants, hasStatVariants, display.generation]);
+
+  // 点击 variant 按钮时，设置一个属于该范围的世代
+  const handleVariantClick = useCallback((variant) => {
+    const targetGen = variant.generationStart || variant.generationEnd || 9;
+    onDetailGenerationChange(String(targetGen));
+  }, [onDetailGenerationChange]);
+
+  // 计算与另一个 variant 的差异
+  const diffStats = useMemo(() => {
+    if (!hasStatVariants || activeVariantIndex < 0) return null;
+    // 与前一个 variant 对比（如果当前是最新的，就和旧的对比）
+    const otherIndex = activeVariantIndex === statVariants.length - 1
+      ? activeVariantIndex - 1
+      : activeVariantIndex + 1;
+    if (otherIndex < 0 || otherIndex >= statVariants.length) return null;
+    const current = statVariants[activeVariantIndex]?.baseStats;
+    const other = statVariants[otherIndex]?.baseStats;
+    if (!current || !other) return null;
+    const diff = {};
+    let hasDiff = false;
+    for (const key of STAT_KEYS) {
+      const d = (current[key] || 0) - (other[key] || 0);
+      diff[key] = d;
+      if (d !== 0) hasDiff = true;
+    }
+    return hasDiff ? diff : null;
+  }, [statVariants, activeVariantIndex, hasStatVariants]);
 
   return (
     <div className="tab-stats">
+      {/* Generation variant switcher */}
+      {hasStatVariants && (
+        <div className="stat-variant-switcher">
+          <span className="stat-variant-hint">该宝可梦的种族值在不同世代有所调整</span>
+          <div className="stat-variant-chips">
+            {variantButtons.map((v, i) => (
+              <button
+                key={i}
+                className={`stat-variant-chip ${i === activeVariantIndex ? "stat-variant-chip-active" : ""}`}
+                onClick={() => handleVariantClick(v)}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Base stat bars */}
       <div className="ov-section">
-        <h4 className="ov-heading">种族值</h4>
-        <BaseStatBars stats={stats} />
+        <h4 className="ov-heading">种族值 — {display.form.nameZh || detail.nameZh}</h4>
+        <BaseStatBars stats={stats} diff={diffStats} />
       </div>
 
       {/* Calculator */}
@@ -401,13 +537,15 @@ const STAT_COLORS = {
 };
 const STAT_LABELS_SHORT = { hp: "HP", atk: "ATK", def: "DEF", spa: "SPA", spd: "SPD", spe: "SPE" };
 
-function BaseStatBars({ stats }) {
+function BaseStatBars({ stats, diff }) {
   const total = STAT_KEYS.reduce((s, k) => s + (stats[k] || 0), 0);
+  const totalDiff = diff ? STAT_KEYS.reduce((s, k) => s + (diff[k] || 0), 0) : 0;
   return (
     <div className="bsb-grid">
       {STAT_KEYS.map((key) => {
         const val = stats[key] || 0;
         const pct = Math.min((val / 200) * 100, 100);
+        const d = diff ? diff[key] || 0 : 0;
         return (
           <div key={key} className="bsb-row">
             <span className="bsb-label" style={{ color: STAT_COLORS[key] }}>{STAT_LABELS_SHORT[key]}</span>
@@ -420,14 +558,28 @@ function BaseStatBars({ stats }) {
                 transition={{ duration: 0.5, ease: "easeOut" }}
               />
             </div>
-            <span className="bsb-val">{val}</span>
+            <span className="bsb-val-group">
+              <span className="bsb-val">{val}</span>
+              {d !== 0 && (
+                <span className={`bsb-diff ${d > 0 ? "bsb-diff-up" : "bsb-diff-down"}`}>
+                  {d > 0 ? `+${d}` : d}
+                </span>
+              )}
+            </span>
           </div>
         );
       })}
       <div className="bsb-row bsb-total">
         <span className="bsb-label">合计</span>
         <div className="bsb-track" />
-        <span className="bsb-val">{total}</span>
+        <span className="bsb-val-group">
+          <span className="bsb-val">{total}</span>
+          {totalDiff !== 0 && (
+            <span className={`bsb-diff ${totalDiff > 0 ? "bsb-diff-up" : "bsb-diff-down"}`}>
+              {totalDiff > 0 ? `+${totalDiff}` : totalDiff}
+            </span>
+          )}
+        </span>
       </div>
     </div>
   );
@@ -436,34 +588,30 @@ function BaseStatBars({ stats }) {
 /* ─── Moves Tab ─── */
 function MovesTab({ detail, display, allMoves, detailGeneration, onDetailGenerationChange }) {
   const generation = display.generation;
+  const genOptions = display.generationOptions || [];
   const entries = useMemo(
     () => sortLearnsetEntries(getPokemonLearnsetEntries(detail, generation)),
     [detail, generation]
   );
   const moveLookup = useMemo(() => buildMoveLookup(allMoves), [allMoves]);
-  const generationRecords = useMemo(
-    () => [...(detail.generationRecords || [])].filter((r) => r.generation).sort((a, b) => a.generation - b.generation),
-    [detail]
-  );
 
   return (
     <div className="tab-moves">
       {/* Generation pills */}
       <div className="mv-gen-strip">
-        {generationRecords.map((record) => {
-          const count = record.learnset?.length || record.moveIds?.length || 0;
-          const isActive = String(record.generation) === String(generation);
+        {genOptions.map((gen) => {
+          const isActive = String(gen) === String(generation);
           return (
             <button
-              key={record.generation}
+              key={gen}
               className={`mv-gen-pill ${isActive ? "mv-gen-pill-active" : ""}`}
-              onClick={() => onDetailGenerationChange(String(record.generation))}
+              onClick={() => onDetailGenerationChange(String(gen))}
             >
-              第 {record.generation} 世代 · {count || "无"} 招
+              第 {gen} 世代
             </button>
           );
         })}
-        {generationRecords.length === 0 && <span className="muted">暂无世代招式记录</span>}
+        {genOptions.length === 0 && <span className="muted">暂无世代记录</span>}
       </div>
 
       {entries.length === 0 ? (

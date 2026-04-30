@@ -8,6 +8,7 @@ import {
   getItemFromSqlite,
   getMoveFromSqlite,
   getPokemonFromSqlite,
+  getPokemonLearnset,
   listAbilitiesFromSqlite,
   listItemsFromSqlite,
   listMovesFromSqlite,
@@ -58,7 +59,13 @@ app.get("/assets/*", (c) => staticResponse(c.req.path) ?? c.notFound());
 
 app.get("/health", (c) => c.json({ ok: true, service: "pokemon-localdex-api" }));
 
-app.get("/pokemon", (c) => {
+// ── API 路由（同时支持 /xxx 和 /api/xxx 两种路径）──
+// Vite 开发模式下前端通过 proxy 把 /api/xxx 转发为 /xxx；
+// 生产模式下由本服务器直接提供静态文件，前端请求 /api/xxx 需要直接匹配。
+
+const apiRoutes = new Hono();
+
+apiRoutes.get("/pokemon", (c) => {
   const query = c.req.query("q") || undefined;
   const type = c.req.query("type") || undefined;
   const generation = numberQuery(c, "generation");
@@ -66,21 +73,32 @@ app.get("/pokemon", (c) => {
   return c.json({ data });
 });
 
-app.get("/pokemon/:id", (c) => {
+apiRoutes.get("/pokemon/:id", (c) => {
   const id = c.req.param("id");
   const entry = getPokemonFromSqlite(id);
   return entry ? c.json({ data: entry }) : c.json({ error: "Pokemon not found" }, 404);
 });
 
-app.get("/items", (c) => c.json({ data: listItemsFromSqlite() }));
+apiRoutes.get("/pokemon/:id/learnset", (c) => {
+  const id = c.req.param("id");
+  const generation = numberQuery(c, "generation") ?? 9;
+  const formKey = c.req.query("form") || "default";
+  // 先确认 pokemon 存在
+  const entry = getPokemonFromSqlite(id);
+  if (!entry) return c.json({ error: "Pokemon not found" }, 404);
+  const data = getPokemonLearnset(entry.id, generation, formKey);
+  return c.json({ data, pokemonId: entry.id, generation, formKey });
+});
 
-app.get("/items/:id", (c) => {
+apiRoutes.get("/items", (c) => c.json({ data: listItemsFromSqlite() }));
+
+apiRoutes.get("/items/:id", (c) => {
   const id = c.req.param("id");
   const entry = getItemFromSqlite(id);
   return entry ? c.json({ data: entry }) : c.json({ error: "Item not found" }, 404);
 });
 
-app.get("/moves", (c) => {
+apiRoutes.get("/moves", (c) => {
   const query = c.req.query("q") || undefined;
   const type = c.req.query("type") || undefined;
   const generation = numberQuery(c, "generation");
@@ -88,36 +106,40 @@ app.get("/moves", (c) => {
   return c.json({ data });
 });
 
-app.get("/moves/:id", (c) => {
+apiRoutes.get("/moves/:id", (c) => {
   const id = c.req.param("id");
   const entry = getMoveFromSqlite(id);
   return entry ? c.json({ data: entry }) : c.json({ error: "Move not found" }, 404);
 });
 
-app.get("/abilities", (c) => {
+apiRoutes.get("/abilities", (c) => {
   const query = c.req.query("q") || undefined;
   const generation = numberQuery(c, "generation");
   const data = listAbilitiesFromSqlite({ query, generation });
   return c.json({ data });
 });
 
-app.get("/abilities/:id", (c) => {
+apiRoutes.get("/abilities/:id", (c) => {
   const id = c.req.param("id");
   const entry = getAbilityFromSqlite(id);
   return entry ? c.json({ data: entry }) : c.json({ error: "Ability not found" }, 404);
 });
 
-app.get("/teams", (c) => c.json({ data: readTeams() }));
+apiRoutes.get("/teams", (c) => c.json({ data: readTeams() }));
 
-app.post("/teams", async (c) => {
+apiRoutes.post("/teams", async (c) => {
   const saved = saveTeam(await c.req.json());
   return c.json({ data: saved }, 201);
 });
 
-app.post("/battle/damage", async (c) => {
+apiRoutes.post("/battle/damage", async (c) => {
   const result = calculateDamage(await c.req.json());
   return c.json({ data: result });
 });
+
+// 挂载到根路径（Vite dev proxy 模式）和 /api 前缀（生产模式）
+app.route("/", apiRoutes);
+app.route("/api", apiRoutes);
 
 app.get("*", (c) => staticResponse("/index.html") ?? c.text("Not Found", 404));
 
