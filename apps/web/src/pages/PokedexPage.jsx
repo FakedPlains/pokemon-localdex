@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
@@ -32,8 +32,7 @@ export default function PokedexPage() {
   const detailRef = useRef(null);
   const activeCardRef = useRef(null);
   const listContainerRef = useRef(null);
-  const cleanupRef = useRef(null);
-  const prevSlugRef = useRef(null);
+  const scrollTargetSlugRef = useRef(null);
   const composingRef = useRef(false);
   const debounceRef = useRef(null);
 
@@ -98,40 +97,69 @@ export default function PokedexPage() {
     return () => { cancelled = true; };
   }, [selectedSlug]);
 
-  // Scroll the selected/previously-selected card into view after layout transitions.
-  // When opening detail: scroll the active card to center in compact list.
-  // When closing detail: scroll the previously-selected card to center in grid list.
-  useEffect(() => {
-    const slugToScrollTo = selectedSlug || prevSlugRef.current;
-    // Update prevSlugRef for next transition
-    prevSlugRef.current = selectedSlug;
-    if (!slugToScrollTo) return;
-    let cancelled = false;
+  // ── Scroll positioning strategy ──
+  // When OPENING detail: list switches to compact mode. We use index-based calculation
+  // because useLayoutEffect fires before framer-motion layout animations complete,
+  // so DOM measurements would return stale (grid-mode) positions.
+  // When CLOSING detail: list switches back to grid mode. We must wait for the CSS/framer
+  // transition (350ms) to finish, then use DOM measurement to find the card's final position.
+  const COMPACT_ITEM_HEIGHT = 69;
+  const COMPACT_GAP = 4;
+  const COMPACT_PADDING = 8;
+  const isClosingRef = useRef(false);
+  const closingSlugRef = useRef(null);
 
-    // Wait for React render + framer-motion layout animation + CSS transition to settle
+  // OPEN: index-based instant positioning (fires before paint)
+  useLayoutEffect(() => {
+    if (isClosingRef.current) return;
+    const slug = scrollTargetSlugRef.current;
+    if (!slug || !selectedSlug) return;
+    scrollTargetSlugRef.current = null;
+
+    const container = listContainerRef.current;
+    if (!container) return;
+
+    const index = list.findIndex((m) => (m.slug || m.id) === slug);
+    if (index < 0) return;
+
+    // Position by index: in compact mode each item is COMPACT_ITEM_HEIGHT + COMPACT_GAP tall.
+    const cardTop = COMPACT_PADDING + index * (COMPACT_ITEM_HEIGHT + COMPACT_GAP);
+    // Center within the actually-visible portion of the container (not the full clientHeight,
+    // since the container may extend below the viewport).
+    const rect = container.getBoundingClientRect();
+    const visibleTop = Math.max(rect.top, 0);
+    const visibleBottom = Math.min(rect.bottom, window.innerHeight);
+    const visibleHeight = Math.max(visibleBottom - visibleTop, 200);
+    const visibleCenterOffset = (visibleTop - rect.top) + visibleHeight / 2;
+    const targetScroll = cardTop - visibleCenterOffset + COMPACT_ITEM_HEIGHT / 2;
+    container.scrollTo({ top: Math.max(0, targetScroll), behavior: "instant" });
+  }, [selectedSlug, list]);
+
+  // CLOSE: wait for layout transition to finish, then DOM-measure the card's position
+  useEffect(() => {
+    if (!isClosingRef.current) return;
+    const slug = closingSlugRef.current;
+    if (!slug) { isClosingRef.current = false; return; }
+    closingSlugRef.current = null;
+
     const timer = setTimeout(() => {
-      if (cancelled) return;
-      const container = document.querySelector(".dex-list");
-      // When opening: find by .dex-item-active; when closing: find by layoutId data attribute
-      const card = selectedSlug
-        ? document.querySelector(".dex-item-active")
-        : document.querySelector(`[data-slug="${CSS.escape(slugToScrollTo)}"]`);
+      isClosingRef.current = false;
+      const container = listContainerRef.current;
+      const card = container?.querySelector(`[data-slug="${CSS.escape(slug)}"]`);
       if (!card || !container) return;
 
+      // Use visible-area centering (same logic as open, but with actual DOM measurements)
       const cardRect = card.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
-      const currentOffset = cardRect.top - containerRect.top + container.scrollTop;
-
-      // Scroll so the card is roughly centered in the visible area
-      const targetScroll = currentOffset - container.clientHeight / 2 + card.offsetHeight / 2;
-      container.scrollTo({ top: Math.max(0, targetScroll), behavior: "smooth" });
-    }, 600);
-
-    cleanupRef.current = timer;
-    return () => {
-      cancelled = true;
-      clearTimeout(cleanupRef.current);
-    };
+      const visibleTop = Math.max(containerRect.top, 0);
+      const visibleBottom = Math.min(containerRect.bottom, window.innerHeight);
+      const visibleHeight = Math.max(visibleBottom - visibleTop, 200);
+      const visibleCenterViewport = visibleTop + visibleHeight / 2;
+      const cardCenterViewport = cardRect.top + card.offsetHeight / 2;
+      const scrollAdjust = cardCenterViewport - visibleCenterViewport;
+      container.scrollTo({ top: Math.max(0, container.scrollTop + scrollAdjust), behavior: "instant" });
+    }, 380);
+    return () => { clearTimeout(timer); isClosingRef.current = false; };
   }, [selectedSlug]);
 
   // Scroll detail panel to top when detail changes
@@ -142,11 +170,24 @@ export default function PokedexPage() {
   }, [detail]);
 
   const handleSelect = useCallback((slug) => {
-    setSelectedSlug((prev) => (prev === slug ? null : slug));
+    setSelectedSlug((prev) => {
+      const isToggleClose = prev === slug;
+      if (isToggleClose) {
+        isClosingRef.current = true;
+        closingSlugRef.current = prev;
+      } else {
+        scrollTargetSlugRef.current = slug;
+      }
+      return isToggleClose ? null : slug;
+    });
   }, []);
 
   const handleClose = useCallback(() => {
-    setSelectedSlug(null);
+    isClosingRef.current = true;
+    setSelectedSlug((prev) => {
+      closingSlugRef.current = prev;
+      return null;
+    });
   }, []);
 
   if (loading && list.length === 0) return <Loading />;
