@@ -31,54 +31,84 @@ body {
   padding: 20px 0 40px;
 }
 
-.hero {
-  display: grid;
-  gap: 20px;
-  padding: 28px;
-  border: 1px solid var(--line);
-  border-radius: 28px;
-  background: linear-gradient(135deg, rgba(255, 248, 236, 0.95), rgba(234, 223, 198, 0.95));
-  box-shadow: var(--shadow);
+/* ── Top Navigation Bar ── */
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 10px 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  box-shadow: 0 4px 24px rgba(64, 50, 28, 0.08), 0 1px 4px rgba(64, 50, 28, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: sticky;
+  top: 12px;
+  z-index: 100;
 }
 
-.eyebrow {
-  margin: 0 0 10px;
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--accent-strong);
+.top-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  margin-right: auto;
+  flex-shrink: 0;
 }
 
-.hero h1 {
-  margin: 0;
-  font-size: clamp(32px, 5vw, 56px);
-  line-height: 0.95;
+.top-nav-logo {
+  font-size: 20px;
+  line-height: 1;
 }
 
-.hero-text {
-  max-width: 720px;
-  margin: 14px 0 0;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.6;
+.top-nav-title {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, var(--accent), #e67e22, var(--grass), var(--water));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  white-space: nowrap;
 }
 
-.hero-nav { display: flex; flex-wrap: wrap; gap: 12px; }
+.top-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
 
-.hero-nav a {
+.top-nav-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 92px;
-  padding: 10px 16px;
+  padding: 8px 18px;
   border-radius: 999px;
-  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(31, 42, 31, 0.08);
+  transition: color 200ms, background 200ms;
+  white-space: nowrap;
 }
 
-.hero-nav a.active { background: var(--accent); color: white; }
+.top-nav-link:hover {
+  color: var(--ink);
+  background: rgba(31, 42, 31, 0.05);
+}
+
+.top-nav-link-active {
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+}
+
+.top-nav-link-active:hover {
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+}
 
 .main-panel { padding-top: 20px; }
 
@@ -664,8 +694,130 @@ button.secondary {
 .dex-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
+
+/* ── Filter Sections (chip-based) ── */
+.dex-filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dex-filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.dex-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dex-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  cursor: pointer;
+  transition: background 180ms, color 180ms, border-color 180ms, box-shadow 180ms;
+  white-space: nowrap;
+}
+
+.dex-filter-chip:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(31, 42, 31, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+.dex-filter-chip-active {
+  color: white !important;
+  background: linear-gradient(135deg, var(--grass), #6b9a3a) !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 8px rgba(138, 166, 90, 0.25);
+}
+
+.dex-filter-chip-active:hover {
+  background: linear-gradient(135deg, #7aaf4a, #5a8a2e) !important;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(138, 166, 90, 0.3);
+}
+
+/* Type icon in filter chip */
+.dex-filter-type-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 50%;
+  padding: 3px;
+  background: rgba(31, 42, 31, 0.45);
+}
+
+/* Per-type icon backgrounds (matching type-chip colors) */
+.dex-filter-chip-type[data-type="一般"] .dex-filter-type-icon { background: #8a8a7f; }
+.dex-filter-chip-type[data-type="火"] .dex-filter-type-icon { background: #d26a2e; }
+.dex-filter-chip-type[data-type="水"] .dex-filter-type-icon { background: var(--water); }
+.dex-filter-chip-type[data-type="电"] .dex-filter-type-icon { background: var(--electric); }
+.dex-filter-chip-type[data-type="草"] .dex-filter-type-icon { background: var(--grass); }
+.dex-filter-chip-type[data-type="冰"] .dex-filter-type-icon { background: #6ebec9; }
+.dex-filter-chip-type[data-type="格斗"] .dex-filter-type-icon { background: #b4473f; }
+.dex-filter-chip-type[data-type="毒"] .dex-filter-type-icon { background: #8b5ea7; }
+.dex-filter-chip-type[data-type="地面"] .dex-filter-type-icon { background: #b68f4e; }
+.dex-filter-chip-type[data-type="飞行"] .dex-filter-type-icon { background: #7f9cd6; }
+.dex-filter-chip-type[data-type="超能力"] .dex-filter-type-icon { background: #db6390; }
+.dex-filter-chip-type[data-type="虫"] .dex-filter-type-icon { background: #7a9a2a; }
+.dex-filter-chip-type[data-type="岩石"] .dex-filter-type-icon { background: #9a8752; }
+.dex-filter-chip-type[data-type="幽灵"] .dex-filter-type-icon { background: #6b5b95; }
+.dex-filter-chip-type[data-type="龙"] .dex-filter-type-icon { background: #4c62d4; }
+.dex-filter-chip-type[data-type="恶"] .dex-filter-type-icon { background: #5a4b43; }
+.dex-filter-chip-type[data-type="钢"] .dex-filter-type-icon { background: #7b8da1; }
+.dex-filter-chip-type[data-type="妖精"] .dex-filter-type-icon { background: #d98db8; }
+
+/* ── Per-type active chip backgrounds ── */
+.dex-filter-chip-type-active {
+  color: white !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.dex-filter-chip-type-active:hover {
+  transform: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+.dex-filter-chip-type-active .dex-filter-type-icon {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.dex-filter-chip-type-active[data-type="一般"] { background: #8a8a7f; }
+.dex-filter-chip-type-active[data-type="火"] { background: #d26a2e; }
+.dex-filter-chip-type-active[data-type="水"] { background: var(--water); }
+.dex-filter-chip-type-active[data-type="电"] { background: var(--electric); color: #352a00 !important; }
+.dex-filter-chip-type-active[data-type="草"] { background: var(--grass); }
+.dex-filter-chip-type-active[data-type="冰"] { background: #6ebec9; color: #12343a !important; }
+.dex-filter-chip-type-active[data-type="格斗"] { background: #b4473f; }
+.dex-filter-chip-type-active[data-type="毒"] { background: #8b5ea7; }
+.dex-filter-chip-type-active[data-type="地面"] { background: #b68f4e; }
+.dex-filter-chip-type-active[data-type="飞行"] { background: #7f9cd6; }
+.dex-filter-chip-type-active[data-type="超能力"] { background: #db6390; }
+.dex-filter-chip-type-active[data-type="虫"] { background: #7a9a2a; }
+.dex-filter-chip-type-active[data-type="岩石"] { background: #9a8752; }
+.dex-filter-chip-type-active[data-type="幽灵"] { background: #6b5b95; }
+.dex-filter-chip-type-active[data-type="龙"] { background: #4c62d4; }
+.dex-filter-chip-type-active[data-type="恶"] { background: #5a4b43; }
+.dex-filter-chip-type-active[data-type="钢"] { background: #7b8da1; }
+.dex-filter-chip-type-active[data-type="妖精"] { background: #d98db8; }
 
 /* ── Search wrapper ── */
 .dex-search-wrap {
@@ -706,34 +858,6 @@ button.secondary {
   box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
 }
 
-.dex-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.dex-filters select {
-  flex: 1 1 auto;
-  min-width: 100px;
-  padding: 7px 28px 7px 12px;
-  border: 1px solid rgba(31, 42, 31, 0.10);
-  border-radius: 999px;
-  background: rgba(255, 248, 236, 0.6) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235f6b5c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  font-size: 13px;
-  color: var(--ink);
-  cursor: pointer;
-  transition: border-color 200ms, background-color 200ms, box-shadow 200ms;
-}
-
-.dex-filters select:focus {
-  outline: none;
-  border-color: rgba(217, 79, 61, 0.35);
-  background-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
-}
 
 /* ── Master-Detail Body ── */
 .dex-body {
@@ -745,7 +869,6 @@ button.secondary {
 /* ── Left: List Panel ── */
 .dex-list-panel {
   padding: 0;
-  overflow: hidden;
   /* Default: full width */
   flex: 1 1 100%;
   min-width: 0;
@@ -763,8 +886,6 @@ button.secondary {
   grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
   gap: 12px;
   padding: 16px;
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
   transition: gap 0.35s cubic-bezier(0.22, 1, 0.36, 1),
               padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -2778,8 +2899,17 @@ padding: 24px 24px 8px;
 
 @media (max-width: 900px) {
   .pokedex-layout, .items-layout, .teams-layout, .damage-layout, .meta-grid, .team-header-grid, .member-grid, .move-grid, .stats-editor, .damage-grid, .result-grid, .damage-side-grid, .media-layout, .variant-toolbar { grid-template-columns: 1fr; }
-  .app-shell { width: min(100vw - 16px, 1200px); padding-top: 12px; }
-  .hero, .detail-panel, .team-builder { padding: 18px; }
+  .app-shell { width: min(100vw - 16px, 1200px); padding-top: 8px; }
+  .detail-panel, .team-builder { padding: 18px; }
+  .top-nav {
+    gap: 6px;
+    padding: 8px 10px 8px 16px;
+    top: 6px;
+    border-radius: 20px;
+  }
+  .top-nav-title { font-size: 14px; }
+  .top-nav-links { gap: 2px; flex-wrap: wrap; }
+  .top-nav-link { padding: 6px 12px; font-size: 13px; }
   .stat-input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .learnset-table { max-height: none; }
   .learnset-row { grid-template-columns: 1fr 1fr; }
@@ -2789,13 +2919,15 @@ padding: 24px 24px 8px;
   .dex-toolbar { gap: 10px; }
   .dex-search { font-size: 12px; padding: 8px 12px 8px 32px; }
   .dex-search-icon { left: 10px; width: 14px; height: 14px; }
-  .dex-filters select { font-size: 12px; padding: 6px 24px 6px 10px; }
+  .dex-filter-chip { padding: 5px 10px; font-size: 12px; gap: 4px; }
+  .dex-filter-chips { gap: 4px; }
+  .dex-filter-type-icon { width: 14px; height: 14px; }
   .dex-header { padding: 18px 18px 16px; }
   .dex-body { flex-direction: column; }
   .dex-list-panel { width: 100%; }
   .dex-list-panel-narrow { flex: 1 1 auto; max-width: none; width: 100%; }
-  .dex-list { max-height: none; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-  .dex-list-compact { grid-template-columns: 1fr !important; gap: 4px !important; max-height: 40vh; }
+  .dex-list { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+  .dex-list-compact { grid-template-columns: 1fr !important; gap: 4px !important; }
   .dex-detail-panel { position: static; max-height: none; }
   .dex-item { padding: 10px 8px; }
   .dex-item-img { width: 64px; height: 64px; }

@@ -64,26 +64,23 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <header className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">Local Pokedex Workspace</p>
-          <h1>Pokemon LocalDex</h1>
-          <p className="hero-text">
-            本地图鉴、道具资料、队伍构筑与伤害计算的统一入口。当前数据来源于 52Poké，并优先读取本地 SQLite。
-          </p>
-        </div>
-        <nav className="hero-nav">
+      <nav className="top-nav">
+        <a className="top-nav-brand" href="#/pokedex">
+          <span className="top-nav-logo">🔴</span>
+          <span className="top-nav-title">Pokemon LocalDex</span>
+        </a>
+        <div className="top-nav-links">
           {NAV_ITEMS.map((item) => (
             <a
               key={item.key}
               href={item.hash}
-              className={route === item.key ? "active" : ""}
+              className={`top-nav-link${route === item.key ? " top-nav-link-active" : ""}`}
             >
               {item.label}
             </a>
           ))}
-        </nav>
-      </header>
+        </div>
+      </nav>
       <main className="main-panel">
         {pageElement}
       </main>

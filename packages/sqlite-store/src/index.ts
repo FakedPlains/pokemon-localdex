@@ -916,7 +916,7 @@ function sourceFromRow(row: Record<string, unknown>): SourceMeta | undefined {
 export type PaginationParams = { offset?: number; limit?: number };
 export type PaginatedResult<T> = { items: T[]; total: number };
 
-export function listPokemonFromSqlite(filters?: { query?: string; type?: string; generation?: number } & PaginationParams) {
+export function listPokemonFromSqlite(filters?: { query?: string; type?: string | string[]; generation?: number } & PaginationParams) {
   const db = openDatabase();
   const conditions: string[] = [];
   const params: Array<string | number> = [];
@@ -927,11 +927,21 @@ export function listPokemonFromSqlite(filters?: { query?: string; type?: string;
     params.push(v, v, v, v, v);
   }
   if (filters?.type) {
-    conditions.push(`EXISTS (
-      SELECT 1 FROM pokemon_form_types pft2
-      WHERE pft2.form_id = pf.id AND pft2.type_name = ?
-    )`);
-    params.push(filters.type);
+    const types = Array.isArray(filters.type) ? filters.type : [filters.type];
+    if (types.length === 1) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM pokemon_form_types pft2
+        WHERE pft2.form_id = pf.id AND pft2.type_name = ?
+      )`);
+      params.push(types[0]);
+    } else if (types.length > 1) {
+      const placeholders = types.map(() => '?').join(', ');
+      conditions.push(`EXISTS (
+        SELECT 1 FROM pokemon_form_types pft2
+        WHERE pft2.form_id = pf.id AND pft2.type_name IN (${placeholders})
+      )`);
+      params.push(...types);
+    }
   }
   if (filters?.generation) {
     conditions.push(`EXISTS (

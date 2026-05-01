@@ -67,9 +67,10 @@ app.get("/health", (c) => c.json({ ok: true, service: "pokemon-localdex-api" }))
 const apiRoutes = new Hono();
 
 apiRoutes.get("/pokemon", (c) => {
-  const query = c.req.query("q") || undefined;
-  const type = c.req.query("type") || undefined;
-  const generation = numberQuery(c, "generation");
+const query = c.req.query("q") || undefined;
+const typeRaw = c.req.query("type") || undefined;
+const type = typeRaw ? (typeRaw.includes(",") ? typeRaw.split(",") : typeRaw) : undefined;
+const generation = numberQuery(c, "generation");
   const limit = numberQuery(c, "limit");
   const offset = numberQuery(c, "offset") ?? 0;
 

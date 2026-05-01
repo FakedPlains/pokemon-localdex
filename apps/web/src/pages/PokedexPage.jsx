@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
@@ -17,7 +17,7 @@ import Loading from "../components/Loading.jsx";
 export default function PokedexPage() {
   const [inputValue, setInputValue] = useState("");
   const [query, setQuery] = useState("");
-  const [type, setType] = useState("");
+  const [types, setTypes] = useState([]);
   const [generation, setGeneration] = useState("");
   const [selectedSlug, setSelectedSlug] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -25,7 +25,6 @@ export default function PokedexPage() {
 
   const detailRef = useRef(null);
   const activeCardRef = useRef(null);
-  const listContainerRef = useRef(null);
   const scrollTargetSlugRef = useRef(null);
   const composingRef = useRef(false);
   const debounceRef = useRef(null);
@@ -34,11 +33,11 @@ export default function PokedexPage() {
   const pokemonPath = useMemo(() => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
-    if (type) params.set("type", type);
+    if (types.length > 0) params.set("type", types.join(","));
     if (generation) params.set("generation", generation);
     const qs = params.toString();
     return qs ? `/pokemon?${qs}` : "/pokemon";
-  }, [query, type, generation]);
+  }, [query, types, generation]);
 
   const { data: list, total, loading, hasMore, sentinelRef, loadingMore } = useInfiniteApi(pokemonPath, { pageSize: 60 });
 
@@ -70,7 +69,7 @@ export default function PokedexPage() {
   }, []);
 
   // Close detail when filters change
-  useEffect(() => { setSelectedSlug(null); setDetail(null); }, [query, type, generation]);
+  useEffect(() => { setSelectedSlug(null); setDetail(null); }, [query, types, generation]);
 
   // Fetch detail when a card is selected
   useEffect(() => {
@@ -86,45 +85,28 @@ export default function PokedexPage() {
     return () => { cancelled = true; };
   }, [selectedSlug]);
 
-  // ── Scroll positioning strategy ──
-  // When OPENING detail: list switches to compact mode. We use index-based calculation
-  // because useLayoutEffect fires before framer-motion layout animations complete,
-  // so DOM measurements would return stale (grid-mode) positions.
-  // When CLOSING detail: list switches back to grid mode. We must wait for the CSS/framer
-  // transition (350ms) to finish, then use DOM measurement to find the card's final position.
-  const COMPACT_ITEM_HEIGHT = 69;
-  const COMPACT_GAP = 4;
-  const COMPACT_PADDING = 8;
+  // ── Scroll positioning strategy (page-level) ──
   const isClosingRef = useRef(false);
   const closingSlugRef = useRef(null);
 
-  // OPEN: index-based instant positioning (fires before paint)
-  useLayoutEffect(() => {
+  // OPEN: scroll the selected card into view after layout settles
+  useEffect(() => {
     if (isClosingRef.current) return;
     const slug = scrollTargetSlugRef.current;
     if (!slug || !selectedSlug) return;
     scrollTargetSlugRef.current = null;
 
-    const container = listContainerRef.current;
-    if (!container) return;
-
-    const index = list.findIndex((m) => (m.slug || m.id) === slug);
-    if (index < 0) return;
-
-    // Position by index: in compact mode each item is COMPACT_ITEM_HEIGHT + COMPACT_GAP tall.
-    const cardTop = COMPACT_PADDING + index * (COMPACT_ITEM_HEIGHT + COMPACT_GAP);
-    // Center within the actually-visible portion of the container (not the full clientHeight,
-    // since the container may extend below the viewport).
-    const rect = container.getBoundingClientRect();
-    const visibleTop = Math.max(rect.top, 0);
-    const visibleBottom = Math.min(rect.bottom, window.innerHeight);
-    const visibleHeight = Math.max(visibleBottom - visibleTop, 200);
-    const visibleCenterOffset = (visibleTop - rect.top) + visibleHeight / 2;
-    const targetScroll = cardTop - visibleCenterOffset + COMPACT_ITEM_HEIGHT / 2;
-    container.scrollTo({ top: Math.max(0, targetScroll), behavior: "instant" });
+    // Wait for framer-motion layout animation to settle
+    const timer = setTimeout(() => {
+      const card = document.querySelector(`[data-slug="${CSS.escape(slug)}"]`);
+      if (card) {
+        card.scrollIntoView({ block: "center", behavior: "instant" });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
   }, [selectedSlug, list]);
 
-  // CLOSE: wait for layout transition to finish, then DOM-measure the card's position
+  // CLOSE: scroll the card back into view after grid layout transition
   useEffect(() => {
     if (!isClosingRef.current) return;
     const slug = closingSlugRef.current;
@@ -133,20 +115,10 @@ export default function PokedexPage() {
 
     const timer = setTimeout(() => {
       isClosingRef.current = false;
-      const container = listContainerRef.current;
-      const card = container?.querySelector(`[data-slug="${CSS.escape(slug)}"]`);
-      if (!card || !container) return;
-
-      // Use visible-area centering (same logic as open, but with actual DOM measurements)
-      const cardRect = card.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-      const visibleTop = Math.max(containerRect.top, 0);
-      const visibleBottom = Math.min(containerRect.bottom, window.innerHeight);
-      const visibleHeight = Math.max(visibleBottom - visibleTop, 200);
-      const visibleCenterViewport = visibleTop + visibleHeight / 2;
-      const cardCenterViewport = cardRect.top + card.offsetHeight / 2;
-      const scrollAdjust = cardCenterViewport - visibleCenterViewport;
-      container.scrollTo({ top: Math.max(0, container.scrollTop + scrollAdjust), behavior: "instant" });
+      const card = document.querySelector(`[data-slug="${CSS.escape(slug)}"]`);
+      if (card) {
+        card.scrollIntoView({ block: "center", behavior: "instant" });
+      }
     }, 380);
     return () => { clearTimeout(timer); isClosingRef.current = false; };
   }, [selectedSlug]);
@@ -195,6 +167,48 @@ export default function PokedexPage() {
           <span className="chip">{total > 0 ? `${list.length} / ${total}` : `${list.length}`} 只宝可梦</span>
         </div>
         <div className="dex-toolbar">
+          {/* Generation filter chips */}
+          <div className="dex-filter-section">
+            <span className="dex-filter-label">按世代筛选</span>
+            <div className="dex-filter-chips">
+              <button
+                className={`dex-filter-chip${generation === "" ? " dex-filter-chip-active" : ""}`}
+                onClick={() => setGeneration("")}
+              >全部</button>
+              {GENERATION_OPTIONS.map((g) => (
+                <button
+                  key={g}
+                  className={`dex-filter-chip${generation === String(g) ? " dex-filter-chip-active" : ""}`}
+                  onClick={() => setGeneration(generation === String(g) ? "" : String(g))}
+                >
+                  第 {g} 世代
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Type filter chips (multi-select, no "all" button) */}
+          <div className="dex-filter-section">
+            <span className="dex-filter-label">按属性筛选</span>
+            <div className="dex-filter-chips">
+              {ALL_TYPE_OPTIONS.map((t) => {
+                const isActive = types.includes(t);
+                return (
+                  <button
+                    key={t}
+                    data-type={t}
+                    className={`dex-filter-chip dex-filter-chip-type${isActive ? " dex-filter-chip-type-active" : ""}`}
+                    onClick={() => setTypes((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t])}
+                  >
+                    <img className="dex-filter-type-icon" src={`/assets/type-icons/type-${t}@sm.png`} alt="" />
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Search bar */}
           <div className="dex-search-wrap">
             <svg className="dex-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="8.5" cy="8.5" r="5.5" /><line x1="13" y1="13" x2="17" y2="17" />
@@ -208,16 +222,6 @@ export default function PokedexPage() {
               onCompositionEnd={handleCompositionEnd}
             />
           </div>
-          <div className="dex-filters">
-            <select value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="">全部属性</option>
-              {ALL_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <select value={generation} onChange={(e) => setGeneration(e.target.value)}>
-              <option value="">全部世代</option>
-              {GENERATION_OPTIONS.map((g) => <option key={g} value={g}>第 {g} 世代</option>)}
-            </select>
-          </div>
         </div>
       </div>
 
@@ -225,7 +229,7 @@ export default function PokedexPage() {
       <div className="dex-body">
         {/* Left: Pokemon list */}
         <div className={`dex-list-panel panel ${hasSelection ? "dex-list-panel-narrow" : ""}`}>
-          <div ref={listContainerRef} className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
+          <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
             {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
             {list.map((member) => {
               const slug = member.slug || member.id;
