@@ -981,4 +981,11 @@ def _form_hints(name_zh: str) -> tuple[list[str], list[str]]:
     elif "星晶形态" in name_zh:
         hints.extend(["s", "stellar"])
         anti_hints.extend(["t", "terastal"])
+    # 蕾冠王骑乘形态：I = Ice Rider (骑白马), S = Shadow Rider (骑黑马)
+    if "骑白马" in name_zh:
+        hints.extend(["i", "ice_rider", "ice rider"])
+        anti_hints.extend(["s", "shadow_rider", "shadow rider"])
+    elif "骑黑马" in name_zh:
+        hints.extend(["s", "shadow_rider", "shadow rider"])
+        anti_hints.extend(["i", "ice_rider", "ice rider"])
     return hints, anti_hints
