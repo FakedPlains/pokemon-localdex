@@ -13,7 +13,7 @@ from .catalog import (
     normalize_move_detail_page,
 )
 from .config import CrawlerPaths
-from .fetcher import PageFetcher
+from .fetcher import PageFetcher, PageNotFoundError
 from .html_tools import parse_pokemon_abilities
 from .pokemon import (
     build_learnset_page_url,
@@ -276,27 +276,53 @@ def crawl_learnsets(conn, fetcher: PageFetcher, args) -> int:
     generations_filter = parse_generations(args.generations)
     updated = 0
     entries = 0
-    for seed in seeds:
+    skipped = 0
+    errors = 0
+    total_seeds = len(seeds)
+    for idx, seed in enumerate(seeds, 1):
         row = conn.execute("SELECT id FROM pokemon WHERE slug = ? OR dex_number = ?", (slugify(seed.name_zh), seed.dex_number)).fetchone()
         if not row and not args.dry_run:
-            detail = fetcher.load_or_fetch(pokemon_cache_key(seed.dex_number), seed.detail_url)
-            pokemon_id = upsert_pokemon_detail(conn, normalize_pokemon_detail_page(detail, seed))
+            try:
+                detail = fetcher.load_or_fetch(pokemon_cache_key(seed.dex_number), seed.detail_url)
+                pokemon_id = upsert_pokemon_detail(conn, normalize_pokemon_detail_page(detail, seed))
+            except (PageNotFoundError, Exception) as e:
+                print(f"[{idx}/{total_seeds}] SKIP #{seed.dex_number:04d} {seed.name_zh}: cannot load detail ({e})")
+                skipped += 1
+                continue
         else:
             pokemon_id = int(row["id"]) if row else -1
-        generations = generations_filter or sorted(set(seed.generations or tuple(range(1, 10))))
+        # 默认只爬最新世代（gen9）+ Champions(99)，除非用户通过 --generations 指定
+        generations = generations_filter or sorted(set(seed.generations or (9,)) | {99})
         for generation in generations:
             url = build_learnset_page_url(seed.name_zh, generation)
             if not url:
                 continue
-            page = fetcher.load_or_fetch(learnset_cache_key(seed.dex_number, generation), url)
-            parsed = parse_learnset_page(page, generation)
+            try:
+                page = fetcher.load_or_fetch(learnset_cache_key(seed.dex_number, generation), url)
+            except PageNotFoundError:
+                # 该世代没有招式页面，跳过
+                skipped += 1
+                continue
+            except Exception as e:
+                print(f"[{idx}/{total_seeds}] ERROR #{seed.dex_number:04d} {seed.name_zh} gen{generation}: {e}")
+                errors += 1
+                continue
+            form_learnsets = parse_learnset_page(page, generation)
+            # form_learnsets: {"default": [...], "骑白马的样子": [...], ...}
+            total_moves = sum(len(moves) for moves in form_learnsets.values())
+            if total_moves == 0:
+                skipped += 1
+                continue
             if args.dry_run:
-                print(f"[dry-run] learnset #{seed.dex_number:04d} {seed.name_zh} gen{generation}: {len(parsed['learnset'])} moves")
+                forms_info = ", ".join(f"{k}={len(v)}" for k, v in form_learnsets.items())
+                print(f"[{idx}/{total_seeds}] dry-run #{seed.dex_number:04d} {seed.name_zh} gen{generation}: {total_moves} moves ({forms_info})")
             else:
-                entries += upsert_pokemon_learnset(conn, pokemon_id, generation, parsed)
+                for form_key, move_list in form_learnsets.items():
+                    entries += upsert_pokemon_learnset(conn, pokemon_id, generation, move_list, form_key)
                 updated += 1
-                print(f"[updated] learnset #{seed.dex_number:04d} {seed.name_zh} gen{generation}: {len(parsed['learnset'])} moves")
-    print(f"Learnsets finished. pages={updated} entries={entries} dryRun={args.dry_run}")
+                forms_info = ", ".join(f"{k}={len(v)}" for k, v in form_learnsets.items())
+                print(f"[{idx}/{total_seeds}] #{seed.dex_number:04d} {seed.name_zh} gen{generation}: {total_moves} moves ({forms_info})")
+    print(f"Learnsets finished. updated={updated} entries={entries} skipped={skipped} errors={errors} dryRun={args.dry_run}")
     return 0
 
 

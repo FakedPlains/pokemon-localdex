@@ -6,13 +6,9 @@ import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS, STAT_KEYS } from "../utils/consta
 import {
   getPokemonPreviewImage,
   resolvePokemonDisplayVariant,
-  getPokemonLearnsetEntries,
-  sortLearnsetEntries,
-  buildMoveLookup,
-  resolveLearnsetMove,
-  resolveMoveGenerationRecord,
   describeLearnsetEntry
 } from "../utils/helpers.js";
+import { LEARN_METHOD_LABELS } from "../utils/constants.js";
 import TypeChip from "../components/TypeChip.jsx";
 import StatCalculator from "../components/StatCalculator.jsx";
 import Loading from "../components/Loading.jsx";
@@ -26,8 +22,6 @@ export default function PokedexPage() {
   const [selectedSlug, setSelectedSlug] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailGeneration, setDetailGeneration] = useState("");
-
-  const [allMoves, setAllMoves] = useState([]);
 
   const detailRef = useRef(null);
   const activeCardRef = useRef(null);
@@ -47,11 +41,6 @@ export default function PokedexPage() {
   }, [query, type, generation]);
 
   const { data: list, total, loading, hasMore, sentinelRef, loadingMore } = useInfiniteApi(pokemonPath, { pageSize: 60 });
-
-  // 全量加载 moves（详情面板招式表需要）
-  useEffect(() => {
-    api("/moves").then((r) => setAllMoves(r.data));
-  }, []);
 
   const handleInputChange = useCallback((e) => {
     const value = e.target.value;
@@ -299,7 +288,6 @@ export default function PokedexPage() {
               {detail ? (
                 <DrawerContent
                   detail={detail}
-                  allMoves={allMoves}
                   detailGeneration={detailGeneration}
                   onDetailGenerationChange={setDetailGeneration}
                 />
@@ -318,22 +306,86 @@ export default function PokedexPage() {
 }
 
 /* ─── Drawer Content with Tabs ─── */
-function DrawerContent({ detail, allMoves, detailGeneration, onDetailGenerationChange }) {
+function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
   const [tab, setTab] = useState("stats");
   const [imageMode, setImageMode] = useState("official");
   const [detailForm, setDetailForm] = useState("default");
+  const [learnsetMeta, setLearnsetMeta] = useState(null);
+  const [learnsetFormOverride, setLearnsetFormOverride] = useState(null);
+
+  const pokemonId = detail.id;
 
   // Reset tab & form when detail changes
   useEffect(() => {
     setTab("stats");
     setImageMode("official");
     setDetailForm("default");
+    setLearnsetFormOverride(null);
+    setLearnsetMeta(null);
   }, [detail]);
+
+  // 加载 learnset meta（可用世代和形态列表）
+  useEffect(() => {
+    let cancelled = false;
+    api(`/pokemon/${pokemonId}/learnset/meta`).then((r) => {
+      if (!cancelled) setLearnsetMeta(r.data);
+    });
+    return () => { cancelled = true; };
+  }, [pokemonId]);
+
+  const learnsetFormKeys = learnsetMeta?.formKeys || [];
 
   const display = useMemo(
     () => resolvePokemonDisplayVariant(detail, detailGeneration, detailForm, ""),
     [detail, detailGeneration, detailForm]
   );
+
+  // 构建 detail form → learnset formKey 的映射表
+  const formToLearnsetMap = useMemo(() => {
+    const map = new Map();
+    if (learnsetFormKeys.length === 0 || display.formOptions.length === 0) return map;
+    const usedLearnsetKeys = new Set();
+    // 第一轮：直接匹配 formKey 或 nameZh
+    for (const form of display.formOptions) {
+      const direct = learnsetFormKeys.find(
+        (fk) => !usedLearnsetKeys.has(fk) && (fk === form.formKey || fk === form.nameZh)
+      );
+      if (direct) {
+        map.set(form.id, direct);
+        usedLearnsetKeys.add(direct);
+      }
+    }
+    // 第二轮：未匹配的 form 按顺序分配剩余的 learnset key
+    const remaining = learnsetFormKeys.filter((fk) => !usedLearnsetKeys.has(fk));
+    let ri = 0;
+    for (const form of display.formOptions) {
+      if (!map.has(form.id) && ri < remaining.length) {
+        map.set(form.id, remaining[ri++]);
+      }
+    }
+    return map;
+  }, [display.formOptions, learnsetFormKeys]);
+
+  const mapFormToLearnsetKey = useCallback((form) => {
+    if (!form) return null;
+    return formToLearnsetMap.get(form.id) || null;
+  }, [formToLearnsetMap]);
+
+  // 当切换 detail 形态时，同时联动 learnset 的 formKey
+  const handleFormChange = useCallback((formId) => {
+    setDetailForm(formId);
+    const form = display.formOptions.find((f) => f.id === formId);
+    setLearnsetFormOverride(mapFormToLearnsetKey(form));
+  }, [display.formOptions, mapFormToLearnsetKey]);
+
+  // 计算当前传给 MovesTab 的 learnset formKey
+  const activeLearnsetFormKey = useMemo(() => {
+    if (learnsetFormOverride && learnsetFormKeys.includes(learnsetFormOverride)) return learnsetFormOverride;
+    // 用当前 display.form 做映射
+    const mapped = mapFormToLearnsetKey(display.form);
+    if (mapped) return mapped;
+    return learnsetFormKeys[0] || null;
+  }, [learnsetFormOverride, learnsetFormKeys, display.form, mapFormToLearnsetKey]);
 
   const generations = detail.generations || [];
 
@@ -375,7 +427,7 @@ function DrawerContent({ detail, allMoves, detailGeneration, onDetailGenerationC
               </span>
             )}
           </div>
-          {/* Form selector — single source of truth */}
+          {/* Form selector */}
           {display.formOptions.length > 1 && (
             <div className="drawer-form-selector">
               <span className="drawer-ability-label">形态</span>
@@ -384,7 +436,7 @@ function DrawerContent({ detail, allMoves, detailGeneration, onDetailGenerationC
                   <button
                     key={form.id}
                     className={`drawer-form-chip ${form.id === display.form.id ? "drawer-form-chip-active" : ""}`}
-                    onClick={() => setDetailForm(form.id)}
+                    onClick={() => handleFormChange(form.id)}
                   >
                     {form.nameZh}
                   </button>
@@ -448,9 +500,10 @@ function DrawerContent({ detail, allMoves, detailGeneration, onDetailGenerationC
             <MovesTab
               detail={detail}
               display={display}
-              allMoves={allMoves}
               detailGeneration={detailGeneration}
               onDetailGenerationChange={onDetailGenerationChange}
+              learnsetMeta={learnsetMeta}
+              externalFormKey={activeLearnsetFormKey}
             />
           )}
         </motion.div>
@@ -650,68 +703,221 @@ function BaseStatBars({ stats, diff }) {
 }
 
 /* ─── Moves Tab ─── */
-function MovesTab({ detail, display, allMoves, detailGeneration, onDetailGenerationChange }) {
-  const generation = display.generation;
-  const genOptions = display.generationOptions || [];
-  const entries = useMemo(
-    () => sortLearnsetEntries(getPokemonLearnsetEntries(detail, generation)),
-    [detail, generation]
-  );
-  const moveLookup = useMemo(() => buildMoveLookup(allMoves), [allMoves]);
+function MovesTab({ detail, display, detailGeneration, onDetailGenerationChange, learnsetMeta, externalFormKey }) {
+  const [learnsetData, setLearnsetData] = useState([]);
+  const [learnsetLoading, setLearnsetLoading] = useState(false);
+  const [learnsetFormKey, setLearnsetFormKey] = useState(null);
+  const [methodFilter, setMethodFilter] = useState("");
+  const [selectedVersionRaw, setSelectedVersion] = useState(null); // null = 未手动选择
+  const [versionGenRef, setVersionGenRef] = useState(null); // 记录 selectedVersion 对应的世代
+
+  const pokemonId = detail.id;
+
+  const learnsetGenOptions = learnsetMeta?.generations || [];
+  const learnsetFormKeys = learnsetMeta?.formKeys || [];
+  const versionsByGen = learnsetMeta?.versionsByGen || {};
+
+  // 当前选中的世代：优先用 detailGeneration，否则取 learnset 可用世代中最大的
+  const activeGen = useMemo(() => {
+    const requested = Number(detailGeneration || 0);
+    if (requested && learnsetGenOptions.includes(requested)) return requested;
+    return learnsetGenOptions.length > 0 ? learnsetGenOptions[learnsetGenOptions.length - 1] : null;
+  }, [detailGeneration, learnsetGenOptions]);
+
+  // 当前世代下可用的游戏版本
+  const availableVersions = useMemo(() => {
+    if (!activeGen) return [];
+    return versionsByGen[activeGen] || [];
+  }, [activeGen, versionsByGen]);
+
+  // 同步派生 selectedVersion：世代切换时自动选中第一个版本，同一世代内保留用户选择
+  const selectedVersion = useMemo(() => {
+    if (versionGenRef === activeGen && selectedVersionRaw !== null) {
+      // 确认用户选择的版本在当前世代仍然有效
+      if (availableVersions.some((v) => v.code === selectedVersionRaw)) return selectedVersionRaw;
+    }
+    return availableVersions.length > 0 ? availableVersions[0].code : null;
+  }, [activeGen, versionGenRef, selectedVersionRaw, availableVersions]);
+
+  // 当前选中的形态：优先使用外部传入的 formKey
+  const activeFormKey = useMemo(() => {
+    if (externalFormKey && learnsetFormKeys.includes(externalFormKey)) return externalFormKey;
+    // fallback: 尝试用 display.form.formKey 匹配
+    const displayFormKey = display.form?.formKey || "default";
+    if (learnsetFormKeys.includes(displayFormKey)) return displayFormKey;
+    const displayName = display.form?.nameZh;
+    if (displayName && learnsetFormKeys.includes(displayName)) return displayName;
+    if (learnsetFormKeys.includes("default")) return "default";
+    return learnsetFormKeys[0] || "default";
+  }, [externalFormKey, display.form, learnsetFormKeys]);
+
+  // 加载 learnset 数据
+  useEffect(() => {
+    if (!activeGen) { setLearnsetData([]); return; }
+    let cancelled = false;
+    setLearnsetLoading(true);
+    const params = new URLSearchParams({ generation: String(activeGen), form: activeFormKey });
+    if (selectedVersion !== null) {
+      params.set("version", selectedVersion);
+    }
+    api(`/pokemon/${pokemonId}/learnset?${params}`).then((r) => {
+      if (!cancelled) {
+        setLearnsetData(r.data || []);
+        setLearnsetFormKey(r.formKey || activeFormKey);
+        setLearnsetLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) { setLearnsetData([]); setLearnsetLoading(false); }
+    });
+    return () => { cancelled = true; };
+  }, [pokemonId, activeGen, activeFormKey, selectedVersion]);
+
+  // 重置筛选器
+  useEffect(() => { setMethodFilter(""); setSelectedVersion(null); setVersionGenRef(null); }, [pokemonId]);
+
+  // 按学习方式分组统计
+  const methodCounts = useMemo(() => {
+    const counts = {};
+    for (const entry of learnsetData) {
+      const m = entry.learnMethod || "other";
+      counts[m] = (counts[m] || 0) + 1;
+    }
+    return counts;
+  }, [learnsetData]);
+
+  // 排序后的招式列表
+  const sortedEntries = useMemo(() => {
+    const methodOrder = { "level-up": 1, evolution: 2, "pre-evolution": 3, "form-change": 4, tm: 5, hm: 6, tutor: 7, egg: 8, event: 9, other: 10 };
+    let filtered = learnsetData;
+    if (methodFilter) {
+      filtered = learnsetData.filter((e) => e.learnMethod === methodFilter);
+    }
+    return [...filtered].sort((a, b) => {
+      const am = methodOrder[a.learnMethod] || 99;
+      const bm = methodOrder[b.learnMethod] || 99;
+      if (am !== bm) return am - bm;
+      const al = a.level ?? 999;
+      const bl = b.level ?? 999;
+      if (al !== bl) return al - bl;
+      return String(a.moveNameZh || "").localeCompare(String(b.moveNameZh || ""), "zh-Hans-CN");
+    });
+  }, [learnsetData, methodFilter]);
+
+  const isFallback = learnsetFormKey && learnsetFormKey !== activeFormKey;
 
   return (
     <div className="tab-moves">
       {/* Generation pills */}
       <div className="mv-gen-strip">
-        {genOptions.map((gen) => {
-          const isActive = String(gen) === String(generation);
+        {learnsetGenOptions.map((gen) => {
+          const isActive = gen === activeGen;
           return (
             <button
               key={gen}
               className={`mv-gen-pill ${isActive ? "mv-gen-pill-active" : ""}`}
               onClick={() => onDetailGenerationChange(String(gen))}
             >
-              第 {gen} 世代
+              {gen === 99 ? "Champions" : `第 ${gen} 世代`}
             </button>
           );
         })}
-        {genOptions.length === 0 && <span className="muted">暂无世代记录</span>}
+        {learnsetMeta && learnsetGenOptions.length === 0 && <span className="muted">暂无招式数据</span>}
+        {!learnsetMeta && <span className="muted">加载中…</span>}
       </div>
 
-      {entries.length === 0 ? (
-        <p className="muted">当前世代还没有导入可学招式表。</p>
-      ) : (
-        <>
-          <p className="muted" style={{ margin: "0 0 8px" }}>共 {entries.length} 条记录</p>
-          <div className="mv-table">
-            <div className="mv-row mv-head">
-              <span>招式</span>
-              <span>学习方式</span>
-              <span>属性</span>
-              <span>分类</span>
-              <span>威力</span>
-              <span>命中</span>
-              <span>PP</span>
-            </div>
-            {entries.map((entry, i) => {
-              const move = resolveLearnsetMove(entry, moveLookup);
-              const moveRecord = move ? resolveMoveGenerationRecord(move, generation) : undefined;
-              const learnText = describeLearnsetEntry(entry) || "—";
-              return (
-                <div key={i} className="mv-row">
-                  <span className="mv-move-name">{entry.moveNameZh || move?.nameZh || "未知"}</span>
-                  <span>{learnText}</span>
-                  <span><TypeChip type={moveRecord?.type || move?.type || ""} /></span>
-                  <span>{moveRecord?.category || move?.category || "—"}</span>
-                  <span>{moveRecord?.power ?? move?.power ?? "—"}</span>
-                  <span>{moveRecord?.accuracy != null ? `${moveRecord.accuracy}%` : move?.accuracy != null ? `${move.accuracy}%` : "—"}</span>
-                  <span>{moveRecord?.pp ?? move?.pp ?? "—"}</span>
-                </div>
-              );
-            })}
-          </div>
-        </>
+      {/* Game version pills — 只有一个版本时不显示 */}
+      {availableVersions.length > 1 && (
+        <div className="mv-version-strip">
+          {availableVersions.map((v) => (
+            <button
+              key={v.code}
+              className={`mv-version-pill ${selectedVersion === v.code ? "mv-version-pill-active" : ""}`}
+              onClick={() => { setVersionGenRef(activeGen); setSelectedVersion(selectedVersion === v.code ? null : v.code); }}
+            >
+              {v.name}
+            </button>
+          ))}
+        </div>
       )}
+
+      {/* Method filter pills */}
+      {sortedEntries.length > 0 && Object.keys(methodCounts).length > 1 && (
+        <div className="mv-method-strip">
+          <button
+            className={`mv-method-pill ${!methodFilter ? "mv-method-pill-active" : ""}`}
+            onClick={() => setMethodFilter("")}
+          >
+            全部 ({learnsetData.length})
+          </button>
+          {Object.entries(methodCounts)
+            .sort(([a], [b]) => {
+              const order = { "level-up": 1, evolution: 2, "pre-evolution": 3, "form-change": 4, tm: 5, hm: 6, tutor: 7, egg: 8, event: 9 };
+              return (order[a] || 99) - (order[b] || 99);
+            })
+            .map(([method, count]) => (
+              <button
+                key={method}
+                className={`mv-method-pill ${methodFilter === method ? "mv-method-pill-active" : ""}`}
+                onClick={() => setMethodFilter(method)}
+              >
+                {LEARN_METHOD_LABELS[method] || method} ({count})
+              </button>
+            ))}
+        </div>
+      )}
+
+      {/* Fallback hint */}
+      {isFallback && (
+        <p className="muted" style={{ margin: "0 0 8px", fontStyle: "italic" }}>
+          当前形态无独立招式数据，显示的是默认形态的招式表。
+        </p>
+      )}
+
+      <div style={{ position: "relative" }}>
+        {learnsetLoading && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.6)", zIndex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: 32 }}>
+            <div className="dex-drawer-loading">
+              <div className="pulse-dot" />
+              <span>加载招式…</span>
+            </div>
+          </div>
+        )}
+        {sortedEntries.length === 0 && !learnsetLoading ? (
+          <p className="muted">当前世代还没有导入可学招式表。</p>
+        ) : sortedEntries.length > 0 ? (
+          <>
+            <p className="muted" style={{ margin: "0 0 8px" }}>
+              共 {sortedEntries.length} 条记录
+              {methodFilter ? ` (${LEARN_METHOD_LABELS[methodFilter] || methodFilter})` : ""}
+            </p>
+            <div className="mv-table">
+              <div className="mv-row mv-head">
+                <span>招式</span>
+                <span>学习方式</span>
+                <span>属性</span>
+                <span>分类</span>
+                <span>威力</span>
+                <span>命中</span>
+                <span>PP</span>
+              </div>
+              {sortedEntries.map((entry, i) => {
+                const learnText = describeLearnsetEntry(entry) || "—";
+                return (
+                  <div key={i} className="mv-row">
+                    <span className="mv-move-name">{entry.moveNameZh || "未知"}</span>
+                    <span>{learnText}</span>
+                    <span><TypeChip type={entry.moveType || ""} /></span>
+                    <span>{entry.moveCategory || "—"}</span>
+                    <span>{entry.movePower ?? "—"}</span>
+                    <span>{entry.moveAccuracy != null ? `${entry.moveAccuracy}%` : "—"}</span>
+                    <span>{entry.movePP ?? "—"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }

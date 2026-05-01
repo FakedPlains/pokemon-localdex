@@ -477,22 +477,30 @@ def upsert_pokemon_learnset(
     conn: sqlite3.Connection,
     pokemon_id: int,
     generation: int,
-    parsed: dict,
+    move_list: list[dict],
     form_key: str = "default",
 ) -> int:
-    """写入宝可梦招式学习列表到 pokemon_learnsets 表。"""
+    """写入宝可梦招式学习列表到 pokemon_learnsets 表。
+
+    move_list 格式::
+
+        [
+            {"move_name_zh": "...", "learn_method": "level-up", "level": 5,
+             "game_version_code": "SV", "tm_number": None, "notes": None},
+            ...
+        ]
+    """
     with conn:
         # 清除该宝可梦在该世代 + 形态的旧招式
         conn.execute(
             "DELETE FROM pokemon_learnsets WHERE pokemon_id = ? AND generation = ? AND form_key = ?",
             (pokemon_id, generation, form_key),
         )
-        # 确保所有招式存在
-        for move in parsed.get("moves") or []:
-            ensure_move(conn, move["name_zh"])
-        # 写入招式学习记录
-        for sort_order, record in enumerate(parsed.get("learnset") or [], start=1):
-            move_id = _lookup_move_id(conn, record["move_name_zh"])
+        # 确保所有招式存在并写入招式学习记录
+        for sort_order, record in enumerate(move_list, start=1):
+            move_name = record["move_name_zh"]
+            ensure_move(conn, move_name)
+            move_id = _lookup_move_id(conn, move_name)
             conn.execute(
                 """
                 INSERT OR IGNORE INTO pokemon_learnsets
@@ -504,7 +512,7 @@ def upsert_pokemon_learnset(
                     pokemon_id,
                     form_key,
                     move_id,
-                    record["move_name_zh"],
+                    move_name,
                     generation,
                     record.get("game_version_code"),
                     record.get("learn_method"),
@@ -514,7 +522,7 @@ def upsert_pokemon_learnset(
                     record.get("notes"),
                 ),
             )
-    return len(parsed.get("learnset") or [])
+    return len(move_list)
 
 
 def _lookup_move_id(conn: sqlite3.Connection, name: str) -> int | None:

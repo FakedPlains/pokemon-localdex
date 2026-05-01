@@ -6,6 +6,7 @@ import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
 import {
   getAbilityFromSqlite,
   getItemFromSqlite,
+  getLearnsetMeta,
   getMoveFromSqlite,
   getPokemonFromSqlite,
   getPokemonLearnset,
@@ -91,11 +92,19 @@ apiRoutes.get("/pokemon/:id/learnset", (c) => {
   const id = c.req.param("id");
   const generation = numberQuery(c, "generation") ?? 9;
   const formKey = c.req.query("form") || "default";
-  // 先确认 pokemon 存在
+  const gameVersion = c.req.query("version"); // undefined = all, "" = generic only, "SV" = specific version
   const entry = getPokemonFromSqlite(id);
   if (!entry) return c.json({ error: "Pokemon not found" }, 404);
-  const data = getPokemonLearnset(entry.id, generation, formKey);
-  return c.json({ data, pokemonId: entry.id, generation, formKey });
+  const result = getPokemonLearnset(entry.id, generation, formKey, gameVersion);
+  return c.json({ data: result.moves, pokemonId: entry.id, generation, formKey: result.formKey, gameVersionCode: result.gameVersionCode });
+});
+
+apiRoutes.get("/pokemon/:id/learnset/meta", (c) => {
+  const id = c.req.param("id");
+  const entry = getPokemonFromSqlite(id);
+  if (!entry) return c.json({ error: "Pokemon not found" }, 404);
+  const meta = getLearnsetMeta(entry.id);
+  return c.json({ data: meta, pokemonId: entry.id });
 });
 
 apiRoutes.get("/items", (c) => c.json({ data: listItemsFromSqlite() }));

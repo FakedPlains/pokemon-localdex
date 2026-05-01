@@ -1784,6 +1784,78 @@ button.secondary {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
 }
 
+.mv-version-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.mv-version-pill {
+  width: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: background 200ms, color 200ms;
+}
+
+.mv-version-pill:hover {
+  background: rgba(100, 140, 200, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+.mv-version-pill-active {
+  color: white;
+  background: linear-gradient(135deg, #5b8bd4, #3a6bb5);
+  border-color: #5b8bd4;
+}
+
+.mv-version-pill-active:hover {
+  background: linear-gradient(135deg, #4a7ac3, #2f5da6);
+}
+
+.mv-method-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.mv-method-pill {
+  width: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: background 200ms, color 200ms;
+}
+
+.mv-method-pill:hover {
+  background: rgba(138, 166, 90, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+.mv-method-pill-active {
+  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.mv-method-pill-active:hover {
+  background: var(--accent-strong);
+}
+
 .mv-table {
   display: grid;
   gap: 4px;

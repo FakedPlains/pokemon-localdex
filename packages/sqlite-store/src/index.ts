@@ -1345,33 +1345,114 @@ export function getPokemonFromSqlite(idOrSlug: string) {
 }
 
 /**
- * 获取宝可梦的招式学习列表（按世代 + 形态）。
+ * 获取宝可梦在 learnsets 表中有哪些世代、形态和游戏版本（用于前端 UI 选择器）。
  */
-export function getPokemonLearnset(pokemonId: number, generation: number, formKey = "default") {
+export function getLearnsetMeta(pokemonId: number) {
   const db = openDatabase();
-  const rows = db.prepare(`
-    SELECT pl.move_name_zh, pl.learn_method, pl.level, pl.tm_number, pl.notes,
-      m.type_name, m.category AS move_category,
-      m.power AS move_power, m.accuracy AS move_accuracy, m.pp AS move_pp, m.id AS move_id
-    FROM pokemon_learnsets pl
-    LEFT JOIN moves m ON m.id = pl.move_id
-    WHERE pl.pokemon_id = ? AND pl.generation = ? AND pl.form_key = ?
-    ORDER BY pl.learn_method, pl.sort_order
-  `).all(pokemonId, generation, formKey) as Record<string, unknown>[];
+  const genRows = db.prepare(`
+    SELECT DISTINCT generation FROM pokemon_learnsets
+    WHERE pokemon_id = ? ORDER BY generation
+  `).all(pokemonId) as Record<string, unknown>[];
+  const formRows = db.prepare(`
+    SELECT DISTINCT form_key FROM pokemon_learnsets
+    WHERE pokemon_id = ? ORDER BY form_key
+  `).all(pokemonId) as Record<string, unknown>[];
+
+  // 每个世代下可用的游戏版本
+  const versionRows = db.prepare(`
+    SELECT DISTINCT generation, game_version_code
+    FROM pokemon_learnsets
+    WHERE pokemon_id = ? AND game_version_code IS NOT NULL AND game_version_code != ''
+    ORDER BY generation, game_version_code
+  `).all(pokemonId) as Record<string, unknown>[];
+
+  const versionsByGen: Record<number, Array<{ code: string; name: string }>> = {};
+  for (const r of versionRows) {
+    const gen = Number(r.generation);
+    const code = String(r.game_version_code);
+    if (!versionsByGen[gen]) versionsByGen[gen] = [];
+    versionsByGen[gen].push({ code, name: GAME_VERSION_NAMES.get(code) || code });
+  }
+
+  db.close();
+  return {
+    generations: genRows.map((r) => Number(r.generation)),
+    formKeys: formRows.map((r) => String(r.form_key)),
+    versionsByGen,
+  };
+}
+
+/**
+ * 获取宝可梦的招式学习列表（按世代 + 形态 + 可选游戏版本）。
+ * 如果指定的 formKey 没有数据，自动 fallback 到 'default'。
+ * gameVersionCode 为空字符串时表示查询无版本标记的通用数据；
+ * 为 undefined 时表示不限版本（返回所有数据）。
+ */
+export function getPokemonLearnset(pokemonId: number, generation: number, formKey = "default", gameVersionCode?: string) {
+  const db = openDatabase();
+
+  // 构建版本过滤条件
+  const versionCondition = gameVersionCode !== undefined
+    ? (gameVersionCode === ""
+      ? "AND (pl.game_version_code IS NULL OR pl.game_version_code = '')"
+      : "AND pl.game_version_code = ?")
+    : "";
+  const versionParams = (gameVersionCode !== undefined && gameVersionCode !== "") ? [gameVersionCode] : [];
+
+  function queryLearnset(pid: number, gen: number, fk: string) {
+    return db.prepare(`
+      SELECT pl.move_name_zh, pl.learn_method, pl.level, pl.tm_number, pl.notes,
+        pl.game_version_code,
+        m.type_name, m.category AS move_category,
+        m.power AS move_power, m.accuracy AS move_accuracy, m.pp AS move_pp, m.id AS move_id
+      FROM pokemon_learnsets pl
+      LEFT JOIN moves m ON m.id = pl.move_id
+      WHERE pl.pokemon_id = ? AND pl.generation = ? AND pl.form_key = ?
+      ${versionCondition}
+      ORDER BY pl.learn_method, pl.sort_order
+    `).all(pid, gen, fk, ...versionParams) as Record<string, unknown>[];
+  }
+
+  // 先尝试指定的 formKey
+  let rows = queryLearnset(pokemonId, generation, formKey);
+
+  // Fallback: 如果指定形态没有数据，尝试 default
+  let usedFormKey = formKey;
+  if (rows.length === 0 && formKey !== "default") {
+    rows = queryLearnset(pokemonId, generation, "default");
+    if (rows.length > 0) usedFormKey = "default";
+  }
+  // Fallback: 如果 default 也没有数据，取该宝可梦在该世代的第一个可用 form_key
+  if (rows.length === 0) {
+    const firstForm = db.prepare(`
+      SELECT DISTINCT form_key FROM pokemon_learnsets
+      WHERE pokemon_id = ? AND generation = ? LIMIT 1
+    `).get(pokemonId, generation) as Record<string, unknown> | undefined;
+    if (firstForm) {
+      const fallbackKey = String(firstForm.form_key);
+      rows = queryLearnset(pokemonId, generation, fallbackKey);
+      if (rows.length > 0) usedFormKey = fallbackKey;
+    }
+  }
+
   db.close();
 
-  return rows.map((r) => ({
-    moveId: r.move_id !== null ? Number(r.move_id) : undefined,
-    moveNameZh: String(r.move_name_zh),
-    learnMethod: String(r.learn_method),
-    level: r.level !== null ? Number(r.level) : undefined,
-    tmNumber: r.tm_number ? String(r.tm_number) : undefined,
-    moveType: r.type_name ? String(r.type_name) : undefined,
-    moveCategory: r.move_category ? String(r.move_category) : undefined,
-    movePower: r.move_power !== null ? Number(r.move_power) : undefined,
-    moveAccuracy: r.move_accuracy !== null ? Number(r.move_accuracy) : undefined,
-    movePP: r.move_pp !== null ? Number(r.move_pp) : undefined,
-  } as LearnsetRecord));
+  return {
+    formKey: usedFormKey,
+    gameVersionCode: gameVersionCode ?? null,
+    moves: rows.map((r) => ({
+      moveId: r.move_id !== null ? Number(r.move_id) : undefined,
+      moveNameZh: String(r.move_name_zh),
+      learnMethod: String(r.learn_method),
+      level: r.level !== null ? Number(r.level) : undefined,
+      tmNumber: r.tm_number ? String(r.tm_number) : undefined,
+      moveType: r.type_name ? String(r.type_name) : undefined,
+      moveCategory: r.move_category ? String(r.move_category) : undefined,
+      movePower: r.move_power !== null ? Number(r.move_power) : undefined,
+      moveAccuracy: r.move_accuracy !== null ? Number(r.move_accuracy) : undefined,
+      movePP: r.move_pp !== null ? Number(r.move_pp) : undefined,
+    } as LearnsetRecord)),
+  };
 }
 
 // ── Move queries ──

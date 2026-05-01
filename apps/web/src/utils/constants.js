@@ -32,6 +32,8 @@ export const LEARN_METHOD_LABELS = {
   tutor: "教学",
   event: "活动",
   evolution: "进化",
+  "pre-evolution": "进化前",
+  "form-change": "形态变化",
   other: "其他"
 };
 

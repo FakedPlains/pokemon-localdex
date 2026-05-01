@@ -186,6 +186,9 @@ def build_pokemon_page_url(name_zh: str) -> str:
 
 
 def build_learnset_page_url(name_zh: str, generation: int) -> str | None:
+    # Champions 使用独立的 URL 格式：喷火龙/Champions招式表
+    if generation == 99:
+        return f"https://wiki.52poke.com/wiki/{quote(name_zh)}/{quote('Champions招式表')}"
     generation_text = generation_to_chinese(generation)
     if not generation_text:
         return None
