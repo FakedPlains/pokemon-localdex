@@ -1421,7 +1421,8 @@ export function getPokemonLearnset(pokemonId: number, generation: number, formKe
       SELECT pl.move_name_zh, pl.learn_method, pl.level, pl.tm_number, pl.notes,
         pl.game_version_code,
         m.type_name, m.category AS move_category,
-        m.power AS move_power, m.accuracy AS move_accuracy, m.pp AS move_pp, m.id AS move_id
+        m.power AS move_power, m.accuracy AS move_accuracy, m.pp AS move_pp, m.id AS move_id,
+        m.description AS move_description
       FROM pokemon_learnsets pl
       LEFT JOIN moves m ON m.id = pl.move_id
       WHERE pl.pokemon_id = ? AND pl.generation = ? AND pl.form_key = ?
@@ -1468,6 +1469,7 @@ export function getPokemonLearnset(pokemonId: number, generation: number, formKe
       movePower: r.move_power !== null ? Number(r.move_power) : undefined,
       moveAccuracy: r.move_accuracy !== null ? Number(r.move_accuracy) : undefined,
       movePP: r.move_pp !== null ? Number(r.move_pp) : undefined,
+      moveDescription: r.move_description ? String(r.move_description) : undefined,
     } as LearnsetRecord)),
   };
 }

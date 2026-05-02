@@ -806,7 +806,18 @@ function MovesTab({ detail, display, detailGeneration, onDetailGenerationChange,
                 const learnText = describeLearnsetEntry(entry) || "—";
                 return (
                   <div key={i} className="mv-row">
-                    <span className="mv-move-name">{entry.moveNameZh || "未知"}</span>
+                    <span className="mv-move-name">
+                      <a
+                        className="drawer-move-link"
+                        href={entry.moveId ? `#/moves?expand=${entry.moveId}` : "#/moves"}
+                        title={entry.moveDescription || entry.moveNameZh}
+                      >
+                        {entry.moveNameZh || "未知"}
+                        {entry.moveDescription && (
+                          <span className="move-tooltip">{entry.moveDescription}</span>
+                        )}
+                      </a>
+                    </span>
                     <span>{learnText}</span>
                     <span><TypeChip type={entry.moveType || ""} /></span>
                     <span>{entry.moveCategory || "—"}</span>

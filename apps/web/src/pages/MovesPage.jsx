@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import Loading from "../components/Loading.jsx";
@@ -63,8 +63,17 @@ function CategoryChip({ category }) {
   );
 }
 
+function parseExpandParam() {
+  const hash = window.location.hash || "";
+  const qIdx = hash.indexOf("?");
+  if (qIdx < 0) return null;
+  const params = new URLSearchParams(hash.slice(qIdx));
+  return params.get("expand") || null;
+}
+
 export default function MovesPage({ query = "", type = "", category = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
+  const pendingExpandRef = useRef(parseExpandParam());
 
   // Reset expanded when filters change
   useEffect(() => { setExpanded(null); }, [query, type, category, generation]);
@@ -80,7 +89,42 @@ export default function MovesPage({ query = "", type = "", category = "", genera
     return qs ? `/moves?${qs}` : "/moves";
   }, [query, type, category, generation]);
 
-  const { data: moves, total, loading, hasMore, sentinelRef, loadingMore } = useInfiniteApi(movesPath, { pageSize: 50 });
+  const { data: moves, total, loading, loadingMore, hasMore, sentinelRef, loadMore } = useInfiniteApi(movesPath, { pageSize: 50 });
+
+  // Auto-expand move from URL hash param (e.g. #/moves?expand=123)
+  useEffect(() => {
+    const expandId = pendingExpandRef.current;
+    if (!expandId || loading) return;
+    if (moves.length === 0 && !hasMore) {
+      pendingExpandRef.current = null;
+      return;
+    }
+    if (moves.length === 0) return;
+
+    const target = moves.find((m) => String(m.id) === expandId);
+    if (target) {
+      pendingExpandRef.current = null;
+      setExpanded(target.id);
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-move-id="${target.id}"]`);
+        if (el) el.scrollIntoView({ block: "center", behavior: "instant" });
+      });
+      const hash = window.location.hash || "";
+      const qIdx = hash.indexOf("?");
+      if (qIdx >= 0) {
+        window.history.replaceState(null, "", hash.slice(0, qIdx));
+      }
+    } else if (hasMore && !loadingMore) {
+      loadMore();
+    } else if (!hasMore) {
+      pendingExpandRef.current = null;
+      const hash = window.location.hash || "";
+      const qIdx = hash.indexOf("?");
+      if (qIdx >= 0) {
+        window.history.replaceState(null, "", hash.slice(0, qIdx));
+      }
+    }
+  }, [moves, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleExpand = useCallback((id) => {
     setExpanded((prev) => (prev === id ? null : id));
@@ -122,6 +166,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
             return (
               <div
                 key={move.id}
+                data-move-id={move.id}
                 className={`mv-row-item${isExpanded ? " mv-row-expanded" : ""}`}
                 style={rowBg && !isExpanded ? { background: rowBg } : undefined}
               >
@@ -161,6 +206,14 @@ export default function MovesPage({ query = "", type = "", category = "", genera
                       {move.nameEn && <span className="mv-name-tag mv-name-en">{move.nameEn}</span>}
                       {move.introducedGeneration && (
                         <span className="mv-name-tag mv-name-gen">第 {move.introducedGeneration} 世代引入</span>
+                      )}
+                      {move.source?.url && (
+                        <a href={move.source.url} target="_blank" rel="noopener noreferrer" className="mv-wiki-link" title={move.source.title || "Wiki"}>
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
+                            <path d="M9 2h5v5" /><path d="M14 2 7.5 8.5" />
+                          </svg>
+                        </a>
                       )}
                     </div>
 

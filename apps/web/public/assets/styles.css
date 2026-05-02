@@ -1576,7 +1576,6 @@ button.secondary {
   color: var(--muted);
   opacity: 0.6;
   transition: opacity 0.2s, color 0.2s;
-  margin-left: auto;
   flex-shrink: 0;
 }
 .drawer-wiki-link:hover {
@@ -1677,7 +1676,52 @@ button.secondary {
   border-top-color: rgba(30, 36, 30, 0.92);
 }
 .drawer-ability-chip:hover .ability-tooltip {
-  display: block;
+display: block;
+}
+
+/* Move link in learnset table */
+.drawer-move-link {
+position: relative;
+color: inherit;
+text-decoration: none;
+border-bottom: 1px dashed rgba(100, 140, 80, 0.4);
+transition: color 0.15s, border-color 0.15s;
+}
+.drawer-move-link:hover {
+color: var(--accent-strong, #3d5a1e);
+border-bottom-color: var(--accent-strong, #3d5a1e);
+}
+
+/* Move tooltip – pops downward, left-aligned to avoid clipping */
+.move-tooltip {
+display: none;
+position: absolute;
+top: calc(100% + 8px);
+left: 0;
+padding: 8px 12px;
+border-radius: 8px;
+background: rgba(30, 36, 30, 0.92);
+color: #f0f0f0;
+font-size: 12px;
+font-weight: 400;
+line-height: 1.5;
+white-space: normal;
+width: max-content;
+max-width: 240px;
+z-index: 100;
+pointer-events: none;
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.move-tooltip::after {
+content: "";
+position: absolute;
+bottom: 100%;
+left: 12px;
+border: 5px solid transparent;
+border-bottom-color: rgba(30, 36, 30, 0.92);
+}
+.drawer-move-link:hover .move-tooltip {
+display: block;
 }
 
 /* ── Form Selector ── */
@@ -3242,6 +3286,23 @@ gap: 6px;
   font-size: 13px;
   line-height: 1.6;
   color: var(--ink);
+}
+
+/* ── Wiki Link (inline icon in detail names) ── */
+.mv-wiki-link,
+.ab-wiki-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  color: var(--muted);
+  opacity: 0.6;
+  transition: opacity 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.mv-wiki-link:hover,
+.ab-wiki-link:hover {
+  opacity: 1;
+  color: var(--accent, #d94f3d);
 }
 
 /* ── Source Link ── */
