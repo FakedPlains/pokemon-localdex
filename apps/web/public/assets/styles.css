@@ -110,6 +110,340 @@ body {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
 }
 
+/* ── Nav Search Box ── */
+.nav-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 260px;
+  min-width: 120px;
+}
+
+.nav-search-icon {
+  position: absolute;
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.nav-search {
+  width: 100%;
+  padding: 7px 32px 7px 30px;
+  border: 1px solid rgba(31, 42, 31, 0.10);
+  border-radius: 999px;
+  background: rgba(255, 248, 236, 0.6);
+  font-size: 13px;
+  color: var(--ink);
+  transition: border-color 200ms, background 200ms, box-shadow 200ms;
+}
+
+.nav-search::placeholder {
+  color: var(--muted);
+  opacity: 0.65;
+  font-size: 12px;
+}
+
+.nav-search:focus {
+  outline: none;
+  border-color: rgba(217, 79, 61, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+.nav-search-clear {
+  position: absolute;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.08);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+
+.nav-search-clear:hover {
+  background: rgba(217, 79, 61, 0.12);
+  color: var(--accent-strong);
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Nav Filter Button ── */
+.nav-filter-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  border-radius: 50%;
+  background: rgba(255, 248, 236, 0.6);
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 200ms, color 200ms, border-color 200ms;
+}
+
+.nav-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  border-color: rgba(31, 42, 31, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+.nav-filter-btn-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: white;
+  border-color: transparent;
+}
+
+.nav-filter-btn-active:hover {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: white;
+  transform: none;
+  box-shadow: none;
+}
+
+.nav-filter-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid white;
+}
+
+.nav-filter-btn-active .nav-filter-badge {
+  background: white;
+  border-color: var(--accent);
+}
+
+/* ── Floating Filter Panel ── */
+.filter-panel-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  padding: 72px 20px 20px;
+  background: rgba(0, 0, 0, 0.08);
+  animation: filterOverlayIn 200ms ease;
+}
+
+@keyframes filterOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.filter-panel {
+  width: min(360px, calc(100vw - 40px));
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 250, 240, 0.96);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  box-shadow: 0 20px 60px rgba(64, 50, 28, 0.18), 0 4px 16px rgba(64, 50, 28, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: filterPanelIn 250ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes filterPanelIn {
+  from { opacity: 0; transform: translateX(20px) scale(0.96); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.filter-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.filter-panel-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.filter-panel-close {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+
+.filter-panel-close:hover {
+  background: rgba(217, 79, 61, 0.1);
+  color: var(--accent-strong);
+  transform: none;
+  box-shadow: none;
+}
+
+.filter-section {
+  margin-bottom: 16px;
+}
+
+.filter-section-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+
+.filter-hint {
+  font-weight: 400;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  cursor: pointer;
+  transition: background 180ms, color 180ms, border-color 180ms;
+  white-space: nowrap;
+}
+
+.filter-chip:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(31, 42, 31, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+.filter-chip-active {
+  color: white !important;
+  background: linear-gradient(135deg, var(--grass), #6b9a3a) !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 8px rgba(138, 166, 90, 0.25);
+}
+
+.filter-chip-active:hover {
+  background: linear-gradient(135deg, #7aaf4a, #5a8a2e) !important;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(138, 166, 90, 0.3);
+}
+
+/* Type filter chips in panel */
+.filter-type-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 50%;
+  padding: 2px;
+  background: rgba(31, 42, 31, 0.45);
+}
+
+.filter-chip-type[data-type="一般"] .filter-type-icon { background: #8a8a7f; }
+.filter-chip-type[data-type="火"] .filter-type-icon { background: #d26a2e; }
+.filter-chip-type[data-type="水"] .filter-type-icon { background: var(--water); }
+.filter-chip-type[data-type="电"] .filter-type-icon { background: var(--electric); }
+.filter-chip-type[data-type="草"] .filter-type-icon { background: var(--grass); }
+.filter-chip-type[data-type="冰"] .filter-type-icon { background: #6ebec9; }
+.filter-chip-type[data-type="格斗"] .filter-type-icon { background: #b4473f; }
+.filter-chip-type[data-type="毒"] .filter-type-icon { background: #8b5ea7; }
+.filter-chip-type[data-type="地面"] .filter-type-icon { background: #b68f4e; }
+.filter-chip-type[data-type="飞行"] .filter-type-icon { background: #7f9cd6; }
+.filter-chip-type[data-type="超能力"] .filter-type-icon { background: #db6390; }
+.filter-chip-type[data-type="虫"] .filter-type-icon { background: #7a9a2a; }
+.filter-chip-type[data-type="岩石"] .filter-type-icon { background: #9a8752; }
+.filter-chip-type[data-type="幽灵"] .filter-type-icon { background: #6b5b95; }
+.filter-chip-type[data-type="龙"] .filter-type-icon { background: #4c62d4; }
+.filter-chip-type[data-type="恶"] .filter-type-icon { background: #5a4b43; }
+.filter-chip-type[data-type="钢"] .filter-type-icon { background: #7b8da1; }
+.filter-chip-type[data-type="妖精"] .filter-type-icon { background: #d98db8; }
+
+.filter-chip-type-active {
+  color: white !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.filter-chip-type-active:hover {
+  transform: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+.filter-chip-type-active .filter-type-icon {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.filter-chip-type-active[data-type="一般"] { background: #8a8a7f; }
+.filter-chip-type-active[data-type="火"] { background: #d26a2e; }
+.filter-chip-type-active[data-type="水"] { background: var(--water); }
+.filter-chip-type-active[data-type="电"] { background: var(--electric); color: #352a00 !important; }
+.filter-chip-type-active[data-type="草"] { background: var(--grass); }
+.filter-chip-type-active[data-type="冰"] { background: #6ebec9; color: #12343a !important; }
+.filter-chip-type-active[data-type="格斗"] { background: #b4473f; }
+.filter-chip-type-active[data-type="毒"] { background: #8b5ea7; }
+.filter-chip-type-active[data-type="地面"] { background: #b68f4e; }
+.filter-chip-type-active[data-type="飞行"] { background: #7f9cd6; }
+.filter-chip-type-active[data-type="超能力"] { background: #db6390; }
+.filter-chip-type-active[data-type="虫"] { background: #7a9a2a; }
+.filter-chip-type-active[data-type="岩石"] { background: #9a8752; }
+.filter-chip-type-active[data-type="幽灵"] { background: #6b5b95; }
+.filter-chip-type-active[data-type="龙"] { background: #4c62d4; }
+.filter-chip-type-active[data-type="恶"] { background: #5a4b43; }
+.filter-chip-type-active[data-type="钢"] { background: #7b8da1; }
+.filter-chip-type-active[data-type="妖精"] { background: #d98db8; }
+
+.filter-clear-all {
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: rgba(217, 79, 61, 0.08);
+  border: 1px solid rgba(217, 79, 61, 0.12);
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.filter-clear-all:hover {
+  background: rgba(217, 79, 61, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
 .main-panel { padding-top: 20px; }
 
 .panel {
@@ -436,10 +770,20 @@ button.secondary {
 }
 
 .type-chip {
-  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 6px;
   border-radius: 999px;
   font-size: 12px;
   color: white;
+}
+
+.type-chip-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .type-chip.type-草 { background: var(--grass); }
@@ -679,7 +1023,7 @@ button.secondary {
    POKEDEX PAGE — Master-Detail Layout
    ═══════════════════════════════════════════════════════ */
 
-.dex-page { display: grid; gap: 18px; }
+.dex-page { display: flex; flex-direction: column; gap: 18px; }
 
 /* ── Header ── */
 .dex-header { padding: 22px 24px 20px; }
@@ -866,10 +1210,13 @@ button.secondary {
   align-items: flex-start;
 }
 
+.dex-body-split {
+  /* no viewport lock — page scrolls naturally */
+}
+
 /* ── Left: List Panel ── */
 .dex-list-panel {
   padding: 0;
-  /* Default: full width */
   flex: 1 1 100%;
   min-width: 0;
   transition: flex 0.45s cubic-bezier(0.22, 1, 0.36, 1),
@@ -879,6 +1226,7 @@ button.secondary {
 .dex-list-panel-narrow {
   flex: 0 0 340px;
   max-width: 340px;
+  /* no overflow-y: auto — scrolls with the page */
 }
 
 .dex-list {
@@ -890,10 +1238,10 @@ button.secondary {
               padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* When detail is open, switch to compact vertical list */
+/* When detail is open, switch to compact single-column list */
 .dex-list-compact {
   grid-template-columns: 1fr;
-  gap: 4px;
+  gap: 6px;
   padding: 8px;
 }
 
@@ -939,17 +1287,19 @@ button.secondary {
   flex-direction: row;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border-color: transparent;
-  background: transparent;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border-color: rgba(31, 42, 31, 0.06);
+  background: linear-gradient(160deg, rgba(255,255,255,0.85), rgba(248,241,226,0.7));
   text-align: left;
+  box-shadow: 0 1px 4px rgba(64, 50, 28, 0.04);
 }
 
 .dex-item-compact:hover {
   transform: none;
-  box-shadow: none;
-  background: rgba(248, 241, 226, 0.6);
+  box-shadow: 0 4px 14px rgba(64, 50, 28, 0.08);
+  border-color: rgba(31, 42, 31, 0.12);
+  background: linear-gradient(160deg, rgba(255,255,255,0.95), rgba(248,241,226,0.85));
 }
 
 /* Active (selected) item */
@@ -957,6 +1307,7 @@ button.secondary {
   background: linear-gradient(135deg, rgba(255,248,240,0.98), rgba(255,240,224,0.95));
   border-color: rgba(217, 79, 61, 0.3);
   box-shadow: 0 2px 8px rgba(217, 79, 61, 0.08);
+  scroll-margin-top: 72px; /* clear the sticky nav bar */
 }
 
 .dex-item-active:hover {
@@ -986,9 +1337,10 @@ button.secondary {
 }
 
 .dex-item-compact .dex-item-img {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .dex-card-placeholder {
@@ -1072,13 +1424,13 @@ button.secondary {
   justify-content: flex-end;
 }
 
-/* ── Right: Detail Panel ── */
+/* ── Right: Detail Panel (sticky) ── */
 .dex-detail-panel {
   position: sticky;
-  top: 12px;
+  top: 72px; /* below the sticky nav */
   padding: 24px;
-  max-height: calc(100vh - 24px);
   overflow-y: auto;
+  max-height: calc(100vh - 84px);
   transform-origin: top center;
   flex: 1 1 0%;
   min-width: 0;
@@ -1217,6 +1569,21 @@ button.secondary {
   color: var(--muted);
 }
 
+.drawer-wiki-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  color: var(--muted);
+  opacity: 0.6;
+  transition: opacity 0.2s, color 0.2s;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.drawer-wiki-link:hover {
+  opacity: 1;
+  color: var(--accent, #d94f3d);
+}
+
 .drawer-types-row { display: flex; gap: 6px; }
 
 .drawer-meta-strip {
@@ -1251,6 +1618,7 @@ button.secondary {
 }
 
 .drawer-ability-chip {
+  position: relative;
   padding: 4px 12px;
   border-radius: 999px;
   font-size: 13px;
@@ -1259,9 +1627,57 @@ button.secondary {
   color: #3d5a1e;
 }
 
+.drawer-ability-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.drawer-ability-link:hover {
+  background: rgba(138, 166, 90, 0.28);
+  box-shadow: 0 1px 4px rgba(61, 90, 30, 0.1);
+}
+
 .drawer-ability-hidden {
   background: rgba(217, 79, 61, 0.1);
   color: var(--accent-strong);
+}
+.drawer-ability-hidden.drawer-ability-link:hover {
+  background: rgba(217, 79, 61, 0.2);
+  box-shadow: 0 1px 4px rgba(217, 79, 61, 0.1);
+}
+
+/* Ability tooltip */
+.ability-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(30, 36, 30, 0.92);
+  color: #f0f0f0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+  width: max-content;
+  max-width: 240px;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.ability-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(30, 36, 30, 0.92);
+}
+.drawer-ability-chip:hover .ability-tooltip {
+  display: block;
 }
 
 /* ── Form Selector ── */
@@ -1298,47 +1714,6 @@ button.secondary {
 .drawer-form-chip-active {
   background: rgba(217, 79, 61, 0.12) !important;
   color: var(--accent-strong) !important;
-}
-
-/* ── Generation & Source Row ── */
-.drawer-extra {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: rgba(31, 42, 31, 0.03);
-  margin-bottom: 16px;
-}
-
-.drawer-gen-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.drawer-gen-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-  background: rgba(138, 166, 90, 0.12);
-  color: #4a6b2a;
-}
-
-.drawer-source-link {
-  font-size: 12px;
-  color: var(--muted);
-  text-decoration: none;
-  margin-left: auto;
-  transition: color 200ms;
-}
-
-.drawer-source-link:hover {
-  color: var(--accent);
 }
 
 /* ── Drawer Tabs ── */
@@ -2910,6 +3285,13 @@ padding: 24px 24px 8px;
   .top-nav-title { font-size: 14px; }
   .top-nav-links { gap: 2px; flex-wrap: wrap; }
   .top-nav-link { padding: 6px 12px; font-size: 13px; }
+  .nav-search-wrap { flex: 1 1 100%; order: 10; min-width: 0; }
+  .nav-search { font-size: 12px; padding: 6px 28px 6px 28px; }
+  .nav-search-icon { left: 8px; width: 13px; height: 13px; }
+  .nav-search-clear { width: 20px; height: 20px; right: 4px; }
+  .nav-filter-btn { width: 32px; height: 32px; }
+  .filter-panel-overlay { padding: 64px 12px 12px; }
+  .filter-panel { width: 100%; border-radius: 16px; padding: 16px; }
   .stat-input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .learnset-table { max-height: none; }
   .learnset-row { grid-template-columns: 1fr 1fr; }
@@ -2924,14 +3306,13 @@ padding: 24px 24px 8px;
   .dex-filter-type-icon { width: 14px; height: 14px; }
   .dex-header { padding: 18px 18px 16px; }
   .dex-body { flex-direction: column; }
-  .dex-list-panel { width: 100%; }
-  .dex-list-panel-narrow { flex: 1 1 auto; max-width: none; width: 100%; }
+  .dex-list-panel-narrow { max-width: none; width: 100%; }
+  .dex-detail-panel { position: relative; top: auto; max-height: none; order: -1; width: 100%; padding: 18px; }
   .dex-list { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
   .dex-list-compact { grid-template-columns: 1fr !important; gap: 4px !important; }
-  .dex-detail-panel { position: static; max-height: none; }
   .dex-item { padding: 10px 8px; }
   .dex-item-img { width: 64px; height: 64px; }
-  .dex-item-compact .dex-item-img { width: 40px; height: 40px; }
+  .dex-item-compact .dex-item-img { width: 42px; height: 42px; }
   .drawer-hero { grid-template-columns: 1fr; }
   .drawer-img-box { max-width: 200px; margin: 0 auto; }
   .sc-row { grid-template-columns: 44px 36px 50px minmax(100px, 1fr) 36px 44px minmax(40px, 0.4fr); gap: 4px; font-size: 12px; }

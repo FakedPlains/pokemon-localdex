@@ -2,10 +2,9 @@ import { useState, useEffect, useMemo } from "react";
 import { api } from "../utils/api.js";
 import Loading from "../components/Loading.jsx";
 
-export default function ItemsPage() {
+export default function ItemsPage({ query: externalQuery = "" }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [selected, setSelected] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -25,7 +24,7 @@ export default function ItemsPage() {
   );
 
   const filteredItems = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = externalQuery.trim().toLowerCase();
     return items.filter((item) => {
       const matchesQuery = !q ||
         [item.id, item.slug, item.nameZh, item.nameJa, item.nameEn, item.effectSummary]
@@ -34,7 +33,7 @@ export default function ItemsPage() {
       const matchesCategory = !category || item.category === category;
       return matchesQuery && matchesCategory;
     });
-  }, [items, query, category]);
+  }, [items, externalQuery, category]);
 
   const visibleItems = useMemo(() => filteredItems.slice(0, visibleLimit), [filteredItems, visibleLimit]);
 
@@ -71,13 +70,6 @@ export default function ItemsPage() {
           <span className="chip">{filteredItems.length} / {items.length} 个道具</span>
         </div>
         <div className="toolbar">
-          <div className="toolbar-row">
-            <input
-              placeholder="搜索道具中文 / 日文 / 英文名或效果"
-              value={query}
-              onChange={(e) => { setQuery(e.target.value); setVisibleLimit(120); }}
-            />
-          </div>
           <div className="toolbar-row">
             <select value={category} onChange={(e) => { setCategory(e.target.value); setVisibleLimit(120); setSelected(null); }}>
               <option value="">全部分类</option>

@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
-import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "../utils/constants.js";
 import Loading from "../components/Loading.jsx";
 
 /* ── 属性颜色映射（用于行底色） ── */
@@ -64,42 +63,11 @@ function CategoryChip({ category }) {
   );
 }
 
-export default function MovesPage() {
-  const [inputValue, setInputValue] = useState("");
-  const [query, setQuery] = useState("");
-  const [type, setType] = useState("");
-  const [category, setCategory] = useState("");
-  const [generation, setGeneration] = useState("");
+export default function MovesPage({ query = "", type = "", category = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
 
-  const composingRef = useRef(false);
-  const debounceRef = useRef(null);
-
-  const handleInputChange = useCallback((e) => {
-    const value = e.target.value;
-    setInputValue(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!composingRef.current) {
-      debounceRef.current = setTimeout(() => setQuery(value), 300);
-    }
-  }, []);
-
-  const handleCompositionStart = useCallback(() => {
-    composingRef.current = true;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-  }, []);
-
-  const handleCompositionEnd = useCallback((e) => {
-    composingRef.current = false;
-    const value = e.target.value;
-    setInputValue(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setQuery(value), 300);
-  }, []);
-
-  useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, []);
+  // Reset expanded when filters change
+  useEffect(() => { setExpanded(null); }, [query, type, category, generation]);
 
   // 构建分页请求路径（所有筛选条件都由服务端处理）
   const movesPath = useMemo(() => {
@@ -130,53 +98,6 @@ export default function MovesPage() {
           </p>
         </div>
 
-        <div className="mv-toolbar">
-          <div className="mv-search-wrap">
-            <svg className="mv-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="8.5" cy="8.5" r="5.5" /><line x1="13" y1="13" x2="17" y2="17" />
-            </svg>
-            <input
-              className="mv-search"
-              placeholder="搜索招式名（中文 / 英文 / 日文）"
-              value={inputValue}
-              onChange={handleInputChange}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-            />
-          </div>
-          <div className="mv-filters">
-            <select
-              className="mv-filter-select"
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-            >
-              <option value="">全部属性</option>
-              {ALL_TYPE_OPTIONS.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-            <select
-              className="mv-filter-select"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              <option value="">全部分类</option>
-              <option value="物理">物理</option>
-              <option value="特殊">特殊</option>
-              <option value="变化">变化</option>
-            </select>
-            <select
-              className="mv-filter-select"
-              value={generation}
-              onChange={(e) => setGeneration(e.target.value)}
-            >
-              <option value="">全部世代</option>
-              {GENERATION_OPTIONS.map((g) => (
-                <option key={g} value={g}>第 {g} 世代</option>
-              ))}
-            </select>
-          </div>
-        </div>
 
         {/* ── 表头 ── */}
         <div className="mv-list-head">

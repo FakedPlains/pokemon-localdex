@@ -1,55 +1,20 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
-import { GENERATION_OPTIONS } from "../utils/constants.js";
 import Loading from "../components/Loading.jsx";
 
-export default function AbilitiesPage() {
-  const [inputValue, setInputValue] = useState("");
-  const [query, setQuery] = useState("");
-  const [generation, setGeneration] = useState("");
+function parseExpandParam() {
+  const hash = window.location.hash || "";
+  const qIdx = hash.indexOf("?");
+  if (qIdx < 0) return null;
+  const params = new URLSearchParams(hash.slice(qIdx));
+  return params.get("expand") || null;
+}
+
+export default function AbilitiesPage({ query = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
   const [detailCache, setDetailCache] = useState({});
-
-  const composingRef = useRef(false);
-  const debounceRef = useRef(null);
-
-  // Debounced query update — respects IME composition
-  const handleInputChange = useCallback((e) => {
-    const value = e.target.value;
-    setInputValue(value);
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (!composingRef.current) {
-      debounceRef.current = setTimeout(() => {
-        setQuery(value);
-      }, 300);
-    }
-  }, []);
-
-  const handleCompositionStart = useCallback(() => {
-    composingRef.current = true;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-  }, []);
-
-  const handleCompositionEnd = useCallback((e) => {
-    composingRef.current = false;
-    const value = e.target.value;
-    setInputValue(value);
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setQuery(value);
-    }, 300);
-  }, []);
-
-  // Cleanup debounce timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
+  const pendingExpandRef = useRef(parseExpandParam());
 
   // 构建分页请求路径
   const abilitiesPath = useMemo(() => {
@@ -60,7 +25,54 @@ export default function AbilitiesPage() {
     return qs ? `/abilities?${qs}` : "/abilities";
   }, [query, generation]);
 
-  const { data: abilities, total, loading, hasMore, sentinelRef } = useInfiniteApi(abilitiesPath, { pageSize: 50 });
+  const { data: abilities, total, loading, loadingMore, hasMore, sentinelRef, loadMore } = useInfiniteApi(abilitiesPath, { pageSize: 50 });
+
+  // Auto-expand ability from URL hash param (e.g. #/abilities?expand=123)
+  useEffect(() => {
+    const expandId = pendingExpandRef.current;
+    if (!expandId || loading) return;
+    if (abilities.length === 0 && !hasMore) {
+      // No abilities at all, give up
+      pendingExpandRef.current = null;
+      return;
+    }
+    if (abilities.length === 0) return; // still loading first page
+
+    const numId = Number(expandId);
+    const target = abilities.find((a) => a.id === numId || String(a.id) === expandId);
+    if (target) {
+      pendingExpandRef.current = null; // consume once found
+      const key = target.id;
+      setExpanded(key);
+      if (!detailCache[key]) {
+        api(`/abilities/${encodeURIComponent(key)}`).then((r) => {
+          setDetailCache((prev) => ({ ...prev, [key]: r.data }));
+        });
+      }
+      // Scroll to the ability row after DOM update
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-ability-id="${key}"]`);
+        if (el) el.scrollIntoView({ block: "center", behavior: "instant" });
+      });
+      // Clean up the expand param from hash
+      const hash = window.location.hash || "";
+      const qIdx = hash.indexOf("?");
+      if (qIdx >= 0) {
+        window.history.replaceState(null, "", hash.slice(0, qIdx));
+      }
+    } else if (hasMore && !loadingMore) {
+      // Target not found yet, load more data
+      loadMore();
+    } else if (!hasMore) {
+      // All data loaded but target not found, give up
+      pendingExpandRef.current = null;
+      const hash = window.location.hash || "";
+      const qIdx = hash.indexOf("?");
+      if (qIdx >= 0) {
+        window.history.replaceState(null, "", hash.slice(0, qIdx));
+      }
+    }
+  }, [abilities, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleExpand = useCallback((slug) => {
     if (expanded === slug) {
@@ -87,33 +99,6 @@ export default function AbilitiesPage() {
           </p>
         </div>
 
-        <div className="ab-toolbar">
-          <div className="ab-search-wrap">
-            <svg className="ab-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="8.5" cy="8.5" r="5.5" /><line x1="13" y1="13" x2="17" y2="17" />
-            </svg>
-            <input
-              className="ab-search"
-              placeholder="搜索特性名（中文 / 英文 / 日文）"
-              value={inputValue}
-              onChange={handleInputChange}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-            />
-          </div>
-          <div className="ab-filters">
-            <select
-              className="ab-gen-select"
-              value={generation}
-              onChange={(e) => setGeneration(e.target.value)}
-            >
-              <option value="">全部世代</option>
-              {GENERATION_OPTIONS.map((g) => (
-                <option key={g} value={g}>第 {g} 世代</option>
-              ))}
-            </select>
-          </div>
-        </div>
 
         {abilities.length === 0 && !loading && (
           <div className="ab-empty">没有找到匹配的特性。</div>
@@ -125,7 +110,7 @@ export default function AbilitiesPage() {
             const isExpanded = expanded === key;
             const detail = detailCache[key];
             return (
-              <div key={ability.id} className={`ab-row${isExpanded ? " ab-row-expanded" : ""}`}>
+              <div key={ability.id} data-ability-id={ability.id} className={`ab-row${isExpanded ? " ab-row-expanded" : ""}`}>
                 <button className="ab-row-header" onClick={() => toggleExpand(key)}>
                   <span className="ab-row-number">
                     {ability.number ? String(ability.number).padStart(3, "0") : "—"}

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
-import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS, STAT_KEYS } from "../utils/constants.js";
+import { STAT_KEYS } from "../utils/constants.js";
 import {
   getPokemonPreviewImage,
   resolvePokemonDisplayVariant,
@@ -14,20 +14,15 @@ import StatCalculator from "../components/StatCalculator.jsx";
 import Loading from "../components/Loading.jsx";
 
 /* ─── Main Page ─── */
-export default function PokedexPage() {
-  const [inputValue, setInputValue] = useState("");
-  const [query, setQuery] = useState("");
-  const [types, setTypes] = useState([]);
-  const [generation, setGeneration] = useState("");
+export default function PokedexPage({ query = "", types = [], generation = "" }) {
   const [selectedSlug, setSelectedSlug] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailGeneration, setDetailGeneration] = useState("");
 
   const detailRef = useRef(null);
   const activeCardRef = useRef(null);
-  const scrollTargetSlugRef = useRef(null);
-  const composingRef = useRef(false);
-  const debounceRef = useRef(null);
+  const prevSlugRef = useRef(null);  // remember slug before closing detail
+  const filterChangedWhileOpenRef = useRef(false); // track filter changes with detail open
 
   // 构建分页请求路径
   const pokemonPath = useMemo(() => {
@@ -39,37 +34,30 @@ export default function PokedexPage() {
     return qs ? `/pokemon?${qs}` : "/pokemon";
   }, [query, types, generation]);
 
+  // Mark that filters changed while detail panel is open
+  useEffect(() => {
+    if (selectedSlug) {
+      filterChangedWhileOpenRef.current = true;
+    }
+  }, [query, types, generation]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { data: list, total, loading, hasMore, sentinelRef, loadingMore } = useInfiniteApi(pokemonPath, { pageSize: 60 });
 
-  const handleInputChange = useCallback((e) => {
-    const value = e.target.value;
-    setInputValue(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!composingRef.current) {
-      debounceRef.current = setTimeout(() => setQuery(value), 300);
-    }
-  }, []);
-
-  const handleCompositionStart = useCallback(() => {
-    composingRef.current = true;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-  }, []);
-
-  const handleCompositionEnd = useCallback((e) => {
-    composingRef.current = false;
-    const value = e.target.value;
-    setInputValue(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setQuery(value), 300);
-  }, []);
-
-  // Cleanup debounce timer
+  // After list reloads due to filter change while detail is open:
+  // - has results → auto-select the first pokemon
+  // - no results  → close detail, show empty state
   useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, []);
+    if (!filterChangedWhileOpenRef.current || loading) return;
+    filterChangedWhileOpenRef.current = false;
 
-  // Close detail when filters change
-  useEffect(() => { setSelectedSlug(null); setDetail(null); }, [query, types, generation]);
+    if (list.length > 0) {
+      const firstSlug = list[0].slug || list[0].id;
+      setSelectedSlug(firstSlug);
+    } else {
+      setSelectedSlug(null);
+      setDetail(null);
+    }
+  }, [list, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch detail when a card is selected
   useEffect(() => {
@@ -85,44 +73,6 @@ export default function PokedexPage() {
     return () => { cancelled = true; };
   }, [selectedSlug]);
 
-  // ── Scroll positioning strategy (page-level) ──
-  const isClosingRef = useRef(false);
-  const closingSlugRef = useRef(null);
-
-  // OPEN: scroll the selected card into view after layout settles
-  useEffect(() => {
-    if (isClosingRef.current) return;
-    const slug = scrollTargetSlugRef.current;
-    if (!slug || !selectedSlug) return;
-    scrollTargetSlugRef.current = null;
-
-    // Wait for framer-motion layout animation to settle
-    const timer = setTimeout(() => {
-      const card = document.querySelector(`[data-slug="${CSS.escape(slug)}"]`);
-      if (card) {
-        card.scrollIntoView({ block: "center", behavior: "instant" });
-      }
-    }, 60);
-    return () => clearTimeout(timer);
-  }, [selectedSlug, list]);
-
-  // CLOSE: scroll the card back into view after grid layout transition
-  useEffect(() => {
-    if (!isClosingRef.current) return;
-    const slug = closingSlugRef.current;
-    if (!slug) { isClosingRef.current = false; return; }
-    closingSlugRef.current = null;
-
-    const timer = setTimeout(() => {
-      isClosingRef.current = false;
-      const card = document.querySelector(`[data-slug="${CSS.escape(slug)}"]`);
-      if (card) {
-        card.scrollIntoView({ block: "center", behavior: "instant" });
-      }
-    }, 380);
-    return () => { clearTimeout(timer); isClosingRef.current = false; };
-  }, [selectedSlug]);
-
   // Scroll detail panel to top when detail changes
   useEffect(() => {
     if (detail && detailRef.current) {
@@ -130,25 +80,51 @@ export default function PokedexPage() {
     }
   }, [detail]);
 
+  // Scroll handling for layout transitions.
+  // Only scroll when layout actually changes (entering/leaving split view),
+  // NOT when switching between pokemon within the split view.
+  const scrollTimerRef = useRef(null);
+  const hadSelectionRef = useRef(false); // was there a selection BEFORE this change?
+
+  useEffect(() => {
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+
+    const wasOpen = hadSelectionRef.current;
+    const isOpen = !!selectedSlug;
+    hadSelectionRef.current = isOpen;
+
+    if (isOpen && !wasOpen) {
+      // Entering split view from grid: scroll to the selected card after layout animation
+      prevSlugRef.current = selectedSlug;
+      scrollTimerRef.current = setTimeout(() => {
+        const card = document.querySelector(`[data-slug="${CSS.escape(selectedSlug)}"]`);
+        if (card) {
+          card.scrollIntoView({ block: "start", behavior: "instant" });
+        }
+      }, 380);
+    } else if (isOpen && wasOpen) {
+      // Switching pokemon within split view: just update prevSlug, no scroll
+      prevSlugRef.current = selectedSlug;
+    } else if (!isOpen && prevSlugRef.current) {
+      // Closing detail: scroll back to the previously selected card
+      const slugToRestore = prevSlugRef.current;
+      scrollTimerRef.current = setTimeout(() => {
+        const card = document.querySelector(`[data-slug="${CSS.escape(slugToRestore)}"]`);
+        if (card) {
+          card.scrollIntoView({ block: "center", behavior: "instant" });
+        }
+      }, 380);
+    }
+
+    return () => { if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current); };
+  }, [selectedSlug]);
+
   const handleSelect = useCallback((slug) => {
-    setSelectedSlug((prev) => {
-      const isToggleClose = prev === slug;
-      if (isToggleClose) {
-        isClosingRef.current = true;
-        closingSlugRef.current = prev;
-      } else {
-        scrollTargetSlugRef.current = slug;
-      }
-      return isToggleClose ? null : slug;
-    });
+    setSelectedSlug((prev) => (prev === slug ? null : slug));
   }, []);
 
   const handleClose = useCallback(() => {
-    isClosingRef.current = true;
-    setSelectedSlug((prev) => {
-      closingSlugRef.current = prev;
-      return null;
-    });
+    setSelectedSlug(null);
   }, []);
 
   if (loading && list.length === 0) return <Loading />;
@@ -157,78 +133,9 @@ export default function PokedexPage() {
 
   return (
     <div className="dex-page">
-      {/* Header */}
-      <div className="dex-header panel">
-        <div className="dex-header-top">
-          <div>
-            <h2 className="panel-title">全国图鉴</h2>
-            <p className="panel-subtitle">点击宝可梦查看详情，包括特性、种族值计算器和招式表。</p>
-          </div>
-          <span className="chip">{total > 0 ? `${list.length} / ${total}` : `${list.length}`} 只宝可梦</span>
-        </div>
-        <div className="dex-toolbar">
-          {/* Generation filter chips */}
-          <div className="dex-filter-section">
-            <span className="dex-filter-label">按世代筛选</span>
-            <div className="dex-filter-chips">
-              <button
-                className={`dex-filter-chip${generation === "" ? " dex-filter-chip-active" : ""}`}
-                onClick={() => setGeneration("")}
-              >全部</button>
-              {GENERATION_OPTIONS.map((g) => (
-                <button
-                  key={g}
-                  className={`dex-filter-chip${generation === String(g) ? " dex-filter-chip-active" : ""}`}
-                  onClick={() => setGeneration(generation === String(g) ? "" : String(g))}
-                >
-                  第 {g} 世代
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Type filter chips (multi-select, no "all" button) */}
-          <div className="dex-filter-section">
-            <span className="dex-filter-label">按属性筛选</span>
-            <div className="dex-filter-chips">
-              {ALL_TYPE_OPTIONS.map((t) => {
-                const isActive = types.includes(t);
-                return (
-                  <button
-                    key={t}
-                    data-type={t}
-                    className={`dex-filter-chip dex-filter-chip-type${isActive ? " dex-filter-chip-type-active" : ""}`}
-                    onClick={() => setTypes((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t])}
-                  >
-                    <img className="dex-filter-type-icon" src={`/assets/type-icons/type-${t}@sm.png`} alt="" />
-                    {t}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Search bar */}
-          <div className="dex-search-wrap">
-            <svg className="dex-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="8.5" cy="8.5" r="5.5" /><line x1="13" y1="13" x2="17" y2="17" />
-            </svg>
-            <input
-              className="dex-search"
-              placeholder="搜索名称 / 编号…"
-              value={inputValue}
-              onChange={handleInputChange}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Master-Detail body */}
-      <div className="dex-body">
-        {/* Left: Pokemon list */}
-        <div className={`dex-list-panel panel ${hasSelection ? "dex-list-panel-narrow" : ""}`}>
+      <div className={`dex-body${hasSelection ? " dex-body-split" : ""}`}>
+        {/* Left: Pokemon list — scrolls naturally with the page */}
+        <div className={`dex-list-panel${hasSelection ? " dex-list-panel-narrow" : ""}`}>
           <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
             {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
             {list.map((member) => {
@@ -271,7 +178,7 @@ export default function PokedexPage() {
           </div>
         </div>
 
-        {/* Right: Detail panel */}
+        {/* Right: Detail panel — sticky so it stays visible while list scrolls */}
         <AnimatePresence mode="wait">
           {hasSelection && (
             <motion.div
@@ -283,7 +190,6 @@ export default function PokedexPage() {
               exit={{ opacity: 0, y: 16, scale: 0.98 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             >
-              {/* Close button */}
               <button className="dex-detail-close" onClick={handleClose} title="关闭详情">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <line x1="4" y1="4" x2="14" y2="14" /><line x1="14" y1="4" x2="4" y2="14" />
@@ -391,8 +297,6 @@ function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
     return learnsetFormKeys[0] || null;
   }, [learnsetFormOverride, learnsetFormKeys, display.form, mapFormToLearnsetKey]);
 
-  const generations = detail.generations || [];
-
   const tabs = [
     { key: "stats", label: "种族值" },
     { key: "moves", label: "招式表" }
@@ -410,6 +314,14 @@ function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
             <span className="drawer-dex">#{String(detail.dexNumber).padStart(4, "0")}</span>
             <h3 className="drawer-name">{detail.nameZh}</h3>
             <span className="drawer-en">{detail.nameEn || ""}</span>
+            {detail.source?.url && (
+              <a href={detail.source.url} target="_blank" rel="noopener noreferrer" className="drawer-wiki-link" title={detail.source.title || "Wiki"}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
+                  <path d="M9 2h5v5" /><path d="M14 2 7.5 8.5" />
+                </svg>
+              </a>
+            )}
           </div>
           <div className="drawer-types-row">
             <TypeChip type={display.primaryType} />
@@ -422,14 +334,21 @@ function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
           </div>
           <div className="drawer-abilities">
             <span className="drawer-ability-label">特性</span>
-            {display.abilityText && display.abilityText.split(" / ").map((a, i) => (
-              <span key={i} className="drawer-ability-chip">{a}</span>
+            {(display.abilitiesDetailed || []).map((ab, i) => (
+              <a
+                key={i}
+                className={`drawer-ability-chip drawer-ability-link${ab.isHidden ? " drawer-ability-hidden" : ""}`}
+                href={ab.abilityId ? `#/abilities?expand=${ab.abilityId}` : "#/abilities"}
+                title={ab.description || ab.nameZh}
+              >
+                <span className="drawer-ability-chip-text">
+                  {ab.nameZh}{ab.isHidden ? " ✦" : ""}
+                </span>
+                {ab.description && (
+                  <span className="ability-tooltip">{ab.description}</span>
+                )}
+              </a>
             ))}
-            {display.hiddenAbilityText && display.hiddenAbilityText !== "无" && (
-              <span className="drawer-ability-chip drawer-ability-hidden" title="隐藏特性">
-                {display.hiddenAbilityText} ✦
-              </span>
-            )}
           </div>
           {/* Form selector */}
           {display.formOptions.length > 1 && (
@@ -450,24 +369,6 @@ function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
           )}
         </div>
       </div>
-
-      {/* Generation & source pills */}
-      {(generations.length > 0 || detail.source?.url) && (
-        <div className="drawer-extra">
-          {generations.length > 0 && (
-            <div className="drawer-gen-row">
-              {generations.map((g) => (
-                <span key={g} className="drawer-gen-pill">第 {g} 世代</span>
-              ))}
-            </div>
-          )}
-          {detail.source?.url && (
-            <a href={detail.source.url} target="_blank" rel="noopener noreferrer" className="drawer-source-link">
-              {detail.source.title || "数据来源"}
-            </a>
-          )}
-        </div>
-      )}
 
       {/* Tab bar */}
       <div className="drawer-tabs">
@@ -642,9 +543,6 @@ function StatsTab({ detail, display, detailGeneration, onDetailGenerationChange 
       {/* Calculator */}
       <div className="ov-section">
         <h4 className="ov-heading">能力值计算器</h4>
-        <p className="muted" style={{ margin: "0 0 12px" }}>
-          选择性格、设置等级、个体值和努力值，实时计算 Lv.50 / Lv.100 下的最终能力值。
-        </p>
         <StatCalculator baseStats={stats} />
       </div>
     </div>

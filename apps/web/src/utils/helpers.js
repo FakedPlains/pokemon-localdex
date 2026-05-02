@@ -276,20 +276,24 @@ export function resolvePokemonDisplayVariant(detail, detailGeneration, detailFor
   const primaryType = selectedForm.primaryType || detail.primaryType;
   const secondaryType = selectedForm.secondaryType || detail.secondaryType;
 
-  // Build ability text from form's abilities array [{nameZh, isHidden}]
+  // Build ability info from form's abilities array [{nameZh, isHidden, abilityId?, description?}]
   const formAbilities = selectedForm.abilities || [];
   const hasOwnAbilities = formAbilities.length > 0;
-  const normalAbilities = formAbilities.filter((a) => !a.isHidden).map((a) => a.nameZh);
-  const hiddenAbilities = formAbilities.filter((a) => a.isHidden).map((a) => a.nameZh);
+  const normalAbilities = formAbilities.filter((a) => !a.isHidden);
+  const hiddenAbilitiesList = formAbilities.filter((a) => a.isHidden);
   const abilityText = normalAbilities.length > 0
-    ? normalAbilities.join(" / ")
+    ? normalAbilities.map((a) => a.nameZh).join(" / ")
     : (detail.abilities || []).join(" / ");
   // Only fallback to top-level hiddenAbility when the form has no own abilities data.
   // Mega / Gmax forms define their own abilities array; if it contains no hidden entry
   // that means the form genuinely has no hidden ability — don't inherit the base form's.
   const hiddenAbilityText = hasOwnAbilities
-    ? (hiddenAbilities.length > 0 ? hiddenAbilities.join(" / ") : "无")
+    ? (hiddenAbilitiesList.length > 0 ? hiddenAbilitiesList.map((a) => a.nameZh).join(" / ") : "无")
     : (detail.hiddenAbility || "无");
+  // Full abilities array with id & description for tooltip / linking
+  const abilitiesDetailed = hasOwnAbilities
+    ? formAbilities
+    : (detail.abilities || []).map((name) => ({ nameZh: name, isHidden: false }));
 
   // Resolve images: form images → top-level image fallback
   const images = selectedForm.images || (detail.image ? { official: detail.image } : undefined);
@@ -304,7 +308,8 @@ export function resolvePokemonDisplayVariant(detail, detailGeneration, detailFor
     primaryType,
     secondaryType,
     abilityText,
-    hiddenAbilityText
+    hiddenAbilityText,
+    abilitiesDetailed
   };
 }
 

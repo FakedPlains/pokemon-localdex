@@ -40,7 +40,7 @@ export type FormTypeVariant = {
 export type FormAbilityVariant = {
   generationStart?: number;
   generationEnd?: number;
-  abilities: Array<{ nameZh: string; isHidden: boolean }>;
+  abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }>;
 };
 
 export type PokemonFormEntry = {
@@ -51,7 +51,7 @@ export type PokemonFormEntry = {
   sortOrder: number;
   primaryType?: string;
   secondaryType?: string;
-  abilities: Array<{ nameZh: string; isHidden: boolean }>;
+  abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }>;
   baseStats?: StatBlock;
   images: Record<string, ImageAsset>;
   /** Generation-specific stat variants (when stats changed across generations) */
@@ -1172,16 +1172,18 @@ export function getPokemonFromSqlite(idOrSlug: string) {
     group.types.push(String(r.type_name));
   }
 
-  // 批量获取形态特性（可能有多条，按世代区分）
+  // 批量获取形态特性（可能有多条，按世代区分），JOIN abilities 表获取 id 和 description
   const faRows = formIds.length ? db.prepare(`
     SELECT pfa.form_id, pfa.ability_name_zh, pfa.is_hidden, pfa.slot,
-           pfa.generation_start, pfa.generation_end
+           pfa.generation_start, pfa.generation_end,
+           a.id AS ability_id, a.description AS ability_description
     FROM pokemon_form_abilities pfa
+    LEFT JOIN abilities a ON a.id = pfa.ability_id
     WHERE pfa.form_id IN (${fPlaceholders})
     ORDER BY pfa.form_id, pfa.generation_start ASC, pfa.slot
   `).all(...formIds) as Record<string, unknown>[] : [];
 
-  const faMap = new Map<number, Array<{ genStart?: number; genEnd?: number; abilities: Array<{ nameZh: string; isHidden: boolean }> }>>();
+  const faMap = new Map<number, Array<{ genStart?: number; genEnd?: number; abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }> }>>();
   for (const r of faRows) {
     const fid = Number(r.form_id);
     const genStart = r.generation_start !== null && r.generation_start !== undefined ? Number(r.generation_start) : undefined;
@@ -1193,7 +1195,12 @@ export function getPokemonFromSqlite(idOrSlug: string) {
       group = { genStart, genEnd, abilities: [] };
       arr.push(group);
     }
-    group.abilities.push({ nameZh: String(r.ability_name_zh), isHidden: Boolean(Number(r.is_hidden)) });
+    group.abilities.push({
+      nameZh: String(r.ability_name_zh),
+      isHidden: Boolean(Number(r.is_hidden)),
+      abilityId: r.ability_id != null ? Number(r.ability_id) : undefined,
+      description: r.ability_description ? String(r.ability_description) : undefined,
+    });
   }
 
   // 批量获取形态图片
