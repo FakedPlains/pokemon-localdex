@@ -1,0 +1,44 @@
+{
+  "name": "@pokemon-localdex/miniprogram",
+  "version": "0.1.0",
+  "private": true,
+  "description": "宝可梦图鉴微信小程序端",
+  "templateInfo": {
+    "name": "default",
+    "typescript": false,
+    "css": "less"
+  },
+  "scripts": {
+    "build:weapp": "taro build --type weapp",
+    "dev:weapp": "taro build --type weapp --watch"
+  },
+  "browserslist": [
+    "last 3 versions",
+    "Android >= 4.1",
+    "ios >= 8"
+  ],
+  "dependencies": {
+    "@tarojs/components": "4.2.0",
+    "@tarojs/helper": "4.2.0",
+    "@tarojs/plugin-platform-weapp": "4.2.0",
+    "@tarojs/react": "4.2.0",
+    "@tarojs/runtime": "4.2.0",
+    "@tarojs/shared": "4.2.0",
+    "@tarojs/taro": "4.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-reconciler": "^0.29.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.8.0",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/runtime": "^7.7.7",
+    "@tarojs/cli": "4.2.0",
+    "@tarojs/plugin-framework-react": "4.2.0",
+    "@tarojs/webpack5-runner": "4.2.0",
+    "babel-preset-taro": "4.2.0",
+    "less": "^4.2.0",
+    "postcss": "^8.4.18",
+    "webpack": "5.91.0"
+  }
+}

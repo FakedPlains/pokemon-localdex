@@ -1,0 +1,84 @@
+/* ── 全局样式 ── */
+
+page {
+  background-color: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica,
+    'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  font-size: 28px;
+  color: #333;
+  box-sizing: border-box;
+}
+
+view, text, image {
+  box-sizing: border-box;
+}
+
+/* ── 属性颜色（使用英文类名避免 WXSS 中文编译问题） ── */
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 22px;
+  color: #fff;
+  font-weight: 500;
+  margin-right: 8px;
+  margin-bottom: 4px;
+}
+
+.type-normal { background: #8a8a7f; }
+.type-fire { background: #d26a2e; }
+.type-water { background: #3b84c5; }
+.type-electric { background: #e4c02a; color: #333; }
+.type-grass { background: #8aa65a; }
+.type-ice { background: #6ebec9; }
+.type-fighting { background: #b4473f; }
+.type-poison { background: #8b5ea7; }
+.type-ground { background: #b68f4e; }
+.type-flying { background: #7f9cd6; }
+.type-psychic { background: #db6390; }
+.type-bug { background: #7a9a2a; }
+.type-rock { background: #9a8752; }
+.type-ghost { background: #6b5b95; }
+.type-dragon { background: #4c62d4; }
+.type-dark { background: #5a4b43; }
+.type-steel { background: #7b8da1; }
+.type-fairy { background: #d98db8; }
+
+/* ── 通用工具类 ── */
+.muted {
+  color: #999;
+  font-size: 24px;
+}
+
+.panel {
+  background: #fff;
+  border-radius: 16px;
+  margin: 16px;
+  overflow: hidden;
+}
+
+.panel-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+}
+
+.panel-subtitle {
+  font-size: 24px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.pulse-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e63946;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}

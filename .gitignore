@@ -12,6 +12,9 @@ node_modules/
 *.swp
 *.swo
 
+# Compiler/bundler caches
+.swc/
+
 # Python bytecode
 __pycache__/
 *.pyc
@@ -36,6 +39,10 @@ yarn-debug.log*
 yarn-error.log*
 /tmp/
 /dist/
+
+# WeChat Mini Program
+project.private.config.json
+apps/miniprogram/dist/
 
 # Empty placeholder DB files
 /data/localdex.db

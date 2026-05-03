@@ -1,0 +1,400 @@
+.detail-page {
+  height: 100vh;
+}
+
+.detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: #999;
+  font-size: 28px;
+}
+
+/* ── Hero 区域 ── */
+.detail-hero {
+  background: #fff;
+  padding-bottom: 24px;
+}
+
+.hero-img-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  background: linear-gradient(180deg, #fafafa 0%, #fff 100%);
+}
+
+.hero-img {
+  width: 300px;
+  height: 300px;
+}
+
+.hero-img-placeholder {
+  font-size: 28px;
+  color: #ccc;
+}
+
+.hero-img-toggle {
+  position: absolute;
+  bottom: 16px;
+  right: 24px;
+  display: flex;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.toggle-btn {
+  padding: 8px 20px;
+  font-size: 22px;
+  color: #666;
+}
+
+.toggle-active {
+  background: #e63946;
+  color: #fff;
+  border-radius: 24px;
+}
+
+.hero-info {
+  padding: 0 32px;
+}
+
+.hero-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hero-dex {
+  font-size: 26px;
+  color: #999;
+  font-family: monospace;
+}
+
+.hero-name {
+  font-size: 40px;
+  font-weight: 700;
+  color: #333;
+}
+
+.hero-name-en {
+  font-size: 26px;
+  color: #999;
+}
+
+.hero-types {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.meta-pill {
+  display: flex;
+  align-items: center;
+  background: #f5f5f5;
+  border-radius: 20px;
+  padding: 8px 20px;
+  gap: 8px;
+}
+
+.meta-key {
+  font-size: 22px;
+  color: #999;
+}
+
+.meta-val {
+  font-size: 24px;
+  color: #333;
+  font-weight: 500;
+}
+
+/* ── 特性 ── */
+.hero-abilities {
+  margin-top: 20px;
+}
+
+.ability-label {
+  font-size: 22px;
+  color: #999;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.ability-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ability-chip {
+  background: #f0f0f0;
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-size: 24px;
+  color: #333;
+}
+
+.ability-hidden {
+  background: #fff3cd;
+  color: #856404;
+}
+
+/* ── 形态选择 ── */
+.form-selector {
+  margin-top: 20px;
+}
+
+.form-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.form-chip {
+  background: #f0f0f0;
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-size: 24px;
+  color: #666;
+}
+
+.form-chip-active {
+  background: #e63946;
+  color: #fff;
+}
+
+/* ── Tab 切换 ── */
+.detail-tabs {
+  display: flex;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  margin-top: 16px;
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 20px 0;
+  font-size: 28px;
+  color: #666;
+  position: relative;
+}
+
+.tab-active {
+  color: #e63946;
+  font-weight: 600;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 48px;
+    height: 4px;
+    background: #e63946;
+    border-radius: 2px;
+  }
+}
+
+/* ── Tab 内容 ── */
+.tab-content {
+  background: #fff;
+  min-height: 400px;
+}
+
+.tab-stats {
+  padding: 24px 32px;
+}
+
+.section-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+/* ── 招式 Tab ── */
+.tab-moves {
+  padding: 16px 0;
+}
+
+.gen-scroll, .method-scroll {
+  white-space: nowrap;
+  padding: 0 24px;
+  margin-bottom: 16px;
+}
+
+.gen-pills, .method-pills {
+  display: inline-flex;
+  gap: 12px;
+}
+
+.gen-pill, .method-pill {
+  display: inline-flex;
+  padding: 10px 24px;
+  border-radius: 24px;
+  background: #f0f0f0;
+  font-size: 24px;
+  color: #666;
+  flex-shrink: 0;
+}
+
+.gen-pill-active, .method-pill-active {
+  background: #e63946;
+  color: #fff;
+}
+
+.moves-empty {
+  padding: 60px 0;
+  text-align: center;
+}
+
+.moves-list {
+  padding: 0 16px;
+}
+
+.moves-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 22px;
+  color: #999;
+  font-weight: 600;
+}
+
+.moves-row {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.mv-col-name {
+  flex: 2;
+  font-size: 26px;
+  color: #333;
+}
+
+.mv-col-method {
+  flex: 1.5;
+  font-size: 22px;
+  color: #666;
+}
+
+.mv-col-type {
+  flex: 1.2;
+}
+
+.mv-col-cat {
+  flex: 1;
+  font-size: 22px;
+  color: #666;
+  text-align: center;
+}
+
+.mv-col-pow {
+  flex: 0.8;
+  font-size: 24px;
+  color: #333;
+  text-align: right;
+  font-weight: 500;
+}
+
+/* ── 进化链 ── */
+.tab-evolution {
+  padding: 24px 32px;
+}
+
+.evo-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.evo-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.evo-method {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.evo-method-text {
+  font-size: 24px;
+  color: #666;
+  background: #f5f5f5;
+  padding: 8px 20px;
+  border-radius: 20px;
+}
+
+.evo-arrow {
+  font-size: 32px;
+  color: #ccc;
+}
+
+.evo-pokemon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background: #fafafa;
+  border-radius: 16px;
+  width: 100%;
+}
+
+.evo-img {
+  width: 160px;
+  height: 160px;
+}
+
+.evo-img-placeholder {
+  width: 160px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eee;
+  border-radius: 50%;
+  font-size: 48px;
+  color: #ccc;
+}
+
+.evo-name {
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+  margin-top: 12px;
+}
+
+.evo-types {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.evo-empty {
+  padding: 60px 0;
+  text-align: center;
+}
