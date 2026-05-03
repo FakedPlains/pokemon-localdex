@@ -26,6 +26,9 @@ data/teams.json
 # Supabase seed data (generated, too large for git)
 supabase/seed.sql
 
+# Supabase CLI temp files
+supabase/.temp/
+
 # Logs and local runtime output
 *.log
 npm-debug.log*
@@ -39,6 +42,9 @@ yarn-error.log*
 /data/localdex.sqlite
 /packages/crawler_py/localdex.db
 /packages/sqlite-store/pokemon.db
+
+# Generated type icon assets (duplicated in apps/web/public/)
+/data/type-icons/
 
 # Generated 52Poke import/cache artifacts
 /data/raw/
