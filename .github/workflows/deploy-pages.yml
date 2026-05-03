@@ -27,13 +27,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 18
 
       - name: Install web dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
+
+      - name: Verify vite installed
+        run: ls -la node_modules/.bin/vite && node_modules/.bin/vite --version
 
       - name: Build
-        run: ./node_modules/.bin/vite build
+        run: node_modules/.bin/vite build
         env:
           GITHUB_PAGES: "true"
 
