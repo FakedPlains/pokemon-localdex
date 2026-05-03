@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { api } from "../utils/api.js";
+import { api, unifiedApi } from "../utils/api.js";
 
 export function useApi(path, options) {
   const [data, setData] = useState(null);
@@ -13,7 +13,7 @@ export function useApi(path, options) {
     setLoading(true);
     setError(null);
 
-    api(path, options)
+    unifiedApi(path, options)
       .then((result) => {
         if (!cancelled) {
           setData(result.data);
@@ -39,7 +39,7 @@ export function useApiCallback() {
   const call = useCallback(async (path, options) => {
     setLoading(true);
     try {
-      const result = await api(path, options);
+      const result = await unifiedApi(path, options);
       return result.data;
     } finally {
       setLoading(false);

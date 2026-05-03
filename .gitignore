@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.production
 
 # OS/editor noise
 .DS_Store
@@ -21,6 +22,9 @@ __pycache__/
 
 # Teams data (user-specific)
 data/teams.json
+
+# Supabase seed data (generated, too large for git)
+supabase/seed.sql
 
 # Logs and local runtime output
 *.log

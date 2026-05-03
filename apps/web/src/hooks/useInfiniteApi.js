@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { api } from "../utils/api.js";
+import { unifiedApi } from "../utils/api.js";
 
 /**
  * 瀑布流分页 hook —— 基于 offset/limit 的无限滚动加载。
@@ -38,7 +38,7 @@ export function useInfiniteApi(basePath, options = {}) {
     setError(null);
 
     try {
-      const result = await api(buildUrl(offset));
+      const result = await unifiedApi(buildUrl(offset));
       if (id !== fetchIdRef.current) return; // 竞态丢弃
 
       const newItems = result.data || [];

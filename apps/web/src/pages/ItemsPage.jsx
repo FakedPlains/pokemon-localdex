@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { api } from "../utils/api.js";
+import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import Loading from "../components/Loading.jsx";
 
@@ -45,7 +45,7 @@ export default function ItemsPage({ query = "" }) {
       const key = target.slug || target.id;
       setExpanded(key);
       if (!detailCache[key]) {
-        api(`/items/${encodeURIComponent(key)}`).then((r) => {
+        unifiedApi(`/items/${encodeURIComponent(key)}`).then((r) => {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
@@ -77,7 +77,7 @@ export default function ItemsPage({ query = "" }) {
     }
     setExpanded(key);
     if (!detailCache[key]) {
-      api(`/items/${encodeURIComponent(key)}`).then((r) => {
+      unifiedApi(`/items/${encodeURIComponent(key)}`).then((r) => {
         setDetailCache((prev) => ({ ...prev, [key]: r.data }));
       });
     }

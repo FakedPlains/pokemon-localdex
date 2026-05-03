@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "../utils/api.js";
+import { api, unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import { STAT_KEYS } from "../utils/constants.js";
 import {
@@ -64,7 +64,7 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
     if (!selectedSlug) { setDetail(null); return; }
     let cancelled = false;
     setDetail(null);
-    api(`/pokemon/${encodeURIComponent(selectedSlug)}`).then((r) => {
+    unifiedApi(`/pokemon/${encodeURIComponent(selectedSlug)}`).then((r) => {
       if (!cancelled) {
         setDetail(r.data);
         setDetailGeneration("");
@@ -237,7 +237,7 @@ function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
   // 加载 learnset meta（可用世代和形态列表）
   useEffect(() => {
     let cancelled = false;
-    api(`/pokemon/${pokemonId}/learnset/meta`).then((r) => {
+    unifiedApi(`/pokemon/${pokemonId}/learnset/meta`).then((r) => {
       if (!cancelled) setLearnsetMeta(r.data);
     });
     return () => { cancelled = true; };
@@ -662,7 +662,7 @@ function MovesTab({ detail, display, detailGeneration, onDetailGenerationChange,
     if (selectedVersion !== null) {
       params.set("version", selectedVersion);
     }
-    api(`/pokemon/${pokemonId}/learnset?${params}`).then((r) => {
+    unifiedApi(`/pokemon/${pokemonId}/learnset?${params}`).then((r) => {
       if (!cancelled) {
         setLearnsetData(r.data || []);
         setLearnsetFormKey(r.formKey || activeFormKey);

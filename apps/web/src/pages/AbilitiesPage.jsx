@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { api } from "../utils/api.js";
+import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import Loading from "../components/Loading.jsx";
 
@@ -45,7 +45,7 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
       const key = target.id;
       setExpanded(key);
       if (!detailCache[key]) {
-        api(`/abilities/${encodeURIComponent(key)}`).then((r) => {
+        unifiedApi(`/abilities/${encodeURIComponent(key)}`).then((r) => {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
@@ -81,7 +81,7 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
     }
     setExpanded(slug);
     if (!detailCache[slug]) {
-      api(`/abilities/${encodeURIComponent(slug)}`).then((r) => {
+      unifiedApi(`/abilities/${encodeURIComponent(slug)}`).then((r) => {
         setDetailCache((prev) => ({ ...prev, [slug]: r.data }));
       });
     }

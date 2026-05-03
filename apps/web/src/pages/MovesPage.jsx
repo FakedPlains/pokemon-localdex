@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { api } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import Loading from "../components/Loading.jsx";
 
@@ -34,10 +33,10 @@ const CATEGORY_COLORS = {
 
 /* ── 图标路径工具 ── */
 function typeIconSrc(typeName) {
-  return `/assets/type-icons/type-${typeName}@sm.png`;
+  return `${import.meta.env.BASE_URL}assets/type-icons/type-${typeName}@sm.png`;
 }
 function categoryIconSrc(category) {
-  return `/assets/type-icons/category-${category}@sm.png`;
+  return `${import.meta.env.BASE_URL}assets/type-icons/category-${category}@sm.png`;
 }
 
 /* ── 属性 Chip（图标 + 文字合并） ── */

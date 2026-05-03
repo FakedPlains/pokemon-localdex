@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { api } from "../utils/api.js";
+import { api, unifiedApi } from "../utils/api.js";
 import { STAT_KEYS, NATURE_OPTIONS } from "../utils/constants.js";
 import { createDraftMember, createDefaultStats } from "../utils/helpers.js";
 import Loading from "../components/Loading.jsx";
@@ -142,9 +142,9 @@ export default function TeamsPage({ teamDraft, onTeamDraftChange }) {
 
   useEffect(() => {
     Promise.all([
-      api("/teams").then((r) => r.data),
-      api("/pokemon").then((r) => r.data),
-      api("/items").then((r) => r.data)
+      unifiedApi("/teams").then((r) => r.data),
+      unifiedApi("/pokemon").then((r) => r.data),
+      unifiedApi("/items").then((r) => r.data)
     ]).then(([teams, pokemon, itemList]) => {
       setSavedTeams(teams);
       setPokemonList(pokemon);
@@ -199,7 +199,7 @@ export default function TeamsPage({ teamDraft, onTeamDraftChange }) {
 
     onTeamDraftChange({ ...teamDraft, id: saved.data.id, name: saved.data.name });
     // Refresh saved teams
-    const teamsResult = await api("/teams");
+    const teamsResult = await unifiedApi("/teams");
     setSavedTeams(teamsResult.data);
   }, [teamDraft, onTeamDraftChange]);
 

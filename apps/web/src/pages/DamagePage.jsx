@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { api } from "../utils/api.js";
+import { api, unifiedApi } from "../utils/api.js";
 import { STAT_KEYS, NATURE_OPTIONS, ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "../utils/constants.js";
 import {
   createDraftMember, createDefaultStats, buildDerivedStats,
@@ -151,8 +151,8 @@ export default function DamagePage({ teamDraft }) {
 
   useEffect(() => {
     Promise.all([
-      api("/pokemon").then((r) => r.data),
-      api("/moves").then((r) => r.data)
+      unifiedApi("/pokemon").then((r) => r.data),
+      unifiedApi("/moves").then((r) => r.data)
     ]).then(([pokemon, moves]) => {
       setPokemonList(pokemon);
       setAllMoves(moves);
@@ -164,7 +164,7 @@ export default function DamagePage({ teamDraft }) {
   useEffect(() => {
     if (!attacker.pokemonId) { setAttackerDetail(null); return; }
     let cancelled = false;
-    api(`/pokemon/${encodeURIComponent(attacker.pokemonId)}`).then((r) => {
+    unifiedApi(`/pokemon/${encodeURIComponent(attacker.pokemonId)}`).then((r) => {
       if (!cancelled) setAttackerDetail(r.data);
     }).catch(() => { if (!cancelled) setAttackerDetail(null); });
     return () => { cancelled = true; };
@@ -174,7 +174,7 @@ export default function DamagePage({ teamDraft }) {
   useEffect(() => {
     if (!defender.pokemonId) { setDefenderDetail(null); return; }
     let cancelled = false;
-    api(`/pokemon/${encodeURIComponent(defender.pokemonId)}`).then((r) => {
+    unifiedApi(`/pokemon/${encodeURIComponent(defender.pokemonId)}`).then((r) => {
       if (!cancelled) setDefenderDetail(r.data);
     }).catch(() => { if (!cancelled) setDefenderDetail(null); });
     return () => { cancelled = true; };

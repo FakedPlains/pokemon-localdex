@@ -268,7 +268,7 @@ export default function App() {
                           }
                         }}
                       >
-                        <img className="filter-type-icon" src={`/assets/type-icons/type-${t}@sm.png`} alt="" />
+                        <img className="filter-type-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${t}@sm.png`} alt="" />
                         {t}
                       </button>
                     );

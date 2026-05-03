@@ -5,7 +5,7 @@ export default function TypeChip({ type }) {
   const chips = getTypeChips(type);
   return chips.map((name) => (
     <span key={name} className={`type-chip type-${name}`}>
-      <img className="type-chip-icon" src={`/assets/type-icons/type-${name}@sm.png`} alt="" />
+      <img className="type-chip-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${name}@sm.png`} alt="" />
       {name}
     </span>
   ));
