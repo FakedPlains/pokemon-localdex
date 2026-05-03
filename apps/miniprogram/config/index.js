@@ -1,3 +1,13 @@
+const path = require('path')
+
+// 读取 .env 文件中的环境变量（不覆盖已有的 process.env）
+try {
+  const envPath = path.resolve(__dirname, '..', '.env')
+  require('dotenv').config({ path: envPath })
+} catch (e) {
+  // dotenv 不可用时静默跳过，依赖 process.env 中已有的值
+}
+
 const config = {
   projectName: 'pokemon-localdex-miniprogram',
   date: '2025-05-03',
@@ -11,7 +21,10 @@ const config = {
   sourceRoot: 'src',
   outputRoot: 'dist',
   plugins: ['@tarojs/plugin-framework-react'],
-  defineConstants: {},
+  defineConstants: {
+    SUPABASE_URL: JSON.stringify(process.env.SUPABASE_URL || ''),
+    SUPABASE_ANON_KEY: JSON.stringify(process.env.SUPABASE_ANON_KEY || ''),
+  },
   copy: {
     patterns: [],
     options: {}

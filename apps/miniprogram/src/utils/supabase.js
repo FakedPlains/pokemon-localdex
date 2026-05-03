@@ -6,13 +6,13 @@
  */
 
 import Taro from '@tarojs/taro'
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config'
+import { supabaseUrl, supabaseAnonKey } from './config'
 
-const REST_URL = `${SUPABASE_URL}/rest/v1`
+const REST_URL = `${supabaseUrl}/rest/v1`
 
 const DEFAULT_HEADERS = {
-  apikey: SUPABASE_ANON_KEY,
-  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  apikey: supabaseAnonKey,
+  Authorization: `Bearer ${supabaseAnonKey}`,
   'Content-Type': 'application/json',
   Prefer: 'return=representation'
 }
