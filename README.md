@@ -1,6 +1,6 @@
 # Pokemon LocalDex
 
-一个宝可梦资料库，数据统一来源于 [52Poké Wiki](https://wiki.52poke.com/)，支持本地 SQLite 和云端 Supabase 双数据源，可部署到 GitHub Pages 作为纯静态站点使用。
+一个宝可梦资料库，数据统一来源于 [52Poké Wiki](https://wiki.52poke.com/)，支持本地 SQLite 和云端 Supabase 双数据源。提供 Web 端和微信小程序端两种客户端，Web 端可部署到 GitHub Pages 作为纯静态站点使用。
 
 **在线访问**：[https://fakedplains.github.io/pokemon-localdex/](https://fakedplains.github.io/pokemon-localdex/)
 
@@ -8,12 +8,15 @@
 
 Pokemon LocalDex 提供宝可梦系列游戏的完整资料查询、队伍构筑和伤害计算能力。所有数据通过爬虫从 52Poké Wiki 采集，支持两种运行模式：本地模式使用 SQLite 数据库，通过 Hono API 提供服务；在线模式前端直连 Supabase，无需后端即可部署到 GitHub Pages 等静态托管平台。
 
+项目同时提供微信小程序端，基于 Taro 框架（React 语法）开发，通过 Supabase PostgREST REST API 直连数据库，无需后端服务。小程序端包含图鉴、招式、特性、道具四个核心页面，以及宝可梦详情页。
+
 ## 快速开始
 
 ### 环境要求
 
 - Node.js >= 22（使用了实验性 SQLite 支持）
 - Python >= 3.10（爬虫依赖）
+- 微信开发者工具（小程序开发需要）
 
 ### 安装依赖
 
@@ -57,12 +60,56 @@ npm run dev:web
 
 前端直连：在 `apps/web/.env` 中设置 `VITE_DATA_SOURCE=supabase` 并配置 Supabase URL 和 anon key，前端会绕过 Hono API 直接查询 Supabase。
 
+### 小程序开发
+
+小程序端位于 `apps/miniprogram/`，基于 Taro 4.2.0 框架开发，使用 React 语法编写，编译为微信小程序。
+
+```bash
+# 启动小程序开发模式（监听文件变化，自动编译）
+cd apps/miniprogram
+npx taro build --type weapp --watch
+
+# 或者生产构建
+npx taro build --type weapp
+```
+
+编译产物输出到 `apps/miniprogram/dist/` 目录，用微信开发者工具打开该目录即可预览和调试。小程序 AppID 为 `wx6f183945e108152a`。
+
+小程序端直连 Supabase PostgREST REST API，不依赖后端服务。Supabase 连接配置位于 `apps/miniprogram/src/utils/config.js`。
+
+**微信后台域名配置**：需要在微信公众平台的「开发管理 → 开发设置 → 服务器域名」中添加以下合法域名：
+
+- request 合法域名：`https://lonaljgaevutlyswrelm.supabase.co`
+- downloadFile 合法域名：`https://wsrv.nl`（图片代理服务）
+
 ### 验证
 
 ```bash
 npm run check:sqlite   # 检查 SQLite 数据完整性
 npm run check:api      # API smoke test
 npm run check:damage   # 伤害计算验证
+```
+
+## 项目结构
+
+项目采用 npm workspaces 管理的 monorepo 结构，包含三个应用和四个共享包：
+
+```
+pokemon-localdex/
+├── apps/
+│   ├── api/                Hono API 服务（托管 SPA 静态资源）
+│   ├── web/                React SPA 客户端（Vite 构建）
+│   └── miniprogram/        微信小程序客户端（Taro + React）
+├── packages/
+│   ├── battle-core/        伤害计算与队伍规则核心
+│   ├── crawler_py/         Python 爬虫（52Poké 数据采集 → SQLite）
+│   ├── sqlite-store/       SQLite 建表、查询适配与类型定义
+│   └── supabase-store/     Supabase 查询适配（与 sqlite-store 同接口）
+├── supabase/               Supabase 数据库 schema
+├── scripts/                爬虫入口脚本
+├── data/                   本地数据（SQLite、页面缓存）
+├── docs/                   技术文档
+└── .github/                CI/CD 工作流
 ```
 
 ## 数据源架构
@@ -73,6 +120,8 @@ npm run check:damage   # 伤害计算验证
 
 **Supabase 模式**（GitHub Pages 部署）：数据存储在 Supabase（PostgreSQL），前端通过 `@supabase/supabase-js` 直连查询，无需后端服务。链路为 `React SPA → supabase-js → Supabase`。后端 API 也支持 Supabase 模式，通过 `supabase-store` 包访问，链路为 `React SPA → Hono API → supabase-store → Supabase`。
 
+**小程序模式**：小程序端通过 `Taro.request` 直接调用 Supabase PostgREST REST API，不使用 `@supabase/supabase-js` SDK（该 SDK 依赖浏览器 API，在小程序环境中不可用）。链路为 `Taro 小程序 → Taro.request → Supabase PostgREST`。
+
 环境变量控制：
 
 | 变量 | 位置 | 值 | 效果 |
@@ -81,6 +130,8 @@ npm run check:damage   # 伤害计算验证
 | `DATA_SOURCE` | 后端 | `supabase` | API 使用 Supabase |
 | `VITE_DATA_SOURCE` | 前端 | 空（默认） | 前端走 Hono API |
 | `VITE_DATA_SOURCE` | 前端 | `supabase` | 前端直连 Supabase |
+
+小程序端的 Supabase 配置直接写在 `apps/miniprogram/src/utils/config.js` 中，不通过环境变量控制。
 
 ## GitHub Pages 部署
 
@@ -110,33 +161,63 @@ CI 工作流文件位于 `.github/workflows/deploy-pages.yml`，使用 `peaceiri
 
 ## 已有功能
 
-### 图鉴浏览
+### Web 端
+
+#### 图鉴浏览
 
 全国图鉴列表，支持按名称/编号搜索、属性筛选和世代筛选。点击宝可梦可查看详情，包括普通/闪光图片切换、多形态切换（超级进化、地区形态、面具形态等）、种族值雷达图、能力值计算器（支持性格/IV/EV 调节）、按世代可学招式表，以及进化链展示。种族值标签页支持世代切换，可查看不同世代的种族值变化。
 
-### 招式查询
+#### 招式查询
 
 完整招式列表，支持按名称搜索和属性筛选。招式详情展示威力、命中、PP、效果描述，以及各世代的参数变化记录。
 
-### 特性查询
+#### 特性查询
 
 完整特性列表，支持按名称搜索。特性详情展示效果描述和各世代的效果变化记录。
 
-### 道具查询
+#### 道具查询
 
 道具列表与详情，展示道具图片、分类和效果说明。
 
-### 队伍构筑
+#### 队伍构筑
 
 6 槽队伍编辑器，支持为每个成员配置性格、等级、特性、携带道具和四个招式。本地模式下队伍数据保存在 `data/teams.json` 文件中；Supabase 直连模式下保存在浏览器 localStorage 中。
 
-### 伤害计算
+#### 伤害计算
 
 独立选择攻击方和防御方，手动配置等级、招式威力、属性相克等参数进行伤害计算。支持从当前队伍快速导入宝可梦配置，选择攻击方后会按该宝可梦在当前世代可学的招式自动过滤候选。注意：伤害计算功能在 GitHub Pages 静态部署模式下不可用，因为计算逻辑在后端执行。
+
+### 小程序端
+
+小程序端提供轻量级的宝可梦资料查询功能，包含四个 Tab 页面和一个详情页：
+
+**图鉴页**：宝可梦列表，支持按名称/编号搜索和属性筛选，展示图鉴编号、名称、属性标签和缩略图。点击进入详情页，展示完整信息包括属性、种族值条形图、特性、进化链等。
+
+**招式页**：招式列表，支持按名称搜索和属性筛选，展示招式名称、属性、分类、威力、命中和 PP。
+
+**特性页**：特性列表，支持按名称搜索，展示特性名称和效果描述。
+
+**道具页**：道具列表，支持按名称搜索，展示道具图标、名称和效果说明。
+
+小程序端的技术特点：通过 `SafeImage` 组件将外部图片（52Poké Wiki 等域名）代理到 `wsrv.nl` 服务加载，绕过微信小程序的域名白名单限制；使用自封装的 Supabase PostgREST 客户端（`supabase.js`）替代官方 SDK，适配小程序的 `Taro.request` 网络接口。
 
 ### 数据采集
 
 Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、935 个招式、314 个特性的完整数据，支持增量更新和全量重建两种模式。
+
+## 技术栈
+
+| 模块 | 技术 |
+|------|------|
+| Web 前端 | React 18 + Vite 8 |
+| 小程序端 | Taro 4.2.0 + React 18 + Webpack 5 |
+| 后端 API | Hono + Node.js 22 |
+| 本地数据库 | SQLite（node:sqlite） |
+| 云端数据库 | Supabase（PostgreSQL） |
+| 爬虫 | Python 3.10+ + BeautifulSoup4 |
+| 部署 | GitHub Pages + GitHub Actions |
+
+整个项目统一使用 React 18.3.1，确保 Web 端和小程序端共享同一 React 版本，避免 monorepo 中的版本冲突。
 
 ## 后续规划
 
@@ -146,6 +227,7 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、935 个招式、3
 - 特性拥有者列表：在特性详情页展示拥有该特性的宝可梦
 - 招式学习者列表：在招式详情页展示可学习该招式的宝可梦
 - 道具数据补全，扩充道具采集覆盖范围
+- 小程序端招式详情页和特性详情页
 
 ### 中期
 
@@ -155,7 +237,6 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、935 个招式、3
 
 ### 远期
 
-- 移动端适配优化，提供更好的手机 H5 体验
 - 离线 PWA 支持，完全脱离网络使用
 - 多语言支持（日文、英文）
 
@@ -163,11 +244,11 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、935 个招式、3
 
 详细的技术文档位于 `docs/` 目录：
 
-- [系统架构](docs/architecture.md) — 整体架构设计、双数据源、部署模式
+- [系统架构](docs/architecture.md) — 整体架构设计、双数据源、部署模式、小程序架构
 - [数据库设计](docs/database.md) — SQLite 表结构、索引和关系说明
-- [API 接口](docs/api.md) — RESTful API 端点、参数和响应格式
+- [API 接口](docs/api.md) — RESTful API 端点、参数和响应格式、小程序端 REST 封装
 - [爬虫指南](docs/crawler.md) — 爬虫命令、参数和运行流程
 
 ## 数据来源
 
-所有数据来源于 [52Poké Wiki](https://wiki.52poke.com/)，宝可梦和道具图片使用 52Poké 在线图片 URL。
+所有数据来源于 [52Poké Wiki](https://wiki.52poke.com/)，宝可梦和道具图片使用 52Poké 在线图片 URL。小程序端通过 [wsrv.nl](https://wsrv.nl/) 图片代理服务加载外部图片。

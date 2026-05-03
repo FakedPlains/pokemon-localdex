@@ -2,11 +2,23 @@
 
 ## 概述
 
-Pokemon LocalDex 的 API 层基于 [Hono](https://hono.dev/) 框架构建，运行在 Node.js 22 上，提供 RESTful 风格的只读查询接口和少量写入接口。API 服务默认监听 `0.0.0.0:3030`，可通过环境变量 `HOST` 和 `PORT` 调整。
+Pokemon LocalDex 提供两种数据访问方式：后端 Hono API（供 Web 端使用）和小程序端直连 Supabase PostgREST REST API。两种方式查询同一个 Supabase（PostgreSQL）数据库，返回的数据结构保持一致。
+
+### Hono API（Web 端）
+
+API 层基于 [Hono](https://hono.dev/) 框架构建，运行在 Node.js 22 上，提供 RESTful 风格的只读查询接口和少量写入接口。API 服务默认监听 `0.0.0.0:3030`，可通过环境变量 `HOST` 和 `PORT` 调整。
 
 API 支持两种数据源，通过 `DATA_SOURCE` 环境变量切换：`sqlite`（默认）使用本地 SQLite 数据库，`supabase` 使用 Supabase（PostgreSQL）。两种模式下接口行为完全一致，仅底层查询实现不同。
 
 所有接口同时挂载在根路径和 `/api` 前缀下。例如 `/pokemon` 和 `/api/pokemon` 返回相同结果。这是为了兼容两种运行模式：Vite 开发模式下前端通过 proxy 将 `/api/xxx` 转发为 `/xxx`；生产模式下 API 服务器直接托管 SPA 静态资源，前端请求 `/api/xxx` 直接匹配。
+
+### Supabase PostgREST（小程序端）
+
+小程序端不经过 Hono API，而是通过 `Taro.request` 直接调用 Supabase 的 PostgREST REST API。封装代码位于 `apps/miniprogram/src/utils/supabase.js`，业务查询逻辑位于 `apps/miniprogram/src/utils/api.js`。
+
+PostgREST 的请求格式为 `GET {SUPABASE_URL}/rest/v1/{table}?{params}`，每个请求需要携带 `apikey` 和 `Authorization: Bearer {anon_key}` 头。查询参数使用 PostgREST 语法，例如 `select=*`、`or=(cond1,cond2)`、`order=column.asc`、`limit=20`。
+
+小程序端的 API 函数与 Web 端返回相同的数据结构（`{ data: ... }` 格式），页面组件无需关心底层数据源差异。
 
 ## 启动方式
 
@@ -44,6 +56,8 @@ API 启用了全局 CORS，允许任意来源访问。
 | limit | number | 每页条数，传入后启用分页模式 |
 | offset | number | 偏移量，默认 0 |
 
+小程序端的分页行为与 Hono API 一致，通过 PostgREST 的 `limit` 和 `offset` 参数实现，总数通过 `Prefer: count=exact` 头和 `Content-Range` 响应头获取。
+
 ## 宝可梦
 
 ### GET /pokemon
@@ -67,6 +81,8 @@ GET /api/pokemon?q=皮卡&type=电&generation=1
 GET /api/pokemon?limit=20&offset=0
 ```
 
+小程序端对应函数：`fetchPokemonList({ q, type, generation, limit, offset })`。注意属性和世代筛选在小程序端通过客户端过滤实现（PostgREST 不支持嵌套表的直接过滤）。
+
 ### GET /pokemon/:id
 
 获取单只宝可梦的完整详情。`:id` 支持三种格式：数字 ID（数据库主键）、slug（如 `pikachu`）、中文名（如 `皮卡丘`）。
@@ -79,6 +95,8 @@ GET /api/pokemon?limit=20&offset=0
 GET /api/pokemon/皮卡丘
 GET /api/pokemon/25
 ```
+
+小程序端对应函数：`fetchPokemonDetail(idOrSlug)`。小程序端使用 `query` + `limit:1` 而非 PostgREST 的 `single` 模式（后者在 0 或多条结果时返回 406 错误），并优先使用数字 ID 导航以避免中文 URL 编码问题。
 
 ### GET /pokemon/:id/learnset
 
@@ -101,6 +119,8 @@ GET /api/pokemon/皮卡丘/learnset?generation=1&form=default
 GET /api/pokemon/25/learnset?generation=9&version=SV
 ```
 
+小程序端对应函数：`fetchPokemonLearnset(pokemonId, generation, formKey, gameVersionCode)`。支持形态回退逻辑：如果指定形态无数据，依次尝试 `default` 形态和该世代的第一个可用形态。
+
 ### GET /pokemon/:id/learnset/meta
 
 获取指定宝可梦的招式表元数据，包括该宝可梦在哪些世代有招式数据、每个世代有哪些形态和游戏版本可选。用于前端构建世代/形态/版本选择器。
@@ -110,6 +130,8 @@ GET /api/pokemon/25/learnset?generation=9&version=SV
 ```
 GET /api/pokemon/25/learnset/meta
 ```
+
+小程序端对应函数：`fetchLearnsetMeta(pokemonId)`。
 
 ## 招式
 
@@ -128,9 +150,13 @@ GET /api/pokemon/25/learnset/meta
 | limit | number | 分页：每页条数 |
 | offset | number | 分页：偏移量 |
 
+小程序端对应函数：`fetchMovesList({ q, type, category, generation, limit, offset })`。
+
 ### GET /moves/:id
 
 获取单个招式的完整详情，包括威力、命中、PP、效果描述和各世代的参数变化记录。`:id` 支持数字 ID 和中文名。
+
+小程序端对应函数：`fetchMoveDetail(idOrSlug)`。
 
 ## 特性
 
@@ -147,9 +173,13 @@ GET /api/pokemon/25/learnset/meta
 | limit | number | 分页：每页条数 |
 | offset | number | 分页：偏移量 |
 
+小程序端对应函数：`fetchAbilitiesList({ q, generation, limit, offset })`。
+
 ### GET /abilities/:id
 
 获取单个特性的完整详情，包括效果描述和各世代的效果变化记录。`:id` 支持数字 ID 和中文名。
+
+小程序端对应函数：`fetchAbilityDetail(idOrSlug)`。
 
 ## 道具
 
@@ -166,9 +196,13 @@ GET /api/pokemon/25/learnset/meta
 | limit | number | 分页：每页条数 |
 | offset | number | 分页：偏移量 |
 
+小程序端对应函数：`fetchItemsList({ q, category, limit, offset })`。
+
 ### GET /items/:id
 
 获取单个道具的详情，包括分类和效果说明。`:id` 支持数字 ID、legacy_id 和中文名。
+
+小程序端对应函数：`fetchItemDetail(idOrSlug)`。
 
 ## 队伍
 
@@ -200,6 +234,8 @@ GET /api/pokemon/25/learnset/meta
 
 如果请求体中包含已存在的 `id`，则更新该队伍；否则创建新队伍。`id` 字段可省略，服务端会自动生成。
 
+注意：队伍功能仅在 Web 端可用。小程序端暂不支持队伍管理。
+
 ## 伤害计算
 
 ### POST /battle/damage
@@ -219,7 +255,7 @@ GET /api/pokemon/25/learnset/meta
 
 返回伤害计算结果，包含最小伤害、最大伤害和乱数范围。
 
-注意：此接口仅在后端 API 模式下可用。GitHub Pages 静态部署（前端直连 Supabase）模式下，伤害计算不可用。
+注意：此接口仅在后端 API 模式下可用。GitHub Pages 静态部署（前端直连 Supabase）模式和小程序端均不支持伤害计算。
 
 ## 健康检查
 
@@ -240,3 +276,23 @@ GET /api/pokemon/25/learnset/meta
 ## 前端直连模式
 
 当前端配置 `VITE_DATA_SOURCE=supabase` 时（GitHub Pages 部署默认配置），前端会绕过 Hono API，通过 `@supabase/supabase-js` 直接查询 Supabase。此模式下上述所有 GET 查询接口的功能由前端 `supabaseApi.js` 中的对应函数实现，返回格式与 API 响应保持一致。POST 接口（队伍保存）降级为 localStorage 存储，伤害计算不可用。
+
+## 小程序端 Supabase REST 封装
+
+小程序端的数据访问层由两个文件组成：
+
+**supabase.js** — 底层 PostgREST 请求封装。提供 `query(table, options)` 和 `queryOne(table, options)` 两个函数。`query` 函数接受 `select`、`filters`、`or`、`order`、`limit`、`offset`、`count`、`single` 等参数，将它们转换为 PostgREST 查询字符串，通过 `Taro.request` 发起请求。`or` 参数会自动包裹括号（PostgREST 要求 `or` 值必须用括号包裹）。`count` 模式通过 `Prefer: count=exact` 头实现，总数从 `Content-Range` 响应头解析。
+
+**api.js** — 业务查询层。封装了所有数据查询函数，包括 `fetchPokemonList`、`fetchPokemonDetail`、`fetchMovesList`、`fetchMoveDetail`、`fetchAbilitiesList`、`fetchAbilityDetail`、`fetchItemsList`、`fetchItemDetail`、`fetchLearnsetMeta`、`fetchPokemonLearnset`。这些函数的返回格式与 Web 端 API 响应保持一致，页面组件可以直接使用。
+
+### PostgREST 查询注意事项
+
+在使用 PostgREST REST API 时需要注意以下几点：
+
+**or 参数格式**：PostgREST 的 `or` 参数值必须用括号包裹，例如 `or=(id.eq.1,name_zh.eq.皮卡丘)`。小程序端的 `supabase.js` 会自动处理括号包裹。
+
+**避免 single 模式**：PostgREST 的 `Accept: application/vnd.pgrst.object+json`（single 模式）在结果不恰好为 1 条时会返回 406 错误。小程序端的详情查询使用 `query` + `limit:1` 替代，更加健壮。
+
+**嵌套表查询**：PostgREST 支持通过 `select` 参数进行关联表查询（如 `pokemon_forms!inner(pokemon_form_types(type_name))`），但不支持对嵌套表的直接过滤。属性筛选等需要在客户端完成。
+
+**关联查询语法**：使用 `!inner` 后缀进行 inner join（如 `pokemon_forms!inner(...)`），使用 `!left` 后缀进行 left join（如 `moves!left(...)`）。
