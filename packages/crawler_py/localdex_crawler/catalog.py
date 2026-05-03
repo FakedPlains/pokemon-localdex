@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+import unicodedata
 
 from bs4 import BeautifulSoup, Tag
 
@@ -72,6 +73,7 @@ class ItemSeed:
     name_en: str | None = None
     category: str | None = None
     effect_summary: str | None = None
+    introduced_generation: int | None = None
 
 
 def parse_move_list_page(html: str) -> list[MoveSeed]:
@@ -255,11 +257,51 @@ def _detect_generation_before_table(table) -> int:
     return 1
 
 
+# 道具列表页中需要爬取的目标分类（wiki 页面 h2/h3 标题文本）
+# 注意：wiki 页面中 Z 可能是全角 Ｚ（U+FF3A）
+_TARGET_ITEM_CATEGORIES = {
+    "携带物品": "携带物品",
+    "攜帶物品": "携带物品",
+    "超级石": "超级石",
+    "超級石": "超级石",
+    "宝可梦使用的Z纯晶": "Z纯晶",
+    "寶可夢使用的Z純晶": "Z纯晶",
+    "宝可梦使用的\uff3a纯晶": "Z纯晶",
+    "寶可夢使用的\uff3a純晶": "Z纯晶",
+    "树果": "树果",
+    "樹果": "树果",
+}
+
+
 def _parse_item_list_tables(html: str) -> list[ItemSeed]:
     soup = BeautifulSoup(html or "", "html.parser")
     seeds: list[ItemSeed] = []
-    for table in soup.find_all("table"):
-        rows = table.find_all("tr")
+    # 遍历所有 h2/h3 标题，找到目标分类后解析其后的表格
+    current_category: str | None = None
+    for element in soup.find_all(["h2", "h3", "table"]):
+        if element.name in ("h2", "h3"):
+            heading_text = clean_inline_text(element.get_text(" ", strip=True))
+            # 去掉 [编辑] 等后缀
+            heading_text = re.sub(r"\[.*?\]", "", heading_text).strip()
+            # NFKC 标准化（全角→半角）后再匹配
+            heading_normalized = unicodedata.normalize("NFKC", heading_text)
+            # 检查是否匹配目标分类
+            matched_category = None
+            for key, value in _TARGET_ITEM_CATEGORIES.items():
+                if key in heading_normalized:
+                    matched_category = value
+                    break
+            if matched_category:
+                current_category = matched_category
+            else:
+                # 遇到非目标的 h2 或 h3 标题，都重置分类
+                # 例如 h3 "邮件"/"糖果"/"护符"/"材料" 不应继承前面的 "携带物品"
+                current_category = None
+            continue
+        # element.name == "table"
+        if not current_category:
+            continue
+        rows = element.find_all("tr")
         if not rows:
             continue
         header = [clean_inline_text(cell.get_text(" ", strip=True)) for cell in rows[0].find_all(["th", "td"])]
@@ -282,7 +324,7 @@ def _parse_item_list_tables(html: str) -> list[ItemSeed]:
                 name_ja=cells[index["日文"]] if "日文" in index and index["日文"] < len(cells) else None,
                 name_en=cells[index["英文"]] if index["英文"] < len(cells) else None,
                 effect_summary=cells[summary_index] if summary_index is not None and summary_index < len(cells) else None,
-                category=None,
+                category=current_category,
                 detail_url=detail_url,
             ))
     return unique_by_key(seeds, lambda item: item.name_zh)
@@ -394,26 +436,59 @@ def normalize_ability_detail_page(page: RawPage, seed: AbilitySeed) -> dict:
 def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
     text = normalize_text(page.html)
     name_ja, name_en = extract_intro_names(text, seed.name_zh)
+    # 效果摘要：优先用详情页「效果」章节，其次用列表页的道具说明
     effect_summary = (
-        clean_summary(section_text_by_heading(page.html, "效果"))
-        or clean_summary(seed.effect_summary)
+        to_simplified(clean_summary(seed.effect_summary))
         or "暂无说明"
     )
+    # 效果详情：
+    # - 树果类道具：只提取 h2「效果」→ h3「携带」子章节（携带效果）
+    # - 其他道具：提取整个 h2「效果」章节
+    if seed.category == "树果":
+        carry_text = section_text_by_heading(page.html, "携带", level=3)
+        effect_detail = to_simplified(clean_summary(carry_text, max_length=2000)) or None
+    else:
+        effect_detail = (
+            to_simplified(clean_summary(section_text_by_heading(page.html, "效果"), max_length=2000))
+            or None
+        )
     bag_info = section_text_by_heading(page.html, "包包信息")
     category = seed.category
     category_match = re.search(r"口袋\s+([^\n ]+)", bag_info or text)
     if not category and category_match:
-        category = category_match.group(1).strip()
-    image_url = _pick_item_image(page.html, seed)
+        category = to_simplified(category_match.group(1).strip())
+    # 世代变更记录（「效果变更」章节）
+    generations: dict[str, dict] = {}
+    for heading in ("效果变更", "效果變更"):
+        changes = extract_generation_changes(page.html, heading)
+        if changes:
+            for change in changes:
+                gen = int(change["generation"])
+                gv_code = change.get("game_version_code")
+                key = f"{gen}|{gv_code or ''}"
+                generations[key] = {
+                    "generation": gen,
+                    "description": to_simplified(str(change["summary"])) or str(change["summary"]),
+                    "game_version_code": gv_code,
+                    "notes": to_simplified(f"来自 52Poké {heading}章节。"),
+                }
+            break
+    # 初登场世代
+    introduced_generation = seed.introduced_generation or _detect_introduced_generation(page.html, text)
+    raw_image_url = _pick_item_image(page.html, seed)
+    image_url = normalize_media_url(raw_image_url) if raw_image_url else None
     return {
-        "legacy_id": f"item-{slugify(seed.name_zh)}",
         "slug": slugify(seed.name_zh),
         "name_zh": seed.name_zh,
         "name_ja": name_ja or seed.name_ja,
         "name_en": name_en or seed.name_en,
         "category": category,
         "effect_summary": effect_summary,
-        "image": ImageAsset(normalize_media_url(image_url), f"{seed.name_zh}图片", normalize_media_url(image_url)) if image_url else None,
+        "effect_detail": effect_detail,
+        "introduced_generation": introduced_generation,
+        "image_url": image_url,
+        "generations": sorted(generations.values(), key=lambda item: item["generation"]),
+        "image": ImageAsset(image_url, f"{seed.name_zh}图片", image_url) if image_url else None,
         "source": page,
     }
 
@@ -460,25 +535,49 @@ def _parse_item_table_text(html: str) -> list[ItemSeed]:
     return items
 
 
+def _detect_introduced_generation(html: str, text: str) -> int | None:
+    """从道具详情页推断初登场世代。"""
+    # 尝试从信息框中提取"引入世代"
+    match = re.search(r"第([一二三四五六七八九])世代", text)
+    if match:
+        from .utils import CHINESE_GENERATIONS
+        return CHINESE_GENERATIONS.get(match.group(1))
+    return None
+
+
 def _pick_item_image(html: str, seed: ItemSeed) -> str | None:
+    from urllib.parse import unquote
     english = re.sub(r"[^A-Za-z0-9]+", "", seed.name_en or "").lower()
+    zh_name = seed.name_zh  # 中文名原文，用于匹配 URL 编码的文件名
     zh_slug = slugify(seed.name_zh).replace("-", "")
     ranked = []
     for url in extract_image_candidates(html):
         file_name = extract_file_name(url).lower()
+        # 对 URL 编码的文件名进行解码，以便匹配中文名
+        decoded_name = unquote(extract_file_name(url))
         score = 0
         if english and english in file_name:
             score += 7
-        if zh_slug and zh_slug in file_name:
+        # 中文名匹配（解码后的文件名中包含道具中文名）
+        if zh_name and zh_name in decoded_name:
+            score += 8
+        elif zh_slug and zh_slug in file_name:
             score += 4
-        if "bag" in file_name or "item" in file_name:
+        # 优先选择 Bag_ 开头的道具图标（Sprite）
+        if file_name.startswith("bag_") and "sprite" in file_name:
+            score += 3
+        elif "bag" in file_name or "item" in file_name:
             score += 2
         if "icon" in file_name:
             score += 2
-        if "sprite" in file_name or file_name.startswith("spr"):
-            score -= 3
+        # 惩罚通用图标（pocket_icon 是分类图标，不是具体道具图标）
+        if "pocket_icon" in file_name:
+            score -= 6
         if "type" in file_name or "move" in file_name:
             score -= 5
+        # 优先选择较新世代的图片（SV > LA > BDSP > Sprite）
+        if "_sv_" in file_name:
+            score += 1
         if score > 0:
             ranked.append((score, len(file_name), url))
     ranked.sort(key=lambda item: (-item[0], item[1]))

@@ -188,15 +188,25 @@ def crawl_catalog(conn, fetcher: PageFetcher, args) -> int:
         seeds = filter_by_name(parse_item_list_page(page.html), name_filters)
         if getattr(args, "item_limit", None) is not None:
             seeds = seeds[: args.item_limit]
+        skipped_items = 0
         for seed in seeds:
-            detail = fetcher.load_or_fetch(f"item-{slugify(seed.name_zh)}", seed.detail_url)
+            try:
+                detail = fetcher.load_or_fetch(f"item-{slugify(seed.name_zh)}", seed.detail_url)
+            except (PageNotFoundError, Exception) as e:
+                print(f"[skip] item {seed.name_zh}: {e}")
+                skipped_items += 1
+                continue
             payload = normalize_item_detail_page(detail, seed)
+            gen_info = f" gen={payload.get('introduced_generation') or '-'} changes={len(payload.get('generations', []))}"
+            img_info = " img=✓" if payload.get("image_url") else ""
             if args.dry_run:
-                print(f"[dry-run] item {seed.name_zh}: category={payload.get('category') or '-'}")
+                print(f"[dry-run] item {seed.name_zh}: category={payload.get('category') or '-'}{gen_info}{img_info}")
             else:
                 upsert_item_detail(conn, payload)
-                print(f"[updated] item {seed.name_zh}: category={payload.get('category') or '-'}")
+                print(f"[updated] item {seed.name_zh}: category={payload.get('category') or '-'}{gen_info}{img_info}")
             totals["items"] += 1
+        if skipped_items:
+            print(f"[warn] Skipped {skipped_items} items due to fetch errors.")
 
     print(f"Catalog finished. {totals} dryRun={args.dry_run}")
     return 0

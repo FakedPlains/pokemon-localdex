@@ -57,11 +57,12 @@ def clear_abilities(conn: sqlite3.Connection) -> int:
 
 
 def clear_items(conn: sqlite3.Connection) -> int:
-    """清除所有道具数据。"""
+    """清除所有道具数据（含 item_generation_records）。"""
     with conn:
         count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+        conn.execute("DELETE FROM item_generation_records")
         conn.execute("DELETE FROM items")
-    return count
+        return count
 
 
 def clear_pokemon(conn: sqlite3.Connection) -> int:
@@ -733,9 +734,12 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
 
 
 def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
-    legacy_id = payload.get("legacy_id") or f"item-{slugify(payload['name_zh'])}"
+    slug = payload.get("slug") or slugify(payload["name_zh"])
+    introduced_gen = payload.get("introduced_generation")
+    if isinstance(introduced_gen, str):
+        introduced_gen = int(introduced_gen) if introduced_gen.isdigit() else None
     with conn:
-        row = conn.execute("SELECT id FROM items WHERE legacy_id = ? OR name_zh = ?", (legacy_id, payload["name_zh"])).fetchone()
+        row = conn.execute("SELECT id FROM items WHERE slug = ? OR name_zh = ?", (slug, payload["name_zh"])).fetchone()
         if row:
             item_id = int(row["id"])
             conn.execute(
@@ -743,6 +747,9 @@ def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
                 UPDATE items
                 SET slug = ?, name_zh = ?, name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
                     category = COALESCE(?, category), effect_summary = COALESCE(?, effect_summary),
+                    effect_detail = COALESCE(?, effect_detail),
+                    introduced_generation = COALESCE(?, introduced_generation),
+                    image_url = COALESCE(?, image_url),
                     source_url = COALESCE(?, source_url), source_title = COALESCE(?, source_title),
                     source_fetched_at = COALESCE(?, source_fetched_at)
                 WHERE id = ?
@@ -754,6 +761,9 @@ def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     payload.get("name_en"),
                     payload.get("category"),
                     payload.get("effect_summary"),
+                    payload.get("effect_detail"),
+                    introduced_gen,
+                    payload.get("image_url"),
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
@@ -764,24 +774,47 @@ def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
             result = conn.execute(
                 """
                 INSERT INTO items
-                  (legacy_id, slug, name_zh, name_ja, name_en, category, effect_summary, source_url, source_title, source_fetched_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  (slug, name_zh, name_ja, name_en, category, effect_summary,
+                   effect_detail, introduced_generation, image_url,
+                   source_url, source_title, source_fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    legacy_id,
-                    payload.get("slug") or slugify(payload["name_zh"]),
+                    slug,
                     payload["name_zh"],
                     payload.get("name_ja"),
                     payload.get("name_en"),
                     payload.get("category"),
                     payload.get("effect_summary"),
+                    payload.get("effect_detail"),
+                    introduced_gen,
+                    payload.get("image_url"),
                     _source_attr(payload.get("source"), "url"),
                     _source_attr(payload.get("source"), "title"),
                     _source_attr(payload.get("source"), "fetched_at"),
                 ),
             )
             item_id = int(result.lastrowid)
-        
+        # 写入世代变更记录
+        conn.execute("DELETE FROM item_generation_records WHERE item_id = ?", (item_id,))
+        for record in payload.get("generations") or []:
+            conn.execute(
+                """
+                INSERT INTO item_generation_records (item_id, generation, game_version_code, description, notes)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(item_id, generation) DO UPDATE SET
+                    game_version_code = excluded.game_version_code,
+                    description = excluded.description,
+                    notes = excluded.notes
+                """,
+                (
+                    item_id,
+                    int(record["generation"]),
+                    record.get("game_version_code"),
+                    record.get("description") or "",
+                    record.get("notes"),
+                ),
+            )
     return item_id
 
 

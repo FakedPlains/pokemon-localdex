@@ -94,9 +94,9 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
       <div className="panel ab-panel">
         <div className="ab-header">
           <h2 className="panel-title">特性资料</h2>
-          <p className="panel-subtitle">
+          <span className="panel-subtitle">
             共收录 {total > 0 ? total : abilities.length} 个特性，按编号排序。点击展开查看详细效果与世代变更。
-          </p>
+          </span>
         </div>
 
 

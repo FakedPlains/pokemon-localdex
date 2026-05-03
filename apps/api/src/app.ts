@@ -108,7 +108,20 @@ apiRoutes.get("/pokemon/:id/learnset/meta", (c) => {
   return c.json({ data: meta, pokemonId: entry.id });
 });
 
-apiRoutes.get("/items", (c) => c.json({ data: listItemsFromSqlite() }));
+apiRoutes.get("/items", (c) => {
+  const query = c.req.query("q") || undefined;
+  const category = c.req.query("category") || undefined;
+  const limit = numberQuery(c, "limit");
+  const offset = numberQuery(c, "offset") ?? 0;
+
+  if (limit !== undefined) {
+    const result = listItemsFromSqlite({ query, category, limit, offset });
+    const { items, total } = result as { items: unknown[]; total: number };
+    return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
+  }
+  const data = listItemsFromSqlite({ query, category });
+  return c.json({ data });
+});
 
 apiRoutes.get("/items/:id", (c) => {
   const id = c.req.param("id");

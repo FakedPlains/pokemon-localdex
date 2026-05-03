@@ -156,6 +156,13 @@ export type AbilityEntry = {
   source?: SourceMeta;
 };
 
+export type ItemGenerationRecord = {
+  generation: number;
+  gameVersionCode?: string;
+  description: string;
+  notes?: string;
+};
+
 export type ItemEntry = {
   id: string;
   slug: string;
@@ -164,6 +171,10 @@ export type ItemEntry = {
   nameEn?: string;
   category?: string;
   effectSummary?: string;
+  effectDetail?: string;
+  introducedGeneration?: number;
+  imageUrl?: string;
+  generations: ItemGenerationRecord[];
   source?: SourceMeta;
 };
 
@@ -456,6 +467,40 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
         PRAGMA foreign_keys = ON;
       `);
     } catch { /* column may already exist */ }
+  }
+
+  // ── 迁移: items 表删除废弃的 legacy_id 列 ──
+  // legacy_id 有 UNIQUE 约束，SQLite 不支持直接 DROP，需要重建表
+  if (_hasCol("items", "legacy_id")) {
+    try {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        CREATE TABLE _items_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          slug TEXT NOT NULL UNIQUE,
+          name_zh TEXT NOT NULL,
+          name_ja TEXT,
+          name_en TEXT,
+          category TEXT,
+          effect_summary TEXT,
+          effect_detail TEXT,
+          introduced_generation INTEGER,
+          image_url TEXT,
+          source_url TEXT,
+          source_title TEXT,
+          source_fetched_at TEXT
+        );
+        INSERT INTO _items_new (id, slug, name_zh, name_ja, name_en, category, effect_summary,
+          effect_detail, introduced_generation, image_url, source_url, source_title, source_fetched_at)
+          SELECT id, slug, name_zh, name_ja, name_en, category, effect_summary,
+            effect_detail, introduced_generation, image_url, source_url, source_title, source_fetched_at
+          FROM items;
+        DROP TABLE items;
+        ALTER TABLE _items_new RENAME TO items;
+        CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
+        PRAGMA foreign_keys = ON;
+      `);
+    } catch { /* table may already be migrated */ }
   }
 
   // moves.introduced_generation: 如果存的是 generations.id 而非世代数字，需要转换
@@ -763,16 +808,28 @@ export function ensureSchema() {
     -- ============================================================
     CREATE TABLE IF NOT EXISTS items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      legacy_id TEXT NOT NULL UNIQUE,
-      slug TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
       name_zh TEXT NOT NULL,
       name_ja TEXT,
       name_en TEXT,
       category TEXT,
       effect_summary TEXT,
+      effect_detail TEXT,
+      introduced_generation INTEGER,
+      image_url TEXT,
       source_url TEXT,
       source_title TEXT,
       source_fetched_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS item_generation_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+      generation INTEGER NOT NULL,
+      game_version_code TEXT,
+      description TEXT,
+      notes TEXT,
+      UNIQUE (item_id, generation)
     );
 
     -- ============================================================
@@ -1657,27 +1714,11 @@ export function getAbilityFromSqlite(idOrName: string) {
 
 // ── Item queries ──
 
-export function listItemsFromSqlite() {
-  const db = openDatabase();
-  const rows = db.prepare("SELECT * FROM items ORDER BY category ASC, name_zh ASC").all() as Record<string, unknown>[];
-  db.close();
-  return rows.map((row) => ({
-    id: String(row.id),
-    slug: String(row.slug),
-    nameZh: String(row.name_zh),
-    nameJa: row.name_ja ? String(row.name_ja) : undefined,
-    nameEn: row.name_en ? String(row.name_en) : undefined,
-    category: row.category ? String(row.category) : undefined,
-    effectSummary: row.effect_summary ? String(row.effect_summary) : undefined,
-    source: sourceFromRow(row),
-  } as ItemEntry));
-}
-
-export function getItemFromSqlite(idOrSlug: string) {
-  const db = openDatabase();
-  const row = db.prepare("SELECT * FROM items WHERE id = ? OR legacy_id = ? OR slug = ? OR name_zh = ? LIMIT 1").get(idOrSlug, idOrSlug, idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
-  if (!row) { db.close(); return undefined; }
-  db.close();
+function hydrateItemRow(db: ReturnType<typeof openDatabase>, row: Record<string, unknown>): ItemEntry {
+  const itemId = Number(row.id);
+  const genRows = db.prepare(
+    "SELECT generation, game_version_code, description, notes FROM item_generation_records WHERE item_id = ? ORDER BY generation ASC"
+  ).all(itemId) as Record<string, unknown>[];
   return {
     id: String(row.id),
     slug: String(row.slug),
@@ -1686,8 +1727,63 @@ export function getItemFromSqlite(idOrSlug: string) {
     nameEn: row.name_en ? String(row.name_en) : undefined,
     category: row.category ? String(row.category) : undefined,
     effectSummary: row.effect_summary ? String(row.effect_summary) : undefined,
+    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
+    introducedGeneration: row.introduced_generation ? Number(row.introduced_generation) : undefined,
+    imageUrl: row.image_url ? String(row.image_url) : undefined,
+    generations: genRows.map((r) => ({
+      generation: Number(r.generation),
+      gameVersionCode: r.game_version_code ? String(r.game_version_code) : undefined,
+      description: String(r.description ?? ""),
+      notes: r.notes ? String(r.notes) : undefined,
+    })),
     source: sourceFromRow(row),
-  } as ItemEntry;
+  };
+}
+
+export function listItemsFromSqlite(filters?: { query?: string; category?: string } & PaginationParams) {
+const db = openDatabase();
+const conditions: string[] = [];
+const params: Array<string | number> = [];
+if (filters?.query) {
+  conditions.push("(name_zh LIKE ? OR name_ja LIKE ? OR name_en LIKE ? OR slug LIKE ? OR effect_summary LIKE ?)");
+  const v = `%${filters.query}%`;
+  params.push(v, v, v, v, v);
+}
+if (filters?.category) {
+  conditions.push("category = ?");
+  params.push(filters.category);
+}
+const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+const usePagination = filters?.limit !== undefined;
+
+let total = 0;
+if (usePagination) {
+  const countRow = db.prepare(`SELECT COUNT(*) AS cnt FROM items ${where}`).get(...params) as Record<string, unknown>;
+  total = Number(countRow.cnt);
+}
+
+const limitClause = usePagination
+  ? `LIMIT ${Number(filters!.limit)} OFFSET ${Number(filters?.offset ?? 0)}`
+  : "";
+
+const rows = db.prepare(`
+  SELECT * FROM items
+  ${where}
+  ORDER BY id ASC
+  ${limitClause}
+`).all(...params) as Record<string, unknown>[];
+const items = rows.map((r) => hydrateItemRow(db, r));
+db.close();
+return usePagination ? { items, total } as PaginatedResult<ItemEntry> : items;
+}
+
+export function getItemFromSqlite(idOrSlug: string) {
+  const db = openDatabase();
+  const row = db.prepare("SELECT * FROM items WHERE id = ? OR slug = ? OR name_zh = ? LIMIT 1").get(idOrSlug, idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
+  if (!row) { db.close(); return undefined; }
+  const result = hydrateItemRow(db, row);
+  db.close();
+  return result;
 }
 
 // ── Utility ──
