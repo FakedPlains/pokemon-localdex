@@ -30,7 +30,7 @@ jobs:
         run: npm install
 
       - name: Build
-        run: npm run build:web
+        run: cd apps/web && npx vite build
         env:
           GITHUB_PAGES: "true"
 
