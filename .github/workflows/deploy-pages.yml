@@ -35,8 +35,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Build
-        working-directory: apps/web
-        run: pnpm exec vite build
+        run: pnpm --filter @pokemon-localdex/web run build
         env:
           GITHUB_PAGES: "true"
 
