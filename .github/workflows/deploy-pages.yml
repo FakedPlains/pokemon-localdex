@@ -24,13 +24,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Debug - check vite location
+        run: |
+          ls -la node_modules/.bin/vite || echo "vite not in root .bin"
+          ls -la apps/web/node_modules/.bin/vite || echo "vite not in web .bin"
+          npm ls vite || true
 
       - name: Build
-        run: cd apps/web && ../../node_modules/.bin/vite build
+        working-directory: apps/web
+        run: node ../../node_modules/vite/bin/vite.js build
         env:
           GITHUB_PAGES: "true"
 
