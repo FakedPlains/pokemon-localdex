@@ -17,8 +17,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,13 +24,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: Install dependencies
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build
-        run: npm run build:web
+        working-directory: apps/web
+        run: pnpm exec vite build
         env:
           GITHUB_PAGES: "true"
 
