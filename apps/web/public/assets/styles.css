@@ -861,6 +861,14 @@ button.secondary {
   border: 1px solid rgba(31, 42, 31, 0.08);
 }
 
+/* 嵌套在 subpanel 内时去掉重复的背景和边框 */
+.subpanel .team-member-editor {
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
 .member-topline {
   display: flex;
   justify-content: space-between;
@@ -2116,6 +2124,49 @@ display: block;
   border-radius: 999px;
   font-size: 12px;
   min-width: 200px;
+}
+
+/* SearchSelect 在预设栏内的紧凑样式 — 与 .sc-chip 风格统一 */
+.sc-preset-nature .ss-wrap {
+  width: auto;
+}
+
+.sc-preset-nature .ss-trigger {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 0;
+  width: auto;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 42, 31, 0.1);
+  gap: 4px;
+  white-space: nowrap;
+  transition: background 150ms, color 150ms, border-color 150ms;
+}
+
+.sc-preset-nature .ss-trigger:hover,
+.sc-preset-nature .ss-trigger:focus {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(31, 42, 31, 0.2);
+}
+
+.sc-preset-nature .ss-dropdown {
+  min-width: 260px;
+  width: max-content;
+  right: auto;
+  border-radius: 12px;
+}
+
+.sc-preset-nature .ss-search {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.sc-preset-nature .ss-option {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 6px;
 }
 
 /* ── EV MAX button ── */
@@ -3921,4 +3972,892 @@ padding: 24px 24px 8px;
   .it-row-desc { display: none; }
   .it-row-detail { padding-left: 12px; }
   .it-load-more { padding: 12px 18px 0; }
+
+  /* Teams responsive */
+  .teams-tabs { gap: 0; }
+  .teams-tab { font-size: 13px; padding: 10px 16px; }
+  .te-card-grid { grid-template-columns: 1fr; }
+  .te-split { grid-template-columns: 1fr; }
+  .te-preview-img { width: 100px; height: 100px; }
+  .te-preview-img img { width: 80px; height: 80px; }
+  .team-slot-grid { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════
+   Teams Page — 宝可梦盒子 & 队伍管理
+   ══════════════════════════════════════════════ */
+
+/* Tab 切换 */
+.teams-tabs {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.teams-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.teams-tab:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.teams-tab-active {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(64, 50, 28, 0.1);
+}
+
+.tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.teams-tab-active .tab-count {
+  background: var(--accent);
+  color: white;
+}
+
+/* ── 编辑器：左右分栏 ── */
+.te-split {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.te-left {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.te-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.te-moves {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.te-field {
+  display: grid;
+  gap: 6px;
+}
+
+.te-field-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* 宝可梦预览图 */
+.te-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.te-preview-img {
+  width: 140px;
+  height: 140px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.te-preview-img img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+}
+
+.te-preview-empty {
+  font-size: 28px;
+  color: var(--muted);
+}
+
+/* 闪光切换 — 复用 drawer-img-toggle 风格 */
+.te-shiny-toggle {
+  display: flex;
+  gap: 4px;
+  background: rgba(31, 42, 31, 0.06);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.te-shiny-toggle button {
+  padding: 4px 14px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+.te-shiny-toggle button:hover {
+  background: rgba(255, 255, 255, 0.5);
+  transform: none;
+  box-shadow: none;
+}
+
+.te-shiny-toggle button.active {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* 特性 tab 切换 */
+.te-ability-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.te-ability-tab {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 42, 31, 0.1);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.te-ability-tab:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(31, 42, 31, 0.2);
+  transform: none;
+  box-shadow: none;
+}
+
+.te-ability-tab-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong)) !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+
+.te-ability-tab-active .te-ha-badge {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+.te-ha-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(31, 42, 31, 0.08);
+  color: var(--muted);
+  letter-spacing: 0.03em;
+}
+
+/* 卡片网格 */
+.te-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+/* 队伍槽位 */
+.te-slot {
+  display: grid;
+  gap: 8px;
+}
+
+.te-slot-empty {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.te-slot-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.te-slot-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.te-slot-inline {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+
+/* 引用标记 */
+.chip-ref {
+  font-size: 11px;
+  background: var(--accent);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* 队伍槽位网格 */
+.team-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* ── SearchSelect 模糊搜索下拉 ── */
+.ss-wrap {
+  position: relative;
+  width: 100%;
+}
+
+/* 触发按钮 — 与全局 input/select 保持一致 */
+.ss-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(31, 42, 31, 0.15);
+  background: rgba(255, 255, 255, 0.88);
+  font-size: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s;
+  text-align: left;
+}
+
+.ss-trigger:hover,
+.ss-trigger:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.ss-val {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ss-placeholder {
+  flex: 1;
+  color: var(--muted);
+}
+
+.ss-arrow {
+  flex-shrink: 0;
+  opacity: 0.45;
+  margin-left: 6px;
+}
+
+.ss-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(64, 50, 28, 0.14);
+  overflow: hidden;
+  animation: ss-fade-in 0.12s ease-out;
+}
+
+@keyframes ss-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ss-search {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.95);
+  outline: none;
+  border-radius: 0;
+}
+
+.ss-search::placeholder {
+  color: var(--muted);
+}
+
+.ss-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.ss-empty {
+  padding: 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ss-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.ss-option:hover {
+  background: rgba(217, 79, 61, 0.06);
+}
+
+.ss-option-active {
+  background: rgba(217, 79, 61, 0.1);
+  font-weight: 600;
+}
+
+.ss-option-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.ss-option-sub {
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* 危险文字 */
+.danger-text {
+  color: #c0392b !important;
+}
+
+/* ══════════════════════════════════════════════
+   BoxCard — 盒子宝可梦卡片
+   ══════════════════════════════════════════════ */
+
+.box-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px 20px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(255, 248, 240, 0.7));
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+/* 顶栏：配置名称 + 菜单 */
+.box-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+}
+
+.box-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.box-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(64, 50, 28, 0.08);
+}
+
+/* 左右布局容器 */
+.box-card-body {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+}
+
+.box-card-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 110px;
+}
+
+.box-card-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 三点菜单 */
+.box-card-menu {
+  position: relative;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.box-card-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.box-card-menu-btn:hover {
+  background: rgba(31, 42, 31, 0.12);
+  color: var(--ink);
+}
+
+.box-card-menu-btn svg {
+  display: block;
+}
+
+.box-card-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 100px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(64, 50, 28, 0.14);
+  overflow: hidden;
+  animation: ss-fade-in 0.12s ease-out;
+  z-index: 100;
+}
+
+.box-card-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 9px 16px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.box-card-dropdown button:hover {
+  background: rgba(31, 42, 31, 0.05);
+}
+
+.box-card-dropdown button:not(:last-child) {
+  border-bottom: 1px solid rgba(31, 42, 31, 0.06);
+}
+
+/* 图片区域 */
+.box-card-thumb {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle, rgba(255, 213, 107, 0.2) 0%, transparent 70%),
+    rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.box-card-thumb > img:first-child {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+.box-card-thumb-empty {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--muted);
+  opacity: 0.4;
+}
+
+/* 道具叠加 */
+.box-card-item-overlay {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* 属性图标（只显示图标，不显示文字） */
+.box-card-types {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.box-card-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  padding: 3px;
+}
+
+.box-card-type-icon img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+/* 宝可梦属性图标底色 */
+.box-card-type-icon.type-草 { background: var(--grass); }
+.box-card-type-icon.type-毒 { background: #8b5ea7; }
+.box-card-type-icon.type-电 { background: var(--electric); }
+.box-card-type-icon.type-水 { background: var(--water); }
+.box-card-type-icon.type-火 { background: #d26a2e; }
+.box-card-type-icon.type-一般 { background: #8a8a7f; }
+.box-card-type-icon.type-冰 { background: #6ebec9; }
+.box-card-type-icon.type-格斗 { background: #b4473f; }
+.box-card-type-icon.type-地面 { background: #b68f4e; }
+.box-card-type-icon.type-飞行 { background: #7f9cd6; }
+.box-card-type-icon.type-超能力 { background: #db6390; }
+.box-card-type-icon.type-虫 { background: #7a9a2a; }
+.box-card-type-icon.type-岩石 { background: #9a8752; }
+.box-card-type-icon.type-幽灵 { background: #6b5b95; }
+.box-card-type-icon.type-龙 { background: #4c62d4; }
+.box-card-type-icon.type-恶 { background: #5a4b43; }
+.box-card-type-icon.type-钢 { background: #7b8da1; }
+.box-card-type-icon.type-妖精 { background: #d98db8; }
+
+/* 名字 + 等级 */
+.box-card-name {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  justify-content: center;
+}
+
+.box-card-name strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.box-card-level {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* 特性 + 性格 */
+.box-card-meta {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.box-card-tag {
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* 招式列表 */
+.box-card-moves {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.box-card-move {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-weight: 500;
+  min-width: 0;
+}
+
+.box-card-move-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+
+.box-card-move-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.box-card-move-power {
+  font-size: 11px;
+  opacity: 0.85;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+/* 招式属性底色 */
+.type-bg-草 { background: var(--grass); }
+.type-bg-毒 { background: #8b5ea7; }
+.type-bg-电 { background: var(--electric); color: #352a00; }
+.type-bg-水 { background: var(--water); }
+.type-bg-火 { background: #d26a2e; }
+.type-bg-一般 { background: #8a8a7f; }
+.type-bg-冰 { background: #6ebec9; color: #12343a; }
+.type-bg-格斗 { background: #b4473f; }
+.type-bg-地面 { background: #b68f4e; }
+.type-bg-飞行 { background: #7f9cd6; }
+.type-bg-超能力 { background: #db6390; }
+.type-bg-虫 { background: #7a9a2a; }
+.type-bg-岩石 { background: #9a8752; }
+.type-bg-幽灵 { background: #6b5b95; }
+.type-bg-龙 { background: #4c62d4; }
+.type-bg-恶 { background: #5a4b43; }
+.type-bg-钢 { background: #7b8da1; }
+.type-bg-妖精 { background: #d98db8; }
+.type-bg-unknown { background: #7b8481; }
+
+/* 电/冰属性深色文字时图标不反色 */
+.type-bg-电 .box-card-move-icon,
+.type-bg-冰 .box-card-move-icon {
+  filter: none;
+  opacity: 0.8;
+}
+.type-bg-电 .box-card-move-power,
+.type-bg-冰 .box-card-move-power {
+  color: inherit;
+}
+
+/* 努力值 / 个体值 — 纯数字表格 */
+.box-card-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(31, 42, 31, 0.08);
+}
+
+.box-card-stats-header,
+.box-card-stats-row {
+  display: grid;
+  grid-template-columns: 28px repeat(6, 1fr);
+  gap: 2px;
+  text-align: center;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.box-card-stats-header span {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.box-card-stats-tag {
+  font-size: 9px;
+  color: var(--muted);
+  font-weight: 500;
+  text-align: right;
+  padding-right: 2px;
+}
+
+.box-card-stats-num {
+  font-variant-numeric: tabular-nums;
+  color: rgba(31, 42, 31, 0.3);
+  font-weight: 500;
+}
+
+.box-card-stats-num.has-val {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* ══════════════════════════════════════════════
+   Modal — 通用弹窗
+   ══════════════════════════════════════════════ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  animation: modal-fade-in 180ms ease;
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-container {
+  position: relative;
+  width: 100%;
+  max-width: 780px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #fffdf8, #fff8f0);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 64px rgba(64, 50, 28, 0.18), 0 4px 16px rgba(64, 50, 28, 0.08);
+  animation: modal-slide-up 220ms ease;
+  overflow: hidden;
+}
+
+@keyframes modal-slide-up {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(31, 42, 31, 0.08);
+  flex-shrink: 0;
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.modal-close-btn:hover {
+  background: rgba(31, 42, 31, 0.12);
+  color: var(--ink);
+}
+
+.modal-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 弹窗内编辑器样式微调 */
+.modal-body .team-member-editor {
+  margin: 0;
+}
+
+/* 移动端适配 */
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 12px;
+  }
+  .modal-container {
+    max-width: 100%;
+    max-height: calc(100vh - 24px);
+    border-radius: 18px;
+  }
+  .modal-header {
+    padding: 16px 18px 12px;
+  }
+  .modal-body {
+    padding: 16px 18px 20px;
+  }
 }

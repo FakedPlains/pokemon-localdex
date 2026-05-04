@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { api, unifiedApi } from "../utils/api.js";
-import { STAT_KEYS, NATURE_OPTIONS, ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "../utils/constants.js";
+import { STAT_KEYS, NATURE_OPTIONS, NATURE_EFFECTS, ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "../utils/constants.js";
 import {
   createDraftMember, createDefaultStats, buildDerivedStats,
   getLearnableDamageMoves, resolveMoveGenerationRecord, describeLearnsetEntry,
@@ -8,7 +8,18 @@ import {
 } from "../utils/helpers.js";
 import TypeChip from "../components/TypeChip.jsx";
 import StatBar from "../components/StatBar.jsx";
+import SearchSelect from "../components/SearchSelect.jsx";
 import Loading from "../components/Loading.jsx";
+
+const STAT_LABELS = { hp: "HP", atk: "攻击", def: "防御", spa: "特攻", spd: "特防", spe: "速度" };
+const NATURE_SELECT_OPTIONS = NATURE_OPTIONS.map((n) => {
+  const eff = NATURE_EFFECTS[n];
+  return {
+    value: n,
+    label: n,
+    sublabel: eff ? `+${STAT_LABELS[eff.up]} -${STAT_LABELS[eff.down]}` : "无修正",
+  };
+});
 
 function StatInputs({ kind, stats, onChange }) {
   return (
@@ -75,9 +86,12 @@ function DamageMemberEditor({ title, side, detail, teamMembers, pokemonList, onF
         </label>
         <label>
           <span>性格</span>
-          <select value={side.nature || "认真"} onChange={(e) => onFieldChange("nature", e.target.value)}>
-            {NATURE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
+          <SearchSelect
+            value={side.nature || "认真"}
+            options={NATURE_SELECT_OPTIONS}
+            onChange={(v) => onFieldChange("nature", v)}
+            placeholder="选择性格…"
+          />
         </label>
       </div>
       <details className="stats-details" open>

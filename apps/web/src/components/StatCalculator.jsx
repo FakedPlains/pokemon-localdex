@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { STAT_KEYS, NATURE_OPTIONS, NATURE_EFFECTS } from "../utils/constants.js";
 import { getNatureMultiplier } from "../utils/helpers.js";
+import SearchSelect from "./SearchSelect.jsx";
 
 const STAT_LABELS = { hp: "HP", atk: "攻击", def: "防御", spa: "特攻", spd: "特防", spe: "速度" };
 const STAT_LABELS_SHORT = { hp: "HP", atk: "攻", def: "防", spa: "特攻", spd: "特防", spe: "速" };
@@ -8,6 +9,15 @@ const STAT_COLORS = {
   hp: "#ff5959", atk: "#f5ac78", def: "#fae078",
   spa: "#9db7f5", spd: "#a7db8d", spe: "#fa92b2"
 };
+
+const NATURE_SELECT_OPTIONS = NATURE_OPTIONS.map((n) => {
+  const eff = NATURE_EFFECTS[n];
+  return {
+    value: n,
+    label: n,
+    sublabel: eff ? `+${STAT_LABELS[eff.up]} -${STAT_LABELS[eff.down]}` : "无修正",
+  };
+});
 
 /* ── Classic mode constants ── */
 const LEVEL_PRESETS = [50, 100];
@@ -86,18 +96,45 @@ function totalSp(sps) {
   return STAT_KEYS.reduce((sum, k) => sum + (sps[k] || 0), 0);
 }
 
-export default function StatCalculator({ baseStats }) {
+/**
+ * @param {Object} props
+ * @param {Object} props.baseStats - 种族值
+ * @param {Object} [props.initialValues] - 可选初始值 { level, nature, ivs, evs }
+ * @param {Function} [props.onChange] - 可选回调 ({ level, nature, ivs, evs }) => void
+ */
+export default function StatCalculator({ baseStats, initialValues, onChange }) {
   const [mode, setMode] = useState("classic"); // "classic" | "champions"
 
   /* ── Classic state ── */
-  const [level, setLevel] = useState(50);
-  const [nature, setNature] = useState("认真");
-  const [ivs, setIvs] = useState(() => Object.fromEntries(STAT_KEYS.map((k) => [k, 31])));
-  const [evs, setEvs] = useState(() => Object.fromEntries(STAT_KEYS.map((k) => [k, 0])));
+  const [level, setLevelRaw] = useState(initialValues?.level || 50);
+  const [nature, setNatureRaw] = useState(initialValues?.nature || "认真");
+  const [ivs, setIvsRaw] = useState(() => ({
+    ...Object.fromEntries(STAT_KEYS.map((k) => [k, 31])),
+    ...(initialValues?.ivs || {})
+  }));
+  const [evs, setEvsRaw] = useState(() => ({
+    ...Object.fromEntries(STAT_KEYS.map((k) => [k, 0])),
+    ...(initialValues?.evs || {})
+  }));
 
   /* ── Champions state ── */
-  const [champNature, setChampNature] = useState("认真");
+  const [champNature, setChampNature] = useState(initialValues?.nature || "认真");
   const [sps, setSps] = useState(() => Object.fromEntries(STAT_KEYS.map((k) => [k, 0])));
+
+  /* ── Alias raw setters so the rest of the component code stays unchanged ── */
+  const setLevel = setLevelRaw;
+  const setNature = setNatureRaw;
+  const setIvs = setIvsRaw;
+  const setEvs = setEvsRaw;
+
+  // Fire onChange whenever classic state changes
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  useEffect(() => {
+    if (onChangeRef.current && mode === "classic") {
+      onChangeRef.current({ level, nature, ivs, evs });
+    }
+  }, [level, nature, ivs, evs, mode]);
 
   /* ── Classic helpers ── */
   const evTotal = useMemo(() => totalEv(evs), [evs]);
@@ -293,15 +330,12 @@ export default function StatCalculator({ baseStats }) {
             {/* Nature */}
             <div className="sc-preset-group sc-preset-nature">
               <span className="sc-preset-label">性格</span>
-              <select value={nature} onChange={(e) => setNature(e.target.value)}>
-                {NATURE_OPTIONS.map((n) => {
-                  const eff = NATURE_EFFECTS[n];
-                  const hint = eff
-                    ? `${n} (+${STAT_LABELS[eff.up]} -${STAT_LABELS[eff.down]})`
-                    : `${n} (无修正)`;
-                  return <option key={n} value={n}>{hint}</option>;
-                })}
-              </select>
+              <SearchSelect
+                value={nature}
+                options={NATURE_SELECT_OPTIONS}
+                onChange={(v) => setNature(v)}
+                placeholder="选择性格…"
+              />
             </div>
 
             {/* IV presets */}
@@ -349,15 +383,12 @@ export default function StatCalculator({ baseStats }) {
             {/* Nature */}
             <div className="sc-preset-group sc-preset-nature">
               <span className="sc-preset-label">性格</span>
-              <select value={champNature} onChange={(e) => setChampNature(e.target.value)}>
-                {NATURE_OPTIONS.map((n) => {
-                  const eff = NATURE_EFFECTS[n];
-                  const hint = eff
-                    ? `${n} (+${STAT_LABELS[eff.up]} -${STAT_LABELS[eff.down]})`
-                    : `${n} (无修正)`;
-                  return <option key={n} value={n}>{hint}</option>;
-                })}
-              </select>
+              <SearchSelect
+                value={champNature}
+                options={NATURE_SELECT_OPTIONS}
+                onChange={(v) => setChampNature(v)}
+                placeholder="选择性格…"
+              />
             </div>
 
             {/* SP presets */}

@@ -563,8 +563,11 @@ def _pick_item_image(html: str, seed: ItemSeed) -> str | None:
             score += 8
         elif zh_slug and zh_slug in file_name:
             score += 4
-        # 优先选择 Bag_ 开头的道具图标（Sprite）
-        if file_name.startswith("bag_") and "sprite" in file_name:
+        # 优先选择 Dream_ 开头的道具图标（高清 Dream World Sprite）
+        if file_name.startswith("dream_") and "sprite" in file_name:
+            score += 5
+        # 其次选择 Bag_ 开头的道具图标（Sprite）
+        elif file_name.startswith("bag_") and "sprite" in file_name:
             score += 3
         elif "bag" in file_name or "item" in file_name:
             score += 2

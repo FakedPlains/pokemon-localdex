@@ -137,13 +137,13 @@ export default function App() {
       case "abilities":
         return <AbilitiesPage query={query} generation={generation} />;
       case "teams":
-        return <TeamsPage teamDraft={teamDraft} onTeamDraftChange={handleTeamDraftChange} />;
+        return <TeamsPage />;
       case "damage":
         return <DamagePage teamDraft={teamDraft} />;
       default:
         return <PokedexPage query={query} types={types} generation={generation} />;
     }
-  }, [route, query, types, generation, moveCategory, teamDraft, handleTeamDraftChange]);
+  }, [route, query, types, generation, moveCategory, teamDraft]);
 
   return (
     <div className="app-shell">
