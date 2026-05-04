@@ -110,6 +110,23 @@ body {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
 }
 
+.top-nav-github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-light);
+  flex-shrink: 0;
+  padding: 6px;
+  border-radius: 50%;
+  transition: color 0.15s, background 0.15s;
+  margin-left: auto;
+}
+
+.top-nav-github:hover {
+  color: var(--ink);
+  background: rgba(31, 42, 31, 0.07);
+}
+
 /* ── Nav Search Box ── */
 .nav-search-wrap {
   position: relative;
@@ -3725,6 +3742,8 @@ padding: 24px 24px 8px;
   .nav-search { font-size: 12px; padding: 6px 28px 6px 28px; }
   .nav-search-icon { left: 8px; width: 13px; height: 13px; }
   .nav-search-clear { width: 20px; height: 20px; right: 4px; }
+  .top-nav-github { padding: 4px; margin-left: 0; }
+  .top-nav-github svg { width: 18px; height: 18px; }
   .nav-filter-btn { width: 32px; height: 32px; }
   .filter-panel-overlay { padding: 64px 12px 12px; }
   .filter-panel { width: 100%; border-radius: 16px; padding: 16px; }

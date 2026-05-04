@@ -402,10 +402,14 @@ export async function fetchPokemonLearnset(pokemonId, generation, formKey = "def
 
 export async function fetchAbilityDetail(idOrSlug) {
   const sb = getSupabase();
+  const numId = Number(idOrSlug);
+  const orFilters = [];
+  if (!isNaN(numId) && Number.isInteger(numId)) orFilters.push("id.eq." + numId);
+  orFilters.push("name_zh.eq." + idOrSlug);
   const { data: row, error } = await sb
     .from("abilities")
     .select("*")
-    .or("id.eq." + idOrSlug + ",name_zh.eq." + idOrSlug)
+    .or(orFilters.join(","))
     .limit(1)
     .single();
   if (error || !row) return { data: null };
@@ -436,10 +440,14 @@ export async function fetchAbilityDetail(idOrSlug) {
 
 export async function fetchMoveDetail(idOrSlug) {
   const sb = getSupabase();
+  const numId = Number(idOrSlug);
+  const orFilters = [];
+  if (!isNaN(numId) && Number.isInteger(numId)) orFilters.push("id.eq." + numId);
+  orFilters.push("name_zh.eq." + idOrSlug);
   const { data: row, error } = await sb
     .from("moves")
     .select("*")
-    .or("id.eq." + idOrSlug + ",name_zh.eq." + idOrSlug)
+    .or(orFilters.join(","))
     .limit(1)
     .single();
   if (error || !row) return { data: null };
@@ -525,10 +533,14 @@ export async function fetchItemsList({ query, category, limit, offset } = {}) {
 
 export async function fetchItemDetail(idOrSlug) {
   const sb = getSupabase();
+  const numId = Number(idOrSlug);
+  const orFilters = [];
+  if (!isNaN(numId) && Number.isInteger(numId)) orFilters.push("id.eq." + numId);
+  orFilters.push("slug.eq." + idOrSlug, "name_zh.eq." + idOrSlug);
   const { data: row, error } = await sb
     .from("items")
     .select("*")
-    .or("id.eq." + idOrSlug + ",slug.eq." + idOrSlug + ",name_zh.eq." + idOrSlug)
+    .or(orFilters.join(","))
     .limit(1)
     .single();
   if (error || !row) return { data: null };
