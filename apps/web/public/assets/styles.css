@@ -1934,6 +1934,108 @@ display: block;
   color: var(--muted);
 }
 
+/* ── Mode Toggle ── */
+.sc-mode-toggle {
+  display: flex;
+  gap: 6px;
+  padding: 3px;
+  background: rgba(31, 42, 31, 0.04);
+  border-radius: 14px;
+  width: fit-content;
+}
+
+.sc-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms, color 150ms, box-shadow 150ms;
+  white-space: nowrap;
+}
+
+.sc-mode-btn:hover:not(.sc-mode-btn-active) {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--ink);
+}
+
+.sc-mode-btn-active {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(31, 42, 31, 0.1);
+  cursor: default;
+}
+
+.sc-mode-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.sc-mode-desc {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+.sc-mode-btn-active .sc-mode-desc {
+  color: var(--ink-light);
+}
+
+/* ── Fixed chip (Champions) ── */
+.sc-chip-fixed {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(31, 42, 31, 0.05);
+  color: var(--muted);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  cursor: default;
+}
+
+/* ── Formula hint (Champions) ── */
+.sc-formula-hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(138, 166, 90, 0.06);
+  border: 1px solid rgba(138, 166, 90, 0.12);
+  font-size: 12px;
+  color: var(--ink-light);
+}
+
+.sc-formula-title {
+  font-weight: 700;
+  color: var(--ink);
+  margin-right: 4px;
+}
+
+.sc-formula-text {
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 11.5px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.sc-formula-note {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
 /* ── Preset Bar ── */
 .sc-presets {
   display: flex;
@@ -2166,6 +2268,11 @@ display: block;
 }
 
 .sc-row:nth-child(even) { background: rgba(255, 255, 255, 0.4); }
+
+/* ── Champions grid (no IV column, must be after .sc-row to override) ── */
+.sc-row-champ {
+  grid-template-columns: 44px 40px 1fr 32px 48px minmax(48px, 0.35fr);
+}
 
 .sc-header {
   font-weight: 700;
@@ -3771,6 +3878,11 @@ padding: 24px 24px 8px;
   .drawer-hero { grid-template-columns: 1fr; }
   .drawer-img-box { max-width: 200px; margin: 0 auto; }
   .sc-row { grid-template-columns: 44px 36px 50px minmax(100px, 1fr) 36px 44px minmax(40px, 0.4fr); gap: 4px; font-size: 12px; }
+  .sc-row-champ { grid-template-columns: 44px 36px minmax(120px, 1fr) 30px 44px minmax(40px, 0.3fr); }
+  .sc-mode-toggle { width: 100%; }
+  .sc-mode-btn { flex: 1; justify-content: center; padding: 6px 10px; font-size: 12px; }
+  .sc-formula-hint { font-size: 11px; gap: 3px 10px; padding: 8px 10px; }
+  .sc-formula-text { font-size: 10.5px; padding: 1px 6px; }
   .sc-field-nature select { width: 160px; }
   /* Moves responsive */
   .mv-list-head { display: none; }
