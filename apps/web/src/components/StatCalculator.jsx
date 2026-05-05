@@ -6,8 +6,8 @@ import SearchSelect from "./SearchSelect.jsx";
 const STAT_LABELS = { hp: "HP", atk: "攻击", def: "防御", spa: "特攻", spd: "特防", spe: "速度" };
 const STAT_LABELS_SHORT = { hp: "HP", atk: "攻", def: "防", spa: "特攻", spd: "特防", spe: "速" };
 const STAT_COLORS = {
-  hp: "#ff5959", atk: "#f5ac78", def: "#fae078",
-  spa: "#9db7f5", spd: "#a7db8d", spe: "#fa92b2"
+  hp: "#8AC654", atk: "#F8CB3C", def: "#D98837",
+  spa: "#59C3D0", spd: "#5890CD", spe: "#A456D0"
 };
 
 const NATURE_SELECT_OPTIONS = NATURE_OPTIONS.map((n) => {
@@ -126,6 +126,7 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
   const setNature = setNatureRaw;
   const setIvs = setIvsRaw;
   const setEvs = setEvsRaw;
+
 
   // Fire onChange whenever classic state changes
   const onChangeRef = useRef(onChange);

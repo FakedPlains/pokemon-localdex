@@ -73,6 +73,7 @@ export function createDraftMember(pokemon) {
   return {
     pokemonId: pokemon?.slug || pokemon?.id || "",
     nameZh: pokemon?.nameZh || "",
+    configName: "",
     level: 50,
     itemId: "",
     abilityId: "",

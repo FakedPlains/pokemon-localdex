@@ -551,8 +551,8 @@ function StatsTab({ detail, display, detailGeneration, onDetailGenerationChange 
 
 /* ─── Base Stat Bars (visual only) ─── */
 const STAT_COLORS = {
-  hp: "#ff5959", atk: "#f5ac78", def: "#fae078",
-  spa: "#9db7f5", spd: "#a7db8d", spe: "#fa92b2"
+  hp: "#8AC654", atk: "#F8CB3C", def: "#D98837",
+  spa: "#59C3D0", spd: "#5890CD", spe: "#A456D0"
 };
 const STAT_LABELS_SHORT = { hp: "HP", atk: "ATK", def: "DEF", spa: "SPA", spd: "SPD", spe: "SPE" };
 

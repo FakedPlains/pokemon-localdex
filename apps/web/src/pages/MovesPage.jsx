@@ -4,31 +4,31 @@ import Loading from "../components/Loading.jsx";
 
 /* ── 属性颜色映射（用于行底色） ── */
 const TYPE_BG_COLORS = {
-  一般: "rgba(138,138,127,0.10)",
-  火:   "rgba(210,106,46,0.10)",
-  水:   "rgba(59,132,197,0.10)",
-  电:   "rgba(228,192,42,0.10)",
-  草:   "rgba(138,166,90,0.10)",
-  冰:   "rgba(110,190,201,0.10)",
-  格斗: "rgba(180,71,63,0.10)",
-  毒:   "rgba(139,94,167,0.10)",
-  地面: "rgba(182,143,78,0.10)",
-  飞行: "rgba(127,156,214,0.10)",
-  超能力:"rgba(219,99,144,0.10)",
-  虫:   "rgba(122,154,42,0.10)",
-  岩石: "rgba(154,135,82,0.10)",
-  幽灵: "rgba(107,91,149,0.10)",
-  龙:   "rgba(76,98,212,0.10)",
-  恶:   "rgba(90,75,67,0.10)",
-  钢:   "rgba(123,141,161,0.10)",
-  妖精: "rgba(217,141,184,0.10)",
+  一般: "rgba(187,187,170,0.10)",
+  火:   "rgba(255,68,34,0.10)",
+  水:   "rgba(51,153,255,0.10)",
+  电:   "rgba(255,204,51,0.10)",
+  草:   "rgba(119,204,85,0.10)",
+  冰:   "rgba(119,221,255,0.10)",
+  格斗: "rgba(187,85,68,0.10)",
+  毒:   "rgba(170,85,153,0.10)",
+  地面: "rgba(221,187,85,0.10)",
+  飞行: "rgba(102,153,255,0.10)",
+  超能力:"rgba(255,85,153,0.10)",
+  虫:   "rgba(170,187,34,0.10)",
+  岩石: "rgba(187,170,102,0.10)",
+  幽灵: "rgba(102,102,187,0.10)",
+  龙:   "rgba(119,102,238,0.10)",
+  恶:   "rgba(119,85,68,0.10)",
+  钢:   "rgba(170,170,187,0.10)",
+  妖精: "rgba(255,170,255,0.10)",
 };
 
 /* ── 分类颜色映射（参考 52Poké Wiki 配色） ── */
 const CATEGORY_COLORS = {
-  物理: "#c92112",
-  特殊: "#4f5870",
-  变化: "#737373",
+  物理: { bg: "#FF4400", text: "#FFCC00" },
+  特殊: { bg: "#2266CC", text: "#BBEEFF" },
+  变化: { bg: "#999999", text: "#EEEEEE" },
 };
 
 /* ── 图标路径工具 ── */
@@ -53,9 +53,9 @@ function TypeIconChip({ type }) {
 /* ── 分类 Chip（图标 + 文字合并） ── */
 function CategoryChip({ category }) {
   if (!category) return <span>—</span>;
-  const bg = CATEGORY_COLORS[category] || "#737373";
+  const colors = CATEGORY_COLORS[category] || { bg: "#999999", text: "#EEEEEE" };
   return (
-    <span className="mv-cat-chip" style={{ background: bg }}>
+    <span className="mv-cat-chip" style={{ background: colors.bg, color: colors.text }}>
       <img className="mv-chip-icon" src={categoryIconSrc(category)} alt="" />
       {category}
     </span>
