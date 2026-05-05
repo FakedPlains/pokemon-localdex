@@ -26,6 +26,50 @@ export async function fetchPokemonList({ query, type, generation, limit, offset 
   const sb = getSupabase();
   const usePagination = limit !== undefined;
 
+  // 当有 type 或 generation 筛选时，先查出符合条件的 pokemon_id 集合
+  // 这样分页的 count 和 range 才能正确工作
+  let filteredIds = null;
+
+  if (type || generation) {
+    const types = type ? (Array.isArray(type) ? type : [type]) : null;
+
+    // 通过 pokemon_form_types 筛选 type
+    let typeIds = null;
+    if (types) {
+      const { data: typeRows } = await sb
+        .from("pokemon_form_types")
+        .select("pokemon_forms!inner ( pokemon_id )")
+        .in("type_name", types);
+      typeIds = new Set((typeRows || []).map((r) => r.pokemon_forms?.pokemon_id).filter(Boolean));
+    }
+
+    // 通过 pokemon_generation_regions 筛选 generation
+    let genIds = null;
+    if (generation) {
+      const { data: genRows } = await sb
+        .from("pokemon_generation_regions")
+        .select("pokemon_id")
+        .eq("generation", Number(generation));
+      genIds = new Set((genRows || []).map((r) => r.pokemon_id));
+    }
+
+    // 取交集
+    if (typeIds && genIds) {
+      filteredIds = [...typeIds].filter((id) => genIds.has(id));
+    } else if (typeIds) {
+      filteredIds = [...typeIds];
+    } else if (genIds) {
+      filteredIds = [...genIds];
+    }
+
+    // 如果筛选结果为空，直接返回
+    if (filteredIds && filteredIds.length === 0) {
+      return usePagination
+        ? { data: [], total: 0, offset: offset || 0, limit, hasMore: false }
+        : { data: [] };
+    }
+  }
+
   let q = sb
     .from("pokemon")
     .select([
@@ -41,6 +85,11 @@ export async function fetchPokemonList({ query, type, generation, limit, offset 
     q = q.or("name_zh.ilike.%" + query + "%,name_ja.ilike.%" + query + "%,name_en.ilike.%" + query + "%,slug.ilike.%" + query + "%");
   }
 
+  // 应用 type/generation 筛选得到的 id 集合
+  if (filteredIds) {
+    q = q.in("id", filteredIds);
+  }
+
   if (usePagination) {
     q = q.range(offset || 0, (offset || 0) + limit - 1);
   }
@@ -48,24 +97,7 @@ export async function fetchPokemonList({ query, type, generation, limit, offset 
   const { data: rows, count, error } = await q;
   if (error) throw error;
 
-  let filtered = rows || [];
-
-  if (type) {
-    const types = Array.isArray(type) ? type : [type];
-    filtered = filtered.filter((row) => {
-      const formTypes = row.pokemon_forms?.[0]?.pokemon_form_types?.map((t) => t.type_name) || [];
-      return types.some((t) => formTypes.includes(t));
-    });
-  }
-
-  if (generation) {
-    filtered = filtered.filter((row) => {
-      const gens = row.pokemon_generation_regions?.map((g) => g.generation) || [];
-      return gens.includes(Number(generation));
-    });
-  }
-
-  const items = filtered.map(mapPokemonRow);
+  const items = (rows || []).map(mapPokemonRow);
 
   if (usePagination) {
     const total = count ?? items.length;
@@ -482,7 +514,9 @@ export async function fetchItemsList({ query, category, limit, offset } = {}) {
   const sb = getSupabase();
   const usePagination = limit !== undefined;
 
-  let q = sb.from("items").select("*", { count: usePagination ? "exact" : undefined })
+  // 使用关联查询一次性获取 generation records，避免 N+1
+  let q = sb.from("items")
+    .select("*, item_generation_records ( generation, game_version_code, description, notes )", { count: usePagination ? "exact" : undefined })
     .order("id", { ascending: true });
 
   if (query) {
@@ -497,13 +531,8 @@ export async function fetchItemsList({ query, category, limit, offset } = {}) {
   const { data: rows, count, error } = await q;
   if (error) throw error;
 
-  const items = await Promise.all((rows || []).map(async (row) => {
-    const { data: genRows } = await sb
-      .from("item_generation_records")
-      .select("*")
-      .eq("item_id", row.id)
-      .order("generation", { ascending: true });
-
+  const items = (rows || []).map((row) => {
+    const genRows = row.item_generation_records || [];
     return {
       id: String(row.id),
       slug: row.slug,
@@ -515,14 +544,14 @@ export async function fetchItemsList({ query, category, limit, offset } = {}) {
       effectDetail: row.effect_detail || undefined,
       introducedGeneration: row.introduced_generation || undefined,
       imageUrl: row.image_url || undefined,
-      generations: (genRows || []).map((r) => ({
+      generations: genRows.map((r) => ({
         generation: r.generation,
         gameVersionCode: r.game_version_code || undefined,
         description: r.description || "",
         notes: r.notes || undefined,
       })),
     };
-  }));
+  });
 
   if (usePagination) {
     const total = count ?? items.length;
@@ -574,7 +603,9 @@ export async function fetchMovesList({ query, type, category, generation, limit,
   const sb = getSupabase();
   const usePagination = limit !== undefined;
 
-  let q = sb.from("moves").select("*", { count: usePagination ? "exact" : undefined })
+  // 使用关联查询一次性获取 generation records，避免 N+1
+  let q = sb.from("moves")
+    .select("*, move_generation_records ( generation, game_version_code, description, notes )", { count: usePagination ? "exact" : undefined })
     .order("name_zh", { ascending: true });
 
   if (query) {
@@ -582,6 +613,11 @@ export async function fetchMovesList({ query, type, category, generation, limit,
   }
   if (type) q = q.eq("type_name", type);
   if (category) q = q.eq("category", category);
+  if (generation) {
+    // 通过关联表筛选特定世代的招式
+    q = q.not("move_generation_records", "is", null)
+      .eq("move_generation_records.generation", generation);
+  }
 
   if (usePagination) {
     q = q.range(offset || 0, (offset || 0) + limit - 1);
@@ -590,13 +626,8 @@ export async function fetchMovesList({ query, type, category, generation, limit,
   const { data: rows, count, error } = await q;
   if (error) throw error;
 
-  const items = await Promise.all((rows || []).map(async (row) => {
-    const { data: genRows } = await sb
-      .from("move_generation_records")
-      .select("*")
-      .eq("move_id", row.id)
-      .order("generation", { ascending: true });
-
+  const items = (rows || []).map((row) => {
+    const genRows = row.move_generation_records || [];
     return {
       id: String(row.id), number: row.number ?? undefined,
       nameZh: row.name_zh, nameJa: row.name_ja || undefined, nameEn: row.name_en || undefined,
@@ -604,14 +635,14 @@ export async function fetchMovesList({ query, type, category, generation, limit,
       power: row.power ?? undefined, accuracy: row.accuracy ?? undefined, pp: row.pp ?? undefined,
       description: row.description || undefined, effectDetail: row.effect_detail || undefined,
       introducedGeneration: row.introduced_generation ?? undefined,
-      generations: (genRows || []).map((g) => ({
+      generations: genRows.map((g) => ({
         generation: g.generation,
         gameVersionCode: g.game_version_code || undefined,
         gameVersionName: g.game_version_code ? GAME_VERSION_NAMES.get(g.game_version_code) : undefined,
         description: g.description || "", notes: g.notes || undefined,
       })),
     };
-  }));
+  });
 
   if (usePagination) {
     const total = count ?? items.length;
@@ -626,12 +657,18 @@ export async function fetchAbilitiesList({ query, generation, limit, offset } = 
   const sb = getSupabase();
   const usePagination = limit !== undefined;
 
-  let q = sb.from("abilities").select("*", { count: usePagination ? "exact" : undefined })
+  // 使用关联查询一次性获取 generation records，避免 N+1
+  let q = sb.from("abilities")
+    .select("*, ability_generation_records ( generation, game_version_code, description, notes )", { count: usePagination ? "exact" : undefined })
     .order("number", { ascending: true })
     .order("name_zh", { ascending: true });
 
   if (query) {
     q = q.or("name_zh.ilike.%" + query + "%,name_ja.ilike.%" + query + "%,name_en.ilike.%" + query + "%");
+  }
+  if (generation) {
+    q = q.not("ability_generation_records", "is", null)
+      .eq("ability_generation_records.generation", generation);
   }
 
   if (usePagination) {
@@ -641,26 +678,21 @@ export async function fetchAbilitiesList({ query, generation, limit, offset } = 
   const { data: rows, count, error } = await q;
   if (error) throw error;
 
-  const items = await Promise.all((rows || []).map(async (row) => {
-    const { data: genRows } = await sb
-      .from("ability_generation_records")
-      .select("*")
-      .eq("ability_id", row.id)
-      .order("generation", { ascending: true });
-
+  const items = (rows || []).map((row) => {
+    const genRows = row.ability_generation_records || [];
     return {
       id: String(row.id), number: row.number ?? undefined,
       nameZh: row.name_zh, nameJa: row.name_ja || undefined, nameEn: row.name_en || undefined,
       description: row.description || undefined, effectDetail: row.effect_detail || undefined,
       introducedGeneration: row.introduced_generation ?? undefined,
-      generations: (genRows || []).map((g) => ({
+      generations: genRows.map((g) => ({
         generation: g.generation,
         gameVersionCode: g.game_version_code || undefined,
         gameVersionName: g.game_version_code ? GAME_VERSION_NAMES.get(g.game_version_code) : undefined,
         description: g.description || "", notes: g.notes || undefined,
       })),
     };
-  }));
+  });
 
   if (usePagination) {
     const total = count ?? items.length;
