@@ -66,8 +66,12 @@ GAME_VERSION_INFO: dict[str, tuple[int, str]] = {
     "晶灿钻石": (8, "BDSP"), "晶燦鑽石": (8, "BDSP"), "明亮珍珠": (8, "BDSP"),
     "晶灿钻石／明亮珍珠": (8, "BDSP"),
     "传说 阿尔宙斯": (8, "LA"), "傳說 阿爾宙斯": (8, "LA"),
+    "传说阿尔宙斯": (8, "LA"), "傳說阿爾宙斯": (8, "LA"),
     "朱": (9, "SV"), "紫": (9, "SV"), "朱／紫": (9, "SV"),
     "零之秘宝": (9, "SVT"),
+    "传说 Z-A": (9, "ZA"), "傳說 Z-A": (9, "ZA"),
+    "传说Z-A": (9, "ZA"), "傳說Z-A": (9, "ZA"),
+    "宝可梦ZA": (9, "ZA"), "寶可夢ZA": (9, "ZA"),
     "Champions": (99, "CHAMP"),
 }
 # 向后兼容：仅世代映射
@@ -389,6 +393,22 @@ def detect_generation_marker(line: str) -> tuple[int, str | None] | None:
     result = generation_from_game_version(line)
     if result:
         return result
+    # 处理无书名号的格式，如 "仅在传说 阿尔宙斯" / "仅在传说 Z-A"
+    bare = re.sub(r"^仅在|^僅在|中$", "", line).strip()
+    if bare and bare != line:
+        bare_normalized = _normalize_punctuation(bare)
+        if bare_normalized in GAME_VERSION_INFO:
+            return GAME_VERSION_INFO[bare_normalized]
+        # 尝试最长匹配
+        best_match: tuple[int, str] | None = None
+        best_key_len = 0
+        for key, info in GAME_VERSION_INFO.items():
+            if key in bare_normalized or bare_normalized in key:
+                if len(key) > best_key_len:
+                    best_key_len = len(key)
+                    best_match = info
+        if best_match:
+            return best_match
     return None
 
 
