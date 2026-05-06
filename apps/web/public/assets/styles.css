@@ -4467,9 +4467,9 @@ gap: 6px;
 }
 
 .te-ability-tab {
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
   border-radius: 999px;
   border: 1px solid rgba(31, 42, 31, 0.1);
   background: rgba(255, 255, 255, 0.7);
@@ -4489,7 +4489,7 @@ gap: 6px;
 }
 
 .te-ability-tab-active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong)) !important;
+  background: var(--accent) !important;
   color: white !important;
   border-color: transparent !important;
 }
@@ -4500,10 +4500,10 @@ gap: 6px;
 }
 
 .te-ha-badge {
-  font-size: 10px;
-  font-weight: 800;
-  padding: 1px 5px;
-  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
   background: rgba(31, 42, 31, 0.08);
   color: var(--muted);
   letter-spacing: 0.03em;
@@ -6181,6 +6181,7 @@ text-overflow: clip;
   gap: 6px;
   justify-content: space-between;
   height: 100%;
+  min-width: 0;
 }
 
 /* 第一栏：图片 + 特性 + 道具 */
@@ -6280,36 +6281,81 @@ text-overflow: clip;
   justify-content: center;
 }
 
-.cfg-shiny-toggle {
+/* ── 形态切换滑块（toolbar 内联） ── */
+.cfg-form-slider-inline {
   display: inline-flex;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(31, 42, 31, 0.06);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 1px;
+  margin-left: 8px;
+  vertical-align: middle;
 }
 
-.cfg-shiny-toggle button {
-  padding: 4px 12px;
+.cfg-form-slider-item {
+  padding: 3px 10px;
   border: none;
+  border-radius: 4px;
   background: transparent;
   font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
   color: var(--muted);
-  position: relative;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.4;
 }
 
-.cfg-shiny-toggle button.active {
-  background: var(--ink);
-  color: #fff;
-  border-radius: 999px;
-  box-shadow: 0 1px 4px rgba(31, 42, 31, 0.2);
-}
-
-.cfg-shiny-toggle button:not(.active):hover {
-  background: rgba(31, 42, 31, 0.06);
+.cfg-form-slider-item:hover {
   color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.cfg-form-slider-active {
+  background: #fff;
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* ── 闪光标识（图片左上角，圆形容器，与道具风格统一） ── */
+.cfg-shiny-badge {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px solid var(--line);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.2s;
+  user-select: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.cfg-shiny-badge:hover {
+  opacity: 1;
+  transform: scale(1.12);
+  border-color: #f5c842;
+  box-shadow: 0 2px 8px rgba(245, 200, 66, 0.3);
+}
+
+.cfg-shiny-badge-active {
+  opacity: 1;
+  background: linear-gradient(135deg, #fff8e1, #fff3cd);
+  border-color: #f5c842;
+  box-shadow: 0 0 0 2px rgba(245, 200, 66, 0.25), 0 2px 8px rgba(245, 200, 66, 0.4);
+  animation: shiny-pulse 2s ease-in-out infinite;
+}
+
+@keyframes shiny-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(245, 200, 66, 0.25), 0 2px 8px rgba(245, 200, 66, 0.4); }
+  50% { box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.35), 0 2px 12px rgba(245, 200, 66, 0.6); }
 }
 
 .cfg-section-label {
@@ -6901,9 +6947,21 @@ padding-left: 16px;
 .cfg-actions {
   display: flex;
   gap: 8px;
-  margin-top: 16px;
-  padding-top: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--line);
+}
+
+.cfg-actions button {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.cfg-actions button.secondary {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 8px;
 }
 
 /* ══════════════════════════════════════════════════════════════

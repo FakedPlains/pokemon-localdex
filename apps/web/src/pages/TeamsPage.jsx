@@ -20,6 +20,7 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [isShiny, setIsShiny] = useState(config.isShiny || false);
   const [configName, setConfigName] = useState(config.configName || "");
+  const [selectedFormKey, setSelectedFormKey] = useState(config.formKey || null); // 当前选中的形态 key
   const [activePanel, setActivePanel] = useState(null); // "item" | "move-0" | "move-1" | "move-2" | "move-3" | "stats" | null
   const [panelSearch, setPanelSearch] = useState("");
   const [items, setItems] = useState([]);
@@ -113,14 +114,31 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
       if (!cancelled) {
         setPokemonDetail(r.data);
         setDetailLoading(false);
-        // 保存闪光图片 URL 和 baseStats 到 config
-        const imgs = r.data?.forms?.[0]?.images || r.data?.images;
+        // 如果 config 中已有 formKey，使用它；否则默认选中第一个形态
+        const forms = r.data?.forms || [];
+        const initialFormKey = config.formKey || (forms[0]?.formKey ?? "default");
+        setSelectedFormKey(initialFormKey);
+        // 根据选中的形态保存闪光图片 URL 和 baseStats 到 config
+        const selectedForm = forms.find((f) => f.formKey === initialFormKey) || forms[0];
+        const imgs = selectedForm?.images || r.data?.images;
         const shinyObj = imgs?.shiny || imgs?.shinyOfficial || imgs?.shinySprite;
         const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
-        const detailBaseStats = r.data?.forms?.[0]?.baseStats || r.data?.baseStats;
+        const detailBaseStats = selectedForm?.baseStats || r.data?.baseStats;
         const updates = {};
         if (shinyUrl && !config.shinyImageUrl) updates.shinyImageUrl = shinyUrl;
         if (detailBaseStats && !config.baseStats) updates.baseStats = detailBaseStats;
+        // 默认选中第一个特性
+        if (!config.abilityId) {
+          const formAbilities = selectedForm?.abilities || [];
+          const normalAbilities = formAbilities.filter((ab) => !ab.isHidden);
+          const firstAbility = normalAbilities[0] || formAbilities[0];
+          if (firstAbility) {
+            updates.abilityId = firstAbility.nameZh || firstAbility.abilityId || "";
+          } else {
+            const topAbilities = r.data?.abilities || [];
+            if (topAbilities.length > 0) updates.abilityId = topAbilities[0];
+          }
+        }
         if (Object.keys(updates).length > 0) {
           onChange((prev) => ({ ...prev, ...updates }));
         }
@@ -131,11 +149,63 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
     return () => { cancelled = true; };
   }, [pokemonId]);
 
+  /* ── 当前选中的形态 ── */
+  const currentForm = useMemo(() => {
+    if (!pokemonDetail) return null;
+    const forms = pokemonDetail.forms || [];
+    if (forms.length === 0) return null;
+    return forms.find((f) => f.formKey === selectedFormKey) || forms[0];
+  }, [pokemonDetail, selectedFormKey]);
+
+  /* ── 形态列表（用于选择器，过滤掉超极巨化形态） ── */
+  const formOptions = useMemo(() => {
+    if (!pokemonDetail) return [];
+    const forms = pokemonDetail.forms || [];
+    return forms
+      .filter((f) => f.formType !== "gmax" && !/超极巨化/.test(f.nameZh || ""))
+      .map((f) => ({
+        value: f.formKey,
+        label: f.nameZh || f.formKey || "默认形态",
+        formType: f.formType || "default",
+      }));
+  }, [pokemonDetail]);
+
+  /* ── 切换形态时更新 config ── */
+  const handleFormChange = useCallback((formKey) => {
+    setSelectedFormKey(formKey);
+    if (!pokemonDetail) return;
+    const forms = pokemonDetail.forms || [];
+    const form = forms.find((f) => f.formKey === formKey) || forms[0];
+    if (!form) return;
+    // 更新 config 中的形态相关信息
+    const imgs = form.images || pokemonDetail.images;
+    const officialImg = imgs?.official || imgs?.sprite;
+    const shinyObj = imgs?.shiny || imgs?.shinyOfficial || imgs?.shinySprite;
+    const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
+    // 切换形态时默认选中第一个特性
+    const formAbilities = form.abilities || [];
+    const normalAbilities = formAbilities.filter((ab) => !ab.isHidden);
+    const firstAbility = normalAbilities[0] || formAbilities[0];
+    const defaultAbilityId = firstAbility
+      ? (firstAbility.nameZh || firstAbility.abilityId || "")
+      : (pokemonDetail.abilities?.[0] || "");
+    const updates = {
+      formKey,
+      formName: form.nameZh || form.formKey || "",
+      primaryType: form.primaryType || pokemonDetail.primaryType || "",
+      secondaryType: form.secondaryType || pokemonDetail.secondaryType || "",
+      baseStats: form.baseStats || pokemonDetail.baseStats || null,
+      imageUrl: officialImg?.url || "",
+      shinyImageUrl: shinyUrl,
+      abilityId: defaultAbilityId,
+    };
+    onChange((prev) => ({ ...prev, ...updates }));
+  }, [pokemonDetail, onChange]);
+
   /* ── 特性列表（分普通 / 隐藏） ── */
   const abilityGroups = useMemo(() => {
     if (!pokemonDetail) return { normal: [], hidden: [] };
-    const form = pokemonDetail.forms?.[0];
-    const abilities = form?.abilities || [];
+    const abilities = currentForm?.abilities || [];
     if (abilities.length > 0) {
       return {
         normal: abilities.filter((ab) => !ab.isHidden).map((ab) => ab.nameZh || ab.abilityId || ""),
@@ -147,7 +217,7 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
       normal: topAbilities,
       hidden: pokemonDetail.hiddenAbility ? [pokemonDetail.hiddenAbility] : [],
     };
-  }, [pokemonDetail]);
+  }, [pokemonDetail, currentForm]);
 
   const allAbilities = useMemo(() => [...abilityGroups.normal, ...abilityGroups.hidden], [abilityGroups]);
 
@@ -198,34 +268,32 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
   }, [items]);
 
   /* ── 图片（普通 / 闪光） ── */
-  const detailImages = pokemonDetail?.forms?.[0]?.images || pokemonDetail?.images;
+  const detailImages = currentForm?.images || pokemonDetail?.images;
   const previewImage = useMemo(() => {
     if (isShiny) {
       const shiny = detailImages?.shiny || detailImages?.shinyOfficial || detailImages?.shinySprite;
       if (shiny) return shiny;
     }
+    if (currentForm?.images?.official) return currentForm.images.official;
     if (pokemonDetail) return getPokemonPreviewImage(pokemonDetail);
     return null;
-  }, [pokemonDetail, detailImages, isShiny]);
+  }, [pokemonDetail, currentForm, detailImages, isShiny]);
 
   const baseStats = useMemo(() => {
     if (!pokemonDetail) return null;
-    const form = pokemonDetail.forms?.[0];
-    return form?.baseStats || pokemonDetail.baseStats || null;
-  }, [pokemonDetail]);
+    return currentForm?.baseStats || pokemonDetail.baseStats || null;
+  }, [pokemonDetail, currentForm]);
 
   /* ── 属性 ── */
   const types = useMemo(() => {
     if (!pokemonDetail) return [];
-    const form = pokemonDetail.forms?.[0];
-    // API uses primaryType/secondaryType instead of a types array
-    const src = form || pokemonDetail;
+    const src = currentForm || pokemonDetail;
     const arr = [];
     if (src.primaryType) arr.push(src.primaryType);
     if (src.secondaryType) arr.push(src.secondaryType);
     if (arr.length > 0) return arr;
-    return form?.types || pokemonDetail.types || [];
-  }, [pokemonDetail]);
+    return pokemonDetail.types || [];
+  }, [pokemonDetail, currentForm]);
 
   const handleField = (field, value) => {
     const draft = { ...config };
@@ -318,11 +386,36 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
     return STAT_KEYS.reduce((sum, key) => sum + (finalStats[key] || 0), 0);
   }, [finalStats]);
 
+  /* ── 形态滑块 Portal（渲染到 toolbar 中） ── */
+  const [portalTarget, setPortalTarget] = useState(null);
+  useEffect(() => {
+    const el = document.getElementById("cfg-form-slider-portal");
+    setPortalTarget(el);
+  }, [pokemonId]);
+
+  const formSliderPortal = (formOptions.length > 1 && portalTarget)
+    ? createPortal(
+        <span className="cfg-form-slider-inline">
+          {formOptions.map((opt) => (
+            <button
+              key={opt.value}
+              className={`cfg-form-slider-item${selectedFormKey === opt.value ? " cfg-form-slider-active" : ""}`}
+              onClick={() => handleFormChange(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </span>,
+        portalTarget
+      )
+    : null;
+
   return (
     <div className="cfg-editor">
+      {formSliderPortal}
       {/* ══ 上方：三等分配置区 ══ */}
       <div className="cfg-top">
-        {/* 第一栏：图片 + 属性 + 闪光 + 特性 + 道具 */}
+        {/* 第一栏：图片 + 属性 + 特性 + 道具 */}
         <div className="cfg-col cfg-col-first">
           <div className="cfg-first-inner">
             <div className="cfg-first-img">
@@ -333,6 +426,11 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
                 {config.itemImageUrl && (
                   <img className="cfg-item-overlay" src={config.itemImageUrl} alt={config.itemId || ""} referrerPolicy="no-referrer" />
                 )}
+                <span
+                  className={`cfg-shiny-badge${isShiny ? " cfg-shiny-badge-active" : ""}`}
+                  onClick={() => { const next = !isShiny; setIsShiny(next); onChange({ ...config, isShiny: next }); }}
+                  title={isShiny ? "切换为普通" : "切换为闪光"}
+                >✨</span>
               </div>
               <div className="cfg-types">
                 {types.map((t) => (
@@ -341,10 +439,6 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
                     {t}
                   </span>
                 ))}
-              </div>
-              <div className="cfg-shiny-toggle">
-                <button className={!isShiny ? "active" : ""} onClick={() => { setIsShiny(false); onChange({ ...config, isShiny: false }); }}>普通</button>
-                <button className={isShiny ? "active" : ""} onClick={() => { setIsShiny(true); onChange({ ...config, isShiny: true }); }}>闪光</button>
               </div>
             </div>
             <div className="cfg-first-meta">
@@ -964,10 +1058,10 @@ function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
 
   return (
     <div className="box-card">
-      {/* 顶栏：宝可梦名称 + 配置名称 + 三点菜单 */}
+      {/* 顶栏：宝可梦名称 + 形态 + 配置名称 + 三点菜单 */}
       <div className="box-card-header">
         <div className="box-card-name">
-          <strong>{config.nameZh || config.pokemonId || "未命名"}</strong>
+          <strong>{config.formName && config.formName !== config.nameZh ? config.formName : (config.nameZh || config.pokemonId || "未命名")}</strong>
           <span className="box-card-level">Lv.{config.level || 50}</span>
         </div>
         <span className="box-card-title">{config.configName || ""}</span>
@@ -1212,10 +1306,10 @@ function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlin
 
   return (
     <div className="box-card te-member-card">
-      {/* 顶栏：宝可梦名称 + 配置名称 + 移除按钮 */}
+        {/* 顶栏：宝可梦名称 + 配置名称 + 移除按钮 */}
       <div className="box-card-header">
         <div className="box-card-name">
-          <strong>{member.nameZh || member.pokemonId || "未命名"}</strong>
+          <strong>{member.formName && member.formName !== member.nameZh ? member.formName : (member.nameZh || member.pokemonId || "未命名")}</strong>
           <span className="box-card-level">Lv.{member.level || 50}</span>
         </div>
         <span className="box-card-title">{member.configName || ""}</span>
@@ -1485,6 +1579,7 @@ const [isNewConfig, setIsNewConfig] = useState(false);
       if (m.configId) return { slot: i + 1, configId: m.configId };
       return {
         slot: i + 1, pokemonId: m.pokemonId, nameZh: m.nameZh, level: Number(m.level || 50),
+        formKey: m.formKey || "", formName: m.formName || "",
         itemId: m.itemId || "", itemImageUrl: m.itemImageUrl || "",
         abilityId: m.abilityId || "", nature: m.nature || "认真",
         moves: (m.moves || []).filter(Boolean), _movesInfo: m._movesInfo || undefined,
@@ -1624,7 +1719,8 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                     ) : (
                       <div className="cfg-toolbar-pokemon">
                         <span className="cfg-toolbar-pokemon-name">{editingConfig.nameZh || editingConfig.pokemonId}</span>
-                        <button className="cfg-toolbar-pokemon-change" onClick={() => { handleEditingConfigChange({ ...editingConfig, pokemonId: "", nameZh: "" }); setPickerSearch(""); }}>更换</button>
+                        <span id="cfg-form-slider-portal"></span>
+                        <button className="cfg-toolbar-pokemon-change" onClick={() => { handleEditingConfigChange({ ...editingConfig, pokemonId: "", nameZh: "", formKey: "", formName: "" }); setPickerSearch(""); }}>更换</button>
                       </div>
                     )}
                     <input
@@ -1741,7 +1837,8 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                         ) : (
                           <div className="cfg-toolbar-pokemon">
                             <span className="cfg-toolbar-pokemon-name">{inlineEditDraft.nameZh || inlineEditDraft.pokemonId}</span>
-                            <button className="cfg-toolbar-pokemon-change" onClick={() => { handleInlineEditDraftChange({ ...inlineEditDraft, pokemonId: "", nameZh: "" }); setInlinePickerSearch(""); }}>更换</button>
+                            <span id="cfg-form-slider-portal"></span>
+                            <button className="cfg-toolbar-pokemon-change" onClick={() => { handleInlineEditDraftChange({ ...inlineEditDraft, pokemonId: "", nameZh: "", formKey: "", formName: "" }); setInlinePickerSearch(""); }}>更换</button>
                           </div>
                         )}
                         <input
