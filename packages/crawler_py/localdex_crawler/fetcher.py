@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import time
 from typing import Any
+from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 
 import requests
 
@@ -94,8 +95,22 @@ class PageFetcher:
             time.sleep(self.request_interval - elapsed)
         self._last_request_time = time.monotonic()
 
+    @staticmethod
+    def _ensure_zh_hans(url: str) -> str:
+        """为 52pokewiki URL 追加 variant=zh-hans 参数，确保返回简体中文内容。"""
+        parsed = urlparse(url)
+        if "52poke.com" not in parsed.netloc:
+            return url
+        qs = parse_qs(parsed.query)
+        if "variant" in qs:
+            return url
+        qs["variant"] = ["zh-hans"]
+        new_query = urlencode(qs, doseq=True)
+        return urlunparse(parsed._replace(query=new_query))
+
     def _fetch_html(self, url: str) -> str:
         """获取页面 HTML。404 时抛出 PageNotFoundError。"""
+        url = self._ensure_zh_hans(url)
         try:
             response = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=self.timeout)
             if response.status_code == 404:
