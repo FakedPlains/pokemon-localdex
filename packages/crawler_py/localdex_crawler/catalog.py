@@ -11,6 +11,7 @@ from .utils import (
     ABILITY_LIST_URL,
     ITEM_LIST_URL,
     MOVE_LIST_URL,
+    POKEMON_TYPES,
     ImageAsset,
     build_ability_page_url,
     build_item_page_url,
@@ -334,6 +335,64 @@ def _looks_like_chinese_name(value: str) -> bool:
     return bool(value and re.search(r"[\u4e00-\u9fff]", value) and not re.search(r"世代|相關|相关|目录|Deutsch|Español", value))
 
 
+def _extract_move_info_from_html(html: str, name_zh: str) -> dict:
+    """从招式详情页 HTML 中解析基本信息（属性、分类、威力、命中、PP、描述、世代）。
+    用于补全列表页中缺失的招式信息。
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    info: dict = {}
+
+    # 从 wgCategories 中提取属性、分类、世代
+    for script in soup.find_all("script"):
+        if script.string and "wgCategories" in (script.string or ""):
+            cat_match = re.search(r'"wgCategories"\s*:\s*\[([^\]]+)\]', script.string)
+            if cat_match:
+                categories = [c.strip().strip('"') for c in cat_match.group(1).split(",")]
+                for cat in categories:
+                    cat_s = to_simplified(cat) or cat
+                    if cat_s.endswith("属性招式"):
+                        type_name = cat_s.replace("属性招式", "")
+                        if type_name in POKEMON_TYPES:
+                            info.setdefault("type", type_name)
+                    if cat_s.endswith("招式") and not cat_s.endswith("属性招式"):
+                        cat_prefix = cat_s.replace("招式", "")
+                        nc = normalize_category(cat_prefix)
+                        if nc:
+                            info.setdefault("category", nc)
+                    gen_match = re.match(r"第([一二三四五六七八九])世代招式", cat_s)
+                    if gen_match:
+                        gen_map = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+                        info.setdefault("introduced_generation", gen_map.get(gen_match.group(1)))
+            break
+
+    # 从信息框表格中提取威力、命中、PP、描述
+    for table in soup.find_all("table", class_="roundy"):
+        text = table.get_text(" ", strip=True)
+        if "属性" not in text or "威力" not in text:
+            continue
+        # 描述: 中文名 日文名 英文名 描述 对战
+        desc_match = re.search(
+            rf"{re.escape(name_zh)}\s+\S+\s+[A-Za-z0-9\s'\-\.]+\s+(.+?)\s*(?:对战|對戰)",
+            text,
+        )
+        if desc_match:
+            desc = to_simplified(desc_match.group(1).strip())
+            if desc and len(desc) > 2:
+                info.setdefault("description", desc)
+        power_match = re.search(r"威力\s+(\d+|—)", text)
+        if power_match and power_match.group(1) != "—":
+            info.setdefault("power", int(power_match.group(1)))
+        acc_match = re.search(r"命中\s+(\d+|—)", text)
+        if acc_match and acc_match.group(1) != "—":
+            info.setdefault("accuracy", int(acc_match.group(1)))
+        pp_match = re.search(r"[PＰ]{2}\s+(\d+)", text)
+        if pp_match:
+            info.setdefault("pp", int(pp_match.group(1)))
+        break
+
+    return info
+
+
 def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
     text = normalize_text(page.html)
     name_ja, name_en = extract_intro_names(text, seed.name_zh)
@@ -343,8 +402,12 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
         or to_simplified(clean_summary(section_text_by_heading(page.html, "招式附加效果")))
         or None
     )
-    # 列表页 "说明" 字段 = 简短描述
-    description = to_simplified(seed.description) or "暂无说明"
+    # 如果 seed 中缺少基本信息，尝试从详情页 HTML 中提取
+    html_info: dict = {}
+    if not seed.type or not seed.category:
+        html_info = _extract_move_info_from_html(page.html, seed.name_zh)
+    # 列表页 "说明" 字段 = 简短描述；如果没有则用 HTML 中解析的
+    description = to_simplified(seed.description) or html_info.get("description") or "暂无说明"
     # 只收集 "招式变更" 章节的内容（跨世代变更记录）
     # wiki 页面标题可能是简体或繁体
     generations: dict[str, dict] = {}
@@ -372,21 +435,21 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
     )
     # 确保所有中文文本都是简体中文
     name_zh = to_simplified(seed.name_zh) or seed.name_zh
-    type_name = to_simplified(seed.type)
-    category = to_simplified(seed.category)
+    type_name = to_simplified(seed.type) or html_info.get("type")
+    category = to_simplified(seed.category) or html_info.get("category")
     return {
-        "number": seed.number,
+        "number": seed.number or html_info.get("number"),
         "name_zh": name_zh,
         "name_ja": name_ja or seed.name_ja,
         "name_en": name_en or seed.name_en,
         "type": type_name,
         "category": category,
-        "power": seed.power,
-        "accuracy": seed.accuracy,
-        "pp": seed.pp,
+        "power": seed.power or html_info.get("power"),
+        "accuracy": seed.accuracy or html_info.get("accuracy"),
+        "pp": seed.pp or html_info.get("pp"),
         "description": description,
         "effect_detail": effect_detail,
-        "introduced_generation": seed.generation,
+        "introduced_generation": seed.generation or html_info.get("introduced_generation"),
         "image": ImageAsset(normalize_media_url(image_url), f"{name_zh}招式动画", normalize_media_url(image_url)) if image_url else None,
         "generations": sorted(generations.values(), key=lambda item: item["generation"]),
         "source": page,

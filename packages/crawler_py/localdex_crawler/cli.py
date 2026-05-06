@@ -41,7 +41,7 @@ from .sqlite_upsert import (
     upsert_pokemon_detail,
     upsert_pokemon_learnset,
 )
-from .utils import ABILITY_LIST_URL, ITEM_LIST_URL, MOVE_LIST_URL, POKEMON_LIST_URL, slugify
+from .utils import ABILITY_LIST_URL, ITEM_LIST_URL, MOVE_LIST_URL, POKEMON_LIST_URL, build_move_page_url, slugify
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -333,7 +333,43 @@ def crawl_learnsets(conn, fetcher: PageFetcher, args) -> int:
                 forms_info = ", ".join(f"{k}={len(v)}" for k, v in form_learnsets.items())
                 print(f"[{idx}/{total_seeds}] #{seed.dex_number:04d} {seed.name_zh} gen{generation}: {total_moves} moves ({forms_info})")
     print(f"Learnsets finished. updated={updated} entries={entries} skipped={skipped} errors={errors} dryRun={args.dry_run}")
+
+    # 自动补全空壳招式（由 ensure_move 创建但缺少详情的记录）
+    if not args.dry_run:
+        _backfill_incomplete_moves(conn, fetcher)
+
     return 0
+
+
+def _backfill_incomplete_moves(conn, fetcher: PageFetcher) -> None:
+    """补全由 ensure_move 创建的空壳招式记录（缺少 type_name 等详情）。"""
+    rows = conn.execute(
+        "SELECT id, name_zh FROM moves WHERE type_name IS NULL OR type_name = ''"
+    ).fetchall()
+    if not rows:
+        return
+    print(f"\n[backfill] 发现 {len(rows)} 个空壳招式，正在补全详情...")
+    success = 0
+    for row in rows:
+        name_zh = row["name_zh"]
+        detail_url = build_move_page_url(name_zh)
+        try:
+            page = fetcher.load_or_fetch(f"move-{slugify(name_zh)}", detail_url)
+        except (PageNotFoundError, Exception):
+            print(f"  [backfill] SKIP {name_zh}: 无法获取详情页")
+            continue
+        # 从列表页缓存中查找 seed 信息
+        list_page = fetcher.load_or_fetch("move-list", MOVE_LIST_URL)
+        all_seeds = parse_move_list_page(list_page.html)
+        seed = next((s for s in all_seeds if s.name_zh == name_zh), None)
+        if not seed:
+            # 列表页中没有该招式，构建最小 seed
+            from .catalog import MoveSeed
+            seed = MoveSeed(name_zh=name_zh, detail_url=detail_url)
+        payload = normalize_move_detail_page(page, seed)
+        upsert_move_detail(conn, payload)
+        success += 1
+    print(f"  [backfill] 完成，补全了 {success}/{len(rows)} 个招式。")
 
 
 def selected_pokemon_seeds(fetcher: PageFetcher, args) -> list:
