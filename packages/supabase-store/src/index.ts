@@ -38,6 +38,8 @@ export type PokemonFormEntry = {
   abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }>;
   baseStats?: StatBlock;
   images: Record<string, ImageAsset>;
+  /** 该形态必须携带的道具（如 Mega 石、原始宝珠等） */
+  requiredItem?: { id: string; nameZh: string; slug: string; imageUrl?: string };
   statVariants?: FormStatVariant[];
   typeVariants?: FormTypeVariant[];
   abilityVariants?: FormAbilityVariant[];
@@ -295,11 +297,12 @@ export async function getPokemonFromSupabase(idOrSlug: string): Promise<PokemonE
   if (!pokemonRow) return undefined;
   const pokemonId = pokemonRow.id;
 
-  // 获取所有形态及其子数据
+  // 获取所有形态及其子数据（含绑定道具）
   const { data: formRows } = await sb
     .from("pokemon_forms")
     .select([
-      "id, form_key, name_zh, form_type, is_default, sort_order",
+      "id, form_key, name_zh, form_type, is_default, sort_order, required_item_id",
+      "items:required_item_id ( id, name_zh, slug, image_url )",
       "pokemon_form_stats ( generation_start, generation_end, hp, atk, def, spa, spd, spe )",
       "pokemon_form_types ( type_name, slot, generation_start, generation_end )",
       "pokemon_form_abilities ( ability_name_zh, is_hidden, slot, ability_id, generation_start, generation_end )",
@@ -426,6 +429,17 @@ export async function getPokemonFromSupabase(idOrSlug: string): Promise<PokemonE
       } : undefined,
       images,
     };
+
+    // 填充绑定道具信息
+    if (f.items) {
+      const item = f.items as any;
+      entry.requiredItem = {
+        id: String(item.id),
+        nameZh: item.name_zh,
+        slug: item.slug,
+        imageUrl: item.image_url || undefined,
+      };
+    }
 
     if (statEntries.length > 1) {
       entry.statVariants = statEntries.map((s: any) => ({

@@ -54,6 +54,8 @@ export type PokemonFormEntry = {
   abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }>;
   baseStats?: StatBlock;
   images: Record<string, ImageAsset>;
+  /** 该形态必须携带的道具（如 Mega 石、原始宝珠等），为 null/undefined 表示无绑定 */
+  requiredItem?: { id: string; nameZh: string; slug: string; imageUrl?: string };
   /** Generation-specific stat variants (when stats changed across generations) */
   statVariants?: FormStatVariant[];
   /** Generation-specific type variants (when types changed across generations) */
@@ -545,6 +547,13 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
       }
     }
   } catch { /* generations table doesn't exist, no migration needed */ }
+
+  // ── 迁移: pokemon_forms 添加 required_item_id 列（形态绑定道具） ──
+  if (_hasCol("pokemon_forms", "form_key") && !_hasCol("pokemon_forms", "required_item_id")) {
+    try {
+      db.exec(`ALTER TABLE pokemon_forms ADD COLUMN required_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL;`);
+    } catch { /* column may already exist */ }
+  }
 }
 
 /**
@@ -651,6 +660,7 @@ export function ensureSchema() {
       form_type TEXT NOT NULL DEFAULT 'default',
       is_default INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
+      required_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
       UNIQUE (pokemon_id, form_key)
     );
 
@@ -1178,10 +1188,11 @@ export function getPokemonFromSqlite(idOrSlug: string) {
 
   const pokemonId = Number(row.id);
 
-  // 查询 2: 所有形态
+  // 查询 2: 所有形态（LEFT JOIN items 获取绑定道具信息）
   const formRows = db.prepare(`
-    SELECT pf.*
+    SELECT pf.*, i.id AS req_item_id, i.name_zh AS req_item_name_zh, i.slug AS req_item_slug, i.image_url AS req_item_image_url
     FROM pokemon_forms pf
+    LEFT JOIN items i ON i.id = pf.required_item_id
     WHERE pf.pokemon_id = ?
     ORDER BY pf.sort_order ASC
   `).all(pokemonId) as Record<string, unknown>[];
@@ -1302,6 +1313,16 @@ export function getPokemonFromSqlite(idOrSlug: string) {
       baseStats: latestStat?.stats,
       images: fiMap.get(fid) || {},
     };
+
+    // 填充绑定道具信息（从 JOIN 结果中读取）
+    if (f.req_item_id) {
+      entry.requiredItem = {
+        id: String(f.req_item_id),
+        nameZh: String(f.req_item_name_zh),
+        slug: String(f.req_item_slug),
+        imageUrl: f.req_item_image_url ? String(f.req_item_image_url) : undefined,
+      };
+    }
 
     // Attach generation variants if there are multiple entries
     if (statEntries.length > 1) {

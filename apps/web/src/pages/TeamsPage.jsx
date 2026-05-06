@@ -199,8 +199,20 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
       shinyImageUrl: shinyUrl,
       abilityId: defaultAbilityId,
     };
+    // 形态绑定道具：自动设置/清除道具
+    if (form.requiredItem) {
+      updates.itemId = form.requiredItem.slug || form.requiredItem.nameZh;
+      updates.itemImageUrl = form.requiredItem.imageUrl || "";
+    } else {
+      // 切换到无绑定道具的形态时，如果之前的道具是被形态锁定的，则清除
+      const prevForm = forms.find((f) => f.formKey === config.formKey);
+      if (prevForm?.requiredItem) {
+        updates.itemId = "";
+        updates.itemImageUrl = "";
+      }
+    }
     onChange((prev) => ({ ...prev, ...updates }));
-  }, [pokemonDetail, onChange]);
+  }, [pokemonDetail, onChange, config.formKey]);
 
   /* ── 特性列表（分普通 / 隐藏） ── */
   const abilityGroups = useMemo(() => {
@@ -367,7 +379,11 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
     return movesList;
   }, [movesList, moveSearchResults]);
 
+  // 当前形态是否绑定了道具（锁定道具选择）
+  const isItemLocked = Boolean(currentForm?.requiredItem);
+
   const openPanel = (panel) => {
+    if (panel === "item" && isItemLocked) return; // 道具被形态锁定时不允许打开面板
     setActivePanel(panel);
     setPanelSearch("");
   };
@@ -463,8 +479,15 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
                   <span className="muted" style={{ fontSize: 12 }}>{detailLoading ? "加载中…" : "暂无"}</span>
                 )}
               </div>
-              <div className="cfg-section-label">道具</div>
-              {activePanel === "item" ? (
+              <div className="cfg-section-label">道具{isItemLocked && <span className="cfg-section-lock-badge">🔒 形态绑定</span>}</div>
+              {isItemLocked ? (
+                <div className="cfg-slot-btn cfg-slot-locked" title="该形态必须携带此道具">
+                  <span className="cfg-item-selected">
+                    {config.itemImageUrl && <img className="cfg-item-selected-img" src={config.itemImageUrl} alt="" referrerPolicy="no-referrer" />}
+                    <span>{currentForm?.requiredItem?.nameZh || config.itemId}</span>
+                  </span>
+                </div>
+              ) : activePanel === "item" ? (
                 <div className="cfg-item-search-wrap">
                   <input
                     className="cfg-item-search-input"
