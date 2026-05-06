@@ -506,15 +506,25 @@ def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
     )
     # 效果详情：
     # - 树果类道具：只提取 h2「效果」→ h3「携带」子章节（携带效果）
-    # - 其他道具：提取整个 h2「效果」章节
+    # - 其他道具：优先提取 h3「效果」（超级石等道具的效果在 h3 级别），
+    #   找不到时再尝试 h2「效果」（精确匹配，避免误匹配到「效果变更」）
     if seed.category == "树果":
         carry_text = section_text_by_heading(page.html, "携带", level=3)
         effect_detail = to_simplified(clean_summary(carry_text, max_length=2000)) or None
     else:
-        effect_detail = (
-            to_simplified(clean_summary(section_text_by_heading(page.html, "效果"), max_length=2000))
-            or None
-        )
+        # 先尝试 h3「效果」（超级石、Z纯晶等道具的效果描述在此级别）
+        h3_effect = section_text_by_heading(page.html, "效果", level=3)
+        if h3_effect:
+            effect_detail = to_simplified(clean_summary(h3_effect, max_length=2000)) or None
+        else:
+            # 再尝试 h2「效果」，使用精确匹配避免匹配到「效果变更」
+            h2_effect = _section_text_by_exact_heading(page.html, "效果", level=2)
+            if h2_effect:
+                effect_detail = to_simplified(clean_summary(h2_effect, max_length=2000)) or None
+            else:
+                # 最后尝试 h2「游戏中」（部分超级石的效果直接放在此章节下）
+                game_text = _section_text_by_exact_heading(page.html, "游戏中", level=2)
+                effect_detail = to_simplified(clean_summary(game_text, max_length=2000)) or None if game_text else None
     bag_info = section_text_by_heading(page.html, "包包信息")
     category = seed.category
     category_match = re.search(r"口袋\s+([^\n ]+)", bag_info or text)
@@ -554,6 +564,32 @@ def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
         "image": ImageAsset(image_url, f"{seed.name_zh}图片", image_url) if image_url else None,
         "source": page,
     }
+
+
+def _section_text_by_exact_heading(html: str, heading: str, level: int = 2) -> str:
+    """与 section_text_by_heading 类似，但使用精确匹配标题文本。
+    避免「效果」匹配到「效果变更」等包含该子串的标题。
+    """
+    soup = BeautifulSoup(html or "", "html.parser")
+    heading_tag = None
+    for tag in soup.find_all(f"h{level}"):
+        tag_text = clean_inline_text(tag.get_text(" ", strip=True))
+        # 去掉 [编辑] 等后缀后精确匹配
+        tag_text = re.sub(r"\[.*?\]", "", tag_text).strip()
+        if tag_text == heading:
+            heading_tag = tag
+            break
+    if not heading_tag:
+        return ""
+    chunks: list[str] = []
+    for sibling in heading_tag.next_siblings:
+        if isinstance(sibling, Tag) and sibling.name == f"h{level}":
+            break
+        if isinstance(sibling, Tag):
+            chunks.append(sibling.get_text("\n", strip=True))
+        elif str(sibling).strip():
+            chunks.append(str(sibling).strip())
+    return "\n".join(item for item in chunks if item).strip()
 
 
 def _parse_item_seeds_from_links(html: str) -> dict[str, ItemSeed]:
