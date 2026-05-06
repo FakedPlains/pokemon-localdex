@@ -162,10 +162,12 @@ def crawl_catalog(conn, fetcher: PageFetcher, args) -> int:
             detail = fetcher.load_or_fetch(f"move-{slugify(seed.name_zh)}", seed.detail_url)
             payload = normalize_move_detail_page(detail, seed)
             if args.dry_run:
-                print(f"[dry-run] move #{payload['number']:03d} {seed.name_zh}: gen={payload['introduced_generation']} changes={len(payload['generations'])}")
+                num_str = f"#{payload['number']:03d}" if payload.get('number') is not None else "#---"
+                print(f"[dry-run] move {num_str} {seed.name_zh}: gen={payload['introduced_generation']} changes={len(payload['generations'])}")
             else:
                 upsert_move_detail(conn, payload)
-                print(f"[updated] move #{payload['number']:03d} {seed.name_zh}: gen={payload['introduced_generation']} changes={len(payload['generations'])}")
+                num_str = f"#{payload['number']:03d}" if payload.get('number') is not None else "#---"
+                print(f"[updated] move {num_str} {seed.name_zh}: gen={payload['introduced_generation']} changes={len(payload['generations'])}")
             totals["moves"] += 1
 
     if getattr(args, "abilities", True):

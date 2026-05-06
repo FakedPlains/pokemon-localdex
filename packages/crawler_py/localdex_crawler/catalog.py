@@ -443,7 +443,7 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
     type_name = to_simplified(seed.type) or html_info.get("type")
     category = to_simplified(seed.category) or html_info.get("category")
     return {
-        "number": seed.number or html_info.get("number"),
+        "number": seed.number or html_info.get("number") or None,
         "name_zh": name_zh,
         "name_ja": name_ja or seed.name_ja,
         "name_en": name_en or seed.name_en,
