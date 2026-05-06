@@ -99,11 +99,11 @@ function totalSp(sps) {
 /**
  * @param {Object} props
  * @param {Object} props.baseStats - 种族值
- * @param {Object} [props.initialValues] - 可选初始值 { level, nature, ivs, evs }
- * @param {Function} [props.onChange] - 可选回调 ({ level, nature, ivs, evs }) => void
+ * @param {Object} [props.initialValues] - 可选初始值 { level, nature, ivs, evs, statMode, sps }
+ * @param {Function} [props.onChange] - 可选回调 ({ level, nature, ivs, evs, statMode, sps }) => void
  */
 export default function StatCalculator({ baseStats, initialValues, onChange }) {
-  const [mode, setMode] = useState("classic"); // "classic" | "champions"
+  const [mode, setMode] = useState(initialValues?.statMode || "classic"); // "classic" | "champions"
 
   /* ── Classic state ── */
   const [level, setLevelRaw] = useState(initialValues?.level || 50);
@@ -118,8 +118,11 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
   }));
 
   /* ── Champions state ── */
-  const [champNature, setChampNature] = useState(initialValues?.nature || "认真");
-  const [sps, setSps] = useState(() => Object.fromEntries(STAT_KEYS.map((k) => [k, 0])));
+  const [champNature, setChampNature] = useState(initialValues?.champNature || initialValues?.nature || "认真");
+  const [sps, setSps] = useState(() => ({
+    ...Object.fromEntries(STAT_KEYS.map((k) => [k, 0])),
+    ...(initialValues?.sps || {})
+  }));
 
   /* ── Alias raw setters so the rest of the component code stays unchanged ── */
   const setLevel = setLevelRaw;
@@ -128,14 +131,18 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
   const setEvs = setEvsRaw;
 
 
-  // Fire onChange whenever classic state changes
+  // Fire onChange whenever state changes (both modes)
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   useEffect(() => {
-    if (onChangeRef.current && mode === "classic") {
-      onChangeRef.current({ level, nature, ivs, evs });
+    if (onChangeRef.current) {
+      if (mode === "classic") {
+        onChangeRef.current({ level, nature, ivs, evs, statMode: "classic", sps });
+      } else {
+        onChangeRef.current({ level, nature: champNature, ivs, evs, statMode: "champions", sps, champNature });
+      }
     }
-  }, [level, nature, ivs, evs, mode]);
+  }, [level, nature, ivs, evs, mode, sps, champNature]);
 
   /* ── Classic helpers ── */
   const evTotal = useMemo(() => totalEv(evs), [evs]);

@@ -44,6 +44,17 @@ export function calculateFinalStat(member, detail, statKey) {
   const base = detail?.baseStats?.[statKey];
   if (base === undefined) return undefined;
 
+  // Champions 模式：SP 直接加算公式
+  if (member.statMode === "champions") {
+    const sp = Number(member.sps?.[statKey] ?? 0);
+    const nature = member.champNature || member.nature || "认真";
+    if (statKey === "hp") {
+      return base + sp + 75;
+    }
+    return Math.floor((base + sp + 20) * getNatureMultiplier(nature, statKey));
+  }
+
+  // 经典模式：IV + EV 公式
   const level = Number(member.level || 50);
   const iv = Number(member.ivs?.[statKey] ?? 31);
   const ev = Number(member.evs?.[statKey] ?? 0);

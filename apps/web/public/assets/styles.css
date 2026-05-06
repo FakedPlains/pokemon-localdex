@@ -4251,6 +4251,10 @@ gap: 6px;
   margin-top: 14px;
 }
 
+.te-team-grid {
+  grid-template-columns: repeat(auto-fill, minmax(420px, 560px));
+}
+
 /* 队伍槽位 */
 .te-slot {
   border-radius: 14px;
@@ -4515,16 +4519,19 @@ gap: 6px;
 
 /* 队伍卡片 */
 .team-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(31, 42, 31, 0.08);
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(64, 50, 28, 0.06);
-  transition: transform 180ms ease, box-shadow 180ms ease;
+position: relative;
+display: flex;
+flex-direction: column;
+gap: 12px;
+padding: 16px;
+width: 100%;
+min-width: 0;
+overflow: hidden;
+background: rgba(255, 255, 255, 0.88);
+border: 1px solid rgba(31, 42, 31, 0.08);
+border-radius: 16px;
+box-shadow: 0 4px 12px rgba(64, 50, 28, 0.06);
+transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
 .team-card:hover {
@@ -4565,47 +4572,63 @@ gap: 6px;
 }
 
 .team-card-members {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+display: grid;
+grid-template-columns: repeat(6, 1fr);
+gap: 4px;
+min-width: 0;
 }
 
 .team-card-member {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 4px;
+min-width: 0;
 }
 
 .team-card-member-img {
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(31, 42, 31, 0.04);
-  border-radius: 12px;
+position: relative;
+width: 100%;
+aspect-ratio: 1;
+display: flex;
+align-items: center;
+justify-content: center;
+background: rgba(31, 42, 31, 0.04);
+border-radius: 10px;
 }
 
-.team-card-member-img img {
-  width: 44px;
-  height: 44px;
-  object-fit: contain;
+.team-card-member-img > img:first-child {
+width: 80%;
+height: 80%;
+object-fit: contain;
 }
 
 .team-card-member-img span {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--muted);
-  opacity: 0.4;
+font-size: 18px;
+font-weight: 700;
+color: var(--muted);
+opacity: 0.4;
+}
+
+.team-card-member-img .team-card-item-overlay {
+position: absolute;
+bottom: -4%;
+right: -4%;
+width: 38%;
+height: 38%;
+object-fit: contain;
+border-radius: 6px;
+background: transparent;
+border: none;
+padding: 0;
 }
 
 .team-card-member-name {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--ink);
-  max-width: 56px;
-  white-space: nowrap;
+font-size: 10px;
+font-weight: 600;
+color: var(--ink);
+max-width: 100%;
+white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
@@ -4645,25 +4668,6 @@ gap: 6px;
   margin-top: 14px;
 }
 
-/* 队伍成员卡片中的移除按钮 */
-.te-member-card .te-slot-remove {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 50%;
-  background: rgba(217, 79, 61, 0.08);
-  color: var(--accent);
-  cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
-}
-.te-member-card .te-slot-remove:hover {
-  background: rgba(217, 79, 61, 0.18);
-  transform: scale(1.1);
-}
 
 /* ── SearchSelect 模糊搜索下拉 ── */
 .ss-wrap {
@@ -4820,21 +4824,30 @@ gap: 6px;
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
-/* 顶栏：配置名称 + 菜单 */
+/* 顶栏：名称 + 菜单 */
 .box-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 28px;
+display: flex;
+align-items: center;
+gap: 8px;
+min-height: 28px;
+}
+
+.box-card-header .box-card-name {
+display: flex;
+align-items: baseline;
+gap: 4px;
+flex-shrink: 0;
 }
 
 .box-card-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+font-size: 12px;
+font-weight: 500;
+color: var(--muted);
+flex: 1;
+min-width: 0;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
 }
 
 .box-card:hover {
@@ -4850,27 +4863,30 @@ gap: 6px;
 }
 
 .box-card-left {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  width: 110px;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+gap: 10px;
+flex-shrink: 0;
+width: 110px;
 }
 
 .box-card-right {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
+display: flex;
+flex-direction: column;
+justify-content: center;
+gap: 10px;
+flex: 1;
+min-width: 0;
 }
 
 /* 三点菜单 */
 .box-card-menu {
-  position: relative;
-  flex-shrink: 0;
-  z-index: 10;
+position: relative;
+flex-shrink: 0;
+margin-left: auto;
+z-index: 10;
 }
 
 .box-card-menu-btn {
@@ -4934,22 +4950,22 @@ gap: 6px;
 
 /* 图片区域 */
 .box-card-thumb {
-  position: relative;
-  width: 96px;
-  height: 96px;
-  display: grid;
-  place-items: center;
-  border-radius: 16px;
-  background:
-    radial-gradient(circle, rgba(255, 213, 107, 0.2) 0%, transparent 70%),
-    rgba(255, 255, 255, 0.5);
-  flex-shrink: 0;
+position: relative;
+width: 92px;
+height: 92px;
+display: grid;
+place-items: center;
+border-radius: 16px;
+background:
+radial-gradient(circle, rgba(255, 213, 107, 0.2) 0%, transparent 70%),
+rgba(255, 255, 255, 0.5);
+flex-shrink: 0;
 }
 
 .box-card-thumb > img:first-child {
-  width: 80px;
-  height: 80px;
-  object-fit: contain;
+width: 76px;
+height: 76px;
+object-fit: contain;
 }
 
 .box-card-thumb-empty {
@@ -5017,32 +5033,25 @@ gap: 6px;
 .box-card-type-icon.type-钢 { background: #AAAABB; }
 .box-card-type-icon.type-妖精 { background: #FFAAFF; }
 
-/* 名字 + 等级 */
-.box-card-name {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  justify-content: center;
-}
-
+/* 名字 + 等级（已移至 header） */
 .box-card-name strong {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--ink);
+font-size: 14px;
+font-weight: 700;
+color: var(--ink);
 }
 
 .box-card-level {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
+font-size: 11px;
+font-weight: 600;
+color: var(--muted);
 }
 
 /* 特性 + 性格 */
 .box-card-meta {
-  display: flex;
-  gap: 4px;
-  justify-content: center;
-  flex-wrap: wrap;
+display: flex;
+gap: 4px;
+justify-content: center;
+flex-wrap: wrap;
 }
 
 .box-card-tag {
@@ -5188,6 +5197,28 @@ font-size: 10px;
 color: var(--muted);
 text-align: right;
 font-weight: 600;
+}
+
+.box-card-stats-tag-iv {
+  color: #59c3d0;
+}
+
+.box-card-stats-tag-ev {
+  color: #d98837;
+}
+
+.box-card-stats-tag-sp {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.box-card-tag-mode {
+  font-size: 9px;
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-weight: 600;
 }
 
 /* ══════════════════════════════════════════════
@@ -6023,6 +6054,18 @@ text-overflow: clip;
   letter-spacing: 0.5px;
   margin-top: 0;
   margin-bottom: 2px;
+}
+
+.cfg-section-mode-badge {
+  font-size: 9px;
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-left: 4px;
+  text-transform: none;
+  letter-spacing: 0;
+  vertical-align: middle;
 }
 
 .cfg-ability-tabs {

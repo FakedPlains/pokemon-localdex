@@ -244,14 +244,16 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
     onChange(draft);
   };
 
-  const handleStatChange = useCallback(({ level, nature, ivs, evs }) => {
+  const handleStatChange = useCallback(({ level, nature, ivs, evs, statMode, sps, champNature }) => {
     onChange((prev) => {
       if (prev.level === level && prev.nature === nature &&
+          prev.statMode === statMode &&
           JSON.stringify(prev.ivs) === JSON.stringify(ivs) &&
-          JSON.stringify(prev.evs) === JSON.stringify(evs)) {
+          JSON.stringify(prev.evs) === JSON.stringify(evs) &&
+          JSON.stringify(prev.sps) === JSON.stringify(sps)) {
         return prev;
       }
-      return { ...prev, level, nature, ivs, evs };
+      return { ...prev, level, nature, ivs, evs, statMode: statMode || "classic", sps: sps || {}, champNature: champNature || nature };
     });
   }, [onChange]);
 
@@ -260,6 +262,9 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
     nature: config.nature || "认真",
     ivs: config.ivs || createDefaultStats("iv"),
     evs: config.evs || createDefaultStats("ev"),
+    statMode: config.statMode || "classic",
+    sps: config.sps || {},
+    champNature: config.champNature || config.nature || "认真",
   };
 
   /* ── 下方面板：搜索过滤 ── */
@@ -451,7 +456,10 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
 
         {/* 第三栏：能力值概览 */}
         <div className="cfg-col cfg-col-stats" onClick={() => openPanel(activePanel === "stats" ? null : "stats")}>
-          <div className="cfg-section-label">能力值</div>
+          <div className="cfg-section-label">
+            能力值
+            {config.statMode === "champions" && <span className="cfg-section-mode-badge">🏆SP</span>}
+          </div>
           {finalStats ? (
             <div className="cfg-stats-mini">
               {STAT_KEYS.map((key) => (
@@ -943,8 +951,8 @@ function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
     // 优先从 config._movesInfo 获取，否则从 fetchedMoves 获取
     const moveInfo = config._movesInfo?.[moveName];
     if (moveInfo) {
-      const parts = moveInfo.sublabel?.split(" · ") || [];
-      return { name: moveName, type: parts[0] || "", power: (parts[2] || "").replace("威力", "") || "" };
+      // _movesInfo 格式: { type: "火", power: 90, category: "特殊" }
+      return { name: moveName, type: moveInfo.type || "", power: moveInfo.power ? String(moveInfo.power) : "" };
     }
     const fetched = fetchedMoves[moveName];
     if (fetched) {
@@ -955,9 +963,13 @@ function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
 
   return (
     <div className="box-card">
-      {/* 顶栏：配置名称 + 三点菜单 */}
+      {/* 顶栏：宝可梦名称 + 配置名称 + 三点菜单 */}
       <div className="box-card-header">
-        <span className="box-card-title">{config.configName || config.nameZh || config.pokemonId || "未命名"}</span>
+        <div className="box-card-name">
+          <strong>{config.nameZh || config.pokemonId || "未命名"}</strong>
+          <span className="box-card-level">Lv.{config.level || 50}</span>
+        </div>
+        <span className="box-card-title">{config.configName || ""}</span>
         <div className="box-card-menu" ref={menuRef}>
           <button className="box-card-menu-btn" onClick={() => setMenuOpen(!menuOpen)} title="操作">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="2" r="1.4"/><circle cx="7" cy="7" r="1.4"/><circle cx="7" cy="12" r="1.4"/></svg>
@@ -995,12 +1007,6 @@ function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
             </div>
           )}
 
-          {/* 名字 + 等级 */}
-          <div className="box-card-name">
-            <strong>{config.nameZh || config.pokemonId || "未命名"}</strong>
-            <span className="box-card-level">Lv.{config.level || 50}</span>
-          </div>
-
           {/* 特性 + 性格 */}
           <div className="box-card-meta">
             {config.abilityId && <span className="box-card-tag">{config.abilityId}</span>}
@@ -1008,7 +1014,7 @@ function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
           </div>
         </div>
 
-        {/* 右侧：招式 + 努力值 */}
+        {/* 右侧：招式 */}
         <div className="box-card-right">
           {/* 招式列表 */}
           {movesWithType.length > 0 && (
@@ -1024,32 +1030,56 @@ function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
               ))}
             </div>
           )}
-
-          {/* 能力值 */}
-          {(() => {
-            const bs = config.baseStats || fetchedInfo?.baseStats;
-            if (!bs) return null;
-            const detail = { baseStats: bs };
-            const stats = Object.fromEntries(
-              STAT_KEYS.map((key) => [key, calculateFinalStat(config, detail, key)])
-            );
-            return (
-              <div className="box-card-stats">
-                <div className="box-card-stats-header">
-                  <span></span>
-                  <span>HP</span><span>攻击</span><span>防御</span><span>特攻</span><span>特防</span><span>速度</span>
-                </div>
-                <div className="box-card-stats-row">
-                  <span className="box-card-stats-tag">能力</span>
-                  {STAT_KEYS.map((k) => (
-                    <span key={k} className="box-card-stats-num has-val">{stats[k]}</span>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
         </div>
       </div>
+
+      {/* 能力值 — 横跨底部 */}
+      {(() => {
+        const bs = config.baseStats || fetchedInfo?.baseStats;
+        if (!bs) return null;
+        const detail = { baseStats: bs };
+        const stats = Object.fromEntries(
+          STAT_KEYS.map((key) => [key, calculateFinalStat(config, detail, key)])
+        );
+        const isChampions = config.statMode === "champions";
+        return (
+          <div className="box-card-stats">
+            <div className="box-card-stats-header">
+              <span></span>
+              <span>HP</span><span>攻击</span><span>防御</span><span>特攻</span><span>特防</span><span>速度</span>
+            </div>
+            {isChampions ? (
+              <div className="box-card-stats-row">
+                <span className="box-card-stats-tag box-card-stats-tag-sp">SP</span>
+                {STAT_KEYS.map((k) => (
+                  <span key={k} className="box-card-stats-num">{config.sps?.[k] || 0}</span>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="box-card-stats-row">
+                  <span className="box-card-stats-tag box-card-stats-tag-iv">个体</span>
+                  {STAT_KEYS.map((k) => (
+                    <span key={k} className="box-card-stats-num">{config.ivs?.[k] ?? 31}</span>
+                  ))}
+                </div>
+                <div className="box-card-stats-row">
+                  <span className="box-card-stats-tag box-card-stats-tag-ev">努力</span>
+                  {STAT_KEYS.map((k) => (
+                    <span key={k} className="box-card-stats-num">{config.evs?.[k] || 0}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="box-card-stats-row">
+              <span className="box-card-stats-tag">能力</span>
+              {STAT_KEYS.map((k) => (
+                <span key={k} className="box-card-stats-num has-val">{stats[k]}</span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1058,7 +1088,7 @@ function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
 //  队伍成员槽位
 // ══════════════════════════════════════════════
 
-function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlineEdit }) {
+function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlineEdit, onEditMember }) {
   const hasMember = member && member.pokemonId;
 
   const boxOptions = useMemo(() => boxConfigs.map((c) => ({ value: c.configId, label: c.configName || c.nameZh || c.pokemonId || "未命名" })), [boxConfigs]);
@@ -1066,6 +1096,15 @@ function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlin
   // hooks 必须在条件分支之前调用（React hooks 规则）
   const [fetchedInfo, setFetchedInfo] = useState(null);
   const [fetchedMoves, setFetchedMoves] = useState({});
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [menuOpen]);
 
   // 按需获取宝可梦图片和类型信息
   useEffect(() => {
@@ -1160,8 +1199,8 @@ function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlin
   const movesWithType = (member.moves || []).filter(Boolean).map((moveName) => {
     const moveInfo = member._movesInfo?.[moveName];
     if (moveInfo) {
-      const parts = moveInfo.sublabel?.split(" · ") || [];
-      return { name: moveName, type: parts[0] || "", power: (parts[2] || "").replace("威力", "") || "" };
+      // _movesInfo 格式: { type: "火", power: 90, category: "特殊" }
+      return { name: moveName, type: moveInfo.type || "", power: moveInfo.power ? String(moveInfo.power) : "" };
     }
     const fetched = fetchedMoves[moveName];
     if (fetched) {
@@ -1172,12 +1211,24 @@ function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlin
 
   return (
     <div className="box-card te-member-card">
-      {/* 顶栏：名称 + 移除按钮 */}
+      {/* 顶栏：宝可梦名称 + 配置名称 + 移除按钮 */}
       <div className="box-card-header">
-        <span className="box-card-title">{member.configName || member.nameZh || member.pokemonId || "未命名"}</span>
-        <button className="te-slot-remove" onClick={() => onRemove(slot)} title="移除">
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4.11 3.05a.75.75 0 0 0-1.06 1.06L6.94 8l-3.89 3.89a.75.75 0 1 0 1.06 1.06L8 9.06l3.89 3.89a.75.75 0 1 0 1.06-1.06L9.06 8l3.89-3.89a.75.75 0 0 0-1.06-1.06L8 6.94 4.11 3.05z"/></svg>
-        </button>
+        <div className="box-card-name">
+          <strong>{member.nameZh || member.pokemonId || "未命名"}</strong>
+          <span className="box-card-level">Lv.{member.level || 50}</span>
+        </div>
+        <span className="box-card-title">{member.configName || ""}</span>
+        <div className="box-card-menu" ref={menuRef}>
+          <button className="box-card-menu-btn" onClick={() => setMenuOpen(!menuOpen)} title="操作">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="2" r="1.4"/><circle cx="7" cy="7" r="1.4"/><circle cx="7" cy="12" r="1.4"/></svg>
+          </button>
+          {menuOpen && (
+            <div className="box-card-dropdown">
+              <button onClick={() => { onEditMember(slot, member); setMenuOpen(false); }}>编辑</button>
+              <button className="danger-text" onClick={() => { onRemove(slot); setMenuOpen(false); }}>移除</button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 左右布局 — 和 BoxCard 一致 */}
@@ -1198,10 +1249,7 @@ function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlin
               ))}
             </div>
           )}
-          <div className="box-card-name">
-            <strong>{member.nameZh || member.pokemonId || "未命名"}</strong>
-            <span className="box-card-level">Lv.{member.level || 50}</span>
-          </div>
+          {/* 特性 + 性格 */}
           <div className="box-card-meta">
             {member.abilityId && <span className="box-card-tag">{member.abilityId}</span>}
             <span className="box-card-tag">{member.nature || "认真"}</span>
@@ -1222,30 +1270,54 @@ function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlin
               ))}
             </div>
           )}
-
-          {/* 能力值 */}
-          {(member.baseStats || fetchedInfo?.baseStats) && (() => {
-            const detail = { baseStats: member.baseStats || fetchedInfo?.baseStats };
-            const stats = Object.fromEntries(
-              STAT_KEYS.map((key) => [key, calculateFinalStat(member, detail, key)])
-            );
-            return (
-              <div className="box-card-stats">
-                <div className="box-card-stats-header">
-                  <span></span>
-                  <span>HP</span><span>攻击</span><span>防御</span><span>特攻</span><span>特防</span><span>速度</span>
-                </div>
-                <div className="box-card-stats-row">
-                  <span className="box-card-stats-tag">能力</span>
-                  {STAT_KEYS.map((k) => (
-                    <span key={k} className="box-card-stats-num has-val">{stats[k]}</span>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
         </div>
       </div>
+
+      {/* 能力值 — 横跨底部 */}
+      {(member.baseStats || fetchedInfo?.baseStats) && (() => {
+        const detail = { baseStats: member.baseStats || fetchedInfo?.baseStats };
+        const stats = Object.fromEntries(
+          STAT_KEYS.map((key) => [key, calculateFinalStat(member, detail, key)])
+        );
+        const isChampions = member.statMode === "champions";
+        return (
+          <div className="box-card-stats">
+            <div className="box-card-stats-header">
+              <span></span>
+              <span>HP</span><span>攻击</span><span>防御</span><span>特攻</span><span>特防</span><span>速度</span>
+            </div>
+            {isChampions ? (
+              <div className="box-card-stats-row">
+                <span className="box-card-stats-tag box-card-stats-tag-sp">SP</span>
+                {STAT_KEYS.map((k) => (
+                  <span key={k} className="box-card-stats-num">{member.sps?.[k] || 0}</span>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="box-card-stats-row">
+                  <span className="box-card-stats-tag box-card-stats-tag-iv">个体</span>
+                  {STAT_KEYS.map((k) => (
+                    <span key={k} className="box-card-stats-num">{member.ivs?.[k] ?? 31}</span>
+                  ))}
+                </div>
+                <div className="box-card-stats-row">
+                  <span className="box-card-stats-tag box-card-stats-tag-ev">努力</span>
+                  {STAT_KEYS.map((k) => (
+                    <span key={k} className="box-card-stats-num">{member.evs?.[k] || 0}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="box-card-stats-row">
+              <span className="box-card-stats-tag">能力</span>
+              {STAT_KEYS.map((k) => (
+                <span key={k} className="box-card-stats-num has-val">{stats[k]}</span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1258,6 +1330,24 @@ function TeamCard({ team, onEdit, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const resolved = resolveTeamMembers(team);
+  const [fetchedImages, setFetchedImages] = useState({});
+
+  // 对于缺少 imageUrl 的成员，按需获取图片
+  useEffect(() => {
+    const missing = resolved.filter((m) => m.pokemonId && !m.imageUrl && !fetchedImages[m.pokemonId]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    missing.forEach((m) => {
+      unifiedApi(`/pokemon/${encodeURIComponent(m.pokemonId)}`).then((r) => {
+        if (cancelled) return;
+        const img = getPokemonPreviewImage(r.data);
+        if (img?.url) {
+          setFetchedImages((prev) => ({ ...prev, [m.pokemonId]: img.url }));
+        }
+      }).catch(() => {});
+    });
+    return () => { cancelled = true; };
+  }, [resolved]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -1290,11 +1380,12 @@ function TeamCard({ team, onEdit, onDelete }) {
           resolved.map((m, i) => {
             const imgUrl = m.isShiny && m.shinyImageUrl
               ? (typeof m.shinyImageUrl === "string" ? m.shinyImageUrl : m.shinyImageUrl?.url || "")
-              : (m.imageUrl || "");
+              : (m.imageUrl || fetchedImages[m.pokemonId] || "");
             return (
               <div key={i} className="team-card-member">
                 <div className="team-card-member-img">
                   {imgUrl ? <img src={imgUrl} alt={m.nameZh || ""} referrerPolicy="no-referrer" /> : <span>?</span>}
+                  {m.itemImageUrl && <img className="team-card-item-overlay" src={m.itemImageUrl} alt={m.itemId || ""} title={m.itemId || ""} referrerPolicy="no-referrer" />}
                 </div>
                 <span className="team-card-member-name">{m.nameZh || m.pokemonId || "?"}</span>
               </div>
@@ -1322,7 +1413,9 @@ export default function TeamsPage() {
   const [isNewTeam, setIsNewTeam] = useState(false);
   const [inlineEditSlot, setInlineEditSlot] = useState(null);
   const [inlineEditDraft, setInlineEditDraft] = useState(null);
+  const [inlineEditIsNew, setInlineEditIsNew] = useState(false); // true=新建空槽位, false=编辑已有成员
   const [inlinePickerSearch, setInlinePickerSearch] = useState("");
+  const inlineEditorRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState("box");
   const [pickerSearch, setPickerSearch] = useState("");
@@ -1388,7 +1481,18 @@ export default function TeamsPage() {
     if (validMembers.length === 0) { window.alert("请至少添加一只宝可梦。"); return; }
     const membersToSave = validMembers.map((m, i) => {
       if (m.configId) return { slot: i + 1, configId: m.configId };
-      return { slot: i + 1, pokemonId: m.pokemonId, nameZh: m.nameZh, level: Number(m.level || 50), itemId: m.itemId || "", abilityId: m.abilityId || "", nature: m.nature || "认真", moves: (m.moves || []).filter(Boolean), ivs: { ...createDefaultStats("iv"), ...(m.ivs || {}) }, evs: { ...createDefaultStats("ev"), ...(m.evs || {}) } };
+      return {
+        slot: i + 1, pokemonId: m.pokemonId, nameZh: m.nameZh, level: Number(m.level || 50),
+        itemId: m.itemId || "", itemImageUrl: m.itemImageUrl || "",
+        abilityId: m.abilityId || "", nature: m.nature || "认真",
+        moves: (m.moves || []).filter(Boolean), _movesInfo: m._movesInfo || undefined,
+        ivs: { ...createDefaultStats("iv"), ...(m.ivs || {}) },
+        evs: { ...createDefaultStats("ev"), ...(m.evs || {}) },
+        statMode: m.statMode || "classic", sps: m.sps || {}, champNature: m.champNature || m.nature || "认真",
+        imageUrl: m.imageUrl || "", shinyImageUrl: m.shinyImageUrl || "", isShiny: m.isShiny || false,
+        primaryType: m.primaryType || "", secondaryType: m.secondaryType || "",
+        baseStats: m.baseStats || null,
+      };
     });
     saveTeam({ ...editingTeam, members: membersToSave }); refreshTeams(); setEditingTeam(null); setIsNewTeam(false); setInlineEditSlot(null); setInlineEditDraft(null);
   }, [editingTeam, refreshTeams]);
@@ -1411,7 +1515,8 @@ export default function TeamsPage() {
     const reindexed = remaining.sort((a, b) => (a.slot || 0) - (b.slot || 0)).map((m, i) => ({ ...m, slot: i + 1 }));
     setEditingTeam({ ...editingTeam, members: reindexed });
   }, [editingTeam]);
-  const handleStartInlineEdit = useCallback((slot) => { setInlineEditSlot(slot); setInlineEditDraft(createDraftMember()); setInlinePickerSearch(""); }, []);
+  const handleStartInlineEdit = useCallback((slot) => { setInlineEditSlot(slot); setInlineEditDraft(createDraftMember()); setInlineEditIsNew(true); setInlinePickerSearch(""); }, []);
+  const handleEditMember = useCallback((slot, member) => { setInlineEditSlot(slot); setInlineEditDraft({ ...member }); setInlineEditIsNew(false); setInlinePickerSearch(""); }, []);
   const handleInlineEditDraftChange = useCallback((updater) => { setInlineEditDraft((prev) => (typeof updater === "function" ? updater(prev) : updater)); }, []);
   const handleConfirmInlineEdit = useCallback(() => {
     if (!editingTeam || !inlineEditDraft?.pokemonId) { window.alert("请先选择一只宝可梦。"); return; }
@@ -1419,9 +1524,18 @@ export default function TeamsPage() {
     const newMember = { ...inlineEditDraft, slot: inlineEditSlot };
     const idx = members.findIndex((m) => m.slot === inlineEditSlot);
     if (idx >= 0) members[idx] = newMember; else members.push(newMember);
-    setEditingTeam({ ...editingTeam, members }); setInlineEditSlot(null); setInlineEditDraft(null);
+    setEditingTeam({ ...editingTeam, members }); setInlineEditSlot(null); setInlineEditDraft(null); setInlineEditIsNew(false);
   }, [editingTeam, inlineEditSlot, inlineEditDraft]);
-  const handleCancelInlineEdit = useCallback(() => { setInlineEditSlot(null); setInlineEditDraft(null); setInlinePickerSearch(""); }, []);
+  const handleCancelInlineEdit = useCallback(() => { setInlineEditSlot(null); setInlineEditDraft(null); setInlineEditIsNew(false); setInlinePickerSearch(""); }, []);
+
+  // 打开内联编辑器时自动滚动到编辑卡片位置
+  useEffect(() => {
+    if (inlineEditSlot && inlineEditorRef.current) {
+      setTimeout(() => {
+        inlineEditorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    }
+  }, [inlineEditSlot]);
 
   // 渐进式槽位：按顺序紧凑排列已有成员 + 1个空位（最多6个）
   const teamSlots = useMemo(() => {
@@ -1589,30 +1703,11 @@ export default function TeamsPage() {
                     <button className="cfg-toolbar-cancel" onClick={handleCancelTeamEdit}>取消</button>
                   </div>
 
-                  <div className="team-slot-grid">
-                    {teamSlots.map((member, i) => {
-                      const slot = i + 1;
-                      // 正在内联编辑的槽位不在 grid 中渲染
-                      if (inlineEditSlot === slot && inlineEditDraft) return null;
-                      return (
-                        <TeamSlot
-                          key={slot}
-                          slot={slot}
-                          member={member}
-                          boxConfigs={boxConfigs}
-                          onSelectFromBox={handleSelectFromBox}
-                          onRemove={handleRemoveMember}
-                          onInlineEdit={handleStartInlineEdit}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  {/* 内联编辑器独立于 grid 渲染，确保全宽布局 */}
+                  {/* 内联编辑器在 grid 上方展示（和盒子编辑一致） */}
                   {inlineEditSlot && inlineEditDraft && (
-                    <div className="cfg-inline-wrap te-slot-inline-standalone">
+                    <div className="cfg-inline-wrap te-slot-inline-standalone" ref={inlineEditorRef}>
                       <div className="cfg-toolbar">
-                        <strong>位置 {inlineEditSlot} — 手动添加</strong>
+                        <strong>位置 {inlineEditSlot} — {inlineEditIsNew ? "手动添加" : "编辑配置"}</strong>
                         {!inlineEditDraft.pokemonId ? (
                           <div className="cfg-toolbar-search">
                             <svg className="cfg-toolbar-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1667,11 +1762,31 @@ export default function TeamsPage() {
                           onChange={handleInlineEditDraftChange}
                           onSave={handleConfirmInlineEdit}
                           onCancel={handleCancelInlineEdit}
-                          saveLabel="确认添加"
+                          saveLabel={inlineEditIsNew ? "确认添加" : "保存修改"}
                         />
                       )}
                     </div>
                   )}
+
+                  <div className="team-slot-grid">
+                    {teamSlots.map((member, i) => {
+                      const slot = i + 1;
+                      // 新建空槽位时隐藏该槽位；编辑已有成员时保留卡片展示
+                      if (inlineEditSlot === slot && inlineEditDraft && inlineEditIsNew) return null;
+                      return (
+                        <TeamSlot
+                          key={slot}
+                          slot={slot}
+                          member={member}
+                          boxConfigs={boxConfigs}
+                          onSelectFromBox={handleSelectFromBox}
+                          onRemove={handleRemoveMember}
+                          onInlineEdit={handleStartInlineEdit}
+                          onEditMember={handleEditMember}
+                        />
+                      );
+                    })}
+                  </div>
 
                   <div className="cfg-actions">
                     <button onClick={handleSaveTeam}>{isNewTeam ? "创建队伍" : "保存队伍"}</button>
@@ -1685,11 +1800,11 @@ export default function TeamsPage() {
                 </button>
               )}
 
-              {!editingTeam && (
+{!editingTeam && (
                 teams.length > 0 ? (
-                  <div className="te-card-grid">
-                    {teams.map((team) => (
-                      <TeamCard
+                <div className="te-card-grid te-team-grid">
+                  {teams.map((team) => (
+                    <TeamCard
                         key={team.teamId}
                         team={team}
                         onEdit={handleEditTeam}
