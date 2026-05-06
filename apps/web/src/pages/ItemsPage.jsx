@@ -190,8 +190,8 @@ export default function ItemsPage({ query = "" }) {
                                     <div className="it-gen-badge">
                                       {record.generation === 99 ? "Champions" : `Gen ${record.generation}`}
                                     </div>
-                                    {record.gameVersionCode && (
-                                      <div className="it-gen-version">{record.gameVersionCode}</div>
+                                    {(record.gameVersionName || record.gameVersionCode) && (
+                                      <div className="it-gen-version">{record.gameVersionName || record.gameVersionCode}</div>
                                     )}
                                   </div>
                                   <div className="it-gen-text">{record.description}</div>

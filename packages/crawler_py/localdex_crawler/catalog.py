@@ -518,22 +518,31 @@ def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
             effect_detail = to_simplified(clean_summary(h3_effect, max_length=2000)) or None
         else:
             # 再尝试 h2「效果」精确匹配，避免匹配到「效果变更」
-            h2_effect = _section_text_by_exact_heading(page.html, "效果", level=2)
+            # 同时排除 h3「效果变更」子章节（如不融冰：h2效果下包含h3效果变更）
+            h2_effect = _section_text_by_exact_heading(page.html, "效果", level=2, exclude_subheadings=["效果变更", "效果變更"])
             if h2_effect:
                 effect_detail = to_simplified(clean_summary(h2_effect, max_length=2000)) or None
             else:
-                # 最后尝试 h2「游戏中」（部分超级石的效果直接放在此章节下）
-                game_text = _section_text_by_exact_heading(page.html, "游戏中", level=2)
-                effect_detail = to_simplified(clean_summary(game_text, max_length=2000)) or None if game_text else None
+                # 尝试 h2「使用效果」（部分超级石使用此标题）
+                use_effect = _section_text_by_exact_heading(page.html, "使用效果", level=2)
+                if use_effect:
+                    effect_detail = to_simplified(clean_summary(use_effect, max_length=2000)) or None
+                else:
+                    # 最后尝试 h2「游戏中」（部分超级石的效果直接放在此章节下）
+                    game_text = _section_text_by_exact_heading(page.html, "游戏中", level=2)
+                    effect_detail = to_simplified(clean_summary(game_text, max_length=2000)) or None if game_text else None
     bag_info = section_text_by_heading(page.html, "包包信息")
     category = seed.category
     category_match = re.search(r"口袋\s+([^\n ]+)", bag_info or text)
     if not category and category_match:
         category = to_simplified(category_match.group(1).strip())
     # 世代变更记录（「效果变更」章节）
+    # 先尝试 h2 级别的「效果变更」（大多数道具），再尝试 h3 级别（如不融冰：h3 在 h2「效果」下面）
     generations: dict[str, dict] = {}
     for heading in ("效果变更", "效果變更"):
-        changes = extract_generation_changes(page.html, heading)
+        changes = extract_generation_changes(page.html, heading, heading_level=2)
+        if not changes:
+            changes = extract_generation_changes(page.html, heading, heading_level=3)
         if changes:
             for change in changes:
                 gen = int(change["generation"])
@@ -566,9 +575,14 @@ def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
     }
 
 
-def _section_text_by_exact_heading(html: str, heading: str, level: int = 2) -> str:
+def _section_text_by_exact_heading(
+    html: str, heading: str, level: int = 2, *, exclude_subheadings: list[str] | None = None
+) -> str:
     """与 section_text_by_heading 类似，但使用精确匹配标题文本。
     避免「效果」匹配到「效果变更」等包含该子串的标题。
+
+    exclude_subheadings: 如果指定，遇到这些子标题（level+1 级别）时停止收集内容。
+    例如提取 h2「效果」时排除 h3「效果变更」子章节。
     """
     soup = BeautifulSoup(html or "", "html.parser")
     heading_tag = None
@@ -581,11 +595,18 @@ def _section_text_by_exact_heading(html: str, heading: str, level: int = 2) -> s
             break
     if not heading_tag:
         return ""
+    sub_level = f"h{level + 1}"
+    exclude_set = set(exclude_subheadings) if exclude_subheadings else set()
     chunks: list[str] = []
     for sibling in heading_tag.next_siblings:
-        if isinstance(sibling, Tag) and sibling.name == f"h{level}":
-            break
         if isinstance(sibling, Tag):
+            if sibling.name == f"h{level}":
+                break
+            # 遇到需要排除的子标题时停止收集
+            if exclude_set and sibling.name == sub_level:
+                sub_text = re.sub(r"\[.*?\]", "", clean_inline_text(sibling.get_text(" ", strip=True))).strip()
+                if sub_text in exclude_set:
+                    break
             chunks.append(sibling.get_text("\n", strip=True))
         elif str(sibling).strip():
             chunks.append(str(sibling).strip())

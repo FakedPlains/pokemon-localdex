@@ -547,6 +547,7 @@ export async function fetchItemsList({ query, category, limit, offset } = {}) {
       generations: genRows.map((r) => ({
         generation: r.generation,
         gameVersionCode: r.game_version_code || undefined,
+        gameVersionName: r.game_version_code ? GAME_VERSION_NAMES.get(r.game_version_code) : undefined,
         description: r.description || "",
         notes: r.notes || undefined,
       })),
@@ -591,6 +592,7 @@ export async function fetchItemDetail(idOrSlug) {
       imageUrl: row.image_url || undefined,
       generations: (genRows || []).map((r) => ({
         generation: r.generation, gameVersionCode: r.game_version_code || undefined,
+        gameVersionName: r.game_version_code ? GAME_VERSION_NAMES.get(r.game_version_code) : undefined,
         description: r.description || "", notes: r.notes || undefined,
       })),
     }

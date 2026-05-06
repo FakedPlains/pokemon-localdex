@@ -60,6 +60,7 @@ GAME_VERSION_INFO: dict[str, tuple[int, str]] = {
     "究极之日": (7, "USUM"), "究極之日": (7, "USUM"),
     "究极之月": (7, "USUM"), "究極之月": (7, "USUM"),
     "Let's Go! 皮卡丘": (7, "LPLE"), "Let's Go! 伊布": (7, "LPLE"),
+    "Let's Go!皮卡丘": (7, "LPLE"), "Let's Go!伊布": (7, "LPLE"),
     "剑": (8, "SWSH"), "劍": (8, "SWSH"), "盾": (8, "SWSH"),
     "劍／盾": (8, "SWSH"), "剑／盾": (8, "SWSH"),
     "晶灿钻石": (8, "BDSP"), "晶燦鑽石": (8, "BDSP"), "明亮珍珠": (8, "BDSP"),
@@ -249,9 +250,11 @@ def section_text_by_heading(html: str, heading: str, level: int = 2) -> str:
             break
     if not heading_tag:
         return ""
+    # 同级或更高级别的标题都作为章节结束标记
+    stop_tag_names = {f"h{i}" for i in range(1, level + 1)}
     chunks: list[str] = []
     for sibling in heading_tag.next_siblings:
-        if isinstance(sibling, Tag) and sibling.name == f"h{level}":
+        if isinstance(sibling, Tag) and sibling.name in stop_tag_names:
             break
         if isinstance(sibling, Tag):
             chunks.append(sibling.get_text("\n", strip=True))
@@ -336,6 +339,12 @@ def extract_intro_names(text: str, fallback_name_zh: str) -> tuple[str | None, s
     return matched.group(1).strip(), matched.group(2).strip()
 
 
+def _normalize_punctuation(text: str) -> str:
+    """将常见全角标点转为半角，用于版本名匹配标准化。"""
+    table = str.maketrans("！？，。：；", "!?,.:;")
+    return text.translate(table)
+
+
 def generation_from_game_version(line: str) -> tuple[int, str] | None:
     """从游戏版本名（如"《白金》"、"《劍／盾》"）推断 (世代编号, game_version_code)。
 
@@ -346,6 +355,8 @@ def generation_from_game_version(line: str) -> tuple[int, str] | None:
     if not matched:
         return None
     version_name = matched.group(1).strip()
+    # 标准化全角标点为半角（如 "Let's Go！皮卡丘" → "Let's Go! 皮卡丘"）
+    version_name = _normalize_punctuation(version_name)
     # 去掉版本名及书名号后，检查剩余内容长度
     remaining = line[:matched.start()] + line[matched.end():]
     remaining = re.sub(r"[\s《》「」]+", "", remaining)
@@ -355,11 +366,16 @@ def generation_from_game_version(line: str) -> tuple[int, str] | None:
     # 先尝试完整匹配
     if version_name in GAME_VERSION_INFO:
         return GAME_VERSION_INFO[version_name]
-    # 再尝试部分匹配（如"劍／盾"匹配"劍"）
+    # 再尝试部分匹配，优先选择最长的匹配键（更具体的匹配优先）
+    # 例如 "Let's Go! 皮卡丘／Let's Go! 伊布" 应匹配 "Let's Go! 皮卡丘"(len=12) 而非 "皮卡丘"(len=3)
+    best_match: tuple[int, str] | None = None
+    best_key_len = 0
     for key, info in GAME_VERSION_INFO.items():
         if key in version_name or version_name in key:
-            return info
-    return None
+            if len(key) > best_key_len:
+                best_key_len = len(key)
+                best_match = info
+    return best_match
 
 
 def detect_generation_marker(line: str) -> tuple[int, str | None] | None:
@@ -391,34 +407,50 @@ def _rejoin_split_markers(text: str) -> str:
     return text
 
 
-def extract_generation_changes(html: str, heading: str) -> list[dict[str, object]]:
+def extract_generation_changes(html: str, heading: str, *, heading_level: int = 2) -> list[dict[str, object]]:
     """从 HTML 中提取世代变更记录。
 
     直接操作 DOM 而非纯文本，避免 <b>/<a> 等内联标签导致文本被
     换行分隔从而丢失数值的问题。
 
-    变更章节的典型 HTML 结构：
+    heading_level: 目标标题的级别，默认为 2（h2）。
+    当 heading_level=2 时，在 h2 到下一个 h2 之间查找 h3 世代标记。
+    当 heading_level=3 时，在 h3 到下一个 h3/h2 之间查找 h4 世代标记。
+
+    变更章节的典型 HTML 结构（h2 级别）：
+      <h2>效果变更</h2>
       <h3>第六世代</h3>
       <ul><li>ＰＰ：<b>30</b> → <b>20</b></li></ul>
-      <h3>仅在《传说 阿尔宙斯》中</h3>
-      <table>...</table>
+
+    或（h3 级别，如不融冰）：
+      <h2>效果</h2>
+      <ul>...</ul>
+      <h3>效果变更</h3>
+      <h4>第四世代</h4>
+      <ul><li>威力提升 10% → 20%</li></ul>
     """
     soup = BeautifulSoup(html or "", "html.parser")
 
-    # 找到目标 h2 标题
+    # 找到目标标题
+    heading_tag_name = f"h{heading_level}"
+    marker_tag_name = f"h{heading_level + 1}"
+    # 同级或更高级别的标题都作为章节结束标记
+    stop_tag_names = {f"h{i}" for i in range(1, heading_level + 1)}
+
     heading_tag = None
-    for tag in soup.find_all("h2"):
-        if heading in tag.get_text(" ", strip=True):
+    for tag in soup.find_all(heading_tag_name):
+        tag_text = re.sub(r"\[.*?\]", "", clean_inline_text(tag.get_text(" ", strip=True))).strip()
+        if tag_text == heading:
             heading_tag = tag
             break
     if not heading_tag:
         return []
 
-    # 收集 h2 到下一个 h2 之间的所有兄弟元素
+    # 收集标题到下一个同级/更高级标题之间的所有兄弟元素
     section_elements: list[Tag] = []
     for sibling in heading_tag.next_siblings:
         if isinstance(sibling, Tag):
-            if sibling.name == "h2":
+            if sibling.name in stop_tag_names:
                 break
             section_elements.append(sibling)
 
@@ -442,8 +474,8 @@ def extract_generation_changes(html: str, heading: str) -> list[dict[str, object
         buffer = []
 
     for elem in section_elements:
-        if elem.name == "h3":
-            # h3 标题：世代标记或游戏版本标记
+        if elem.name == marker_tag_name:
+            # 世代标记或游戏版本标记
             line = clean_inline_text(elem.get_text(" ", strip=True))
             marker = detect_generation_marker(line)
             if marker:

@@ -1730,12 +1730,16 @@ function hydrateItemRow(db: ReturnType<typeof openDatabase>, row: Record<string,
     effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
     introducedGeneration: row.introduced_generation ? Number(row.introduced_generation) : undefined,
     imageUrl: row.image_url ? String(row.image_url) : undefined,
-    generations: genRows.map((r) => ({
-      generation: Number(r.generation),
-      gameVersionCode: r.game_version_code ? String(r.game_version_code) : undefined,
-      description: String(r.description ?? ""),
-      notes: r.notes ? String(r.notes) : undefined,
-    })),
+    generations: genRows.map((r) => {
+      const code = r.game_version_code ? String(r.game_version_code) : undefined;
+      return {
+        generation: Number(r.generation),
+        gameVersionCode: code,
+        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
+        description: String(r.description ?? ""),
+        notes: r.notes ? String(r.notes) : undefined,
+      };
+    }),
     source: sourceFromRow(row),
   };
 }
