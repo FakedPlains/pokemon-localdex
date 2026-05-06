@@ -2,6 +2,8 @@
 
 一个宝可梦资料库，数据统一来源于 [52Poké Wiki](https://wiki.52poke.com/)，支持本地 SQLite 和云端 Supabase 双数据源。提供 Web 端和微信小程序端两种客户端，Web 端可部署到 GitHub Pages 作为纯静态站点使用。
 
+> 本项目使用 Git LFS 管理大文件（SQLite 数据库和 normalized JSON），克隆后需执行 `git lfs pull` 获取完整数据文件。
+
 **在线访问**：[https://fakedplains.github.io/pokemon-localdex/](https://fakedplains.github.io/pokemon-localdex/)
 
 ## 功能概览
@@ -107,7 +109,7 @@ pokemon-localdex/
 │   └── supabase-store/     Supabase 查询适配（与 sqlite-store 同接口）
 ├── supabase/               Supabase 数据库 schema
 ├── scripts/                爬虫入口脚本
-├── data/                   本地数据（SQLite、页面缓存）
+├── data/                   本地数据（SQLite [LFS]、页面缓存）
 ├── docs/                   技术文档
 └── .github/                CI/CD 工作流
 ```
@@ -203,7 +205,7 @@ CI 工作流文件位于 `.github/workflows/deploy-pages.yml`，使用 `peaceiri
 
 ### 数据采集
 
-Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、935 个招式、314 个特性的完整数据，支持增量更新和全量重建两种模式。
+Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、939 个招式、314 个特性、429 个道具的完整数据，支持增量更新和全量重建两种模式。爬虫请求时自动追加 `variant=zh-hans` 参数，确保从 Wiki 获取的原始内容即为简体中文，避免繁简转换导致的译名偏差。
 
 ## 技术栈
 
@@ -215,6 +217,7 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、935 个招式、3
 | 本地数据库 | SQLite（node:sqlite） |
 | 云端数据库 | Supabase（PostgreSQL） |
 | 爬虫 | Python 3.10+ + BeautifulSoup4 |
+| 大文件管理 | Git LFS（SQLite、normalized JSON） |
 | 部署 | GitHub Pages + GitHub Actions |
 
 整个项目统一使用 React 18.3.1，确保 Web 端和小程序端共享同一 React 版本，避免 monorepo 中的版本冲突。

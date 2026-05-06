@@ -14,7 +14,7 @@ Pokemon LocalDex 的数据采集由一个 Python 爬虫完成，数据源为 [52
 pip install -r packages/crawler_py/requirements.txt
 ```
 
-主要依赖包括 `requests`（HTTP 请求）、`beautifulsoup4`（HTML 解析）和 `opencc`（繁简转换）。
+主要依赖包括 `requests`（HTTP 请求）、`beautifulsoup4`（HTML 解析）和 `opencc`（繁简转换，作为补充处理）。
 
 ## 快速开始
 
@@ -222,7 +222,9 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 
 ### 文本处理规范
 
-**繁简转换**：52Poké Wiki 的内容以繁体中文为主。爬虫使用 `opencc`（OpenCC）库的 `t2s` 配置将所有繁体中文文本转换为简体中文后再存入数据库。所有面向用户的文本字段（名称、描述、效果说明等）都必须经过 `to_simplified()` 处理。
+**简体中文优先**：爬虫在发起请求时会自动为 52Poké Wiki 的 URL 追加 `variant=zh-hans` 参数（通过 `PageFetcher._ensure_zh_hans()` 方法），这样 Wiki 服务器会直接返回简体中文版本的页面内容，包括正确的简体译名（如“深渊突刺”而非“地狱突刺”）。这避免了仅依赖 OpenCC `t2s` 字符级转换时无法处理语义级译名差异的问题。
+
+**补充繁简转换**：尽管请求时已指定简体变体，爬虫仍保留 `opencc` 的 `t2s` 转换作为安全网。所有面向用户的文本字段（名称、描述、效果说明等）仍经过 `to_simplified()` 处理，确保即使 Wiki 返回了残留繁体字符也能被正确转换。
 
 **Unicode 标准化**：所有从 HTML 提取的文本都经过 NFKC 标准化（`unicodedata.normalize("NFKC", ...)`），将全角字符转为半角，统一字符编码。例如全角的"ＰＰ"会被标准化为半角"PP"。
 
