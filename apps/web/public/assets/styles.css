@@ -7002,3 +7002,31 @@ padding-left: 16px;
     transform: translateY(-8px) scale(0.95);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Version Exclusive Tags (仅限标识)
+   ══════════════════════════════════════════════════════════════ */
+
+.mv-gen-exclusive-tag,
+.ab-gen-exclusive-tag,
+.it-gen-exclusive-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, rgba(220, 120, 60, 0.18), rgba(220, 120, 60, 0.08));
+  color: #b05020;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mv-gen-exclusive,
+.ab-gen-exclusive,
+.it-gen-exclusive {
+  opacity: 0.75;
+  border-left: 2px solid rgba(220, 120, 60, 0.4);
+  padding-left: 10px;
+}

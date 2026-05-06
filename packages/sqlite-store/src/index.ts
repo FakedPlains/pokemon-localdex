@@ -108,6 +108,7 @@ export type MoveGenerationRecord = {
   generation: number;
   gameVersionCode?: string;
   gameVersionName?: string;
+  versionExclusive?: boolean;
   type?: string;
   category?: string;
   power?: number;
@@ -139,6 +140,7 @@ export type AbilityGenerationRecord = {
   generation: number;
   gameVersionCode?: string;
   gameVersionName?: string;
+  versionExclusive?: boolean;
   description: string;
   notes?: string;
 };
@@ -159,6 +161,8 @@ export type AbilityEntry = {
 export type ItemGenerationRecord = {
   generation: number;
   gameVersionCode?: string;
+  gameVersionName?: string;
+  versionExclusive?: boolean;
   description: string;
   notes?: string;
 };
@@ -1561,6 +1565,7 @@ function hydrateMoveRow(db: DatabaseSync, row: Record<string, unknown>): MoveEnt
         generation: Number(g.generation),
         gameVersionCode: code,
         gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
+        versionExclusive: g.version_exclusive === 1,
         description: g.description ? String(g.description) : "",
         notes: g.notes ? String(g.notes) : undefined,
       };
@@ -1653,6 +1658,7 @@ function hydrateAbilityRow(db: DatabaseSync, row: Record<string, unknown>): Abil
         generation: Number(g.generation),
         gameVersionCode: code,
         gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
+        versionExclusive: g.version_exclusive === 1,
         description: g.description ? String(g.description) : "",
         notes: g.notes ? String(g.notes) : undefined,
       };
@@ -1717,7 +1723,7 @@ export function getAbilityFromSqlite(idOrName: string) {
 function hydrateItemRow(db: ReturnType<typeof openDatabase>, row: Record<string, unknown>): ItemEntry {
   const itemId = Number(row.id);
   const genRows = db.prepare(
-    "SELECT generation, game_version_code, description, notes FROM item_generation_records WHERE item_id = ? ORDER BY generation ASC"
+    "SELECT generation, game_version_code, description, notes, version_exclusive FROM item_generation_records WHERE item_id = ? ORDER BY generation ASC"
   ).all(itemId) as Record<string, unknown>[];
   return {
     id: String(row.id),
@@ -1736,6 +1742,7 @@ function hydrateItemRow(db: ReturnType<typeof openDatabase>, row: Record<string,
         generation: Number(r.generation),
         gameVersionCode: code,
         gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
+        versionExclusive: r.version_exclusive === 1,
         description: String(r.description ?? ""),
         notes: r.notes ? String(r.notes) : undefined,
       };

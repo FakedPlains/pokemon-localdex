@@ -252,19 +252,22 @@ export default function MovesPage({ query = "", type = "", category = "", genera
                       </div>
                     </div>
 
-                    {/* 世代变更（过滤掉传说阿尔宙斯 LA） */}
-                    {move.generations?.filter((r) => r.gameVersionCode !== "LA").length > 0 && (
+                    {/* 世代变更 */}
+                    {move.generations?.length > 0 && (
                       <div className="mv-gen-section">
                         <div className="mv-gen-title">世代变更</div>
                         <div className="mv-gen-timeline">
-                          {move.generations.filter((r) => r.gameVersionCode !== "LA").map((record, i) => (
-                            <div key={i} className="mv-gen-item">
+                          {move.generations.map((record, i) => (
+                            <div key={i} className={`mv-gen-item${record.versionExclusive ? ' mv-gen-exclusive' : ''}`}>
                               <div className="mv-gen-badges">
                                 <div className="mv-gen-badge">
                                   {record.generation === 99 ? "Champions" : `Gen ${record.generation}`}
                                 </div>
-                                {record.gameVersionName && (
-                                  <div className="mv-gen-version">{record.gameVersionName}</div>
+                                {(record.gameVersionName || record.gameVersionCode) && (
+                                  <div className="mv-gen-version">{record.gameVersionName || record.gameVersionCode}</div>
+                                )}
+                                {record.versionExclusive && (
+                                  <div className="mv-gen-exclusive-tag">仅限</div>
                                 )}
                               </div>
                               <div className="mv-gen-text">{record.description}</div>

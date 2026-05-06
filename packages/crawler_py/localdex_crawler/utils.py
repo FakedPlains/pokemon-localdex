@@ -382,6 +382,12 @@ def generation_from_game_version(line: str) -> tuple[int, str] | None:
     return best_match
 
 
+def is_version_exclusive_marker(line: str) -> bool:
+    """判断标题行是否为"仅在XXX中"格式，即版本独占标记。"""
+    stripped = line.strip()
+    return stripped.startswith("仅在") or stripped.startswith("僅在")
+
+
 def detect_generation_marker(line: str) -> tuple[int, str | None] | None:
     """从行文本中检测世代标记，支持"第X世代"和游戏版本名两种格式。
     返回 (generation, game_version_code) 或 None。
@@ -477,6 +483,7 @@ def extract_generation_changes(html: str, heading: str, *, heading_level: int = 
     records: list[dict[str, object]] = []
     current_generation: int | None = None
     current_game_version: str | None = None
+    current_version_exclusive: bool = False
     buffer: list[str] = []
 
     def flush() -> None:
@@ -487,6 +494,7 @@ def extract_generation_changes(html: str, heading: str, *, heading_level: int = 
                 record: dict[str, object] = {
                     "generation": current_generation,
                     "summary": summary,
+                    "version_exclusive": current_version_exclusive,
                 }
                 if current_game_version:
                     record["game_version_code"] = current_game_version
@@ -501,6 +509,7 @@ def extract_generation_changes(html: str, heading: str, *, heading_level: int = 
             if marker:
                 flush()
                 current_generation, current_game_version = marker
+                current_version_exclusive = is_version_exclusive_marker(line)
             continue
 
         if not current_generation:

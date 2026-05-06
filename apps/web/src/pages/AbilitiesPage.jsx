@@ -165,13 +165,16 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
                             <div className="ab-gen-title">世代变更</div>
                             <div className="ab-gen-timeline">
                               {detail.generations.map((record, i) => (
-                                <div key={i} className="ab-gen-item">
+                                <div key={i} className={`ab-gen-item${record.versionExclusive ? ' ab-gen-exclusive' : ''}`}>
                                   <div className="ab-gen-badges">
                                     <div className="ab-gen-badge">
                                       {record.generation === 99 ? "Champions" : `Gen ${record.generation}`}
                                     </div>
-                                    {record.gameVersionName && (
-                                      <div className="ab-gen-version">{record.gameVersionName}</div>
+                                    {(record.gameVersionName || record.gameVersionCode) && (
+                                      <div className="ab-gen-version">{record.gameVersionName || record.gameVersionCode}</div>
+                                    )}
+                                    {record.versionExclusive && (
+                                      <div className="ab-gen-exclusive-tag">仅限</div>
                                     )}
                                   </div>
                                   <div className="ab-gen-text">{record.description}</div>

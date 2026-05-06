@@ -185,13 +185,16 @@ export default function ItemsPage({ query = "" }) {
                             <div className="it-gen-title">世代变更</div>
                             <div className="it-gen-timeline">
                               {detail.generations.map((record, i) => (
-                                <div key={i} className="it-gen-item">
+                                <div key={i} className={`it-gen-item${record.versionExclusive ? ' it-gen-exclusive' : ''}`}>
                                   <div className="it-gen-badges">
                                     <div className="it-gen-badge">
                                       {record.generation === 99 ? "Champions" : `Gen ${record.generation}`}
                                     </div>
                                     {(record.gameVersionName || record.gameVersionCode) && (
                                       <div className="it-gen-version">{record.gameVersionName || record.gameVersionCode}</div>
+                                    )}
+                                    {record.versionExclusive && (
+                                      <div className="it-gen-exclusive-tag">仅限</div>
                                     )}
                                   </div>
                                   <div className="it-gen-text">{record.description}</div>

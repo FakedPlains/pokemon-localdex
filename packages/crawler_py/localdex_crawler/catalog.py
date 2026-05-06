@@ -38,8 +38,6 @@ from .utils import (
     unique_by_key,
 )
 
-# 这些版本的效果变更不记录（仅在特定版本中的独立效果，不属于主线世代变更）
-_EXCLUDED_VERSION_CODES = {"LPLE", "LA", "ZA"}
 
 
 @dataclass(frozen=True)
@@ -420,13 +418,12 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
             for change in changes:
                 gen = int(change["generation"])
                 gv_code = change.get("game_version_code")
-                if gv_code in _EXCLUDED_VERSION_CODES:
-                    continue
                 key = f"{gen}|{gv_code or ''}"
                 generations[key] = {
                     "generation": gen,
                     "description": to_simplified(str(change["summary"])) or str(change["summary"]),
                     "game_version_code": gv_code,
+                    "version_exclusive": bool(change.get("version_exclusive", False)),
                     "notes": to_simplified(f"来自 52Poké {heading}章节。"),
                 }
             break
@@ -480,13 +477,12 @@ def normalize_ability_detail_page(page: RawPage, seed: AbilitySeed) -> dict:
             for change in changes:
                 gen = int(change["generation"])
                 gv_code = change.get("game_version_code")
-                if gv_code in _EXCLUDED_VERSION_CODES:
-                    continue
                 key = f"{gen}|{gv_code or ''}"
                 generations[key] = {
                     "generation": gen,
                     "description": to_simplified(str(change["summary"])) or str(change["summary"]),
                     "game_version_code": gv_code,
+                    "version_exclusive": bool(change.get("version_exclusive", False)),
                     "notes": f"来自 52Poké {heading}章节。",
                 }
             break
@@ -554,13 +550,12 @@ def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
             for change in changes:
                 gen = int(change["generation"])
                 gv_code = change.get("game_version_code")
-                if gv_code in _EXCLUDED_VERSION_CODES:
-                    continue
                 key = f"{gen}|{gv_code or ''}"
                 generations[key] = {
                     "generation": gen,
                     "description": to_simplified(str(change["summary"])) or str(change["summary"]),
                     "game_version_code": gv_code,
+                    "version_exclusive": bool(change.get("version_exclusive", False)),
                     "notes": to_simplified(f"来自 52Poké {heading}章节。"),
                 }
             break

@@ -640,11 +640,12 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
         for record in payload.get("generations") or []:
             conn.execute(
                 """
-                INSERT INTO move_generation_records (move_id, generation, game_version_code, description, notes)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO move_generation_records (move_id, generation, game_version_code, description, notes, version_exclusive)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(move_id, generation, game_version_code) DO UPDATE SET
                   description = excluded.description,
-                  notes = excluded.notes
+                  notes = excluded.notes,
+                  version_exclusive = excluded.version_exclusive
                 """,
                 (
                     move_id,
@@ -652,6 +653,7 @@ def upsert_move_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     record.get("game_version_code") or "",
                     record.get("description") or "",
                     record.get("notes"),
+                    1 if record.get("version_exclusive") else 0,
                 ),
             )
         
@@ -715,12 +717,13 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
         for record in payload.get("generations") or []:
             conn.execute(
                 """
-                INSERT INTO ability_generation_records (ability_id, generation, game_version_code, description, notes)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO ability_generation_records (ability_id, generation, game_version_code, description, notes, version_exclusive)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(ability_id, generation) DO UPDATE SET
                   game_version_code = excluded.game_version_code,
                   description = excluded.description,
-                  notes = excluded.notes
+                  notes = excluded.notes,
+                  version_exclusive = excluded.version_exclusive
                 """,
                 (
                     ability_id,
@@ -728,6 +731,7 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     record.get("game_version_code"),
                     record.get("description") or "",
                     record.get("notes"),
+                    1 if record.get("version_exclusive") else 0,
                 ),
             )
     return ability_id
@@ -800,12 +804,13 @@ def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
         for record in payload.get("generations") or []:
             conn.execute(
                 """
-                INSERT INTO item_generation_records (item_id, generation, game_version_code, description, notes)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO item_generation_records (item_id, generation, game_version_code, description, notes, version_exclusive)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(item_id, generation) DO UPDATE SET
                     game_version_code = excluded.game_version_code,
                     description = excluded.description,
-                    notes = excluded.notes
+                    notes = excluded.notes,
+                    version_exclusive = excluded.version_exclusive
                 """,
                 (
                     item_id,
@@ -813,6 +818,7 @@ def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
                     record.get("game_version_code"),
                     record.get("description") or "",
                     record.get("notes"),
+                    1 if record.get("version_exclusive") else 0,
                 ),
             )
     return item_id
