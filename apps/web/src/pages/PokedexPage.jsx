@@ -9,6 +9,8 @@ import {
   describeLearnsetEntry
 } from "../utils/helpers.js";
 import { LEARN_METHOD_LABELS } from "../utils/constants.js";
+import { saveBoxConfig, getTeams, saveTeam } from "../utils/teamStorage.js";
+import { useToast } from "../components/Toast.jsx";
 import TypeChip from "../components/TypeChip.jsx";
 import StatCalculator from "../components/StatCalculator.jsx";
 import Loading from "../components/Loading.jsx";
@@ -447,9 +449,142 @@ function MetaPill({ label, value }) {
   );
 }
 
+/* ─── Team Picker Modal ─── */
+function TeamPickerModal({ onSelect, onClose }) {
+  const teams = getTeams();
+  const modalRef = useRef(null);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (modalRef.current && !modalRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  const handleCreate = () => {
+    const name = newName.trim();
+    if (!name) return;
+    const newTeam = saveTeam({ name, format: "singles", members: [] });
+    onSelect(newTeam);
+  };
+
+  return (
+    <div className="sc-team-picker-overlay">
+      <div className="sc-team-picker" ref={modalRef}>
+        <div className="sc-team-picker-header">
+          <strong>选择队伍</strong>
+          <button className="sc-team-picker-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="sc-team-picker-list">
+          {teams.map((t) => {
+            const memberCount = (t.members || []).length;
+            const isFull = memberCount >= 6;
+            return (
+              <button
+                key={t.teamId}
+                className={`sc-team-picker-item ${isFull ? "sc-team-picker-item-full" : ""}`}
+                onClick={() => !isFull && onSelect(t)}
+                disabled={isFull}
+              >
+                <span className="sc-team-picker-item-name">{t.name || "未命名队伍"}</span>
+                <span className="sc-team-picker-item-count">{memberCount}/6</span>
+                {isFull && <span className="sc-team-picker-item-tag">已满</span>}
+              </button>
+            );
+          })}
+        </div>
+        <div className="sc-team-picker-footer">
+          {creating ? (
+            <div className="sc-team-picker-create-form">
+              <input
+                className="sc-team-picker-create-input"
+                type="text"
+                placeholder="输入队伍名称…"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+                autoFocus
+              />
+              <button className="sc-team-picker-create-confirm" onClick={handleCreate}>确定</button>
+              <button className="sc-team-picker-create-cancel" onClick={() => { setCreating(false); setNewName(""); }}>取消</button>
+            </div>
+          ) : (
+            <button className="sc-team-picker-create-btn" onClick={() => setCreating(true)}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M8 3v10M3 8h10" />
+              </svg>
+              创建新队伍
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Stats Tab ─── */
 function StatsTab({ detail, display, detailGeneration, onDetailGenerationChange }) {
+  const toast = useToast();
   const stats = display.stats || {};
+  const [calcValues, setCalcValues] = useState(null);
+  const [showTeamPicker, setShowTeamPicker] = useState(false);
+  const [addFeedback, setAddFeedback] = useState(""); // "box" | "team" | ""
+
+  // 构建当前宝可梦配置数据
+  const buildConfig = useCallback(() => {
+    const img = getPokemonPreviewImage(detail);
+    return {
+      pokemonId: detail.slug || String(detail.id),
+      nameZh: display.form?.nameZh || detail.nameZh || "",
+      level: calcValues?.level || 50,
+      nature: calcValues?.nature || "认真",
+      ivs: calcValues?.ivs || {},
+      evs: calcValues?.evs || {},
+      statMode: calcValues?.statMode || "classic",
+      sps: calcValues?.sps || {},
+      champNature: calcValues?.champNature || "认真",
+      moves: [],
+      itemId: "",
+      itemImageUrl: "",
+      abilityId: "",
+      imageUrl: img?.url || "",
+      shinyImageUrl: display.images?.shinyOfficial || display.images?.shinySprite || "",
+      isShiny: false,
+      primaryType: display.primaryType || "",
+      secondaryType: display.secondaryType || "",
+      baseStats: stats,
+    };
+  }, [detail, display, stats, calcValues]);
+
+  const handleAddToBox = useCallback(() => {
+    const config = buildConfig();
+    saveBoxConfig(config);
+    setAddFeedback("box");
+    setTimeout(() => setAddFeedback(""), 2000);
+  }, [buildConfig]);
+
+  const handleAddToTeam = useCallback((team) => {
+    const config = buildConfig();
+    const members = [...(team.members || [])];
+    if (members.length >= 6) {
+      toast.error("该队伍已有 6 只宝可梦，无法继续添加。");
+      return;
+    }
+    const duplicate = members.find((m) => m.pokemonId === config.pokemonId);
+    if (duplicate) {
+      toast.error(`该队伍中已存在「${config.nameZh || config.pokemonId}」，不能重复添加同一宝可梦。`);
+      return;
+    }
+    const slot = members.length + 1;
+    members.push({ ...config, slot });
+    saveTeam({ ...team, members });
+    setShowTeamPicker(false);
+    setAddFeedback("team");
+    setTimeout(() => setAddFeedback(""), 2000);
+  }, [buildConfig]);
 
   // 获取当前形态的 statVariants
   const currentForm = display.form || {};
@@ -543,7 +678,31 @@ function StatsTab({ detail, display, detailGeneration, onDetailGenerationChange 
       {/* Calculator */}
       <div className="ov-section">
         <h4 className="ov-heading">能力值计算器</h4>
-        <StatCalculator baseStats={stats} />
+        <StatCalculator baseStats={stats} onChange={setCalcValues} />
+
+        {/* 添加到盒子/队伍按钮 */}
+        <div className="sc-actions">
+          <button className="sc-action-btn sc-action-box" onClick={handleAddToBox}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="12" height="10" rx="1.5" />
+              <path d="M2 7h12" />
+              <path d="M6 4V2.5A.5.5 0 0 1 6.5 2h3a.5.5 0 0 1 .5.5V4" />
+            </svg>
+            添加到盒子
+          </button>
+          <button className="sc-action-btn sc-action-team" onClick={() => setShowTeamPicker(true)}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="8" cy="5" r="3" />
+              <path d="M2 14c0-2.5 2.5-4.5 6-4.5s6 2 6 4.5" />
+            </svg>
+            添加到队伍
+          </button>
+          {addFeedback === "box" && <span className="sc-action-feedback">✓ 已添加到盒子</span>}
+          {addFeedback === "team" && <span className="sc-action-feedback">✓ 已添加到队伍</span>}
+        </div>
+
+        {/* 队伍选择弹窗 */}
+        {showTeamPicker && <TeamPickerModal onSelect={handleAddToTeam} onClose={() => setShowTeamPicker(false)} />}
       </div>
     </div>
   );

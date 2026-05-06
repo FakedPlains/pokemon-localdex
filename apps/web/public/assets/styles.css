@@ -2044,6 +2044,272 @@ display: block;
   margin-top: 2px;
 }
 
+/* ── Action buttons (添加到盒子/队伍) ── */
+.sc-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(31, 42, 31, 0.06);
+}
+
+.sc-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid rgba(31, 42, 31, 0.12);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.sc-action-btn:hover {
+  background: rgba(31, 42, 31, 0.04);
+  border-color: rgba(31, 42, 31, 0.2);
+  box-shadow: 0 1px 4px rgba(31, 42, 31, 0.06);
+}
+
+.sc-action-btn:active {
+  transform: scale(0.97);
+}
+
+.sc-action-btn svg {
+  flex-shrink: 0;
+}
+
+.sc-action-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2e7d32;
+  background: rgba(76, 175, 80, 0.12);
+  border-radius: 6px;
+  animation: sc-feedback-in 0.3s ease;
+}
+
+@keyframes sc-feedback-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Team Picker Modal ── */
+.sc-team-picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2px);
+  animation: sc-overlay-in 0.2s ease;
+}
+
+@keyframes sc-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sc-team-picker {
+background: #fff;
+border-radius: 14px;
+box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+width: 340px;
+max-height: 400px;
+display: flex;
+flex-direction: column;
+overflow: hidden;
+animation: sc-picker-in 0.25s ease;
+}
+
+@keyframes sc-picker-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.sc-team-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(31, 42, 31, 0.08);
+}
+
+.sc-team-picker-header strong {
+  font-size: 14px;
+}
+
+.sc-team-picker-close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(31, 42, 31, 0.06);
+  border-radius: 50%;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--muted);
+  transition: background 0.15s;
+}
+
+.sc-team-picker-close:hover {
+  background: rgba(31, 42, 31, 0.12);
+}
+
+.sc-team-picker-empty {
+  padding: 32px 18px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sc-team-picker-list {
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sc-team-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  text-align: left;
+  width: 100%;
+}
+
+.sc-team-picker-item:hover:not(:disabled) {
+  background: rgba(31, 42, 31, 0.04);
+  border-color: rgba(31, 42, 31, 0.16);
+}
+
+.sc-team-picker-item:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.sc-team-picker-item-full {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sc-team-picker-item-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sc-team-picker-item-count {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.sc-team-picker-item-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(244, 67, 54, 0.1);
+  color: #f44336;
+}
+
+.sc-team-picker-footer {
+  padding: 8px;
+}
+
+.sc-team-picker-create-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sc-team-picker-create-btn:hover {
+  background: rgba(31, 42, 31, 0.04);
+  color: var(--ink);
+}
+
+.sc-team-picker-create-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sc-team-picker-create-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid rgba(31, 42, 31, 0.15);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.sc-team-picker-create-input:focus {
+  border-color: rgba(31, 42, 31, 0.35);
+}
+
+.sc-team-picker-create-confirm {
+  padding: 7px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.sc-team-picker-create-confirm:hover {
+  opacity: 0.85;
+}
+
+.sc-team-picker-create-cancel {
+  padding: 7px 10px;
+  border: 1px solid rgba(31, 42, 31, 0.12);
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sc-team-picker-create-cancel:hover {
+  background: rgba(31, 42, 31, 0.04);
+}
+
 /* ── Preset Bar ── */
 .sc-presets {
   display: flex;
@@ -6638,4 +6904,101 @@ padding-left: 16px;
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Toast 通知系统
+   ══════════════════════════════════════════════════════════════ */
+
+.toast-container {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  animation: toast-enter 0.3s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+  max-width: 420px;
+  word-break: break-word;
+}
+
+.toast-item.toast-leaving {
+  animation: toast-leave 0.3s cubic-bezier(0.06, 0.71, 0.55, 1) forwards;
+}
+
+/* 类型变体 */
+.toast-error {
+  background: #fff0f0;
+  border: 1px solid #ffccc7;
+  color: #cf1322;
+}
+
+.toast-success {
+  background: #f0fff4;
+  border: 1px solid #b7eb8f;
+  color: #237804;
+}
+
+.toast-info {
+  background: #f0f5ff;
+  border: 1px solid #adc6ff;
+  color: #1d39c4;
+}
+
+/* 图标 */
+.toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-error .toast-icon { color: #cf1322; }
+.toast-success .toast-icon { color: #237804; }
+.toast-info .toast-icon { color: #1d39c4; }
+
+/* 消息文本 */
+.toast-message {
+  flex: 1;
+}
+
+/* 动画 */
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
 }

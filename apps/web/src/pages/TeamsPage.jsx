@@ -9,6 +9,7 @@ import {
   resolveTeamMembers
 } from "../utils/teamStorage.js";
 import StatCalculator from "../components/StatCalculator.jsx";
+import { useToast } from "../components/Toast.jsx";
 
 // ══════════════════════════════════════════════
 //  宝可梦配置编辑器
@@ -1404,9 +1405,10 @@ function TeamCard({ team, onEdit, onDelete }) {
 // ══════════════════════════════════════════════
 
 export default function TeamsPage() {
-  const [boxConfigs, setBoxConfigs] = useState([]);
-  const [editingConfig, setEditingConfig] = useState(null);
-  const [isNewConfig, setIsNewConfig] = useState(false);
+  const toast = useToast();
+const [boxConfigs, setBoxConfigs] = useState([]);
+const [editingConfig, setEditingConfig] = useState(null);
+const [isNewConfig, setIsNewConfig] = useState(false);
 
   const [teams, setTeams] = useState([]);
   const [editingTeam, setEditingTeam] = useState(null);
@@ -1448,7 +1450,7 @@ export default function TeamsPage() {
   const handleNewConfig = useCallback(() => { setEditingConfig(createDraftMember()); setIsNewConfig(true); }, []);
   const handleEditConfig = useCallback((config) => { setEditingConfig({ ...config }); setIsNewConfig(false); }, []);
   const handleSaveConfig = useCallback(() => {
-    if (!editingConfig?.pokemonId) { window.alert("请先选择一只宝可梦。"); return; }
+    if (!editingConfig?.pokemonId) { toast.error("请先选择一只宝可梦。"); return; }
     const configToSave = { ...editingConfig };
     // 如果没有填写配置名称，默认使用宝可梦名称
     const baseName = configToSave.configName?.trim() || configToSave.nameZh || configToSave.pokemonId || "未命名";
@@ -1476,9 +1478,9 @@ export default function TeamsPage() {
   const handleEditTeam = useCallback((team) => { setEditingTeam({ ...team, members: resolveTeamMembers(team) }); setIsNewTeam(false); setInlineEditSlot(null); setInlineEditDraft(null); }, []);
   const handleSaveTeam = useCallback(() => {
     if (!editingTeam) return;
-    if (!editingTeam.name?.trim()) { window.alert("请输入队伍名称。"); return; }
+    if (!editingTeam.name?.trim()) { toast.error("请输入队伍名称。"); return; }
     const validMembers = (editingTeam.members || []).filter((m) => m && m.pokemonId);
-    if (validMembers.length === 0) { window.alert("请至少添加一只宝可梦。"); return; }
+    if (validMembers.length === 0) { toast.error("请至少添加一只宝可梦。"); return; }
     const membersToSave = validMembers.map((m, i) => {
       if (m.configId) return { slot: i + 1, configId: m.configId };
       return {
@@ -1503,6 +1505,12 @@ export default function TeamsPage() {
     const config = boxConfigs.find((c) => c.configId === configId);
     if (!config) return;
     const members = [...(editingTeam.members || [])];
+    // 检查是否已存在相同宝可梦（排除当前槽位）
+    const duplicate = members.find((m) => m.slot !== slot && m.pokemonId === config.pokemonId);
+    if (duplicate) {
+      toast.error(`队伍中已存在「${config.nameZh || config.pokemonId}」，不能重复添加同一宝可梦。`);
+      return;
+    }
     const idx = members.findIndex((m) => m.slot === slot);
     const newMember = { ...config, slot, configId };
     if (idx >= 0) members[idx] = newMember; else members.push(newMember);
@@ -1519,8 +1527,14 @@ export default function TeamsPage() {
   const handleEditMember = useCallback((slot, member) => { setInlineEditSlot(slot); setInlineEditDraft({ ...member }); setInlineEditIsNew(false); setInlinePickerSearch(""); }, []);
   const handleInlineEditDraftChange = useCallback((updater) => { setInlineEditDraft((prev) => (typeof updater === "function" ? updater(prev) : updater)); }, []);
   const handleConfirmInlineEdit = useCallback(() => {
-    if (!editingTeam || !inlineEditDraft?.pokemonId) { window.alert("请先选择一只宝可梦。"); return; }
+    if (!editingTeam || !inlineEditDraft?.pokemonId) { toast.error("请先选择一只宝可梦。"); return; }
     const members = [...(editingTeam.members || [])];
+    // 检查是否已存在相同宝可梦（排除当前槽位）
+    const duplicate = members.find((m) => m.slot !== inlineEditSlot && m.pokemonId === inlineEditDraft.pokemonId);
+    if (duplicate) {
+      toast.error(`队伍中已存在「${inlineEditDraft.nameZh || inlineEditDraft.pokemonId}」，不能重复添加同一宝可梦。`);
+      return;
+    }
     const newMember = { ...inlineEditDraft, slot: inlineEditSlot };
     const idx = members.findIndex((m) => m.slot === inlineEditSlot);
     if (idx >= 0) members[idx] = newMember; else members.push(newMember);

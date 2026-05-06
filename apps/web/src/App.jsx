@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createDraftMember } from "./utils/helpers.js";
 import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "./utils/constants.js";
+import { ToastProvider } from "./components/Toast.jsx";
 import PokedexPage from "./pages/PokedexPage.jsx";
 import ItemsPage from "./pages/ItemsPage.jsx";
 import MovesPage from "./pages/MovesPage.jsx";
@@ -146,6 +147,7 @@ export default function App() {
   }, [route, query, types, generation, moveCategory, teamDraft]);
 
   return (
+    <ToastProvider>
     <div className="app-shell">
       <nav className="top-nav">
         <a className="top-nav-brand" href="#/pokedex">
@@ -328,5 +330,6 @@ export default function App() {
         {pageElement}
       </main>
     </div>
+    </ToastProvider>
   );
 }
