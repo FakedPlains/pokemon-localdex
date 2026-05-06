@@ -161,11 +161,12 @@ export async function fetchPokemonDetail(idOrSlug) {
   if (!pokemonRow) return { data: null };
   const pokemonId = pokemonRow.id;
 
-  // 获取所有形态及其子数据
+  // 获取所有形态及其子数据（含绑定道具）
   const { data: formRows } = await sb
     .from("pokemon_forms")
     .select([
-      "id, form_key, name_zh, form_type, is_default, sort_order",
+      "id, form_key, name_zh, form_type, is_default, sort_order, required_item_id",
+      "items:required_item_id ( id, name_zh, slug, image_url )",
       "pokemon_form_stats ( generation_start, generation_end, hp, atk, def, spa, spd, spe )",
       "pokemon_form_types ( type_name, slot, generation_start, generation_end )",
       "pokemon_form_abilities ( ability_name_zh, is_hidden, slot, ability_id, generation_start, generation_end )",
@@ -281,11 +282,53 @@ export async function fetchPokemonDetail(idOrSlug) {
       images,
     };
 
+    // 填充绑定道具信息
+    if (f.items) {
+      const item = f.items;
+      entry.requiredItem = {
+        id: String(item.id),
+        nameZh: item.name_zh,
+        slug: item.slug,
+        imageUrl: item.image_url || undefined,
+      };
+    }
+
     if (statEntries.length > 1) {
       entry.statVariants = statEntries.map((s) => ({
         generationStart: s.generation_start ?? undefined,
         generationEnd: s.generation_end ?? undefined,
         baseStats: { hp: s.hp, atk: s.atk, def: s.def, spa: s.spa, spd: s.spd, spe: s.spe },
+      }));
+    }
+
+    // 世代属性变体
+    const typeGenGroups = new Map();
+    for (const t of typeEntries) {
+      const key = `${t.generation_start ?? ''}_${t.generation_end ?? ''}`;
+      if (!typeGenGroups.has(key)) typeGenGroups.set(key, { generationStart: t.generation_start ?? undefined, generationEnd: t.generation_end ?? undefined, types: [] });
+      typeGenGroups.get(key).types.push(t.type_name);
+    }
+    if (typeGenGroups.size > 1) {
+      entry.typeVariants = [...typeGenGroups.values()].map((g) => ({
+        generationStart: g.generationStart,
+        generationEnd: g.generationEnd,
+        primaryType: g.types[0],
+        secondaryType: g.types[1],
+      }));
+    }
+
+    // 世代特性变体
+    const abilityGenGroups = new Map();
+    for (const a of abilityEntries) {
+      const key = `${a.generation_start ?? ''}_${a.generation_end ?? ''}`;
+      if (!abilityGenGroups.has(key)) abilityGenGroups.set(key, { generationStart: a.generation_start ?? undefined, generationEnd: a.generation_end ?? undefined, abilities: [] });
+      abilityGenGroups.get(key).abilities.push({ nameZh: a.ability_name_zh, isHidden: Boolean(a.is_hidden), abilityId: a.ability_id || undefined });
+    }
+    if (abilityGenGroups.size > 1) {
+      entry.abilityVariants = [...abilityGenGroups.values()].map((g) => ({
+        generationStart: g.generationStart,
+        generationEnd: g.generationEnd,
+        abilities: g.abilities,
       }));
     }
 
@@ -462,6 +505,7 @@ export async function fetchAbilityDetail(idOrSlug) {
         generation: g.generation,
         gameVersionCode: g.game_version_code || undefined,
         gameVersionName: g.game_version_code ? GAME_VERSION_NAMES.get(g.game_version_code) : undefined,
+        versionExclusive: g.version_exclusive === 1 || g.version_exclusive === true,
         description: g.description || "", notes: g.notes || undefined,
       })),
     }
@@ -502,6 +546,7 @@ export async function fetchMoveDetail(idOrSlug) {
         generation: g.generation,
         gameVersionCode: g.game_version_code || undefined,
         gameVersionName: g.game_version_code ? GAME_VERSION_NAMES.get(g.game_version_code) : undefined,
+        versionExclusive: g.version_exclusive === 1 || g.version_exclusive === true,
         description: g.description || "", notes: g.notes || undefined,
       })),
     }
@@ -516,7 +561,7 @@ export async function fetchItemsList({ query, category, limit, offset } = {}) {
 
   // 使用关联查询一次性获取 generation records，避免 N+1
   let q = sb.from("items")
-    .select("*, item_generation_records ( generation, game_version_code, description, notes )", { count: usePagination ? "exact" : undefined })
+    .select("*, item_generation_records ( generation, game_version_code, description, notes, version_exclusive )", { count: usePagination ? "exact" : undefined })
     .order("id", { ascending: true });
 
   if (query) {
@@ -548,6 +593,7 @@ export async function fetchItemsList({ query, category, limit, offset } = {}) {
         generation: r.generation,
         gameVersionCode: r.game_version_code || undefined,
         gameVersionName: r.game_version_code ? GAME_VERSION_NAMES.get(r.game_version_code) : undefined,
+        versionExclusive: r.version_exclusive === 1 || r.version_exclusive === true,
         description: r.description || "",
         notes: r.notes || undefined,
       })),
@@ -593,6 +639,7 @@ export async function fetchItemDetail(idOrSlug) {
       generations: (genRows || []).map((r) => ({
         generation: r.generation, gameVersionCode: r.game_version_code || undefined,
         gameVersionName: r.game_version_code ? GAME_VERSION_NAMES.get(r.game_version_code) : undefined,
+        versionExclusive: r.version_exclusive === 1 || r.version_exclusive === true,
         description: r.description || "", notes: r.notes || undefined,
       })),
     }
@@ -607,7 +654,7 @@ export async function fetchMovesList({ query, type, category, generation, limit,
 
   // 使用关联查询一次性获取 generation records，避免 N+1
   let q = sb.from("moves")
-    .select("*, move_generation_records ( generation, game_version_code, description, notes )", { count: usePagination ? "exact" : undefined })
+    .select("*, move_generation_records ( generation, game_version_code, description, notes, version_exclusive )", { count: usePagination ? "exact" : undefined })
     .order("name_zh", { ascending: true });
 
   if (query) {
@@ -641,6 +688,7 @@ export async function fetchMovesList({ query, type, category, generation, limit,
         generation: g.generation,
         gameVersionCode: g.game_version_code || undefined,
         gameVersionName: g.game_version_code ? GAME_VERSION_NAMES.get(g.game_version_code) : undefined,
+        versionExclusive: g.version_exclusive === 1 || g.version_exclusive === true,
         description: g.description || "", notes: g.notes || undefined,
       })),
     };
@@ -661,7 +709,7 @@ export async function fetchAbilitiesList({ query, generation, limit, offset } = 
 
   // 使用关联查询一次性获取 generation records，避免 N+1
   let q = sb.from("abilities")
-    .select("*, ability_generation_records ( generation, game_version_code, description, notes )", { count: usePagination ? "exact" : undefined })
+    .select("*, ability_generation_records ( generation, game_version_code, description, notes, version_exclusive )", { count: usePagination ? "exact" : undefined })
     .order("number", { ascending: true })
     .order("name_zh", { ascending: true });
 
@@ -691,6 +739,7 @@ export async function fetchAbilitiesList({ query, generation, limit, offset } = 
         generation: g.generation,
         gameVersionCode: g.game_version_code || undefined,
         gameVersionName: g.game_version_code ? GAME_VERSION_NAMES.get(g.game_version_code) : undefined,
+        versionExclusive: g.version_exclusive === 1 || g.version_exclusive === true,
         description: g.description || "", notes: g.notes || undefined,
       })),
     };

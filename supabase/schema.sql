@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS move_generation_records (
   game_version_code TEXT NOT NULL DEFAULT '',
   description TEXT,
   notes TEXT,
+  version_exclusive INTEGER NOT NULL DEFAULT 0,
   UNIQUE (move_id, generation, game_version_code)
 );
 
@@ -61,6 +62,7 @@ CREATE TABLE IF NOT EXISTS ability_generation_records (
   game_version_code TEXT,
   description TEXT,
   notes TEXT,
+  version_exclusive INTEGER NOT NULL DEFAULT 0,
   UNIQUE (ability_id, generation)
 );
 
@@ -90,6 +92,7 @@ CREATE TABLE IF NOT EXISTS item_generation_records (
   game_version_code TEXT,
   description TEXT,
   notes TEXT,
+  version_exclusive INTEGER NOT NULL DEFAULT 0,
   UNIQUE (item_id, generation)
 );
 
@@ -123,6 +126,7 @@ CREATE TABLE IF NOT EXISTS pokemon_forms (
   form_type TEXT NOT NULL DEFAULT 'default',
   is_default INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
+  required_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
   UNIQUE (pokemon_id, form_key)
 );
 
