@@ -512,12 +512,12 @@ def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
         carry_text = section_text_by_heading(page.html, "携带", level=3)
         effect_detail = to_simplified(clean_summary(carry_text, max_length=2000)) or None
     else:
-        # 先尝试 h3「效果」（超级石、Z纯晶等道具的效果描述在此级别）
-        h3_effect = section_text_by_heading(page.html, "效果", level=3)
+        # 先尝试 h3「效果」精确匹配（超级石、Z纯晶等道具的效果描述在此级别）
+        h3_effect = _section_text_by_exact_heading(page.html, "效果", level=3)
         if h3_effect:
             effect_detail = to_simplified(clean_summary(h3_effect, max_length=2000)) or None
         else:
-            # 再尝试 h2「效果」，使用精确匹配避免匹配到「效果变更」
+            # 再尝试 h2「效果」精确匹配，避免匹配到「效果变更」
             h2_effect = _section_text_by_exact_heading(page.html, "效果", level=2)
             if h2_effect:
                 effect_detail = to_simplified(clean_summary(h2_effect, max_length=2000)) or None
