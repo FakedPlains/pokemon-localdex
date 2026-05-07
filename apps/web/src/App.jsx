@@ -8,6 +8,7 @@ import MovesPage from "./pages/MovesPage.jsx";
 import AbilitiesPage from "./pages/AbilitiesPage.jsx";
 import TeamsPage from "./pages/TeamsPage.jsx";
 import DamagePage from "./pages/DamagePage.jsx";
+import TypeChartPage from "./pages/TypeChartPage.jsx";
 
 const NAV_ITEMS = [
   { key: "pokedex", label: "图鉴", hash: "#/pokedex" },
@@ -15,7 +16,8 @@ const NAV_ITEMS = [
   { key: "moves", label: "招式", hash: "#/moves" },
   { key: "items", label: "道具", hash: "#/items" },
   { key: "teams", label: "队伍", hash: "#/teams" },
-  { key: "damage", label: "伤害", hash: "#/damage" }
+  { key: "damage", label: "伤害", hash: "#/damage" },
+  { key: "typechart", label: "克制表", hash: "#/typechart" }
 ];
 
 /* Per-page search placeholder text */
@@ -25,7 +27,8 @@ const SEARCH_PLACEHOLDERS = {
   moves: "搜索招式名（中/英/日）…",
   abilities: "搜索特性名（中/英/日）…",
   teams: "队伍页暂无搜索",
-  damage: "伤害页暂无搜索"
+  damage: "伤害页暂无搜索",
+  typechart: "克制表页暂无搜索"
 };
 
 /* Pages that support the shared search */
@@ -141,6 +144,8 @@ export default function App() {
         return <TeamsPage />;
       case "damage":
         return <DamagePage teamDraft={teamDraft} />;
+      case "typechart":
+        return <TypeChartPage />;
       default:
         return <PokedexPage query={query} types={types} generation={generation} />;
     }

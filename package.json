@@ -10,7 +10,6 @@
     "dev:api": "node --enable-source-maps apps/api/src/server.ts",
     "dev:web": "npm run dev -w @pokemon-localdex/web",
     "build:web": "npm run build -w @pokemon-localdex/web",
-    "check:damage": "node --enable-source-maps packages/battle-core/src/demo.ts",
     "check:api": "node --enable-source-maps apps/api/src/smoke.ts",
     "check:sqlite": "node --enable-source-maps packages/sqlite-store/src/demo.ts",
     "db:ensure": "node --enable-source-maps packages/sqlite-store/src/import-db.ts",
@@ -24,6 +23,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.0",
+    "@smogon/calc": "^0.11.0",
     "hono": "^4.12.15",
     "vite": "^8.0.10"
   },

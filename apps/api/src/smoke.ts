@@ -44,11 +44,9 @@ console.log("item detail:", getItemFromSqlite("气势披带")?.nameEn);
 console.log("ability detail:", getAbilityFromSqlite("静电")?.effectDetail?.slice(0, 50));
 
 const damage = calculateDamage({
-  level: 50,
-  power: 80,
-  attack: 150,
-  defense: 100,
-  stab: 1.5,
-  typeEffectiveness: 1
+  generation: 9,
+  attacker: { name: "皮卡丘", level: 50 },
+  defender: { name: "喷火龙", level: 50 },
+  move: { name: "十万伏特" },
 });
 console.log("damage sample:", damage);
