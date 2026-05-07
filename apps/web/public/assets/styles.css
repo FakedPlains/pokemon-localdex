@@ -1835,13 +1835,15 @@ display: block;
    Base Stat Bars
    ═══════════════════════════════════════════════════════ */
 
-.bsb-grid { display: grid; gap: 8px; }
+.bsb-grid { display: grid; gap: 2px; }
 
 .bsb-row {
   display: grid;
   grid-template-columns: 42px 1fr auto;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
+  padding: 5px 8px;
+  border-radius: 8px;
 }
 
 .bsb-label {
@@ -1851,9 +1853,9 @@ display: block;
 }
 
 .bsb-track {
-  height: 10px;
+  height: 8px;
   border-radius: 999px;
-  background: rgba(31, 42, 31, 0.07);
+  background: rgba(31, 42, 31, 0.06);
   overflow: hidden;
 }
 
@@ -1870,13 +1872,13 @@ display: block;
 }
 
 .bsb-val {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .bsb-total .bsb-label { color: var(--ink); }
-.bsb-total .bsb-val { font-size: 16px; }
+.bsb-total .bsb-val { font-size: 14px; }
 
 .bsb-diff {
   font-size: 12px;
@@ -2663,8 +2665,8 @@ animation: sc-picker-in 0.25s ease;
 
 .sc-final-cell {
   text-align: center;
-  font-weight: 800;
-  font-size: 15px;
+  font-weight: 700;
+  font-size: 13px;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
