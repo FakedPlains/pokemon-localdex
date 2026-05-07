@@ -5427,42 +5427,44 @@ box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 .box-card-stats-header,
 .box-card-stats-row {
   display: grid;
-  grid-template-columns: 28px repeat(6, 1fr);
+  grid-template-columns: 30px repeat(6, 1fr);
   gap: 2px;
   text-align: center;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
 .box-card-stats-header span {
-  color: var(--muted);
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 700;
 }
 
 .box-card-stats-tag {
-  font-size: 9px;
-  color: var(--muted);
-  font-weight: 500;
+  font-size: 11px;
+  color: var(--ink);
+  font-weight: 700;
   text-align: right;
   padding-right: 2px;
 }
 
 .box-card-stats-num {
   font-variant-numeric: tabular-nums;
-  color: rgba(31, 42, 31, 0.3);
+  color: var(--ink);
+  opacity: 0.8;
   font-weight: 500;
 }
 
 .box-card-stats-num.has-val {
-color: var(--ink);
-font-weight: 700;
+  color: var(--ink);
+  opacity: 1;
+  font-weight: 600;
 }
 
 .box-card-stats-total {
-font-size: 10px;
-color: var(--muted);
-text-align: right;
-font-weight: 600;
+  font-size: 12px;
+  color: var(--ink);
+  text-align: right;
+  font-weight: 600;
 }
 
 .box-card-stats-tag-iv {
@@ -6461,12 +6463,11 @@ text-overflow: clip;
 }
 
 .cfg-stat-name {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink);
-  width: 26px;
+  width: 28px;
   text-transform: uppercase;
-  opacity: 0.7;
 }
 
 .cfg-stat-bar {
@@ -6492,17 +6493,19 @@ text-overflow: clip;
 .cfg-stat-row:nth-child(6) .cfg-stat-fill { background: #A456D0; }
 
 .cfg-stat-val {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--ink);
+  opacity: 0.8;
   width: 24px;
   text-align: right;
 }
 
 .cfg-stat-total {
-  font-size: 11px;
-  color: var(--muted);
+  font-size: 12px;
+  color: var(--ink);
   text-align: center;
+  font-weight: 600;
   margin-top: 2px;
 }
 
