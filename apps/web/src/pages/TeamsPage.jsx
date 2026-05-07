@@ -9,7 +9,6 @@ import {
   resolveTeamMembers
 } from "../utils/teamStorage.js";
 import StatCalculator from "../components/StatCalculator.jsx";
-import StatsDisplay from "../components/StatsDisplay.jsx";
 import { useToast } from "../components/Toast.jsx";
 
 // ══════════════════════════════════════════════
@@ -580,7 +579,18 @@ function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
             {config.statMode === "champions" && <span className="cfg-section-mode-badge">🏆SP</span>}
           </div>
           {finalStats ? (
-            <StatsDisplay mode="bar" finalStats={finalStats} statTotal={statTotal} />
+            <div className="cfg-stats-mini">
+              {STAT_KEYS.map((key) => (
+                <div key={key} className="cfg-stat-row">
+                  <span className="cfg-stat-name">{key}</span>
+                  <div className="cfg-stat-bar">
+                    <div className="cfg-stat-fill" style={{ width: `${Math.min(100, (finalStats[key] || 0) / 2.55)}%` }} />
+                  </div>
+                  <span className="cfg-stat-val">{finalStats[key]}</span>
+                </div>
+              ))}
+              <div className="cfg-stat-total">合计 {statTotal}</div>
+            </div>
           ) : (
             <span className="muted" style={{ fontSize: 12 }}>{detailLoading ? "加载中…" : pokemonId ? "暂无数据" : "—"}</span>
           )}
@@ -1149,15 +1159,43 @@ function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
         const stats = Object.fromEntries(
           STAT_KEYS.map((key) => [key, calculateFinalStat(config, detail, key)])
         );
+        const isChampions = config.statMode === "champions";
         return (
-          <StatsDisplay
-            mode="table"
-            finalStats={stats}
-            statMode={config.statMode}
-            ivs={config.ivs}
-            evs={config.evs}
-            sps={config.sps}
-          />
+          <div className="box-card-stats">
+            <div className="box-card-stats-header">
+              <span></span>
+              <span>HP</span><span>攻击</span><span>防御</span><span>特攻</span><span>特防</span><span>速度</span>
+            </div>
+            {isChampions ? (
+              <div className="box-card-stats-row">
+                <span className="box-card-stats-tag box-card-stats-tag-sp">SP</span>
+                {STAT_KEYS.map((k) => (
+                  <span key={k} className="box-card-stats-num">{config.sps?.[k] || 0}</span>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="box-card-stats-row">
+                  <span className="box-card-stats-tag box-card-stats-tag-iv">个体</span>
+                  {STAT_KEYS.map((k) => (
+                    <span key={k} className="box-card-stats-num">{config.ivs?.[k] ?? 31}</span>
+                  ))}
+                </div>
+                <div className="box-card-stats-row">
+                  <span className="box-card-stats-tag box-card-stats-tag-ev">努力</span>
+                  {STAT_KEYS.map((k) => (
+                    <span key={k} className="box-card-stats-num">{config.evs?.[k] || 0}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="box-card-stats-row">
+              <span className="box-card-stats-tag">能力</span>
+              {STAT_KEYS.map((k) => (
+                <span key={k} className="box-card-stats-num has-val">{stats[k]}</span>
+              ))}
+            </div>
+          </div>
         );
       })()}
     </div>
@@ -1359,15 +1397,43 @@ function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlin
         const stats = Object.fromEntries(
           STAT_KEYS.map((key) => [key, calculateFinalStat(member, detail, key)])
         );
+        const isChampions = member.statMode === "champions";
         return (
-          <StatsDisplay
-            mode="table"
-            finalStats={stats}
-            statMode={member.statMode}
-            ivs={member.ivs}
-            evs={member.evs}
-            sps={member.sps}
-          />
+          <div className="box-card-stats">
+            <div className="box-card-stats-header">
+              <span></span>
+              <span>HP</span><span>攻击</span><span>防御</span><span>特攻</span><span>特防</span><span>速度</span>
+            </div>
+            {isChampions ? (
+              <div className="box-card-stats-row">
+                <span className="box-card-stats-tag box-card-stats-tag-sp">SP</span>
+                {STAT_KEYS.map((k) => (
+                  <span key={k} className="box-card-stats-num">{member.sps?.[k] || 0}</span>
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="box-card-stats-row">
+                  <span className="box-card-stats-tag box-card-stats-tag-iv">个体</span>
+                  {STAT_KEYS.map((k) => (
+                    <span key={k} className="box-card-stats-num">{member.ivs?.[k] ?? 31}</span>
+                  ))}
+                </div>
+                <div className="box-card-stats-row">
+                  <span className="box-card-stats-tag box-card-stats-tag-ev">努力</span>
+                  {STAT_KEYS.map((k) => (
+                    <span key={k} className="box-card-stats-num">{member.evs?.[k] || 0}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="box-card-stats-row">
+              <span className="box-card-stats-tag">能力</span>
+              {STAT_KEYS.map((k) => (
+                <span key={k} className="box-card-stats-num has-val">{stats[k]}</span>
+              ))}
+            </div>
+          </div>
         );
       })()}
     </div>
