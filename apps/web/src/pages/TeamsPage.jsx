@@ -8,699 +8,9 @@ import {
   getTeams, saveTeam, deleteTeam,
   resolveTeamMembers
 } from "../utils/teamStorage.js";
-import StatCalculator from "../components/StatCalculator.jsx";
 import PokemonConfigCard from "../components/PokemonConfigCard.jsx";
+import PokemonEditor from "../components/PokemonEditor.jsx";
 import { useToast } from "../components/Toast.jsx";
-
-// ══════════════════════════════════════════════
-//  宝可梦配置编辑器
-// ══════════════════════════════════════════════
-
-function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }) {
-  const [pokemonDetail, setPokemonDetail] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [isShiny, setIsShiny] = useState(config.isShiny || false);
-  const [configName, setConfigName] = useState(config.configName || "");
-  const [selectedFormKey, setSelectedFormKey] = useState(config.formKey || null); // 当前选中的形态 key
-  const [activePanel, setActivePanel] = useState(null); // "item" | "move-0" | "move-1" | "move-2" | "move-3" | "stats" | null
-  const [panelSearch, setPanelSearch] = useState("");
-  const [items, setItems] = useState([]);
-  const [itemsHasMore, setItemsHasMore] = useState(true);
-  const [itemsLoading, setItemsLoading] = useState(false);
-  const [itemSearchResults, setItemSearchResults] = useState(null); // null = 使用分页列表
-  const [moveSearchResults, setMoveSearchResults] = useState(null); // null = 使用宝可梦招式列表
-  const [movesLoading, setMovesLoading] = useState(false);
-  const itemsOffsetRef = useRef(0);
-  const itemsInitRef = useRef(false);
-  const itemListRef = useRef(null);
-  const moveListRef = useRef(null);
-  const itemSearchTimer = useRef(null);
-  const pokemonId = config.pokemonId;
-
-  // 道具分页加载（仅在面板打开时触发）
-  const loadItemsPage = useCallback((reset) => {
-    if (itemsLoading) return;
-    if (!reset && !itemsHasMore) return;
-    const offset = reset ? 0 : itemsOffsetRef.current;
-    setItemsLoading(true);
-    unifiedApi(`/items?limit=50&offset=${offset}`).then((r) => {
-      const newItems = r.data || [];
-      if (reset) {
-        setItems(newItems);
-      } else {
-        setItems((prev) => [...prev, ...newItems]);
-      }
-      setItemsHasMore(r.hasMore ?? false);
-      itemsOffsetRef.current = offset + newItems.length;
-      setItemsLoading(false);
-    }).catch(() => { setItemsLoading(false); });
-  }, [itemsLoading, itemsHasMore]);
-
-  // 面板打开时加载首页道具
-  useEffect(() => {
-    if (activePanel === "item" && !itemsInitRef.current) {
-      itemsInitRef.current = true;
-      loadItemsPage(true);
-    }
-  }, [activePanel]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 道具搜索（防抖，走 API）
-  useEffect(() => {
-    if (activePanel !== "item") return;
-    if (!panelSearch.trim()) {
-      setItemSearchResults(null);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setItemsLoading(true);
-      unifiedApi(`/items?q=${encodeURIComponent(panelSearch.trim())}&limit=50`).then((r) => {
-        setItemSearchResults(r.data || []);
-        setItemsLoading(false);
-      }).catch(() => { setItemSearchResults([]); setItemsLoading(false); });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [panelSearch, activePanel]);
-
-  // 招式搜索（防抖，走 /moves API）
-  useEffect(() => {
-    if (!activePanel?.startsWith("move-")) return;
-    if (!panelSearch.trim()) {
-      setMoveSearchResults(null);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setMovesLoading(true);
-      unifiedApi(`/moves?q=${encodeURIComponent(panelSearch.trim())}&limit=50`).then((r) => {
-        setMoveSearchResults(r.data || []);
-        setMovesLoading(false);
-      }).catch(() => { setMoveSearchResults([]); setMovesLoading(false); });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [panelSearch, activePanel]);
-
-  // 道具列表滚动加载更多（仅在非搜索模式下）
-  const handleItemScroll = useCallback((e) => {
-    if (panelSearch.trim()) return; // 搜索模式不分页
-    const el = e.target;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
-      loadItemsPage(false);
-    }
-  }, [loadItemsPage, panelSearch]);
-
-  useEffect(() => {
-    if (!pokemonId) { setPokemonDetail(null); return; }
-    let cancelled = false;
-    setDetailLoading(true);
-    unifiedApi(`/pokemon/${encodeURIComponent(pokemonId)}`).then((r) => {
-      if (!cancelled) {
-        setPokemonDetail(r.data);
-        setDetailLoading(false);
-        // 如果 config 中已有 formKey，使用它；否则默认选中第一个形态
-        const forms = r.data?.forms || [];
-        const initialFormKey = config.formKey || (forms[0]?.formKey ?? "default");
-        setSelectedFormKey(initialFormKey);
-        // 根据选中的形态保存闪光图片 URL 和 baseStats 到 config
-        const selectedForm = forms.find((f) => f.formKey === initialFormKey) || forms[0];
-        const imgs = selectedForm?.images || r.data?.images;
-        const shinyObj = imgs?.shiny || imgs?.shinyOfficial || imgs?.shinySprite;
-        const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
-        const detailBaseStats = selectedForm?.baseStats || r.data?.baseStats;
-        const updates = {};
-        if (shinyUrl && !config.shinyImageUrl) updates.shinyImageUrl = shinyUrl;
-        if (detailBaseStats && !config.baseStats) updates.baseStats = detailBaseStats;
-        // 默认选中第一个特性
-        if (!config.abilityId) {
-          const formAbilities = selectedForm?.abilities || [];
-          const normalAbilities = formAbilities.filter((ab) => !ab.isHidden);
-          const firstAbility = normalAbilities[0] || formAbilities[0];
-          if (firstAbility) {
-            updates.abilityId = firstAbility.nameZh || firstAbility.abilityId || "";
-          } else {
-            const topAbilities = r.data?.abilities || [];
-            if (topAbilities.length > 0) updates.abilityId = topAbilities[0];
-          }
-        }
-        if (Object.keys(updates).length > 0) {
-          onChange((prev) => ({ ...prev, ...updates }));
-        }
-      }
-    }).catch(() => {
-      if (!cancelled) { setPokemonDetail(null); setDetailLoading(false); }
-    });
-    return () => { cancelled = true; };
-  }, [pokemonId]);
-
-  /* ── 当前选中的形态 ── */
-  const currentForm = useMemo(() => {
-    if (!pokemonDetail) return null;
-    const forms = pokemonDetail.forms || [];
-    if (forms.length === 0) return null;
-    return forms.find((f) => f.formKey === selectedFormKey) || forms[0];
-  }, [pokemonDetail, selectedFormKey]);
-
-  /* ── 形态列表（用于选择器，过滤掉超极巨化形态） ── */
-  const formOptions = useMemo(() => {
-    if (!pokemonDetail) return [];
-    const forms = pokemonDetail.forms || [];
-    return forms
-      .filter((f) => f.formType !== "gmax" && !/超极巨化/.test(f.nameZh || ""))
-      .map((f) => ({
-        value: f.formKey,
-        label: f.nameZh || f.formKey || "默认形态",
-        formType: f.formType || "default",
-      }));
-  }, [pokemonDetail]);
-
-  /* ── 切换形态时更新 config ── */
-  const handleFormChange = useCallback((formKey) => {
-    setSelectedFormKey(formKey);
-    if (!pokemonDetail) return;
-    const forms = pokemonDetail.forms || [];
-    const form = forms.find((f) => f.formKey === formKey) || forms[0];
-    if (!form) return;
-    // 更新 config 中的形态相关信息
-    const imgs = form.images || pokemonDetail.images;
-    const officialImg = imgs?.official || imgs?.sprite;
-    const shinyObj = imgs?.shiny || imgs?.shinyOfficial || imgs?.shinySprite;
-    const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
-    // 切换形态时默认选中第一个特性
-    const formAbilities = form.abilities || [];
-    const normalAbilities = formAbilities.filter((ab) => !ab.isHidden);
-    const firstAbility = normalAbilities[0] || formAbilities[0];
-    const defaultAbilityId = firstAbility
-      ? (firstAbility.nameZh || firstAbility.abilityId || "")
-      : (pokemonDetail.abilities?.[0] || "");
-    const updates = {
-      formKey,
-      formName: form.nameZh || form.formKey || "",
-      primaryType: form.primaryType || pokemonDetail.primaryType || "",
-      secondaryType: form.secondaryType || pokemonDetail.secondaryType || "",
-      baseStats: form.baseStats || pokemonDetail.baseStats || null,
-      imageUrl: officialImg?.url || "",
-      shinyImageUrl: shinyUrl,
-      abilityId: defaultAbilityId,
-    };
-    // 形态绑定道具：自动设置/清除道具
-    if (form.requiredItem) {
-      updates.itemId = form.requiredItem.slug || form.requiredItem.nameZh;
-      updates.itemImageUrl = form.requiredItem.imageUrl || "";
-    } else {
-      // 切换到无绑定道具的形态时，如果之前的道具是被形态锁定的，则清除
-      const prevForm = forms.find((f) => f.formKey === config.formKey);
-      if (prevForm?.requiredItem) {
-        updates.itemId = "";
-        updates.itemImageUrl = "";
-      }
-    }
-    onChange((prev) => ({ ...prev, ...updates }));
-  }, [pokemonDetail, onChange, config.formKey]);
-
-  /* ── 特性列表（分普通 / 隐藏） ── */
-  const abilityGroups = useMemo(() => {
-    if (!pokemonDetail) return { normal: [], hidden: [] };
-    const abilities = currentForm?.abilities || [];
-    if (abilities.length > 0) {
-      return {
-        normal: abilities.filter((ab) => !ab.isHidden).map((ab) => ab.nameZh || ab.abilityId || ""),
-        hidden: abilities.filter((ab) => ab.isHidden).map((ab) => ab.nameZh || ab.abilityId || ""),
-      };
-    }
-    const topAbilities = pokemonDetail.abilities || [];
-    return {
-      normal: topAbilities,
-      hidden: pokemonDetail.hiddenAbility ? [pokemonDetail.hiddenAbility] : [],
-    };
-  }, [pokemonDetail, currentForm]);
-
-  const allAbilities = useMemo(() => [...abilityGroups.normal, ...abilityGroups.hidden], [abilityGroups]);
-
-  const [movesList, setMovesList] = useState([]);
-  useEffect(() => {
-    if (!pokemonDetail) { setMovesList([]); return; }
-    let cancelled = false;
-    unifiedApi(`/pokemon/${pokemonDetail.id}/learnset/meta`).then((meta) => {
-      if (cancelled) return;
-      const gens = meta.data?.generations || [];
-      const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
-      const formKeys = meta.data?.formKeys || [];
-      const form = formKeys[0] || "default";
-      return unifiedApi(`/pokemon/${pokemonDetail.id}/learnset?generation=${latestGen}&form=${form}`);
-    }).then((r) => {
-      if (cancelled || !r) return;
-      const entries = r.data || [];
-      const seen = new Set();
-      const moves = [];
-      for (const entry of entries) {
-        const name = entry.moveNameZh || entry.moveId;
-        if (name && !seen.has(name)) {
-          seen.add(name);
-          moves.push({
-            value: name,
-            label: name,
-            moveType: entry.moveType || "",
-            moveCategory: entry.moveCategory || "",
-            movePower: entry.movePower ?? null,
-            moveAccuracy: entry.moveAccuracy ?? null,
-            movePP: entry.movePP ?? null,
-            moveDescription: entry.moveDescription || "",
-          });
-        }
-      }
-      setMovesList(moves);
-    }).catch(() => { if (!cancelled) setMovesList([]); });
-    return () => { cancelled = true; };
-  }, [pokemonDetail]);
-
-  const itemOptions = useMemo(() => {
-    return items.map((item) => ({
-      value: item.slug || String(item.id),
-      label: item.nameZh || item.slug || String(item.id),
-      sublabel: item.effectSummary || "",
-      imageUrl: item.imageUrl || "",
-    }));
-  }, [items]);
-
-  /* ── 图片（普通 / 闪光） ── */
-  const detailImages = currentForm?.images || pokemonDetail?.images;
-  const previewImage = useMemo(() => {
-    if (isShiny) {
-      const shiny = detailImages?.shiny || detailImages?.shinyOfficial || detailImages?.shinySprite;
-      if (shiny) return shiny;
-    }
-    if (currentForm?.images?.official) return currentForm.images.official;
-    if (pokemonDetail) return getPokemonPreviewImage(pokemonDetail);
-    return null;
-  }, [pokemonDetail, currentForm, detailImages, isShiny]);
-
-  const baseStats = useMemo(() => {
-    if (!pokemonDetail) return null;
-    return currentForm?.baseStats || pokemonDetail.baseStats || null;
-  }, [pokemonDetail, currentForm]);
-
-  /* ── 属性 ── */
-  const types = useMemo(() => {
-    if (!pokemonDetail) return [];
-    const src = currentForm || pokemonDetail;
-    const arr = [];
-    if (src.primaryType) arr.push(src.primaryType);
-    if (src.secondaryType) arr.push(src.secondaryType);
-    if (arr.length > 0) return arr;
-    return pokemonDetail.types || [];
-  }, [pokemonDetail, currentForm]);
-
-  const handleField = (field, value) => {
-    const draft = { ...config };
-    draft[field] = field === "level" ? Number(value || 50) : value;
-    onChange(draft);
-  };
-
-  const handleMove = (moveIndex, value, moveOpt) => {
-    const draft = { ...config, moves: [...(config.moves || ["", "", "", ""])] };
-    draft.moves[moveIndex] = value;
-    // 保存招式类型信息以便展示
-    if (moveOpt && value) {
-      const movesInfo = { ...(config._movesInfo || {}) };
-      movesInfo[value] = { type: moveOpt.moveType || "", power: moveOpt.movePower ?? "", category: moveOpt.moveCategory || "" };
-      draft._movesInfo = movesInfo;
-    }
-    onChange(draft);
-  };
-
-  const handleStatChange = useCallback(({ level, nature, ivs, evs, statMode, sps, champNature }) => {
-    onChange((prev) => {
-      if (prev.level === level && prev.nature === nature &&
-          prev.statMode === statMode &&
-          JSON.stringify(prev.ivs) === JSON.stringify(ivs) &&
-          JSON.stringify(prev.evs) === JSON.stringify(evs) &&
-          JSON.stringify(prev.sps) === JSON.stringify(sps)) {
-        return prev;
-      }
-      return { ...prev, level, nature, ivs, evs, statMode: statMode || "classic", sps: sps || {}, champNature: champNature || nature };
-    });
-  }, [onChange]);
-
-  const statInitialValues = {
-    level: config.level || 50,
-    nature: config.nature || "认真",
-    ivs: config.ivs || createDefaultStats("iv"),
-    evs: config.evs || createDefaultStats("ev"),
-    statMode: config.statMode || "classic",
-    sps: config.sps || {},
-    champNature: config.champNature || config.nature || "认真",
-  };
-
-  /* ── 下方面板：搜索过滤 ── */
-  const panelFilteredItems = useMemo(() => {
-    if (itemSearchResults !== null) {
-      // 搜索模式：使用 API 返回的结果
-      return itemSearchResults.map((item) => ({
-        value: item.slug || String(item.id),
-        label: item.nameZh || item.slug || String(item.id),
-        sublabel: item.effectSummary || "",
-        imageUrl: item.imageUrl || "",
-      }));
-    }
-    return itemOptions;
-  }, [itemOptions, itemSearchResults]);
-
-  const panelFilteredMoves = useMemo(() => {
-    if (moveSearchResults !== null) {
-      // 搜索模式：使用 /moves API 返回的结果
-      return moveSearchResults.map((m) => ({
-        value: m.nameZh || String(m.id),
-        label: m.nameZh || String(m.id),
-        moveType: m.type || "",
-        moveCategory: m.category || "",
-        movePower: m.power ?? null,
-        moveAccuracy: m.accuracy ?? null,
-        movePP: m.pp ?? null,
-        moveDescription: m.description || "",
-      }));
-    }
-    return movesList;
-  }, [movesList, moveSearchResults]);
-
-  // 当前形态是否绑定了道具（锁定道具选择）
-  const isItemLocked = Boolean(currentForm?.requiredItem);
-
-  const openPanel = (panel) => {
-    if (panel === "item" && isItemLocked) return; // 道具被形态锁定时不允许打开面板
-    setActivePanel(panel);
-    setPanelSearch("");
-  };
-
-  /* ── 计算实际能力值 ── */
-  const finalStats = useMemo(() => {
-    if (!baseStats) return null;
-    const detail = { baseStats };
-    return Object.fromEntries(
-      STAT_KEYS.map((key) => [key, calculateFinalStat(config, detail, key)])
-    );
-  }, [baseStats, config]);
-
-  const statTotal = useMemo(() => {
-    if (!finalStats) return null;
-    return STAT_KEYS.reduce((sum, key) => sum + (finalStats[key] || 0), 0);
-  }, [finalStats]);
-
-  /* ── 形态滑块 Portal（渲染到 toolbar 中） ── */
-  const [portalTarget, setPortalTarget] = useState(null);
-  useEffect(() => {
-    const el = document.getElementById("cfg-form-slider-portal");
-    setPortalTarget(el);
-  }, [pokemonId]);
-
-  const formSliderPortal = (formOptions.length > 1 && portalTarget)
-    ? createPortal(
-        <span className="cfg-form-slider-inline">
-          {formOptions.map((opt) => (
-            <button
-              key={opt.value}
-              className={`cfg-form-slider-item${selectedFormKey === opt.value ? " cfg-form-slider-active" : ""}`}
-              onClick={() => handleFormChange(opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </span>,
-        portalTarget
-      )
-    : null;
-
-  return (
-    <div className="cfg-editor">
-      {formSliderPortal}
-      {/* ══ 上方：三等分配置区 ══ */}
-      <div className="cfg-top">
-        {/* 第一栏：图片 + 属性 + 特性 + 道具 */}
-        <div className="cfg-col cfg-col-first">
-          <div className="cfg-first-inner">
-            <div className="cfg-first-img">
-              <div className="cfg-preview-img">
-                {previewImage?.url
-                  ? <img src={previewImage.url} alt={config.nameZh || ""} referrerPolicy="no-referrer" />
-                  : <span className="cfg-preview-empty">{pokemonId ? "…" : "?"}</span>}
-                {config.itemImageUrl && (
-                  <img className="cfg-item-overlay" src={config.itemImageUrl} alt={config.itemId || ""} referrerPolicy="no-referrer" />
-                )}
-                <span
-                  className={`cfg-shiny-badge${isShiny ? " cfg-shiny-badge-active" : ""}`}
-                  onClick={() => { const next = !isShiny; setIsShiny(next); onChange({ ...config, isShiny: next }); }}
-                  title={isShiny ? "切换为普通" : "切换为闪光"}
-                >✨</span>
-              </div>
-              <div className="cfg-types">
-                {types.map((t) => (
-                  <span key={t} className={`type-chip type-${t}`}>
-                    <img className="type-chip-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${t}@sm.png`} alt="" />
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div className="cfg-first-meta">
-              <div className="cfg-section-label">特性</div>
-              <div className="cfg-ability-tabs">
-                {abilityGroups.normal.map((name) => (
-                  <button
-                    key={name}
-                    className={`te-ability-tab${config.abilityId === name ? " te-ability-tab-active" : ""}`}
-                    onClick={() => handleField("abilityId", name)}
-                  >{name}</button>
-                ))}
-                {abilityGroups.hidden.map((name) => (
-                  <button
-                    key={name}
-                    className={`te-ability-tab te-ability-tab-hidden${config.abilityId === name ? " te-ability-tab-active" : ""}`}
-                    onClick={() => handleField("abilityId", name)}
-                    title="隐藏特性"
-                  >{name}<span className="te-ha-badge">HA</span></button>
-                ))}
-                {allAbilities.length === 0 && (
-                  <span className="muted" style={{ fontSize: 12 }}>{detailLoading ? "加载中…" : "暂无"}</span>
-                )}
-              </div>
-              <div className="cfg-section-label">道具{isItemLocked && <span className="cfg-section-lock-badge">🔒 形态绑定</span>}</div>
-              {isItemLocked ? (
-                <div className="cfg-slot-btn cfg-slot-locked" title="该形态必须携带此道具">
-                  <span className="cfg-item-selected">
-                    {config.itemImageUrl && <img className="cfg-item-selected-img" src={config.itemImageUrl} alt="" referrerPolicy="no-referrer" />}
-                    <span>{currentForm?.requiredItem?.nameZh || config.itemId}</span>
-                  </span>
-                </div>
-              ) : activePanel === "item" ? (
-                <div className="cfg-item-search-wrap">
-                  <input
-                    className="cfg-item-search-input"
-                    placeholder="搜索道具…"
-                    value={panelSearch}
-                    onChange={(e) => setPanelSearch(e.target.value)}
-                    autoFocus
-                  />
-                  {panelSearch && (
-                    <button className="cfg-item-search-clear" onClick={() => setPanelSearch("")}>✕</button>
-                  )}
-                  <button className="cfg-item-search-close" onClick={() => setActivePanel(null)}>取消</button>
-                </div>
-              ) : (
-                <button
-                  className="cfg-slot-btn"
-                  onClick={() => openPanel("item")}
-                >
-                  {config.itemId ? (
-                    <span className="cfg-item-selected">
-                      {config.itemImageUrl && <img className="cfg-item-selected-img" src={config.itemImageUrl} alt="" referrerPolicy="no-referrer" />}
-                      <span>{config.itemId}</span>
-                    </span>
-                  ) : "选择道具…"}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 第二栏：招式 */}
-        <div className="cfg-col cfg-col-moves">
-          <div className="cfg-section-label">招式</div>
-          {[0, 1, 2, 3].map((mi) => {
-            if (activePanel === `move-${mi}`) {
-              return (
-                <div key={mi} className="cfg-move-search-wrap">
-                  <input
-                    className="cfg-move-search-input"
-                    placeholder={`搜索招式 ${mi + 1}…`}
-                    value={panelSearch}
-                    onChange={(e) => setPanelSearch(e.target.value)}
-                    autoFocus
-                  />
-                  {panelSearch && (
-                    <button className="cfg-move-search-clear" onClick={() => setPanelSearch("")}>✕</button>
-                  )}
-                  <button className="cfg-move-search-close" onClick={() => setActivePanel(null)}>取消</button>
-                </div>
-              );
-            }
-            const moveName = config.moves?.[mi];
-            if (moveName) {
-              // 优先从 config._movesInfo 获取，其次从 movesList 查找
-              const savedInfo = config._movesInfo?.[moveName];
-              const moveInfo = movesList.find((m) => m.value === moveName);
-              const moveType = savedInfo?.type || moveInfo?.moveType || "";
-              const movePower = savedInfo?.power || moveInfo?.movePower;
-              return (
-                <div
-                  key={mi}
-                  className={`box-card-move type-bg-${moveType || "unknown"} cfg-move-slot`}
-                  onClick={() => openPanel(`move-${mi}`)}
-                >
-                  {moveType && (
-                    <img className="box-card-move-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${moveType}@sm.png`} alt={moveType} />
-                  )}
-                  <span className="box-card-move-name">{moveName}</span>
-                  {movePower && <span className="box-card-move-power">{movePower}</span>}
-                </div>
-              );
-            }
-            return (
-              <button
-                key={mi}
-                className="cfg-slot-btn"
-                onClick={() => openPanel(`move-${mi}`)}
-              >
-                {`招式 ${mi + 1}`}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 第三栏：能力值概览 */}
-        <div className="cfg-col cfg-col-stats" onClick={() => openPanel(activePanel === "stats" ? null : "stats")}>
-          <div className="cfg-section-label">
-            能力值
-            {config.statMode === "champions" && <span className="cfg-section-mode-badge">🏆SP</span>}
-          </div>
-          {finalStats ? (
-            <div className="cfg-stats-mini">
-              {STAT_KEYS.map((key) => (
-                <div key={key} className="cfg-stat-row">
-                  <span className="cfg-stat-name">{key}</span>
-                  <div className="cfg-stat-bar">
-                    <div className="cfg-stat-fill" style={{ width: `${Math.min(100, (finalStats[key] || 0) / 2.55)}%` }} />
-                  </div>
-                  <span className="cfg-stat-val">{finalStats[key]}</span>
-                </div>
-              ))}
-              <div className="cfg-stat-total">合计 {statTotal}</div>
-            </div>
-          ) : (
-            <span className="muted" style={{ fontSize: 12 }}>{detailLoading ? "加载中…" : pokemonId ? "暂无数据" : "—"}</span>
-          )}
-        </div>
-      </div>
-
-      {/* ══ 下方：联动面板 ══ */}
-      {activePanel && (
-        <div className="cfg-bottom-panel">
-          {/* 道具面板 */}
-          {activePanel === "item" && (
-            <div className="cfg-item-panel-list" ref={itemListRef} onScroll={handleItemScroll}>
-              {panelFilteredItems.map((opt) => (
-                <div
-                  key={opt.value}
-                  className={`cfg-item-panel-row${config.itemId === opt.value ? " cfg-item-panel-row-active" : ""}`}
-                  onClick={() => { const draft = { ...config, itemId: opt.value, itemImageUrl: opt.imageUrl }; onChange(draft); setActivePanel(null); setPanelSearch(""); }}
-                >
-                  <div className="cfg-item-panel-img">
-                    {opt.imageUrl && <img src={opt.imageUrl} alt="" referrerPolicy="no-referrer" />}
-                  </div>
-                  <div className="cfg-item-panel-info">
-                    <span className="cfg-item-panel-name">{opt.label}</span>
-                    {opt.sublabel && <span className="cfg-item-panel-desc">{opt.sublabel}</span>}
-                  </div>
-                </div>
-              ))}
-              {itemsLoading && <div className="cfg-panel-empty">加载中…</div>}
-              {!itemsLoading && panelFilteredItems.length === 0 && <div className="cfg-panel-empty">无匹配结果</div>}
-            </div>
-          )}
-
-          {/* 招式面板 */}
-          {activePanel?.startsWith("move-") && (() => {
-            const mi = Number(activePanel.split("-")[1]);
-            return (
-              <div className="cfg-move-panel-wrap" ref={moveListRef}>
-                <table className="cfg-move-panel-table">
-                  <thead>
-                    <tr>
-                      <th className="cfg-mth-name">招式</th>
-                      <th className="cfg-mth-type">属性</th>
-                      <th className="cfg-mth-cat">类型</th>
-                      <th className="cfg-mth-num">威力</th>
-                      <th className="cfg-mth-num">命中</th>
-                      <th className="cfg-mth-num">PP</th>
-                      <th className="cfg-mth-desc">描述</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {panelFilteredMoves.map((opt) => (
-                      <tr
-                        key={opt.value}
-                        className={`cfg-move-panel-row${config.moves?.[mi] === opt.value ? " cfg-move-panel-row-active" : ""}`}
-                        onClick={() => { handleMove(mi, opt.value, opt); setActivePanel(null); setPanelSearch(""); }}
-                      >
-                        <td className="cfg-mtd-name">{opt.label}</td>
-                        <td className="cfg-mtd-type">
-                          {opt.moveType && (
-                            <span className={`type-chip type-${opt.moveType}`}>
-                              <img className="type-chip-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${opt.moveType}@sm.png`} alt="" />
-                              {opt.moveType}
-                            </span>
-                          )}
-                        </td>
-                        <td className="cfg-mtd-cat">
-                          {opt.moveCategory && (
-                            <span className={`cfg-move-cat-chip cfg-move-cat-${opt.moveCategory}`} title={opt.moveCategory}>
-                              <img src={`${import.meta.env.BASE_URL}assets/type-icons/category-${opt.moveCategory}@sm.png`} alt="" />
-                            </span>
-                          )}
-                        </td>
-                        <td className="cfg-mtd-num">{opt.movePower ?? "—"}</td>
-                        <td className="cfg-mtd-num">{opt.moveAccuracy != null ? `${opt.moveAccuracy}%` : "—"}</td>
-                        <td className="cfg-mtd-num">{opt.movePP ?? "—"}</td>
-                        <td className="cfg-mtd-desc" title={opt.moveDescription || ""}>{opt.moveDescription || ""}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {movesLoading && <div className="cfg-panel-empty">加载中…</div>}
-                {!movesLoading && panelFilteredMoves.length === 0 && <div className="cfg-panel-empty">{detailLoading ? "加载中…" : "无匹配结果"}</div>}
-              </div>
-            );
-          })()}
-
-          {/* 能力值面板 */}
-          {activePanel === "stats" && baseStats && (
-            <>
-              <div className="cfg-panel-header">
-                <span className="cfg-panel-title">能力值分配</span>
-                <button className="cfg-panel-close" onClick={() => setActivePanel(null)}>✕</button>
-              </div>
-              <div className="cfg-panel-stats">
-                <StatCalculator baseStats={baseStats} initialValues={statInitialValues} onChange={handleStatChange} />
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ══ 底部操作栏 ══ */}
-      <div className="cfg-actions">
-        <button onClick={onSave}>{saveLabel || "保存配置"}</button>
-        {onCancel && <button className="secondary" onClick={onCancel}>取消</button>}
-      </div>
-    </div>
-  );
-}
 
 // ══════════════════════════════════════════════
 //  自定义下拉选择器（替代原生 select）
@@ -974,6 +284,153 @@ function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
 }
 
 // ══════════════════════════════════════════════
+//  盒子列表行（列表视图）
+// ══════════════════════════════════════════════
+
+function BoxListRow({ config, onEdit, onDelete, onDuplicate }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [fetchedInfo, setFetchedInfo] = useState(null);
+  const [fetchedItemImageUrl, setFetchedItemImageUrl] = useState("");
+  const menuRef = useRef(null);
+  const btnRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const [dropdownPos, setDropdownPos] = useState(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e) => {
+      const inBtn = menuRef.current && menuRef.current.contains(e.target);
+      const inDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
+      if (!inBtn && !inDropdown) setMenuOpen(false);
+    };
+    const scrollHandler = () => setMenuOpen(false);
+    document.addEventListener("mousedown", handler);
+    window.addEventListener("scroll", scrollHandler, true);
+    return () => { document.removeEventListener("mousedown", handler); window.removeEventListener("scroll", scrollHandler, true); };
+  }, [menuOpen]);
+
+  // 计算 dropdown 的 fixed 定位
+  useEffect(() => {
+    if (menuOpen && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    } else if (!menuOpen) {
+      setDropdownPos(null);
+    }
+  }, [menuOpen]);
+
+  // 按需获取宝可梦信息
+  useEffect(() => {
+    if (config.imageUrl || !config.pokemonId) return;
+    let cancelled = false;
+    unifiedApi(`/pokemon/${encodeURIComponent(config.pokemonId)}`).then((r) => {
+      if (cancelled) return;
+      const p = r.data;
+      const img = getPokemonPreviewImage(p);
+      const shinyObj = p?.forms?.[0]?.images?.shiny || p?.images?.shiny;
+      const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
+      const baseStats = p?.forms?.[0]?.baseStats || p?.baseStats || null;
+      setFetchedInfo({ imageUrl: img?.url || "", shinyImageUrl: shinyUrl, primaryType: p?.primaryType || "", secondaryType: p?.secondaryType || "", baseStats });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [config.pokemonId, config.imageUrl]);
+
+  // 按需获取道具图片
+  useEffect(() => {
+    if (config.itemImageUrl || !config.itemId) return;
+    let cancelled = false;
+    unifiedApi(`/items?q=${encodeURIComponent(config.itemId)}`).then((r) => {
+      if (cancelled) return;
+      const items = r.data || [];
+      const match = items.find((it) => it.nameZh === config.itemId || it.slug === config.itemId) || items[0];
+      if (match?.imageUrl) setFetchedItemImageUrl(match.imageUrl);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [config.itemId, config.itemImageUrl]);
+
+  const resolveShinyUrl = (v) => (typeof v === "string" ? v : v?.url || "");
+  const normalImageUrl = config.imageUrl || fetchedInfo?.imageUrl || "";
+  const shinyImageUrl = resolveShinyUrl(config.shinyImageUrl) || resolveShinyUrl(fetchedInfo?.shinyImageUrl);
+  const imageUrl = (config.isShiny && shinyImageUrl) ? shinyImageUrl : normalImageUrl;
+  const types = [config.primaryType || fetchedInfo?.primaryType, config.secondaryType || fetchedInfo?.secondaryType].filter(Boolean);
+  const itemImgUrl = config.itemImageUrl || fetchedItemImageUrl;
+  const baseStats = config.baseStats || fetchedInfo?.baseStats;
+
+  // 计算最终能力值
+  const finalStats = useMemo(() => {
+    if (!baseStats) return null;
+    const detail = { baseStats };
+    return Object.fromEntries(
+      STAT_KEYS.map((key) => [key, calculateFinalStat(config, detail, key)])
+    );
+  }, [baseStats, config]);
+
+  return (
+    <div className={`box-list-row${menuOpen ? " box-list-row-menu-open" : ""}`} onClick={() => onEdit(config)}>
+      {/* 图片 + 道具叠加 */}
+      <div className="box-list-col box-list-col-img">
+        <div className="box-list-thumb">
+          {imageUrl ? <img src={imageUrl} alt={config.nameZh || ""} referrerPolicy="no-referrer" /> : <span className="box-list-thumb-empty">?</span>}
+          {itemImgUrl && (
+            <img className="box-list-item-overlay" src={itemImgUrl} alt={config.itemId} title={config.itemId} referrerPolicy="no-referrer" />
+          )}
+        </div>
+      </div>
+
+      {/* 名称 */}
+      <div className="box-list-col box-list-col-name">
+        <span className="box-list-name-zh">{config.formName && config.formName !== config.nameZh ? config.formName : (config.nameZh || config.pokemonId || "未命名")}</span>
+        {config.configName && <span className="box-list-config-name">{config.configName}</span>}
+      </div>
+
+      {/* 属性 */}
+      <div className="box-list-col box-list-col-types">
+        {types.map((t) => (
+          <span key={t} className={`type-chip type-${t} box-list-type-chip`}>
+            <img className="type-chip-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${t}@sm.png`} alt={t} />
+            {t}
+          </span>
+        ))}
+      </div>
+
+      {/* 特性 */}
+      <div className="box-list-col box-list-col-ability">
+        <span className="box-list-ability">{config.abilityId || "—"}</span>
+      </div>
+
+      {/* 性格 */}
+      <div className="box-list-col box-list-col-nature">
+        <span className="box-list-nature">{config.nature || "认真"}</span>
+      </div>
+
+      {/* 能力值 */}
+      {STAT_KEYS.map((k) => (
+        <div key={k} className="box-list-col box-list-col-stats">
+          <span className="box-list-stat-val">{finalStats?.[k] ?? "—"}</span>
+        </div>
+      ))}
+
+      {/* 操作菜单 */}
+      <div className="box-list-col box-list-col-actions" onClick={(e) => e.stopPropagation()}>
+        <div className="box-card-menu" ref={menuRef}>
+          <button className="box-card-menu-btn" ref={btnRef} onClick={() => setMenuOpen(!menuOpen)} title="操作">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="2" r="1.4"/><circle cx="7" cy="7" r="1.4"/><circle cx="7" cy="12" r="1.4"/></svg>
+          </button>
+          {menuOpen && dropdownPos && createPortal(
+            <div className="box-card-dropdown box-list-dropdown-fixed" ref={dropdownRef} style={{ position: "fixed", top: dropdownPos.top, right: dropdownPos.right }}>
+              <button onClick={() => { onEdit(config); setMenuOpen(false); }}>编辑</button>
+              <button onClick={() => { onDuplicate(config.configId); setMenuOpen(false); }}>复制</button>
+              <button className="danger-text" onClick={() => { onDelete(config.configId); setMenuOpen(false); }}>删除</button>
+            </div>,
+            document.body
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════
 //  队伍成员槽位
 // ══════════════════════════════════════════════
 
@@ -1105,6 +562,7 @@ const [isNewConfig, setIsNewConfig] = useState(false);
   const inlineEditorRef = useRef(null);
 
   const [activeTab, setActiveTab] = useState("box");
+  const [boxViewMode, setBoxViewMode] = useState("card"); // "card" | "list"
   const [pickerSearch, setPickerSearch] = useState("");
 
   const editorRef = useRef(null);
@@ -1358,17 +816,65 @@ const [isNewConfig, setIsNewConfig] = useState(false);
               )}
 
               {boxConfigs.length > 0 ? (
-                <div className="te-card-grid">
-                  {boxConfigs.map((config) => (
-                    <BoxCard
-                      key={config.configId}
-                      config={config}
-                      onEdit={handleEditConfig}
-                      onDelete={handleDeleteConfig}
-                      onDuplicate={handleDuplicateConfig}
-                    />
-                  ))}
-                </div>
+                <>
+                  {/* 视图切换 */}
+                  <div className="box-view-toggle">
+                    <button
+                      className={`box-view-btn${boxViewMode === "card" ? " box-view-btn-active" : ""}`}
+                      onClick={() => setBoxViewMode("card")}
+                      title="卡片视图"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+                    </button>
+                    <button
+                      className={`box-view-btn${boxViewMode === "list" ? " box-view-btn-active" : ""}`}
+                      onClick={() => setBoxViewMode("list")}
+                      title="列表视图"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2.5" rx="1"/><rect x="1" y="6.75" width="14" height="2.5" rx="1"/><rect x="1" y="11.5" width="14" height="2.5" rx="1"/></svg>
+                    </button>
+                  </div>
+
+                  {boxViewMode === "card" ? (
+                    <div className="te-card-grid">
+                      {boxConfigs.map((config) => (
+                        <BoxCard
+                          key={config.configId}
+                          config={config}
+                          onEdit={handleEditConfig}
+                          onDelete={handleDeleteConfig}
+                          onDuplicate={handleDuplicateConfig}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="box-list-view">
+                      <div className="box-list-header">
+                        <span className="box-list-hcol box-list-hcol-img"></span>
+                        <span className="box-list-hcol box-list-hcol-name">名称</span>
+                        <span className="box-list-hcol box-list-hcol-types">属性</span>
+                        <span className="box-list-hcol box-list-hcol-ability">特性</span>
+                        <span className="box-list-hcol box-list-hcol-nature">性格</span>
+                        <span className="box-list-hcol box-list-hcol-stats">HP</span>
+                        <span className="box-list-hcol box-list-hcol-stats">攻击</span>
+                        <span className="box-list-hcol box-list-hcol-stats">防御</span>
+                        <span className="box-list-hcol box-list-hcol-stats">特攻</span>
+                        <span className="box-list-hcol box-list-hcol-stats">特防</span>
+                        <span className="box-list-hcol box-list-hcol-stats">速度</span>
+                        <span className="box-list-hcol box-list-hcol-actions"></span>
+                      </div>
+                      {boxConfigs.map((config) => (
+                        <BoxListRow
+                          key={config.configId}
+                          config={config}
+                          onEdit={handleEditConfig}
+                          onDelete={handleDeleteConfig}
+                          onDuplicate={handleDuplicateConfig}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : (
                 !editingConfig && (
                   <div className="detail-empty" style={{ textAlign: "center", padding: "40px 0" }}>
