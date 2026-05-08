@@ -65,3 +65,4 @@ apps/web/public/assets/cache/pokemon/*
 apps/web/public/assets/cache/pokemon/*/*
 !/apps/web/public/assets/cache/pokemon/*/*超级*.webp
 !/apps/web/public/assets/cache/pokemon/*/*超极巨*.webp
+.wrangler/

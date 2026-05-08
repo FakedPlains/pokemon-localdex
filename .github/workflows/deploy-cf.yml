@@ -1,0 +1,65 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main, cloudflare-migration]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Build & Deploy to Cloudflare Pages
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build web frontend
+        run: npm run build:web
+        env:
+          # Cloudflare Pages 使用根路径
+          GITHUB_PAGES: "false"
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=pokemon-localdex --branch=main
+
+  # 可选：D1 schema 迁移（仅在 schema/d1-schema.sql 变更时触发）
+  migrate-d1:
+    runs-on: ubuntu-latest
+    name: D1 Schema Migration
+    needs: []
+    if: |
+      github.ref == 'refs/heads/main' &&
+      contains(github.event.head_commit.modified, 'schema/d1-schema.sql')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run D1 migration
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute pokemon-localdex-d1 --remote --file=schema/d1-schema.sql

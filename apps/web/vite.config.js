@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  // GitHub Pages 部署在 /pokemon-localdex/ 路径下
+  // GitHub Pages 部署在 /pokemon-localdex/ 路径下；Cloudflare Pages 和本地均使用 "/"
   base: process.env.GITHUB_PAGES === "true" ? "/pokemon-localdex/" : "/",
   publicDir: "public",
   build: {
