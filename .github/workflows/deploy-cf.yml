@@ -23,7 +23,9 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: |
+          rm -f package-lock.json
+          npm install --no-audit --no-fund
         env:
           # 让 .npmrc 中的 ${GITHUB_TOKEN} 占位符生效，用于拉取 @fakedplains 私有包
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
