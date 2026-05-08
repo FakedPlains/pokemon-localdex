@@ -1,14 +1,14 @@
 # Pokemon LocalDex
 
-一个宝可梦资料库，数据统一来源于 [52Poké Wiki](https://wiki.52poke.com/)，支持本地 SQLite 和云端 Supabase 双数据源。提供 Web 端和微信小程序端两种客户端，Web 端可部署到 GitHub Pages 作为纯静态站点使用。
+一个宝可梦资料库，数据统一来源于 [52Poké Wiki](https://wiki.52poke.com/)，支持本地 SQLite、云端 Supabase 和 Cloudflare D1 三种数据源。提供 Web 端和微信小程序端两种客户端，Web 端部署到 Cloudflare Pages，通过 Service Binding 代理到 Worker 访问 D1 数据库。
 
 > 本项目使用 Git LFS 管理大文件（SQLite 数据库和 normalized JSON），克隆后需执行 `git lfs pull` 获取完整数据文件。
 
-**在线访问**：[https://fakedplains.github.io/pokemon-localdex/](https://fakedplains.github.io/pokemon-localdex/)
+**在线访问**：[https://pokemon-localdex.pages.dev/](https://pokemon-localdex.pages.dev/)
 
 ## 功能概览
 
-Pokemon LocalDex 提供宝可梦系列游戏的完整资料查询、队伍构筑和伤害计算能力。所有数据通过爬虫从 52Poké Wiki 采集，支持两种运行模式：本地模式使用 SQLite 数据库，通过 Hono API 提供服务；在线模式前端直连 Supabase，无需后端即可部署到 GitHub Pages 等静态托管平台。
+Pokemon LocalDex 提供宝可梦系列游戏的完整资料查询、队伍构筑和伤害计算能力。所有数据通过爬虫从 52Poké Wiki 采集，支持三种运行模式：本地模式使用 SQLite 数据库，通过 Hono API 提供服务；生产模式前端部署到 Cloudflare Pages，通过 Pages Functions + Service Binding 代理到 Worker，Worker 从 D1 数据库读取数据；小程序模式通过 Supabase PostgREST REST API 直连数据库。
 
 项目同时提供微信小程序端，基于 Taro 框架（React 语法）开发，通过 Supabase PostgREST REST API 直连数据库，无需后端服务。小程序端包含图鉴、招式、特性、道具四个核心页面，以及宝可梦详情页。
 
@@ -94,35 +94,42 @@ npm run check:damage   # 伤害计算验证
 
 ## 项目结构
 
-项目采用 npm workspaces 管理的 monorepo 结构，包含三个应用和四个共享包：
+项目采用 npm workspaces 管理的 monorepo 结构，包含三个应用和多个共享包：
 
 ```
 pokemon-localdex/
 ├── apps/
-│   ├── api/                Hono API 服务（托管 SPA 静态资源）
+│   ├── api/                Hono API 服务（本地 SQLite / Worker D1）
 │   ├── web/                React SPA 客户端（Vite 构建）
 │   └── miniprogram/        微信小程序客户端（Taro + React）
 ├── packages/
-│   ├── battle-core/        伤害计算与队伍规则核心
+│   ├── battle-core/        伤害计算与队伍规则核心（Node.js 版）
+│   ├── d1-battle-core/     伤害计算核心（Cloudflare Workers D1 版）
+│   ├── d1-store/           D1 查询适配层
 │   ├── crawler_py/         Python 爬虫（52Poké 数据采集 → SQLite）
 │   ├── sqlite-store/       SQLite 建表、查询适配与类型定义
 │   └── supabase-store/     Supabase 查询适配（与 sqlite-store 同接口）
+├── functions/              Cloudflare Pages Functions（Service Binding 代理）
+│   └── api/[[path]].ts     将 /api/* 请求代理到 Worker
+├── schema/                 D1 数据库 schema
 ├── supabase/               Supabase 数据库 schema
 ├── scripts/                爬虫入口脚本
 ├── data/                   本地数据（SQLite [LFS]、页面缓存）
 ├── docs/                   技术文档
+├── wrangler.toml           Cloudflare Pages 配置（Service Binding）
+├── wrangler.worker.toml    Cloudflare Worker 配置（D1 绑定）
 └── .github/                CI/CD 工作流
 ```
 
 ## 数据源架构
 
-项目支持两种数据源，通过环境变量切换，代码层面保持统一的接口。
+项目支持三种数据源，通过环境变量和部署模式切换，代码层面保持统一的接口。
 
 **SQLite 模式**（本地开发默认）：Python 爬虫采集数据写入 SQLite，Hono API 通过 `sqlite-store` 包读取数据库，前端通过 API 获取数据。完整链路为 `React SPA → Hono API → sqlite-store → SQLite`。
 
-**Supabase 模式**（GitHub Pages 部署）：数据存储在 Supabase（PostgreSQL），前端通过 `@supabase/supabase-js` 直连查询，无需后端服务。链路为 `React SPA → supabase-js → Supabase`。后端 API 也支持 Supabase 模式，通过 `supabase-store` 包访问，链路为 `React SPA → Hono API → supabase-store → Supabase`。
+**D1 模式**（Cloudflare Pages 生产部署）：数据存储在 Cloudflare D1（SQLite 兼容），Worker 通过 `d1-store` 包读取数据库，前端通过 Pages Functions 的 Service Binding 代理请求到 Worker。链路为 `React SPA → Pages Functions → Service Binding → Worker → d1-store → D1`。
 
-**小程序模式**：小程序端通过 `Taro.request` 直接调用 Supabase PostgREST REST API，不使用 `@supabase/supabase-js` SDK（该 SDK 依赖浏览器 API，在小程序环境中不可用）。链路为 `Taro 小程序 → Taro.request → Supabase PostgREST`。
+**Supabase 模式**（小程序 + 备用）：数据存储在 Supabase（PostgreSQL），小程序通过 `Taro.request` 直连 Supabase PostgREST REST API。Web 前端也支持通过 `@supabase/supabase-js` 直连查询。
 
 环境变量控制：
 
@@ -130,36 +137,54 @@ pokemon-localdex/
 |------|------|------|------|
 | `DATA_SOURCE` | 后端 | `sqlite`（默认） | API 使用 SQLite |
 | `DATA_SOURCE` | 后端 | `supabase` | API 使用 Supabase |
+| `DATA_SOURCE` | Worker | `d1` | Worker 使用 D1 |
 | `VITE_DATA_SOURCE` | 前端 | 空（默认） | 前端走 Hono API |
 | `VITE_DATA_SOURCE` | 前端 | `supabase` | 前端直连 Supabase |
 
 小程序端的 Supabase 配置直接写在 `apps/miniprogram/src/utils/config.js` 中，不通过环境变量控制。
 
-## GitHub Pages 部署
+## Cloudflare Pages 部署
 
-项目通过 GitHub Actions 自动部署到 GitHub Pages。每次推送到 `main` 分支会触发构建，产物部署到 `gh-pages` 分支。
+项目通过 GitHub Actions 自动部署到 Cloudflare Pages。每次推送到 `main` 分支会触发构建和部署。
 
-Supabase 凭证通过 GitHub Repository Secrets 注入，不存储在代码仓库中。首次部署前需要在 GitHub 仓库的 Settings → Secrets and variables → Actions 中添加以下两个 Secret：
+### 部署架构
 
-- `VITE_SUPABASE_URL` — Supabase 项目 URL（如 `https://xxx.supabase.co`）
-- `VITE_SUPABASE_ANON_KEY` — Supabase anon/public key
-
-CI 构建时这些 Secret 作为环境变量注入 Vite，覆盖 `.env.production` 中的空占位符。`GITHUB_PAGES=true` 环境变量会将 Vite 的 `base` 设置为 `/pokemon-localdex/`，以匹配 GitHub Pages 的子路径。
-
-手动部署：
-
-```bash
-# 本地构建 GitHub Pages 产物（需要手动提供 Supabase 凭证）
-GITHUB_PAGES=true \
-  VITE_DATA_SOURCE=supabase \
-  VITE_SUPABASE_URL=https://xxx.supabase.co \
-  VITE_SUPABASE_ANON_KEY=your-anon-key \
-  npm run build:web
-
-# 构建产物在 dist/ 目录
+```
+用户浏览器
+    │
+    ▼
+Cloudflare Pages（静态资源 + Pages Functions）
+    │
+    │ /api/* → Service Binding
+    ▼
+Cloudflare Worker (pokemon-localdex-api)
+    │
+    │ D1 binding
+    ▼
+Cloudflare D1 数据库 (pokemon-localdex-d1)
 ```
 
-CI 工作流文件位于 `.github/workflows/deploy-pages.yml`，使用 `peaceiris/actions-gh-pages` 将 `dist/` 目录推送到 `gh-pages` 分支。
+Pages Functions（`functions/api/[[path]].ts`）通过 Service Binding 将所有 `/api/*` 请求转发给名为 `pokemon-localdex-api` 的 Worker，Worker 从 D1 数据库读取数据并返回响应。
+
+### CI/CD 工作流
+
+工作流文件位于 `.github/workflows/deploy-cf.yml`，推送到 `main` 分支时自动触发：
+
+1. 删除 `package-lock.json` 后重新 `npm install`（确保 native binding 匹配 CI 平台）
+2. 执行 `npm run build:web` 构建前端
+3. 部署 Worker（`wrangler deploy --config wrangler.worker.toml`）
+4. 部署 Pages（`wrangler pages deploy dist --project-name=pokemon-localdex`）
+
+### GitHub Secrets 配置
+
+首次部署前需在 GitHub 仓库的 Settings → Secrets and variables → Actions 中添加：
+
+- `CLOUDFLARE_API_TOKEN` — Cloudflare API Token（需要 Workers/Pages/D1 权限）
+- `CLOUDFLARE_ACCOUNT_ID` — Cloudflare Account ID
+
+### 分支保护规则
+
+`main` 分支设置了保护规则：禁止强制推送（force push），所有代码变更必须通过 Pull Request 合并。这确保了部署的可追溯性和代码审查流程。
 
 ## 已有功能
 
@@ -183,11 +208,11 @@ CI 工作流文件位于 `.github/workflows/deploy-pages.yml`，使用 `peaceiri
 
 #### 队伍构筑
 
-6 槽队伍编辑器，支持为每个成员配置性格、等级、特性、携带道具和四个招式。本地模式下队伍数据保存在 `data/teams.json` 文件中；Supabase 直连模式下保存在浏览器 localStorage 中。
+6 槽队伍编辑器，支持为每个成员配置性格、等级、特性（数字 ID + 中文名称双字段存储）、携带道具和四个招式。队伍数据保存在浏览器 localStorage 中。
 
 #### 伤害计算
 
-独立选择攻击方和防御方，支持完整的对战环境配置：性格搜索选择（带修正属性标注）、特性内联选择、道具搜索（带图片预览）、形态切换（自动绑定道具和特性）、天气切换（晴天/大日照/雨天/大雨/沙暴/雪/乱流）、场地切换（电气/青草/薄雾/精神）等。支持从盒子/队伍快速导入配置并自动转换 EV↔SP，选择攻击方后会按该宝可梦在当前世代可学的招式自动过滤候选。注意：伤害计算功能在 GitHub Pages 静态部署模式下不可用，因为计算逻辑在后端执行。
+独立选择攻击方和防御方，支持完整的对战环境配置：性格搜索选择（带修正属性标注）、特性内联选择、道具搜索（带图片预览）、形态切换（自动绑定道具和特性）、天气切换（晴天/大日照/雨天/大雨/沙暴/雪/乱流）、场地切换（电气/青草/薄雾/精神）等。支持从盒子/队伍快速导入配置并自动转换 EV↔SP，选择攻击方后会按该宝可梦在当前世代可学的招式自动过滤候选。招式搜索采用按需搜索模式（200ms 防抖），不预加载全部招式数据。
 
 ### 小程序端
 
@@ -213,12 +238,13 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、939 个招式、3
 |------|------|
 | Web 前端 | React 18 + Vite 8 |
 | 小程序端 | Taro 4.2.0 + React 18 + Webpack 5 |
-| 后端 API | Hono + Node.js 22 |
+| 后端 API | Hono + Node.js 22（本地）/ Cloudflare Workers（生产）|
 | 本地数据库 | SQLite（node:sqlite） |
-| 云端数据库 | Supabase（PostgreSQL） |
+| 生产数据库 | Cloudflare D1（SQLite 兼容） |
+| 小程序数据库 | Supabase（PostgreSQL） |
 | 爬虫 | Python 3.10+ + BeautifulSoup4 |
 | 大文件管理 | Git LFS（SQLite、normalized JSON） |
-| 部署 | GitHub Pages + GitHub Actions |
+| 部署 | Cloudflare Pages + Workers + GitHub Actions |
 
 整个项目统一使用 React 18.3.1，确保 Web 端和小程序端共享同一 React 版本，避免 monorepo 中的版本冲突。
 
@@ -247,8 +273,8 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、939 个招式、3
 
 详细的技术文档位于 `docs/` 目录：
 
-- [系统架构](docs/architecture.md) — 整体架构设计、双数据源、部署模式、小程序架构
-- [数据库设计](docs/database.md) — SQLite 表结构、索引和关系说明
+- [系统架构](docs/architecture.md) — 整体架构设计、三种数据源、部署模式、小程序架构
+- [数据库设计](docs/database.md) — SQLite/D1 表结构、索引和关系说明
 - [API 接口](docs/api.md) — RESTful API 端点、参数和响应格式、小程序端 REST 封装
 - [爬虫指南](docs/crawler.md) — 爬虫命令、参数和运行流程
 

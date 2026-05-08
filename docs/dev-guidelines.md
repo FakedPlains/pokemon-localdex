@@ -75,8 +75,9 @@ SQLite 和 Supabase 的 schema 必须保持同步。修改数据库结构时：
 通过 `DATA_SOURCE` 环境变量控制：
 
 ```bash
-DATA_SOURCE=sqlite    # 使用本地 SQLite（默认）
+DATA_SOURCE=sqlite    # 使用本地 SQLite（本地开发默认）
 DATA_SOURCE=supabase  # 使用 Supabase
+DATA_SOURCE=d1        # 使用 Cloudflare D1（Worker 生产模式）
 ```
 
 切换逻辑在 `apps/api/src/app.ts` 顶部，动态 `import` 对应的 store 包。**不要在路由处理函数内部做数据源判断**，所有切换逻辑集中在模块导入处。
@@ -86,8 +87,8 @@ DATA_SOURCE=supabase  # 使用 Supabase
 通过 `VITE_DATA_SOURCE` 环境变量控制：
 
 ```bash
-VITE_DATA_SOURCE=         # 留空：走 Hono API（本地开发默认）
-VITE_DATA_SOURCE=supabase # 直连 Supabase（GitHub Pages 生产）
+VITE_DATA_SOURCE=         # 留空：走 API（本地开发默认；生产走 Pages Functions 代理到 Worker）
+VITE_DATA_SOURCE=supabase # 直连 Supabase（备用模式）
 ```
 
 统一入口是 `apps/web/src/utils/api.js` 中的 `unifiedApi` 对象，**所有页面和 hook 必须通过 `unifiedApi` 调用，不得直接 import `supabaseApi.js` 或直接 `fetch("/api/...")`**。
@@ -121,7 +122,7 @@ defineConstants: {
 
 Web 端使用 **hash 路由**（`HashRouter`），路由格式为 `#/pokedex`、`#/moves` 等。
 
-原因：GitHub Pages 静态托管不支持 HTML5 History API（刷新会 404），hash 路由无需服务端配合。
+原因：hash 路由无需服务端配合，适用于各种静态托管平台（Cloudflare Pages 等），刷新不会 404。
 
 **不要改为 BrowserRouter**，除非同时配置了服务端 fallback。
 
@@ -171,7 +172,8 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 | `nameZh` | 宝可梦中文名（仅用于显示） | `"皮卡丘"` |
 | `itemId` | 道具数据库 ID（用于 API 请求） | `"123"` |
 | `itemName` | 道具中文名（仅用于显示） | `"气势披带"` |
-| `abilityId` | 特性中文名（仅用于显示，不涉及 API 回查） | `"静电"` |
+| `abilityId` | 特性数据库 ID（用于数据标识） | `"42"` |
+| `abilityName` | 特性中文名（仅用于显示） | `"静电"` |
 
 **开发注意**：
 
@@ -179,9 +181,10 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 - API 详情请求使用 `/pokemon/${id}` 或 `/items/${id}` 格式，不需要 `encodeURIComponent`
 - 搜索请求仍使用中文名称：`/pokemon?q=${encodeURIComponent(name)}`（这是正确的）
 - 界面显示优先使用 `itemName`，降级到 `itemId`：`data.itemName || data.itemId`
-- `abilityId` 例外：因为特性仅用于显示，不涉及通过 ID 回查 API，所以直接存储中文名
+- `abilityId` 存储数字 ID，同时保存 `abilityName` 用于显示。PokemonEditor 的特性选择返回 `{id, name}` 对象，同时写入两个字段
+- 界面显示优先使用 `abilityName`，降级到 `abilityId`：`data.abilityName || data.abilityId`
 
-**数据迁移**：`utils/migrateStorage.js` 提供了旧格式数据的自动迁移。应用启动时（`main.jsx`）会检测并迁移旧数据（中文名 → 数字 ID）。迁移完成后通过 `localdex-migration-done` 自定义事件通知组件刷新。
+**数据迁移**：`utils/migrateStorage.js` 提供了旧格式数据的自动迁移（当前版本 v3）。应用启动时（`main.jsx`）会检测并迁移旧数据（中文名 → 数字 ID），包括 pokemonId、itemId 和 abilityId 三个字段。迁移标记为 `localdex_migration_v3`，存储在 localStorage 中防止重复执行。
 
 ### 4.7 DamagePage 开发注意事项
 
@@ -261,39 +264,41 @@ Vite dev server 配置了 proxy，将 `/api` 请求转发到 `http://localhost:3
 
 ### 6.3 CI 环境变量
 
-GitHub Actions 工作流从 Secrets 读取以下变量：
+GitHub Actions 工作流（`.github/workflows/deploy-cf.yml`）从 Secrets 读取以下变量：
 
 | Secret 名称 | 用途 |
 |-------------|------|
-| `VITE_SUPABASE_URL` | Supabase 项目 URL |
-| `VITE_SUPABASE_ANON_KEY` | Supabase 匿名访问密钥 |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（Workers/Pages/D1 权限）|
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID |
 
 ---
 
 ## 七、构建与部署规范
 
-### 7.1 GitHub Pages 部署
+### 7.1 Cloudflare Pages 部署
 
-**不要手动推送到 `gh-pages` 分支**，所有部署通过 GitHub Actions 自动完成。
+所有部署通过 GitHub Actions 自动完成，推送到 `main` 分支触发。
 
-工作流触发条件：推送到 `main` 分支。
+`main` 分支设置了保护规则：禁止强制推送，只能通过 Pull Request 合并。
+
+工作流文件：`.github/workflows/deploy-cf.yml`
 
 工作流关键步骤：
-1. 删除 `package-lock.json` 后重新 `npm install`（确保 native binding 匹配 CI 平台）
-2. 注入 Supabase 凭证到 `.env.production`
-3. `npm run build:web`（`GITHUB_PAGES=true` 触发 Vite base 路径切换）
-4. 产物部署到 `gh-pages` 分支
+1. 删除 `package-lock.json` 后重新 `npm install`（确保 native binding 匹配 CI 平台，解决 rolldown 等原生模块在 Linux 环境的兼容问题）
+2. `npm run build:web` 构建前端到 `dist/`
+3. 部署 Worker：`wrangler deploy --config wrangler.worker.toml`
+4. 部署 Pages：`wrangler pages deploy dist --project-name=pokemon-localdex --branch=main`
 
 ### 7.2 Vite Base 路径
 
-本地开发和生产部署的 base 路径不同：
+Vite 的 base 路径固定为 `"/"`，Cloudflare Pages 在根路径提供服务，无需子路径前缀：
 
 ```javascript
 // vite.config.js
-base: process.env.GITHUB_PAGES ? '/pokemon-localdex/' : '/'
+base: "/"
 ```
 
-**注意**：本地开发时不要设置 `GITHUB_PAGES=true`，否则所有静态资源路径会加上 `/pokemon-localdex/` 前缀导致 404。
+构建产物输出到项目根目录的 `dist/`（`outDir: "../../dist"`），供 `wrangler pages deploy` 使用。
 
 ### 7.3 小程序构建
 
@@ -371,14 +376,14 @@ npm run crawl:pokemon  # 仅爬取宝可梦数据
 1. 登录微信公众平台 → 开发管理 → 开发设置 → 服务器域名，添加 `https://wsrv.nl`
 2. 将 `<Image>` 替换为 `<SafeImage>`
 
-### Q4：GitHub Pages 部署后页面空白
+### Q4：Cloudflare Pages 部署后 API 报 1101 错误
 
-**原因**：通常是 Supabase 凭证未正确注入，或 base 路径配置错误。
+**原因**：Service Binding 未正确配置。Pages Functions 通过 Service Binding 代理请求到 Worker，如果 `wrangler.toml` 中缺少 `[[services]]` 声明，会返回 1101 错误。
 
 **排查步骤**：
-1. 检查 GitHub Actions 日志，确认 Secrets 注入步骤无报错
-2. 检查构建产物中 `index.html` 的 `<script src>` 路径是否包含 `/pokemon-localdex/` 前缀
-3. 打开浏览器控制台，查看是否有 Supabase 认证错误
+1. 确认 `wrangler.toml` 中有 `[[services]]` 块声明 `binding = "API_WORKER"` 和 `service = "pokemon-localdex-api"`
+2. 确认 Worker 已通过 `wrangler deploy --config wrangler.worker.toml` 成功部署
+3. 直接访问 Worker URL（`pokemon-localdex-api.<account>.workers.dev`）验证 Worker 本身是否正常
 
 ### Q5：爬虫报 SSL 错误
 
