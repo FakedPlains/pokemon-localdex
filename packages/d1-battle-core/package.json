@@ -1,0 +1,8 @@
+{
+  "name": "@pokemon-localdex/d1-battle-core",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@fakedplains/smogon-calc": "^0.11.0"
+  }
+}

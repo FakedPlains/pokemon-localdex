@@ -14,6 +14,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createD1Store } from "../../../packages/d1-store/src/index.ts";
 import type { D1Database } from "../../../packages/d1-store/src/index.ts";
+import { calculateDamageD1 } from "../../../packages/d1-battle-core/src/index.ts";
 
 // Cloudflare Workers Env 类型
 export interface Env {
@@ -186,13 +187,16 @@ api.delete("/teams/:id", async (c) => {
   return c.json({ ok: true });
 });
 
-// ── Battle damage（Workers 版：不查询数据库，直接透传英文名） ──
-// 如需中文名映射，可在前端传入英文名，或后续扩展为 D1 查询版本
+// ── Battle damage（D1 版：查询数据库做中英文名称映射） ──
 
 api.post("/battle/damage", async (c) => {
-  // 动态导入 battle-core 的纯计算部分（不含 SQLite 查询）
-  // 暂时返回 501，待 battle-core 拆分后启用
-  return c.json({ error: "Battle damage calculation not yet available in Workers mode" }, 501);
+  try {
+    const input = await c.req.json();
+    const result = await calculateDamageD1(c.env.DB, input);
+    return c.json({ data: result });
+  } catch (err: any) {
+    return c.json({ error: err?.message ?? "Calculation failed" }, 400);
+  }
 });
 
 // 挂载路由
