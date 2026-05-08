@@ -351,6 +351,7 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
       secondaryType: form.secondaryType || detail.secondaryType || "",
       imageUrl: officialImg?.url || member.imageUrl || "",
       abilityId: defaultAbilityId,
+      abilityName: defaultAbilityId,
     };
     // 形态绑定道具：自动设置/清除道具
     if (form.requiredItem) {
@@ -498,6 +499,7 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
       level: cfg.level || 50,
       nature: finalNature,
       abilityId: cfg.abilityId || "",
+      abilityName: cfg.abilityName || "",
       itemId: cfg.itemId || "",
       itemName: cfg.itemName || "",
       itemImageUrl: cfg.itemImageUrl || "",
@@ -620,7 +622,7 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
                   <button
                     key={ab.name}
                     className={"dc-ability-btn" + (member.abilityId === ab.name ? " dc-ability-btn-active" : "") + (ab.isHidden ? " dc-ability-btn-hidden" : "")}
-                    onClick={() => onChange({ ...member, abilityId: ab.name })}
+                    onClick={() => onChange({ ...member, abilityId: ab.name, abilityName: ab.name })}
                   >
                     {ab.name}{ab.isHidden ? " (隐)" : ""}
                   </button>
@@ -915,7 +917,7 @@ export default function DamagePage() {
 
     setCalculating(true);
     try {
-      const gen = Number(generation) || 9;
+      const gen = Number(generation);
       function resolveEvs(member) {
         if (!isChampions) return member.evs || {};
         if (member.sps && Object.keys(member.sps).length > 0) return member.sps;
