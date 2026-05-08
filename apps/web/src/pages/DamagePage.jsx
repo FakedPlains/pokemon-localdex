@@ -142,19 +142,14 @@ function SimpleStatEditor({ member, detail, isChampions, onChange, boosts, onBoo
 //  子组件：招式搜索选择
 // ══════════════════════════════════════════════════════════════
 
-function MoveSearch({ allMoves, generation, onSelect, selectedMove }) {
+function MoveSearch({ allMoves, generation, onSelect, selectedMove, onSearch, searching }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return allMoves.slice(0, 30);
-    const q = query.trim().toLowerCase();
-    return allMoves.filter((m) => {
-      const text = (m.nameZh || "") + " " + (m.slug || "") + " " + (m.nameEn || "");
-      return text.toLowerCase().includes(q);
-    }).slice(0, 30);
-  }, [allMoves, query]);
+    return allMoves.slice(0, 30);
+  }, [allMoves]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -170,6 +165,13 @@ function MoveSearch({ allMoves, generation, onSelect, selectedMove }) {
     setOpen(false);
   };
 
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setQuery(val);
+    setOpen(true);
+    if (onSearch) onSearch(val);
+  };
+
   return (
     <div className="dc-move-search" ref={wrapRef}>
       <div className="dc-inline-search-input-wrap">
@@ -180,7 +182,7 @@ function MoveSearch({ allMoves, generation, onSelect, selectedMove }) {
           className="dc-inline-search-input"
           placeholder="搜索招式..."
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onChange={handleInputChange}
           onFocus={() => setOpen(true)}
         />
         {query && (
@@ -189,7 +191,9 @@ function MoveSearch({ allMoves, generation, onSelect, selectedMove }) {
       </div>
       {open && (
         <div className="dc-inline-search-dropdown dc-move-dropdown">
-          {filtered.length === 0 && <div className="dc-dropdown-hint">无匹配招式</div>}
+          {searching && <div className="dc-dropdown-hint">搜索中…</div>}
+          {!searching && filtered.length === 0 && query.trim() && <div className="dc-dropdown-hint">无匹配招式</div>}
+          {!searching && filtered.length === 0 && !query.trim() && <div className="dc-dropdown-hint">输入关键词搜索招式</div>}
           {filtered.map((m) => {
             const record = resolveMoveGenerationRecord(m, generation);
             const type = record?.type || m.type || "";
@@ -823,14 +827,19 @@ export default function DamagePage() {
   const [allMoves, setAllMoves] = useState([]);
   const [attackerDetail, setAttackerDetail] = useState(null);
   const [defenderDetail, setDefenderDetail] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  // 加载招式列表
-  useEffect(() => {
-    unifiedApi("/moves").then((r) => {
-      setAllMoves(r.data || []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+  // 招式按需搜索（不再一次性全量加载）
+  const moveSearchTimer = useRef(null);
+  const searchMoves = useCallback((keyword) => {
+    if (!keyword || keyword.trim().length === 0) { setAllMoves([]); return; }
+    if (moveSearchTimer.current) clearTimeout(moveSearchTimer.current);
+    moveSearchTimer.current = setTimeout(() => {
+      setLoading(true);
+      unifiedApi("/moves?q=" + encodeURIComponent(keyword.trim())).then((r) => {
+        setAllMoves(r.data || []);
+      }).catch(() => setAllMoves([])).finally(() => setLoading(false));
+    }, 200);
   }, []);
 
   // 加载攻击方详情
@@ -925,8 +934,8 @@ export default function DamagePage() {
             formKey: attacker.formKey || "",
             level: Number(level || 50),
             nature: attacker.nature || "认真",
-            ability: attacker.abilityId || "",
-            item: attacker.itemId || "",
+            ability: attacker.abilityName || attacker.abilityId || "",
+            item: attacker.itemName || attacker.itemId || "",
             evs: resolveEvs(attacker),
             ivs: attacker.ivs || {},
             boosts: Object.values(atkBoost).some((v) => v !== 0) ? atkBoost : undefined,
@@ -937,8 +946,8 @@ export default function DamagePage() {
             formKey: defender.formKey || "",
             level: Number(level || 50),
             nature: defender.nature || "认真",
-            ability: defender.abilityId || "",
-            item: defender.itemId || "",
+            ability: defender.abilityName || defender.abilityId || "",
+            item: defender.itemName || defender.itemId || "",
             evs: resolveEvs(defender),
             ivs: defender.ivs || {},
             boosts: Object.values(defBoost).some((v) => v !== 0) ? defBoost : undefined,
@@ -1134,6 +1143,8 @@ export default function DamagePage() {
                 generation={generation}
                 selectedMove={selectedMove}
                 onSelect={setSelectedMove}
+                onSearch={searchMoves}
+                searching={loading}
               />
               <button
                 className="dc-calc-btn"

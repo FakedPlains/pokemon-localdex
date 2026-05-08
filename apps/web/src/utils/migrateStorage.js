@@ -9,14 +9,16 @@
  * 3. 迁移成功后就地更新 localStorage 数据并标记已迁移
  * 4. 标记保留在 localStorage 中，防止重复执行（一次性操作）
  *
- * 迁移标记：localdex_migration_v2（存在则表示已迁移，无需再次执行）
+ * 迁移标记：localdex_migration_v3（存在则表示已迁移，无需再次执行）
+ *
+ * v3 新增：将 abilityId（旧格式为中文特性名）数字化，同时保留 abilityName
  */
 
 import { unifiedApi } from "./api.js";
 
 const BOX_KEY = "localdex_box";
 const TEAMS_KEY = "localdex_teams";
-const MIGRATION_FLAG = "localdex_migration_v2";
+const MIGRATION_FLAG = "localdex_migration_v3";
 
 /**
  * 判断一个 ID 值是否为旧格式（非纯数字，即中文名称）
@@ -45,7 +47,7 @@ function needsMigration() {
 
   // 检查 box 中是否有旧格式 ID
   for (const config of box) {
-    if (isLegacyId(config.pokemonId) || isLegacyId(config.itemId)) {
+    if (isLegacyId(config.pokemonId) || isLegacyId(config.itemId) || isLegacyId(config.abilityId)) {
       return true;
     }
   }
@@ -54,7 +56,7 @@ function needsMigration() {
   for (const team of teams) {
     for (const member of team.members || []) {
       if (member.configId) continue; // 引用 box 的成员不需要单独检查
-      if (isLegacyId(member.pokemonId) || isLegacyId(member.itemId)) {
+      if (isLegacyId(member.pokemonId) || isLegacyId(member.itemId) || isLegacyId(member.abilityId)) {
         return true;
       }
     }
@@ -112,6 +114,24 @@ async function resolveItemId(nameZh) {
 }
 
 /**
+ * 通过中文名称查询特性的数字 ID
+ * @returns {{ id: string, nameZh: string } | null}
+ */
+async function resolveAbilityId(nameZh) {
+  if (!nameZh) return null;
+  try {
+    const result = await unifiedApi(`/abilities?q=${encodeURIComponent(nameZh)}&limit=5`);
+    const list = result.data || [];
+    const exact = list.find((a) => a.nameZh === nameZh || a.slug === nameZh);
+    if (exact) return { id: String(exact.id), nameZh: exact.nameZh };
+    if (list.length > 0) return { id: String(list[0].id), nameZh: list[0].nameZh };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 迁移单个配置对象（就地修改）
  * @returns {boolean} 是否有变更
  */
@@ -138,6 +158,19 @@ async function migrateConfig(config) {
       config.itemName = config.itemId;
       config.itemId = resolved.id;
       changed = true;
+    }
+  }
+
+  // 迁移 abilityId（v3：中文特性名 → 数字 ID + abilityName）
+  if (isLegacyId(config.abilityId)) {
+    const resolved = await resolveAbilityId(config.abilityId);
+    if (resolved) {
+      config.abilityName = config.abilityId;
+      config.abilityId = resolved.id;
+      changed = true;
+    } else {
+      // 解析失败时仍保留为 abilityName 字段
+      if (!config.abilityName) config.abilityName = config.abilityId;
     }
   }
 

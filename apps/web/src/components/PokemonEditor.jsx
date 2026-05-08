@@ -142,10 +142,14 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
           const normalAbilities = formAbilities.filter((ab) => !ab.isHidden);
           const firstAbility = normalAbilities[0] || formAbilities[0];
           if (firstAbility) {
-            updates.abilityId = firstAbility.nameZh || firstAbility.abilityId || "";
+            updates.abilityId = firstAbility.abilityId ? String(firstAbility.abilityId) : "";
+            updates.abilityName = firstAbility.nameZh || "";
           } else {
             const topAbilities = r.data?.abilities || [];
-            if (topAbilities.length > 0) updates.abilityId = topAbilities[0];
+            if (topAbilities.length > 0) {
+              updates.abilityId = "";
+              updates.abilityName = topAbilities[0];
+            }
           }
         }
         if (Object.keys(updates).length > 0) {
@@ -196,7 +200,10 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     const normalAbilities = formAbilities.filter((ab) => !ab.isHidden);
     const firstAbility = normalAbilities[0] || formAbilities[0];
     const defaultAbilityId = firstAbility
-      ? (firstAbility.nameZh || firstAbility.abilityId || "")
+      ? (firstAbility.abilityId ? String(firstAbility.abilityId) : "")
+      : "";
+    const defaultAbilityName = firstAbility
+      ? (firstAbility.nameZh || "")
       : (pokemonDetail.abilities?.[0] || "");
     const updates = {
       formKey,
@@ -207,6 +214,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       imageUrl: officialImg?.url || "",
       shinyImageUrl: shinyUrl,
       abilityId: defaultAbilityId,
+      abilityName: defaultAbilityName,
     };
     // 形态绑定道具：自动设置/清除道具
     if (form.requiredItem) {
@@ -224,20 +232,21 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     onChange((prev) => ({ ...prev, ...updates }));
   }, [pokemonDetail, onChange, config.formKey]);
 
-  /* ── 特性列表（分普通 / 隐藏） ── */
+  /* ── 特性列表（分普通 / 隐藏），返回 {id, name} 对象数组 ── */
   const abilityGroups = useMemo(() => {
     if (!pokemonDetail) return { normal: [], hidden: [] };
     const abilities = currentForm?.abilities || [];
     if (abilities.length > 0) {
       return {
-        normal: abilities.filter((ab) => !ab.isHidden).map((ab) => ab.nameZh || ab.abilityId || ""),
-        hidden: abilities.filter((ab) => ab.isHidden).map((ab) => ab.nameZh || ab.abilityId || ""),
+        normal: abilities.filter((ab) => !ab.isHidden).map((ab) => ({ id: ab.abilityId || "", name: ab.nameZh || ab.abilityId || "" })),
+        hidden: abilities.filter((ab) => ab.isHidden).map((ab) => ({ id: ab.abilityId || "", name: ab.nameZh || ab.abilityId || "" })),
       };
     }
-    const topAbilities = pokemonDetail.abilities || [];
+    const topAbilities = (pokemonDetail.abilities || []).map((a) => ({ id: "", name: a }));
+    const hiddenAbility = pokemonDetail.hiddenAbility ? [{ id: "", name: pokemonDetail.hiddenAbility }] : [];
     return {
       normal: topAbilities,
-      hidden: pokemonDetail.hiddenAbility ? [pokemonDetail.hiddenAbility] : [],
+      hidden: hiddenAbility,
     };
   }, [pokemonDetail, currentForm]);
 
@@ -472,20 +481,20 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
             <div className="cfg-first-meta">
               <div className="cfg-section-label">特性</div>
               <div className="cfg-ability-tabs">
-                {abilityGroups.normal.map((name) => (
+                {abilityGroups.normal.map((ab) => (
                   <button
-                    key={name}
-                    className={`te-ability-tab${config.abilityId === name ? " te-ability-tab-active" : ""}`}
-                    onClick={() => handleField("abilityId", name)}
-                  >{name}</button>
+                    key={ab.name}
+                    className={`te-ability-tab${(config.abilityName || config.abilityId) === ab.name || config.abilityId === String(ab.id) ? " te-ability-tab-active" : ""}`}
+                    onClick={() => onChange((prev) => ({ ...prev, abilityId: ab.id ? String(ab.id) : "", abilityName: ab.name }))}
+                  >{ab.name}</button>
                 ))}
-                {abilityGroups.hidden.map((name) => (
+                {abilityGroups.hidden.map((ab) => (
                   <button
-                    key={name}
-                    className={`te-ability-tab te-ability-tab-hidden${config.abilityId === name ? " te-ability-tab-active" : ""}`}
-                    onClick={() => handleField("abilityId", name)}
+                    key={ab.name}
+                    className={`te-ability-tab te-ability-tab-hidden${(config.abilityName || config.abilityId) === ab.name || config.abilityId === String(ab.id) ? " te-ability-tab-active" : ""}`}
+                    onClick={() => onChange((prev) => ({ ...prev, abilityId: ab.id ? String(ab.id) : "", abilityName: ab.name }))}
                     title="隐藏特性"
-                  >{name}<span className="te-ha-badge">HA</span></button>
+                  >{ab.name}<span className="te-ha-badge">HA</span></button>
                 ))}
                 {allAbilities.length === 0 && (
                   <span className="muted" style={{ fontSize: 12 }}>{detailLoading ? "加载中…" : "暂无"}</span>

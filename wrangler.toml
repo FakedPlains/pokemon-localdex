@@ -8,7 +8,9 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # ── Pages Functions 绑定（/api/* 代理到 Worker） ──
-# Service Binding 通过 Cloudflare Dashboard 或 API 配置，见 functions/api/[[path]].ts
+[[services]]
+binding = "API_WORKER"
+service = "pokemon-localdex-api"
 
 # ── 本地开发配置 ──
 [dev]

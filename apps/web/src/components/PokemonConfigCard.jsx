@@ -181,7 +181,7 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
             </div>
           )}
           <div className="box-card-meta">
-            {data.abilityId && <span className="box-card-tag">{data.abilityId}</span>}
+            {(data.abilityName || data.abilityId) && <span className="box-card-tag">{data.abilityName || data.abilityId}</span>}
             <span className="box-card-tag">{data.nature || "认真"}</span>
           </div>
         </div>

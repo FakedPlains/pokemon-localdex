@@ -339,8 +339,8 @@ export async function calculateDamageD1(
   const attacker = new Pokemon(gen, atkNameEn ?? input.attacker.name, {
     level: input.attacker.level ?? 50,
     nature: natureZhToEn(input.attacker.nature ?? "认真"),
-    ability: atkAbilityEn ?? input.attacker.ability,
-    item: atkItemEn ?? input.attacker.item,
+    ability: (atkAbilityEn || input.attacker.ability) || undefined,
+    item: (atkItemEn || input.attacker.item) || undefined,
     evs: input.attacker.evs as any,
     ivs: input.attacker.ivs as any,
     boosts: input.attacker.boosts as any,
@@ -359,8 +359,8 @@ export async function calculateDamageD1(
   const defender = new Pokemon(gen, defNameEn ?? input.defender.name, {
     level: input.defender.level ?? 50,
     nature: natureZhToEn(input.defender.nature ?? "认真"),
-    ability: defAbilityEn ?? input.defender.ability,
-    item: defItemEn ?? input.defender.item,
+    ability: (defAbilityEn || input.defender.ability) || undefined,
+    item: (defItemEn || input.defender.item) || undefined,
     evs: input.defender.evs as any,
     ivs: input.defender.ivs as any,
     boosts: input.defender.boosts as any,

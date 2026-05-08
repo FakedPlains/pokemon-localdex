@@ -30,8 +30,13 @@ jobs:
 
       - name: Build web frontend
         run: npm run build:web
-        env:
-          GITHUB_PAGES: "false"
+
+      - name: Deploy API Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.worker.toml
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
