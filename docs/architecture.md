@@ -118,7 +118,7 @@ API 同时挂载在根路径 `/` 和 `/api` 前缀下：Vite 开发模式下前�
 
 Supabase 直连模式下的降级处理：队伍数据保存在浏览器 localStorage 中；伤害计算功能不可用（计算逻辑在后端 battle-core 中执行）。
 
-当前包含六个页面：图鉴页（PokedexPage）提供宝可梦列表搜索和详情展示；招式页（MovesPage）提供招式列表和世代差异查看；特性页（AbilitiesPage）提供特性列表和世代差异查看；道具页（ItemsPage）提供道具列表和详情；队伍页（TeamsPage）提供 6 槽队伍编辑器；伤害页（DamagePage）提供独立的伤害计算器。
+当前包含七个页面：图鉴页（PokedexPage）提供宝可梦列表搜索和详情展示；招式页（MovesPage）提供招式列表和世代差异查看；特性页（AbilitiesPage）提供特性列表和世代差异查看；道具页（ItemsPage）提供道具列表和详情；队伍页（TeamsPage）提供 6 槽队伍编辑器；伤害页（DamagePage）提供完整的伤害计算器，支持性格搜索选择、特性内联选择、道具图片预览、形态切换（自动绑定道具/特性）、天气和场地分段切换、EV↔SP 自动转换等；属性克制表页（TypeChartPage）展示 18 属性相克关系。
 
 前端采用"形态优先"的数据模型：`resolvePokemonDisplayVariant()` 函数根据当前选中的形态和世代，从 API 返回的嵌套数据中解析出正确的属性、种族值、特性和图片，是整个展示层的核心数据转换逻辑。
 
