@@ -1,11 +1,11 @@
 /**
  * battle-core: 伤害计算引擎
  *
- * 使用 @smogon/calc 作为底层计算库，通过实时查询 SQLite 数据库
- * 将中文名称映射为英文名称，再传入 @smogon/calc 进行精确计算。
+ * 使用 @fakedplains/smogon-calc（fork 版，支持 Champions gen 0）作为底层计算库，
+ * 通过实时查询 SQLite 数据库将中文名称映射为英文名称，再传入计算。
  */
-import { calculate, Pokemon, Move, Field } from "@smogon/calc";
-import type { GenerationNum } from "@smogon/calc/src/data/interface";
+import { calculate, Pokemon, Move, Field } from "@fakedplains/smogon-calc";
+import type { GenerationNum } from "@fakedplains/smogon-calc/dist/data/interface";
 
 // ── 中英文名称映射（性格是固定的，不需要查数据库） ──
 
@@ -55,6 +55,54 @@ function openDb(): DatabaseSync {
  */
 function queryPokemonNameEn(nameZh: string): string | undefined {
   const db = openDb();
+  const row = db.prepare(
+    "SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1"
+  ).get(nameZh) as { name_en: string } | undefined;
+  db.close();
+  return row?.name_en || undefined;
+}
+
+/**
+ * 通过 formKey 和宝可梦中文名查询形态英文名
+ * 优先用 formKey 精确匹配，fallback 到基础宝可梦名
+ */
+function queryPokemonFormNameEn(nameZh: string, formKey?: string): string | undefined {
+  const db = openDb();
+  
+  // 如果有 formKey 且不是 default，尝试通过 form_key 查询
+  if (formKey && formKey !== "default") {
+    const formRow = db.prepare(`
+      SELECT pf.name_en
+      FROM pokemon_forms pf
+      JOIN pokemon p ON pf.pokemon_id = p.id
+      WHERE pf.form_key = ? AND p.name_zh = ?
+      LIMIT 1
+    `).get(formKey, nameZh) as { name_en: string } | undefined;
+    if (formRow?.name_en) {
+      db.close();
+      return formRow.name_en;
+    }
+    
+    // 也尝试用 form_key 直接匹配（不依赖 nameZh）
+    const formRow2 = db.prepare(`
+      SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1
+    `).get(formKey) as { name_en: string } | undefined;
+    if (formRow2?.name_en) {
+      db.close();
+      return formRow2.name_en;
+    }
+  }
+  
+  // fallback: 用中文名查 pokemon_forms 表（形态中文名可能直接传入）
+  const formByName = db.prepare(`
+    SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1
+  `).get(nameZh) as { name_en: string } | undefined;
+  if (formByName?.name_en) {
+    db.close();
+    return formByName.name_en;
+  }
+  
+  // 最终 fallback: 查基础宝可梦表
   const row = db.prepare(
     "SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1"
   ).get(nameZh) as { name_en: string } | undefined;
@@ -122,6 +170,7 @@ export type DamageCalcInput = {
   // 攻击方
   attacker: {
     name: string;           // 宝可梦中文名
+    formKey?: string;       // 形态 key（如 "超级喷火龙y"）
     level?: number;         // 等级，默认 50
     nature?: string;        // 性格中文名，默认 "认真"
     ability?: string;       // 特性中文名
@@ -136,6 +185,7 @@ export type DamageCalcInput = {
   // 防守方
   defender: {
     name: string;
+    formKey?: string;       // 形态 key
     level?: number;
     nature?: string;
     ability?: string;
@@ -271,10 +321,11 @@ const STATUS_MAP: Record<string, string> = {
  * 接收中文名称，实时查询数据库获取英文名，然后调用 @smogon/calc
  */
 export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
-  const gen = (input.generation || 9) as GenerationNum;
+  // generation=0 为 Champions 模式，fork 版 calc 库原生支持（calculateChampions）
+  const gen = input.generation as GenerationNum;
 
   // ── 解析攻击方 ──
-  const atkNameEn = queryPokemonNameEn(input.attacker.name) || input.attacker.name;
+  const atkNameEn = queryPokemonFormNameEn(input.attacker.name, input.attacker.formKey) || input.attacker.name;
   const atkAbilityEn = input.attacker.ability
     ? (queryAbilityNameEn(input.attacker.ability) || input.attacker.ability)
     : undefined;
@@ -302,7 +353,7 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
   });
 
   // ── 解析防守方 ──
-  const defNameEn = queryPokemonNameEn(input.defender.name) || input.defender.name;
+  const defNameEn = queryPokemonFormNameEn(input.defender.name, input.defender.formKey) || input.defender.name;
   const defAbilityEn = input.defender.ability
     ? (queryAbilityNameEn(input.defender.ability) || input.defender.ability)
     : undefined;

@@ -3,7 +3,7 @@ import { api, unifiedApi } from "../utils/api.js";
 import { GENERATION_OPTIONS, calcTypeEffectiveness } from "../utils/constants.js";
 import {
   createDraftMember, createDefaultStats, buildDerivedStats,
-  resolveMoveGenerationRecord, getPokemonPreviewImage
+  resolveMoveGenerationRecord, getPokemonPreviewImage, evToSp
 } from "../utils/helpers.js";
 import { getBox, getTeams, resolveTeamMembers } from "../utils/teamStorage.js";
 import TypeChip from "../components/TypeChip.jsx";
@@ -556,29 +556,48 @@ export default function DamagePage({ teamDraft }) {
     var mType = record ? (record.type || move.type || "") : (move.type || "");
     var cat = record ? (record.category || move.category || "physical") : (move.category || "physical");
 
+    // Champions模式下，优先使用sps作为evs，否则将evs通过evToSp转换
+    var isChampions = Number(moveGeneration) === 0;
+    function resolveEvs(member) {
+      if (!isChampions) return member.evs || {};
+      // Champions模式：优先用sps
+      if (member.sps && Object.keys(member.sps).length > 0) {
+        return member.sps;
+      }
+      // 没有sps则将evs转换
+      var evs = member.evs || {};
+      var converted = {};
+      for (var key of Object.keys(evs)) {
+        converted[key] = evToSp(evs[key]);
+      }
+      return converted;
+    }
+
     // 构建新版请求体
     var calcResult = await api("/battle/damage", {
       method: "POST",
       body: JSON.stringify({
-        generation: Number(moveGeneration) || 9,
+        generation: moveGeneration !== "" ? Number(moveGeneration) : 9,
         attacker: {
           name: atkMember.nameZh || (atkDetail && atkDetail.nameZh) || "",
+          formKey: atkMember.formKey || "",
           level: Number(atkMember.level || 50),
           nature: atkMember.nature || "认真",
           ability: atkMember.abilityId || "",
           item: atkMember.itemId || "",
-          evs: atkMember.evs || {},
+          evs: resolveEvs(atkMember),
           ivs: atkMember.ivs || {},
           boosts: atkBoost ? { atk: 1, def: 1, spa: 1, spd: 1, spe: 1 } : undefined,
           status: atkStatus !== "none" ? atkStatus : "",
         },
         defender: {
           name: defMember.nameZh || (defDetail && defDetail.nameZh) || "",
+          formKey: defMember.formKey || "",
           level: Number(defMember.level || 50),
           nature: defMember.nature || "认真",
           ability: defMember.abilityId || "",
           item: defMember.itemId || "",
-          evs: defMember.evs || {},
+          evs: resolveEvs(defMember),
           ivs: defMember.ivs || {},
           boosts: defBoost ? { atk: 1, def: 1, spa: 1, spd: 1, spe: 1 } : undefined,
         },
@@ -749,7 +768,7 @@ export default function DamagePage({ teamDraft }) {
               setMoveGeneration(v);
               if (selectedMove) applyMove(selectedMove, v);
               setResult(null);
-            }} options={GENERATION_OPTIONS.map((g) => ({ value: g, label: g + "世代" }))} />
+            }} options={[...GENERATION_OPTIONS.map((g) => ({ value: g, label: g + "世代" })), { value: 0, label: "Champions" }]} />
             <button className="dmg-toolbar-btn" onClick={handleReset}>重置</button>
           </div>
         </div>

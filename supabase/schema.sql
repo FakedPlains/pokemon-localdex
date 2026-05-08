@@ -119,15 +119,16 @@ CREATE TABLE IF NOT EXISTS pokemon (
 -- 宝可梦形态
 -- ============================================================
 CREATE TABLE IF NOT EXISTS pokemon_forms (
-  id SERIAL PRIMARY KEY,
-  pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-  form_key TEXT NOT NULL,
-  name_zh TEXT NOT NULL,
-  form_type TEXT NOT NULL DEFAULT 'default',
-  is_default INTEGER NOT NULL DEFAULT 0,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  required_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
-  UNIQUE (pokemon_id, form_key)
+id SERIAL PRIMARY KEY,
+pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+form_key TEXT NOT NULL,
+name_zh TEXT NOT NULL,
+name_en TEXT,
+form_type TEXT NOT NULL DEFAULT 'default',
+is_default INTEGER NOT NULL DEFAULT 0,
+sort_order INTEGER NOT NULL DEFAULT 0,
+required_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+UNIQUE (pokemon_id, form_key)
 );
 
 CREATE TABLE IF NOT EXISTS pokemon_form_stats (

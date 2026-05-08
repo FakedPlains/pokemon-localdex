@@ -40,6 +40,17 @@ export function getNatureMultiplier(nature, statKey) {
   return 1;
 }
 
+/**
+ * 经典 EV → Champions SP 转换
+ * Lv.50 时 EV 的实际能力值增量 = ceil(floor(EV/4) / 2)
+ * Champions 的 SP 直接就是能力值加成，所以 SP = 该增量
+ */
+export function evToSp(ev) {
+  if (ev <= 0) return 0;
+  const evEffect = Math.floor(ev / 4);
+  return Math.min(Math.max(Math.ceil(evEffect / 2), 0), 32);
+}
+
 export function calculateFinalStat(member, detail, statKey) {
   const base = detail?.baseStats?.[statKey];
   if (base === undefined) return undefined;
