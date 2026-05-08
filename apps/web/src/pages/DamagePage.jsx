@@ -827,18 +827,18 @@ export default function DamagePage() {
   const [allMoves, setAllMoves] = useState([]);
   const [attackerDetail, setAttackerDetail] = useState(null);
   const [defenderDetail, setDefenderDetail] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [moveSearching, setMoveSearching] = useState(false);
 
   // 招式按需搜索（不再一次性全量加载）
   const moveSearchTimer = useRef(null);
   const searchMoves = useCallback((keyword) => {
-    if (!keyword || keyword.trim().length === 0) { setAllMoves([]); return; }
+    if (!keyword || keyword.trim().length === 0) { setAllMoves([]); setMoveSearching(false); return; }
     if (moveSearchTimer.current) clearTimeout(moveSearchTimer.current);
+    setMoveSearching(true);
     moveSearchTimer.current = setTimeout(() => {
-      setLoading(true);
       unifiedApi("/moves?q=" + encodeURIComponent(keyword.trim())).then((r) => {
         setAllMoves(r.data || []);
-      }).catch(() => setAllMoves([])).finally(() => setLoading(false));
+      }).catch(() => setAllMoves([])).finally(() => setMoveSearching(false));
     }, 200);
   }, []);
 
@@ -1027,7 +1027,6 @@ export default function DamagePage() {
     setResult(null);
   }, [isChampions]);
 
-  if (loading) return <Loading />;
 
   return (
     <section className="view-grid">
@@ -1144,7 +1143,7 @@ export default function DamagePage() {
                 selectedMove={selectedMove}
                 onSelect={setSelectedMove}
                 onSearch={searchMoves}
-                searching={loading}
+                searching={moveSearching}
               />
               <button
                 className="dc-calc-btn"
