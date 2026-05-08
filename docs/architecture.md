@@ -50,6 +50,11 @@ pokemon-localdex/
 ├── apps/
 │   ├── api/              Hono API 服务（托管 SPA 静态资源）
 │   ├── web/              React SPA 客户端（Vite 构建）
+│   │   ├── src/
+│   │   │   ├── pages/        七个页面（Pokedex、Moves、Abilities、Items、Teams、Damage、TypeChart）
+│   │   │   ├── components/   公共组件（TypeChip、CustomSelect、SearchSelect、StatCalculator 等）
+│   │   │   ├── hooks/        数据请求 hook（useApi、useInfiniteApi）
+│   │   │   └── utils/        工具函数（api、supabaseApi、constants、helpers、teamStorage）
 │   │   ├── .env          本地开发环境变量（VITE_DATA_SOURCE 留空）
 │   │   └── .env.production  生产构建模板（凭证由 CI Secrets 注入）
 │   └── miniprogram/      微信小程序客户端（Taro + React）

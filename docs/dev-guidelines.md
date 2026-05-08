@@ -145,6 +145,32 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 
 属性颜色定义在 `apps/web/src/utils/constants.js` 的 `TYPE_COLORS` 对象中，小程序端有对应的 `constants.js`。**不要在组件内硬编码颜色值**，统一从常量文件引用。
 
+### 4.5 公共组件说明
+
+**CustomSelect** — 自定义下拉选择框，支持选项分组和自定义渲染。用于 DamagePage 中的性格选择等场景。
+
+**SearchSelect** — 带异步搜索功能的下拉框，支持远程搜索和本地过滤。用于 DamagePage 中的宝可梦、招式、道具、特性搜索选择。
+
+**PokemonConfigCard** — 宝可梦配置卡片组件，展示宝可梦的基本信息和配置状态。
+
+**PokemonEditor** — 宝可梦编辑器组件，提供完整的宝可梦属性编辑界面。
+
+**PokemonPickerList** — 宝可梦选择列表组件，用于从列表中选择宝可梦。
+
+**StatCalculator** — 能力值计算器，支持 EV/IV 输入和实际能力值计算，同时支持 Champions 赛制的 SP 模式。
+
+### 4.6 DamagePage 开发注意事项
+
+DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
+
+**EV↔SP 自动转换**：DamagePage 支持 Champions 赛制（SP 模式）和标准赛制（EV 模式）。切换赛制时会自动转换努力值，转换逻辑使用 `evToSp()` 和 `spToEv()` 函数，确保数据不丢失。
+
+**形态切换自动绑定**：当用户切换宝可梦形态时，DamagePage 会自动绑定对应形态的道具和特性。例如超级进化形态会自动设置对应的超级石，极巨化形态会自动清除道具。
+
+**天气和场地分段切换**：天气和场地选择使用分段控制器（segmented control）样式，采用 toggle 行为——点击已选中的按钮会取消选择（回到"无"状态），而不是设置一个显式的"无"选项。
+
+**道具图片预览**：选中道具后，道具图片和名称以 flex 布局展示在搜索框位置，点击可清除选择恢复搜索框。不要使用绝对定位覆盖输入框的方式（会导致图片和文字重叠）。
+
 ---
 
 ## 五、爬虫开发规范

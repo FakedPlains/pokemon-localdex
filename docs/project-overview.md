@@ -33,21 +33,24 @@ pokemon-localdex/
 │   │   ├── src/
 │   │   │   ├── App.jsx         路由入口（hash 路由）
 │   │   │   ├── main.jsx        React 挂载点
-│   │   │   ├── pages/          六个页面组件
+│   │   │   ├── pages/          七个页面组件
 │   │   │   │   ├── PokedexPage.jsx      图鉴页（列表 + 详情抽屉）
 │   │   │   │   ├── MovesPage.jsx        招式页
 │   │   │   │   ├── AbilitiesPage.jsx    特性页
 │   │   │   │   ├── ItemsPage.jsx        道具页
 │   │   │   │   ├── TeamsPage.jsx        队伍编辑器
-│   │   │   │   └── DamagePage.jsx       伤害计算器
+│   │   │   │   ├── DamagePage.jsx       伤害计算器
+│   │   │   │   └── TypeChartPage.jsx    属性克制表
 │   │   │   ├── components/     公共 UI 组件
 │   │   │   │   ├── TypeChip.jsx         属性标签（带颜色）
-│   │   │   │   ├── StatBar.jsx          种族值条形图
+│   │   │   │   ├── CustomSelect.jsx     自定义下拉选择框
 │   │   │   │   ├── StatCalculator.jsx   能力值计算器
 │   │   │   │   ├── Loading.jsx          加载状态
 │   │   │   │   ├── Toast.jsx            Toast 通知
-│   │   │   │   ├── SearchSelect.jsx     搜索下拉框
-│   │   │   │   └── ImageViewer.jsx      图片查看器
+│   │   │   │   ├── SearchSelect.jsx     搜索下拉框（带异步搜索）
+│   │   │   │   ├── PokemonConfigCard.jsx 宝可梦配置卡片
+│   │   │   │   ├── PokemonEditor.jsx    宝可梦编辑器
+│   │   │   │   └── PokemonPickerList.jsx 宝可梦选择列表
 │   │   │   ├── hooks/
 │   │   │   │   ├── useApi.js            单次请求 hook
 │   │   │   │   └── useInfiniteApi.js    无限滚动分页 hook
