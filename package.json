@@ -22,7 +22,6 @@
     "crawl:items": "python3 scripts/crawl-52poke-db.py items"
   },
   "dependencies": {
-    "@fakedplains/smogon-calc": "^0.11.0",
     "@hono/node-server": "^2.0.0",
     "hono": "^4.12.15",
     "vite": "^8.0.10"

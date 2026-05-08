@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  packages: read
 
 jobs:
   build-and-deploy:
@@ -24,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           rm -f package-lock.json
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
+          rm -f packages/battle-core/package.json
           npm install --no-audit --no-fund
 
       - name: Build
