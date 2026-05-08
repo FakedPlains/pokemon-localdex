@@ -53,7 +53,7 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
     filterChangedWhileOpenRef.current = false;
 
     if (list.length > 0) {
-      const firstSlug = list[0].slug || list[0].id;
+      const firstSlug = String(list[0].id);
       setSelectedSlug(firstSlug);
     } else {
       setSelectedSlug(null);
@@ -66,7 +66,7 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
     if (!selectedSlug) { setDetail(null); return; }
     let cancelled = false;
     setDetail(null);
-    unifiedApi(`/pokemon/${encodeURIComponent(selectedSlug)}`).then((r) => {
+    unifiedApi(`/pokemon/${selectedSlug}`).then((r) => {
       if (!cancelled) {
         setDetail(r.data);
         setDetailGeneration("");
@@ -141,7 +141,7 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
           <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
             {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
             {list.map((member) => {
-              const slug = member.slug || member.id;
+              const slug = String(member.id);
               const isActive = selectedSlug === slug;
               const image = getPokemonPreviewImage(member);
               return (
@@ -537,7 +537,7 @@ function StatsTab({ detail, display, detailGeneration, onDetailGenerationChange 
   const buildConfig = useCallback(() => {
     const img = getPokemonPreviewImage(detail);
     return {
-      pokemonId: detail.slug || String(detail.id),
+      pokemonId: String(detail.id),
       nameZh: display.form?.nameZh || detail.nameZh || "",
       level: calcValues?.level || 50,
       nature: calcValues?.nature || "认真",

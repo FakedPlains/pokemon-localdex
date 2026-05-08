@@ -93,7 +93,7 @@ export function createDefaultStats(kind) {
 
 export function createDraftMember(pokemon) {
   return {
-    pokemonId: pokemon?.slug || pokemon?.id || "",
+    pokemonId: pokemon?.id ? String(pokemon.id) : "",
     nameZh: pokemon?.nameZh || "",
     configName: "",
     level: 50,

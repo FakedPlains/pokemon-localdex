@@ -45,7 +45,7 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
       const key = target.id;
       setExpanded(key);
       if (!detailCache[key]) {
-        unifiedApi(`/abilities/${encodeURIComponent(key)}`).then((r) => {
+        unifiedApi(`/abilities/${key}`).then((r) => {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
@@ -74,15 +74,15 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
     }
   }, [abilities, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleExpand = useCallback((slug) => {
-    if (expanded === slug) {
+  const toggleExpand = useCallback((id) => {
+    if (expanded === id) {
       setExpanded(null);
       return;
     }
-    setExpanded(slug);
-    if (!detailCache[slug]) {
-      unifiedApi(`/abilities/${encodeURIComponent(slug)}`).then((r) => {
-        setDetailCache((prev) => ({ ...prev, [slug]: r.data }));
+    setExpanded(id);
+    if (!detailCache[id]) {
+      unifiedApi(`/abilities/${id}`).then((r) => {
+        setDetailCache((prev) => ({ ...prev, [id]: r.data }));
       });
     }
   }, [expanded, detailCache]);

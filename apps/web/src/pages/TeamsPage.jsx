@@ -105,7 +105,7 @@ function BoxListRow({ config, onEdit, onDelete, onDuplicate }) {
   useEffect(() => {
     if (config.imageUrl || !config.pokemonId) return;
     let cancelled = false;
-    unifiedApi(`/pokemon/${encodeURIComponent(config.pokemonId)}`).then((r) => {
+    unifiedApi(`/pokemon/${config.pokemonId}`).then((r) => {
       if (cancelled) return;
       const p = r.data;
       const img = getPokemonPreviewImage(p);
@@ -121,11 +121,10 @@ function BoxListRow({ config, onEdit, onDelete, onDuplicate }) {
   useEffect(() => {
     if (config.itemImageUrl || !config.itemId) return;
     let cancelled = false;
-    unifiedApi(`/items?q=${encodeURIComponent(config.itemId)}`).then((r) => {
+    unifiedApi(`/items/${config.itemId}`).then((r) => {
       if (cancelled) return;
-      const items = r.data || [];
-      const match = items.find((it) => it.nameZh === config.itemId || it.slug === config.itemId) || items[0];
-      if (match?.imageUrl) setFetchedItemImageUrl(match.imageUrl);
+      const item = r.data;
+      if (item?.imageUrl) setFetchedItemImageUrl(item.imageUrl);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [config.itemId, config.itemImageUrl]);
@@ -153,9 +152,9 @@ function BoxListRow({ config, onEdit, onDelete, onDuplicate }) {
       <div className="box-list-col box-list-col-img">
         <div className="box-list-thumb">
           {imageUrl ? <img src={imageUrl} alt={config.nameZh || ""} referrerPolicy="no-referrer" /> : <span className="box-list-thumb-empty">?</span>}
-          {itemImgUrl && (
-            <img className="box-list-item-overlay" src={itemImgUrl} alt={config.itemId} title={config.itemId} referrerPolicy="no-referrer" />
-          )}
+            {itemImgUrl && (
+              <img className="box-list-item-overlay" src={itemImgUrl} alt={config.itemName || config.itemId} title={config.itemName || config.itemId} referrerPolicy="no-referrer" />
+            )}
         </div>
       </div>
 
@@ -263,7 +262,7 @@ function TeamCard({ team, onEdit, onDelete }) {
     if (missing.length === 0) return;
     let cancelled = false;
     missing.forEach((m) => {
-      unifiedApi(`/pokemon/${encodeURIComponent(m.pokemonId)}`).then((r) => {
+      unifiedApi(`/pokemon/${m.pokemonId}`).then((r) => {
         if (cancelled) return;
         const img = getPokemonPreviewImage(r.data);
         if (img?.url) {
@@ -353,6 +352,14 @@ const [isNewConfig, setIsNewConfig] = useState(false);
   useEffect(() => {
     setBoxConfigs(getBox());
     setTeams(getTeams());
+
+    // 监听迁移完成事件，刷新数据
+    const handleMigrationDone = () => {
+      setBoxConfigs(getBox());
+      setTeams(getTeams());
+    };
+    window.addEventListener("localdex-migration-done", handleMigrationDone);
+    return () => window.removeEventListener("localdex-migration-done", handleMigrationDone);
   }, []);
 
   // 新建/编辑时自动滚动到编辑区域
@@ -411,7 +418,7 @@ const [isNewConfig, setIsNewConfig] = useState(false);
       return {
         slot: i + 1, pokemonId: m.pokemonId, nameZh: m.nameZh, level: Number(m.level || 50),
         formKey: m.formKey || "", formName: m.formName || "",
-        itemId: m.itemId || "", itemImageUrl: m.itemImageUrl || "",
+        itemId: m.itemId || "", itemName: m.itemName || "", itemImageUrl: m.itemImageUrl || "",
         abilityId: m.abilityId || "", nature: m.nature || "认真",
         moves: (m.moves || []).filter(Boolean), _movesInfo: m._movesInfo || undefined,
         ivs: { ...createDefaultStats("iv"), ...(m.ivs || {}) },
@@ -571,7 +578,7 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                         const img = getPokemonPreviewImage(p);
                         handleEditingConfigChange({
                           ...editingConfig,
-                          pokemonId: p.slug || String(p.id),
+                          pokemonId: String(p.id),
                           nameZh: p.nameZh || "",
                           primaryType: p.primaryType || "",
                           secondaryType: p.secondaryType || "",
@@ -737,7 +744,7 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                             const img = getPokemonPreviewImage(p);
                             handleInlineEditDraftChange({
                               ...inlineEditDraft,
-                              pokemonId: p.slug || String(p.id),
+                              pokemonId: String(p.id),
                               nameZh: p.nameZh || "",
                               primaryType: p.primaryType || "",
                               secondaryType: p.secondaryType || "",

@@ -350,7 +350,8 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
     };
     // 形态绑定道具：自动设置/清除道具
     if (form.requiredItem) {
-      updates.itemId = form.requiredItem.slug || form.requiredItem.nameZh || "";
+      updates.itemId = form.requiredItem.id ? String(form.requiredItem.id) : (form.requiredItem.slug || "");
+      updates.itemName = form.requiredItem.nameZh || "";
       updates.itemImageUrl = form.requiredItem.imageUrl || "";
     } else {
       // 切换到无绑定道具的形态时，如果之前的道具是被形态锁定的，则清除
@@ -422,7 +423,7 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
     const pImg = getPokemonPreviewImage(p);
     onChange({
       ...createDraftMember(),
-      pokemonId: p.slug || String(p.id),
+      pokemonId: String(p.id),
       nameZh: p.nameZh || "",
       primaryType: p.primaryType || "",
       secondaryType: p.secondaryType || "",
@@ -494,6 +495,7 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
       nature: finalNature,
       abilityId: cfg.abilityId || "",
       itemId: cfg.itemId || "",
+      itemName: cfg.itemName || "",
       itemImageUrl: cfg.itemImageUrl || "",
       formKey: cfg.formKey || "",
       formName: cfg.formName || "",
@@ -660,17 +662,17 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
             <div className="dc-config-field">
               <span>道具</span>
               {isItemLocked ? (
-                <div className="dc-item-locked">
-                  {member.itemImageUrl && <img className="dc-item-locked-img" src={member.itemImageUrl} alt="" referrerPolicy="no-referrer" />}
-                  {member.itemId || "—"}
-                </div>
+<div className="dc-item-locked">
+                {member.itemImageUrl && <img className="dc-item-locked-img" src={member.itemImageUrl} alt="" referrerPolicy="no-referrer" />}
+{member.itemName || member.itemId || "—"}
+</div>
               ) : (
                 <div className="dc-item-search-wrap" ref={itemWrapRef}>
-                  {member.itemId && !itemOpen ? (
-                    <div className="dc-item-selected" onClick={() => setItemOpen(true)}>
-                      {member.itemImageUrl && <img className="dc-item-selected-img" src={member.itemImageUrl} alt="" referrerPolicy="no-referrer" />}
-                      <span className="dc-item-selected-name">{member.itemId}</span>
-                      <button className="dc-item-clear" onClick={(e) => { e.stopPropagation(); onChange({ ...member, itemId: "", itemImageUrl: "" }); setItemQuery(""); }}>×</button>
+{member.itemId && !itemOpen ? (
+<div className="dc-item-selected" onClick={() => setItemOpen(true)}>
+                {member.itemImageUrl && <img className="dc-item-selected-img" src={member.itemImageUrl} alt="" referrerPolicy="no-referrer" />}
+<span className="dc-item-selected-name">{member.itemName || member.itemId}</span>
+<button className="dc-item-clear" onClick={(e) => { e.stopPropagation(); onChange({ ...member, itemId: "", itemName: "", itemImageUrl: "" }); setItemQuery(""); }}>×</button>
                     </div>
                   ) : (
                     <input
@@ -686,10 +688,10 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
                     <div className="dc-item-dropdown">
                       {itemResults.map((item) => (
                         <button
-                          key={item.slug || item.id}
+                          key={item.id}
                           className="dc-item-option"
                           onClick={() => {
-                            onChange({ ...member, itemId: item.nameZh || item.slug || "", itemImageUrl: item.imageUrl || "" });
+                            onChange({ ...member, itemId: String(item.id), itemName: item.nameZh || "", itemImageUrl: item.imageUrl || "" });
                             setItemQuery("");
                             setItemOpen(false);
                           }}
@@ -835,7 +837,7 @@ export default function DamagePage() {
   useEffect(() => {
     if (!attacker.pokemonId) { setAttackerDetail(null); return; }
     let cancelled = false;
-    unifiedApi("/pokemon/" + encodeURIComponent(attacker.pokemonId)).then((r) => {
+    unifiedApi("/pokemon/" + attacker.pokemonId).then((r) => {
       if (!cancelled) setAttackerDetail(r.data);
     }).catch(() => { if (!cancelled) setAttackerDetail(null); });
     return () => { cancelled = true; };
@@ -845,7 +847,7 @@ export default function DamagePage() {
   useEffect(() => {
     if (!defender.pokemonId) { setDefenderDetail(null); return; }
     let cancelled = false;
-    unifiedApi("/pokemon/" + encodeURIComponent(defender.pokemonId)).then((r) => {
+    unifiedApi("/pokemon/" + defender.pokemonId).then((r) => {
       if (!cancelled) setDefenderDetail(r.data);
     }).catch(() => { if (!cancelled) setDefenderDetail(null); });
     return () => { cancelled = true; };

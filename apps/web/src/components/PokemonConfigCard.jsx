@@ -35,7 +35,7 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
   useEffect(() => {
     if (data.imageUrl || !data.pokemonId) return;
     let cancelled = false;
-    unifiedApi(`/pokemon/${encodeURIComponent(data.pokemonId)}`).then((r) => {
+    unifiedApi(`/pokemon/${data.pokemonId}`).then((r) => {
       if (cancelled) return;
       const p = r.data;
       const img = getPokemonPreviewImage(p);
@@ -52,11 +52,10 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
   useEffect(() => {
     if (data.itemImageUrl || !data.itemId) return;
     let cancelled = false;
-    unifiedApi(`/items?q=${encodeURIComponent(data.itemId)}`).then((r) => {
+    unifiedApi(`/items/${data.itemId}`).then((r) => {
       if (cancelled) return;
-      const items = r.data || [];
-      const match = items.find((it) => it.nameZh === data.itemId || it.slug === data.itemId) || items[0];
-      if (match?.imageUrl) setFetchedItemImageUrl(match.imageUrl);
+      const item = r.data;
+      if (item?.imageUrl) setFetchedItemImageUrl(item.imageUrl);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [data.itemId, data.itemImageUrl]);
@@ -67,7 +66,7 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
     if (moves.length === 0 || data._movesInfo) return;
     if (!data.pokemonId) return;
     let cancelled = false;
-    unifiedApi(`/pokemon/${encodeURIComponent(data.pokemonId)}`).then((r) => {
+    unifiedApi(`/pokemon/${data.pokemonId}`).then((r) => {
       if (cancelled) return;
       const pokemonId = r.data?.id;
       if (!pokemonId) return;
@@ -169,7 +168,7 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
           <div className="box-card-thumb">
             {imageUrl ? <img src={imageUrl} alt={data.nameZh || ""} referrerPolicy="no-referrer" /> : <span className="box-card-thumb-empty">?</span>}
             {itemImgUrl && (
-              <img className="box-card-item-overlay" src={itemImgUrl} alt={data.itemId} title={data.itemId} referrerPolicy="no-referrer" />
+              <img className="box-card-item-overlay" src={itemImgUrl} alt={data.itemName || data.itemId} title={data.itemName || data.itemId} referrerPolicy="no-referrer" />
             )}
           </div>
           {types.length > 0 && (

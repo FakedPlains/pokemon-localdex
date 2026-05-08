@@ -159,7 +159,31 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 
 **StatCalculator** — 能力值计算器，支持 EV/IV 输入和实际能力值计算，同时支持 Champions 赛制的 SP 模式。
 
-### 4.6 DamagePage 开发注意事项
+### 4.6 ID 使用规范
+
+前端所有 API 请求和 localStorage 存储**必须使用数据库数字 ID**，不得使用中文名称或 slug 作为标识符。
+
+**存储字段约定**：
+
+| 字段 | 用途 | 示例值 |
+|------|------|--------|
+| `pokemonId` | 宝可梦数据库 ID（用于 API 请求） | `"25"` |
+| `nameZh` | 宝可梦中文名（仅用于显示） | `"皮卡丘"` |
+| `itemId` | 道具数据库 ID（用于 API 请求） | `"123"` |
+| `itemName` | 道具中文名（仅用于显示） | `"气势披带"` |
+| `abilityId` | 特性中文名（仅用于显示，不涉及 API 回查） | `"静电"` |
+
+**开发注意**：
+
+- 从列表选择宝可梦/道具时，使用 `String(item.id)` 存储 ID，同时保存 `nameZh` / `itemName` 用于显示
+- API 详情请求使用 `/pokemon/${id}` 或 `/items/${id}` 格式，不需要 `encodeURIComponent`
+- 搜索请求仍使用中文名称：`/pokemon?q=${encodeURIComponent(name)}`（这是正确的）
+- 界面显示优先使用 `itemName`，降级到 `itemId`：`data.itemName || data.itemId`
+- `abilityId` 例外：因为特性仅用于显示，不涉及通过 ID 回查 API，所以直接存储中文名
+
+**数据迁移**：`utils/migrateStorage.js` 提供了旧格式数据的自动迁移。应用启动时（`main.jsx`）会检测并迁移旧数据（中文名 → 数字 ID）。迁移完成后通过 `localdex-migration-done` 自定义事件通知组件刷新。
+
+### 4.7 DamagePage 开发注意事项
 
 DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 

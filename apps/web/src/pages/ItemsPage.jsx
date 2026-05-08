@@ -42,10 +42,10 @@ export default function ItemsPage({ query = "" }) {
     const target = items.find((it) => it.slug === expandId || String(it.id) === expandId);
     if (target) {
       pendingExpandRef.current = null;
-      const key = target.slug || target.id;
+      const key = String(target.id);
       setExpanded(key);
       if (!detailCache[key]) {
-        unifiedApi(`/items/${encodeURIComponent(key)}`).then((r) => {
+        unifiedApi(`/items/${key}`).then((r) => {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
@@ -77,7 +77,7 @@ export default function ItemsPage({ query = "" }) {
     }
     setExpanded(key);
     if (!detailCache[key]) {
-      unifiedApi(`/items/${encodeURIComponent(key)}`).then((r) => {
+      unifiedApi(`/items/${key}`).then((r) => {
         setDetailCache((prev) => ({ ...prev, [key]: r.data }));
       });
     }
@@ -101,7 +101,7 @@ export default function ItemsPage({ query = "" }) {
 
         <div className="it-list">
           {items.map((item) => {
-            const key = item.slug || item.id;
+            const key = String(item.id);
             const isExpanded = expanded === key;
             const detail = detailCache[key];
             return (

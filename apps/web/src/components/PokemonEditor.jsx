@@ -119,7 +119,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     if (!pokemonId) { setPokemonDetail(null); return; }
     let cancelled = false;
     setDetailLoading(true);
-    unifiedApi(`/pokemon/${encodeURIComponent(pokemonId)}`).then((r) => {
+    unifiedApi(`/pokemon/${pokemonId}`).then((r) => {
       if (!cancelled) {
         setPokemonDetail(r.data);
         setDetailLoading(false);
@@ -210,7 +210,8 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     };
     // 形态绑定道具：自动设置/清除道具
     if (form.requiredItem) {
-      updates.itemId = form.requiredItem.slug || form.requiredItem.nameZh;
+      updates.itemId = form.requiredItem.id ? String(form.requiredItem.id) : (form.requiredItem.slug || "");
+      updates.itemName = form.requiredItem.nameZh || "";
       updates.itemImageUrl = form.requiredItem.imageUrl || "";
     } else {
       // 切换到无绑定道具的形态时，如果之前的道具是被形态锁定的，则清除
@@ -281,10 +282,11 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
 
   const itemOptions = useMemo(() => {
     return items.map((item) => ({
-      value: item.slug || String(item.id),
+      value: String(item.id),
       label: item.nameZh || item.slug || String(item.id),
       sublabel: item.effectSummary || "",
       imageUrl: item.imageUrl || "",
+      nameZh: item.nameZh || "",
     }));
   }, [items]);
 
@@ -362,10 +364,11 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     if (itemSearchResults !== null) {
       // 搜索模式：使用 API 返回的结果
       return itemSearchResults.map((item) => ({
-        value: item.slug || String(item.id),
+        value: String(item.id),
         label: item.nameZh || item.slug || String(item.id),
         sublabel: item.effectSummary || "",
         imageUrl: item.imageUrl || "",
+        nameZh: item.nameZh || "",
       }));
     }
     return itemOptions;
@@ -449,7 +452,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
                   ? <img src={previewImage.url} alt={config.nameZh || ""} referrerPolicy="no-referrer" />
                   : <span className="cfg-preview-empty">{pokemonId ? "…" : "?"}</span>}
                 {config.itemImageUrl && (
-                  <img className="cfg-item-overlay" src={config.itemImageUrl} alt={config.itemId || ""} referrerPolicy="no-referrer" />
+                  <img className="cfg-item-overlay" src={config.itemImageUrl} alt={config.itemName || config.itemId || ""} referrerPolicy="no-referrer" />
                 )}
                 <span
                   className={`cfg-shiny-badge${isShiny ? " cfg-shiny-badge-active" : ""}`}
@@ -493,7 +496,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
                 <div className="cfg-slot-btn cfg-slot-locked" title="该形态必须携带此道具">
                   <span className="cfg-item-selected">
                     {config.itemImageUrl && <img className="cfg-item-selected-img" src={config.itemImageUrl} alt="" referrerPolicy="no-referrer" />}
-                    <span>{currentForm?.requiredItem?.nameZh || config.itemId}</span>
+                    <span>{currentForm?.requiredItem?.nameZh || config.itemName || config.itemId}</span>
                   </span>
                 </div>
               ) : activePanel === "item" ? (
@@ -518,7 +521,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
                   {config.itemId ? (
                     <span className="cfg-item-selected">
                       {config.itemImageUrl && <img className="cfg-item-selected-img" src={config.itemImageUrl} alt="" referrerPolicy="no-referrer" />}
-                      <span>{config.itemId}</span>
+                      <span>{config.itemName || config.itemId}</span>
                     </span>
                   ) : "选择道具…"}
                 </button>
@@ -616,7 +619,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
                 <div
                   key={opt.value}
                   className={`cfg-item-panel-row${config.itemId === opt.value ? " cfg-item-panel-row-active" : ""}`}
-                  onClick={() => { const draft = { ...config, itemId: opt.value, itemImageUrl: opt.imageUrl }; onChange(draft); setActivePanel(null); setPanelSearch(""); }}
+                  onClick={() => { const draft = { ...config, itemId: opt.value, itemName: opt.nameZh || opt.label, itemImageUrl: opt.imageUrl }; onChange(draft); setActivePanel(null); setPanelSearch(""); }}
                 >
                   <div className="cfg-item-panel-img">
                     {opt.imageUrl && <img src={opt.imageUrl} alt="" referrerPolicy="no-referrer" />}

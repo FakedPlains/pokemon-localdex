@@ -6,12 +6,13 @@
  *   localdex_teams: Team[]          — 队伍列表，成员可以是内联配置或引用 box 中的 configId
  *
  * PokemonConfig: {
- *   configId: string,       // 唯一 ID
- *   pokemonId: string,      // 宝可梦 slug / id
- *   nameZh: string,         // 显示名
+ *   configId: string,       // 唯一 ID（本地生成）
+ *   pokemonId: string,      // 宝可梦数据库数字 ID（如 "25"）
+ *   nameZh: string,         // 显示名（中文名）
  *   level: number,
- *   itemId: string,
- *   abilityId: string,
+ *   itemId: string,         // 道具数据库数字 ID（如 "123"）
+ *   itemName: string,       // 道具显示名（中文名）
+ *   abilityId: string,      // 特性名称（中文名）
  *   nature: string,
  *   moves: string[4],
  *   ivs: { hp, atk, def, spa, spd, spe },

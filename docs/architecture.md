@@ -54,7 +54,7 @@ pokemon-localdex/
 │   │   │   ├── pages/        七个页面（Pokedex、Moves、Abilities、Items、Teams、Damage、TypeChart）
 │   │   │   ├── components/   公共组件（TypeChip、CustomSelect、SearchSelect、StatCalculator 等）
 │   │   │   ├── hooks/        数据请求 hook（useApi、useInfiniteApi）
-│   │   │   └── utils/        工具函数（api、supabaseApi、constants、helpers、teamStorage）
+│   │   │   └── utils/        工具函数（api、supabaseApi、constants、helpers、teamStorage、migrateStorage）
 │   │   ├── .env          本地开发环境变量（VITE_DATA_SOURCE 留空）
 │   │   └── .env.production  生产构建模板（凭证由 CI Secrets 注入）
 │   └── miniprogram/      微信小程序客户端（Taro + React）
@@ -122,6 +122,10 @@ API 同时挂载在根路径 `/` 和 `/api` 前缀下：Vite 开发模式下前�
 当 `VITE_DATA_SOURCE` 为空或 `api` 时，所有请求通过 `fetch("/api/...")` 发送到 Hono API。当 `VITE_DATA_SOURCE=supabase` 时，前端通过 `supabaseApi.js` 中的函数直接查询 Supabase，GET 请求完全绕过后端。这一切换逻辑封装在 `api.js` 的 `unifiedApi()` 函数中，上层组件和 hook 无需感知数据源差异。
 
 Supabase 直连模式下的降级处理：队伍数据保存在浏览器 localStorage 中；伤害计算功能不可用（计算逻辑在后端 battle-core 中执行）。
+
+**ID 使用规范**：前端所有 API 请求和 localStorage 存储均使用数据库数字 ID（如 `pokemonId: "25"`、`itemId: "123"`），不使用中文名称或 slug 作为标识符。中文名称仅用于界面显示，通过 `nameZh`、`itemName` 等字段保存。这确保了 API 请求的稳定性和 URL 的简洁性。
+
+**数据迁移**：`migrateStorage.js` 提供了从旧格式（中文名称作为 ID）到新格式（数字 ID）的自动迁移逻辑。应用启动时会检测 localStorage 中是否存在旧格式数据，如有则通过 API 搜索将中文名解析为数字 ID 并就地更新。迁移是异步的、不阻塞渲染、幂等的（通过 `localdex_migration_v2` 标记防止重复执行）。
 
 当前包含七个页面：图鉴页（PokedexPage）提供宝可梦列表搜索和详情展示；招式页（MovesPage）提供招式列表和世代差异查看；特性页（AbilitiesPage）提供特性列表和世代差异查看；道具页（ItemsPage）提供道具列表和详情；队伍页（TeamsPage）提供 6 槽队伍编辑器；伤害页（DamagePage）提供完整的伤害计算器，支持性格搜索选择、特性内联选择、道具图片预览、形态切换（自动绑定道具/特性）、天气和场地分段切换、EV↔SP 自动转换等；属性克制表页（TypeChartPage）展示 18 属性相克关系。
 

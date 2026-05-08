@@ -60,7 +60,8 @@ pokemon-localdex/
 │   │   │       ├── supabaseApi.js       Supabase 直连查询函数
 │   │   │       ├── constants.js         全局常量（属性、性格、招式学习方式等）
 │   │   │       ├── helpers.js           数据转换工具函数
-│   │   │       └── teamStorage.js       队伍/盒子本地存储
+│   │   │       ├── teamStorage.js       队伍/盒子本地存储
+│   │   │       └── migrateStorage.js    localStorage 数据迁移（旧格式中文名→数字ID）
 │   │   ├── public/
 │   │   │   └── assets/
 │   │   │       ├── styles.css           全局样式
