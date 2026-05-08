@@ -11,7 +11,7 @@ Pokemon LocalDex 是一个宝可梦图鉴应用，数据完全来自 [52Poké Wi
 | 模式 | 前端 | 数据源 | 适用场景 |
 |------|------|--------|---------|
 | **本地模式** | React SPA（Vite dev server） | 本地 SQLite → Hono API | 本地开发、离线使用 |
-| **在线模式** | React SPA（GitHub Pages 静态托管） | Supabase（PostgreSQL） | 公开访问，零后端 |
+| **生产模式** | React SPA（Cloudflare Pages） | D1 → Worker（Service Binding 代理） | 公开访问，全球 CDN |
 | **小程序模式** | Taro + React（微信小程序） | Supabase PostgREST REST API | 移动端入口 |
 
 ---
@@ -21,10 +21,11 @@ Pokemon LocalDex 是一个宝可梦图鉴应用，数据完全来自 [52Poké Wi
 ```
 pokemon-localdex/
 ├── apps/
-│   ├── api/                    Hono API 服务（同时托管 SPA 静态资源）
+│   ├── api/                    Hono API 服务（本地 SQLite / Worker D1）
 │   │   ├── src/
 │   │   │   ├── app.ts          路由定义、数据源切换、Teams/Battle 接口
-│   │   │   ├── server.ts       HTTP 服务器入口（监听 0.0.0.0:3030）
+│   │   │   ├── server.ts       HTTP 服务器入口（本地模式，监听 0.0.0.0:3030）
+│   │   │   ├── worker.ts       Cloudflare Workers 入口（生产模式）
 │   │   │   ├── static.ts       静态文件服务（dist/ → apps/web/public/）
 │   │   │   └── smoke.ts        启动自检脚本
 │   │   └── .env.example        API 环境变量模板
@@ -32,7 +33,7 @@ pokemon-localdex/
 │   ├── web/                    React SPA（Vite 构建）
 │   │   ├── src/
 │   │   │   ├── App.jsx         路由入口（hash 路由）
-│   │   │   ├── main.jsx        React 挂载点
+│   │   │   ├── main.jsx        React 挂载点（含启动时数据迁移）
 │   │   │   ├── pages/          七个页面组件
 │   │   │   │   ├── PokedexPage.jsx      图鉴页（列表 + 详情抽屉）
 │   │   │   │   ├── MovesPage.jsx        招式页
@@ -48,6 +49,7 @@ pokemon-localdex/
 │   │   │   │   ├── Loading.jsx          加载状态
 │   │   │   │   ├── Toast.jsx            Toast 通知
 │   │   │   │   ├── SearchSelect.jsx     搜索下拉框（带异步搜索）
+│   │   │   │   ├── MoveSearch.jsx       招式按需搜索组件（200ms 防抖）
 │   │   │   │   ├── PokemonConfigCard.jsx 宝可梦配置卡片
 │   │   │   │   ├── PokemonEditor.jsx    宝可梦编辑器
 │   │   │   │   └── PokemonPickerList.jsx 宝可梦选择列表
@@ -60,16 +62,14 @@ pokemon-localdex/
 │   │   │       ├── supabaseApi.js       Supabase 直连查询函数
 │   │   │       ├── constants.js         全局常量（属性、性格、招式学习方式等）
 │   │   │       ├── helpers.js           数据转换工具函数
-│   │   │       ├── teamStorage.js       队伍/盒子本地存储
-│   │   │       └── migrateStorage.js    localStorage 数据迁移（旧格式中文名→数字ID）
+│   │   │       ├── teamStorage.js       队伍/盒子本地存储（abilityId + abilityName 双字段）
+│   │   │       └── migrateStorage.js    localStorage 数据迁移（v3：中文名→数字ID，含 abilityId）
 │   │   ├── public/
 │   │   │   └── assets/
 │   │   │       ├── styles.css           全局样式
 │   │   │       └── type-icons/          属性图标（PNG）
 │   │   ├── .env                本地开发（VITE_DATA_SOURCE 留空，走 API）
-│   │   ├── .env.production     生产构建模板（凭证由 CI Secrets 注入）
-│   │   ├── .env.example        配置说明模板
-│   │   └── vite.config.js      Vite 配置（proxy、base、outDir）
+│   │   └── vite.config.js      Vite 配置（proxy、base:"/"、outDir:"../../dist"）
 │   │
 │   └── miniprogram/            微信小程序（Taro 4.2.0 + React 18）
 │       ├── src/
@@ -99,8 +99,12 @@ pokemon-localdex/
 │       └── project.config.json 微信开发者工具项目配置（AppID: wx6f183945e108152a）
 │
 ├── packages/
-│   ├── battle-core/            伤害计算核心（纯 TypeScript）
+│   ├── battle-core/            伤害计算核心（Node.js 版，node:sqlite 同步查询）
 │   │   └── src/index.ts        calculateDamage() 函数
+│   ├── d1-battle-core/         伤害计算核心（Workers 版，D1 异步查询）
+│   │   └── src/index.ts        calculateDamage() 函数（基于 @fakedplains/smogon-calc）
+│   ├── d1-store/               D1 查询适配层（与 sqlite-store 同接口）
+│   │   └── src/index.ts        类型定义 + 查询函数（D1 async API）
 │   ├── crawler_py/             Python 爬虫（52Poké → SQLite）
 │   │   └── localdex_crawler/   爬虫核心模块
 │   ├── sqlite-store/           SQLite 查询适配层（TypeScript）
@@ -108,8 +112,14 @@ pokemon-localdex/
 │   └── supabase-store/         Supabase 查询适配层（TypeScript）
 │       └── src/index.ts        与 sqlite-store 同接口，底层用 supabase-js
 │
+├── functions/                  Cloudflare Pages Functions
+│   └── api/[[path]].ts         catch-all：通过 Service Binding 代理 /api/* 到 Worker
+│
+├── schema/
+│   └── d1-schema.sql           D1 数据库 schema
+│
 ├── supabase/
-│   └── schema.sql              Supabase 数据库 schema（与 SQLite 对应）
+│   └── schema.sql              Supabase 数据库 schema（与 SQLite/D1 对应）
 │
 ├── scripts/
 │   ├── crawl-52poke-db.py      爬虫入口脚本（npm run crawl:* 的实际执行文件）
@@ -124,11 +134,13 @@ pokemon-localdex/
 │
 ├── .github/
 │   └── workflows/
-│       └── deploy-pages.yml    GitHub Pages 自动部署工作流
+│       └── deploy-cf.yml       Cloudflare Pages + Worker 自动部署工作流
 │
+├── wrangler.toml               Cloudflare Pages 配置（Service Binding 声明）
+├── wrangler.worker.toml        Cloudflare Worker 配置（D1 绑定）
 ├── docs/                       技术文档（本目录）
 ├── package.json                Monorepo 根配置（npm workspaces）
-└── .npmrc                      npm registry 配置
+└── .npmrc                      npm registry 配置（公共 registry + GitHub Packages）
 ```
 
 ---
@@ -145,14 +157,14 @@ Python 爬虫，唯一数据源为 52Poké Wiki。核心职责：
 
 模块分工：`cli.py`（命令行入口）→ `fetcher.py`（HTTP + 缓存）→ `pokemon.py` / `catalog.py`（页面解析）→ `sqlite_upsert.py`（数据库写入）
 
-### 3.2 存储层（sqlite-store / supabase-store）
+### 3.2 存储层（sqlite-store / d1-store / supabase-store）
 
-两个可互换的 TypeScript 包，对外暴露**完全相同的函数签名**：
+三个可互换的 TypeScript 包，对外暴露**完全相同的函数签名**：
 
 ```typescript
-listPokemonFromSqlite / listPokemonFromSupabase
-getPokemonFromSqlite  / getPokemonFromSupabase
-listMovesFromSqlite   / listMovesFromSupabase
+listPokemonFromSqlite / listPokemonFromD1 / listPokemonFromSupabase
+getPokemonFromSqlite  / getPokemonFromD1  / getPokemonFromSupabase
+listMovesFromSqlite   / listMovesFromD1   / listMovesFromSupabase
 // ... 以此类推
 ```
 
@@ -160,31 +172,49 @@ API 层通过 `DATA_SOURCE` 环境变量动态 `import` 对应的包，切换对
 
 **sqlite-store** 使用 Node.js 22 内置的 `node:sqlite`（`DatabaseSync`），无需额外依赖。
 
+**d1-store** 使用 Cloudflare D1 异步 API，在 Workers 运行时中通过 binding 访问数据库。D1 是 SQLite 兼容的边缘数据库，表结构与本地 SQLite 完全一致。
+
 **supabase-store** 使用 `@supabase/supabase-js` 客户端，通过 Supabase REST API 查询。
 
 ### 3.3 API 层（apps/api）
 
-基于 Hono 框架，运行在 Node.js 22，默认监听 `0.0.0.0:3030`。
+基于 Hono 框架，支持两种运行模式：
+
+**本地模式**（`server.ts` 入口）：运行在 Node.js 22，默认监听 `0.0.0.0:3030`。根据 `DATA_SOURCE` 环境变量（默认 `sqlite`）动态导入 sqlite-store 或 supabase-store。
+
+**Worker 模式**（`worker.ts` 入口）：运行在 Cloudflare Workers，使用 D1 binding 通过 d1-store 和 d1-battle-core 访问数据。
 
 关键设计：
-- 所有路由**同时挂载在 `/` 和 `/api` 前缀**下，兼容 Vite dev proxy 和生产直连两种模式
-- 生产模式下同时托管 React SPA 静态资源（`dist/` → `apps/web/public/`）
+- 所有路由**同时挂载在 `/` 和 `/api` 前缀**下，兼容 Vite dev proxy 和 Pages Functions 代理两种模式
+- 本地生产模式下同时托管 React SPA 静态资源
 - 全局启用 CORS，允许任意来源
 
-### 3.4 Web 展示层（apps/web）
+### 3.4 Pages Functions 代理层
+
+`functions/api/[[path]].ts` 是 Cloudflare Pages 的 catch-all Function，通过 Service Binding 将所有 `/api/*` 请求转发给 Worker：
+
+```typescript
+export const onRequest: PagesFunction<Env> = async (context) => {
+  return context.env.API_WORKER.fetch(context.request);
+};
+```
+
+Service Binding 在 `wrangler.toml` 中声明，Pages 和 Worker 之间走 Cloudflare 内部网络，无额外延迟。
+
+### 3.5 Web 展示层（apps/web）
 
 React 18 SPA，Vite 构建，使用 **hash 路由**（`#/pokedex`、`#/moves` 等）。
 
 数据获取通过 `unifiedApi()` 统一入口，根据 `VITE_DATA_SOURCE` 自动选择：
 
 ```
-VITE_DATA_SOURCE 为空 / "api"  →  fetch("/api/...")  →  Hono API
+VITE_DATA_SOURCE 为空 / "api"  →  fetch("/api/...")  →  Hono API / Pages Functions
 VITE_DATA_SOURCE = "supabase"  →  supabaseApi.js 直连 Supabase
 ```
 
 核心数据转换函数 `resolvePokemonDisplayVariant()`：根据当前选中的形态和世代，从 API 返回的嵌套数据中解析出正确的属性、种族值、特性和图片。
 
-### 3.5 小程序展示层（apps/miniprogram）
+### 3.6 小程序展示层（apps/miniprogram）
 
 Taro 4.2.0 + React 18，编译为微信小程序原生代码。
 
@@ -193,9 +223,11 @@ Taro 4.2.0 + React 18，编译为微信小程序原生代码。
 - 图片通过 `SafeImage` 组件代理到 `wsrv.nl`，绕过微信域名白名单限制
 - Supabase 凭证通过 Taro `defineConstants` 在编译时注入，不硬编码在源码中
 
-### 3.6 核心库（battle-core）
+### 3.7 核心库
 
-纯 TypeScript 库，实现宝可梦伤害计算公式（含本系加成、属性克制、天气、急所、乱数范围）。仅在后端 API 模式下可用，GitHub Pages 和小程序端不支持。
+**battle-core**（Node.js 版）：纯 TypeScript 伤害计算库，使用 `node:sqlite` 同步查询做中英文名称映射。仅在本地 API 模式下使用。
+
+**d1-battle-core**（Workers 版）：与 battle-core 逻辑一致，使用 D1 异步 API 做名称映射。基于 `@fakedplains/smogon-calc` 计算引擎，支持完整的伤害计算（含本系加成、属性克制、天气、急所、乱数范围、道具和特性影响）。Worker 接收中文名称参数后通过 D1 查询英文名，再调用计算引擎。
 
 ---
 
@@ -219,16 +251,19 @@ Hono API（apps/api，:3030）
 React SPA（apps/web，:5173 dev / :3030 prod）
 ```
 
-### 在线模式数据流（GitHub Pages）
+### 生产模式数据流（Cloudflare Pages）
 
 ```
-data/sqlite/localdex.sqlite
-    │ migrate-to-supabase.mjs
+React SPA（Cloudflare Pages CDN）
+    │ fetch("/api/...")
     ▼
-Supabase（PostgreSQL）
-    │ @supabase/supabase-js
+Pages Functions（functions/api/[[path]].ts）
+    │ Service Binding → env.API_WORKER.fetch(request)
     ▼
-React SPA（GitHub Pages 静态托管）
+Worker（pokemon-localdex-api）
+    │ D1 binding → env.DB
+    ▼
+Cloudflare D1（pokemon-localdex-d1）
 ```
 
 ### 小程序模式数据流
@@ -249,11 +284,12 @@ Supabase（PostgreSQL）
 
 | 文件 | 作用域 | 关键变量 |
 |------|--------|---------|
-| `apps/api/.env` | API 服务 | `DATA_SOURCE`（sqlite/supabase）、`HOST`、`PORT`、`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` |
+| `apps/api/.env` | API 服务（本地） | `DATA_SOURCE`（sqlite/supabase）、`HOST`、`PORT`、`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` |
 | `apps/web/.env` | Web 本地开发 | `VITE_DATA_SOURCE`（留空走 API） |
-| `apps/web/.env.production` | Web 生产构建模板 | `VITE_DATA_SOURCE=supabase`，凭证留空由 CI 注入 |
+| `apps/web/vite.config.js` | 构建配置 | `base: "/"`（固定，不再条件切换） |
+| `wrangler.worker.toml` | Worker 配置 | `DATA_SOURCE=d1`、D1 binding |
 | `apps/miniprogram/.env` | 小程序构建 | `SUPABASE_URL`、`SUPABASE_ANON_KEY` |
-| GitHub Secrets | CI 构建 | `VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY` |
+| GitHub Secrets | CI 部署 | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` |
 
 `.env` 和 `.env.*`（除 `.env.production` 和 `.env.example`）均被 `.gitignore` 排除。
 
@@ -289,14 +325,37 @@ npx taro build --type weapp --watch  # 开发构建（监听模式）
 
 ## 七、部署
 
-### GitHub Pages
+### Cloudflare Pages（生产环境）
 
-推送到 `main` 分支自动触发 `.github/workflows/deploy-pages.yml`：
+推送到 `main` 分支自动触发 `.github/workflows/deploy-cf.yml`：
 
-1. 删除 lockfile 后重新 `npm install`（解析正确平台的 native binding）
-2. 注入 Supabase 凭证（GitHub Secrets）并执行 `npm run build:web`
-3. 设置 `GITHUB_PAGES=true`，Vite `base` 自动切换为 `/pokemon-localdex/`
-4. 产物推送到 `gh-pages` 分支
+1. 删除 `package-lock.json` 后重新 `npm install`（确保 native binding 匹配 CI 平台）
+2. 执行 `npm run build:web` 构建前端
+3. 部署 API Worker（`wrangler deploy --config wrangler.worker.toml`）
+4. 部署 Pages（`wrangler pages deploy dist --project-name=pokemon-localdex --branch=main`）
+
+部署架构：
+
+```
+用户 → Cloudflare Pages (CDN + Pages Functions)
+              │ /api/* Service Binding
+              ▼
+       Worker (pokemon-localdex-api)
+              │ D1 binding
+              ▼
+       D1 Database (pokemon-localdex-d1)
+```
+
+GitHub Secrets 配置：
+
+| Secret 名称 | 用途 |
+|-------------|------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（Workers/Pages/D1 权限）|
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID |
+
+### 分支保护规则
+
+`main` 分支设置了保护规则：禁止强制推送，只能通过 Pull Request 合并。确保部署的可追溯性和代码审查流程。
 
 ### 微信小程序
 
@@ -334,5 +393,7 @@ Web 端使用 `@vitejs/plugin-react@5.2.0`（不得使用 v6.x，v6.x 要求 Rea
 - **关联表**：`evolution_chains`、`pokemon_learnsets`、`pokemon_generation_regions`
 
 核心设计原则：**形态优先**——宝可梦的属性、种族值、特性、图片均挂在 `pokemon_forms` 下，而非主表。形态子表使用 `generation_start` / `generation_end` 表示世代范围，支持跨世代数据变化。
+
+本地 SQLite、Cloudflare D1 和 Supabase 三个数据库的表结构保持一致，schema 分别定义在 `packages/sqlite-store/src/index.ts`、`schema/d1-schema.sql` 和 `supabase/schema.sql` 中。
 
 详细表结构见 [database.md](./database.md)。
