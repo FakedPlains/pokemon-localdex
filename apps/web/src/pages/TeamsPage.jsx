@@ -419,7 +419,7 @@ const [isNewConfig, setIsNewConfig] = useState(false);
         slot: i + 1, pokemonId: m.pokemonId, nameZh: m.nameZh, level: Number(m.level || 50),
         formKey: m.formKey || "", formName: m.formName || "",
         itemId: m.itemId || "", itemName: m.itemName || "", itemImageUrl: m.itemImageUrl || "",
-        abilityId: m.abilityId || "", nature: m.nature || "认真",
+        abilityId: m.abilityId || "", abilityName: m.abilityName || "", nature: m.nature || "认真",
         moves: (m.moves || []).filter(Boolean), _movesInfo: m._movesInfo || undefined,
         ivs: { ...createDefaultStats("iv"), ...(m.ivs || {}) },
         evs: { ...createDefaultStats("ev"), ...(m.evs || {}) },

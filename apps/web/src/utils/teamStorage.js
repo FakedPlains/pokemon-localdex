@@ -12,7 +12,8 @@
  *   level: number,
  *   itemId: string,         // 道具数据库数字 ID（如 "123"）
  *   itemName: string,       // 道具显示名（中文名）
- *   abilityId: string,      // 特性名称（中文名）
+ *   abilityId: string,      // 特性数据库数字 ID（如 "65"），旧数据可能是中文名
+ *   abilityName: string,    // 特性显示名（中文名）
  *   nature: string,
  *   moves: string[4],
  *   ivs: { hp, atk, def, spa, spd, spe },

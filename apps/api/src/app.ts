@@ -6,12 +6,14 @@ import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
 
 // ── 数据源选择：通过 DATA_SOURCE 环境变量切换 ──
 // DATA_SOURCE=supabase  → 使用 Supabase (PostgreSQL)
+// DATA_SOURCE=d1        → 使用 Cloudflare D1（Workers 环境）
 // DATA_SOURCE=sqlite    → 使用本地 SQLite（默认）
 
 const DATA_SOURCE = (process.env.DATA_SOURCE || "sqlite").toLowerCase();
 const useSupabase = DATA_SOURCE === "supabase";
+const useD1 = DATA_SOURCE === "d1";
 
-// 动态导入数据层
+// ── 数据层接口（统一签名，兼容三种数据源） ──
 let listPokemon: any;
 let getPokemon: any;
 let getLearnsetMetaFn: any;
@@ -22,7 +24,11 @@ let listMoves: any;
 let getMove: any;
 let listAbilities: any;
 let getAbility: any;
-let BattleTeamType: any;
+
+// Teams 存储（Node.js 模式使用文件，D1 模式由 worker.ts 注入）
+let listTeamsFn: (() => any) | null = null;
+let saveTeamFn: ((input: any) => any) | null = null;
+let deleteTeamFn: ((id: string) => any) | null = null;
 
 if (useSupabase) {
   const sb = await import("../../../packages/supabase-store/src/index.ts");
@@ -37,7 +43,8 @@ if (useSupabase) {
   listAbilities = sb.listAbilitiesFromSupabase;
   getAbility = sb.getAbilityFromSupabase;
   console.log("[API] Data source: Supabase (PostgreSQL)");
-} else {
+} else if (!useD1) {
+  // SQLite 模式（默认，Node.js 本地开发）
   const sq = await import("../../../packages/sqlite-store/src/index.ts");
   listPokemon = sq.listPokemonFromSqlite;
   getPokemon = sq.getPokemonFromSqlite;
@@ -51,11 +58,12 @@ if (useSupabase) {
   getAbility = sq.getAbilityFromSqlite;
   console.log("[API] Data source: SQLite (local)");
 }
+// D1 模式：函数由 worker.ts 通过 injectD1Store() 注入，此处留空
 
 // 导入静态文件服务
 import { staticResponse } from "./static.ts";
 
-// ── Teams 文件存储（两种模式都使用本地 JSON 文件） ──
+// ── Teams 文件存储（Node.js 模式） ──
 const TEAMS_FILE = resolve(import.meta.dirname, "../../../data/teams.json");
 
 type BattleTeam = {
@@ -68,7 +76,7 @@ function readTeams(): BattleTeam[] {
   return JSON.parse(readFileSync(TEAMS_FILE, "utf8"));
 }
 
-function saveTeam(input: Partial<BattleTeam>): BattleTeam {
+function saveTeamToFile(input: Partial<BattleTeam>): BattleTeam {
   const teams = readTeams();
   const now = new Date().toISOString();
   const team: BattleTeam = {
@@ -90,13 +98,55 @@ function saveTeam(input: Partial<BattleTeam>): BattleTeam {
   return team;
 }
 
+// 默认使用文件存储（Node.js 模式）
+if (!useD1) {
+  listTeamsFn = () => readTeams();
+  saveTeamFn = (input: any) => saveTeamToFile(input);
+  deleteTeamFn = (id: string) => {
+    const teams = readTeams().filter((t) => t.id !== id);
+    mkdirSync(dirname(TEAMS_FILE), { recursive: true });
+    writeFileSync(TEAMS_FILE, JSON.stringify(teams, null, 2));
+  };
+}
+
+// ── D1 注入接口（供 worker.ts 调用） ──
+export function injectD1Store(store: {
+  listPokemon: any;
+  getPokemon: any;
+  getLearnsetMeta: any;
+  getPokemonLearnset: any;
+  listItems: any;
+  getItem: any;
+  listMoves: any;
+  getMove: any;
+  listAbilities: any;
+  getAbility: any;
+  listTeams: () => any;
+  saveTeam: (input: any) => any;
+  deleteTeam: (id: string) => any;
+}) {
+  listPokemon = store.listPokemon;
+  getPokemon = store.getPokemon;
+  getLearnsetMetaFn = store.getLearnsetMeta;
+  getPokemonLearnsetFn = store.getPokemonLearnset;
+  listItems = store.listItems;
+  getItem = store.getItem;
+  listMoves = store.listMoves;
+  getMove = store.getMove;
+  listAbilities = store.listAbilities;
+  getAbility = store.getAbility;
+  listTeamsFn = store.listTeams;
+  saveTeamFn = store.saveTeam;
+  deleteTeamFn = store.deleteTeam;
+}
+
 // ── Hono app ──
 
 export const app = new Hono();
 
 app.use("*", cors({
   origin: "*",
-  allowMethods: ["GET", "POST", "OPTIONS"],
+  allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
   allowHeaders: ["Content-Type"]
 }));
 
@@ -106,8 +156,6 @@ app.get("/assets/*", (c) => staticResponse(c.req.path) ?? c.notFound());
 app.get("/health", (c) => c.json({ ok: true, service: "pokemon-localdex-api", dataSource: DATA_SOURCE }));
 
 // ── API 路由 ──
-// Supabase 模式下所有查询函数都是 async 的，
-// SQLite 模式下是同步的，但 await 同步值也没问题。
 
 const apiRoutes = new Hono();
 
@@ -218,11 +266,21 @@ apiRoutes.get("/abilities/:id", async (c) => {
   return entry ? c.json({ data: entry }) : c.json({ error: "Ability not found" }, 404);
 });
 
-apiRoutes.get("/teams", (c) => c.json({ data: readTeams() }));
+apiRoutes.get("/teams", async (c) => {
+  const teams = await listTeamsFn?.() ?? [];
+  return c.json({ data: teams });
+});
 
 apiRoutes.post("/teams", async (c) => {
-  const saved = saveTeam(await c.req.json());
+  if (!saveTeamFn) return c.json({ error: "Teams storage not available" }, 503);
+  const saved = await saveTeamFn(await c.req.json());
   return c.json({ data: saved }, 201);
+});
+
+apiRoutes.delete("/teams/:id", async (c) => {
+  if (!deleteTeamFn) return c.json({ error: "Teams storage not available" }, 503);
+  await deleteTeamFn(c.req.param("id"));
+  return c.json({ ok: true });
 });
 
 apiRoutes.post("/battle/damage", async (c) => {

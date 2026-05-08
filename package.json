@@ -9,10 +9,19 @@
   "scripts": {
     "dev:api": "node --enable-source-maps apps/api/src/server.ts",
     "dev:web": "npm run dev -w @pokemon-localdex/web",
+    "dev:worker": "wrangler dev apps/api/src/worker.ts --env development",
     "build:web": "npm run build -w @pokemon-localdex/web",
+    "build:cf": "npm run build:web && wrangler deploy --dry-run",
     "check:api": "node --enable-source-maps apps/api/src/smoke.ts",
     "check:sqlite": "node --enable-source-maps packages/sqlite-store/src/demo.ts",
     "db:ensure": "node --enable-source-maps packages/sqlite-store/src/import-db.ts",
+    "d1:create": "wrangler d1 create pokemon-localdex-d1",
+    "d1:migrate": "wrangler d1 execute pokemon-localdex-d1 --file=schema/d1-schema.sql",
+    "d1:migrate:remote": "wrangler d1 execute pokemon-localdex-d1 --remote --file=schema/d1-schema.sql",
+    "d1:import": "node --enable-source-maps scripts/import-to-d1.mjs",
+    "worker:dev": "wrangler dev --config wrangler.worker.toml",
+    "worker:deploy": "wrangler deploy --config wrangler.worker.toml",
+    "deploy:cf": "npm run build:web && wrangler pages deploy dist --project-name=pokemon-localdex --commit-dirty=true",
     "crawl": "python3 scripts/crawl-52poke-db.py",
     "crawl:all": "python3 scripts/crawl-52poke-db.py all",
     "crawl:pokemon": "python3 scripts/crawl-52poke-db.py pokemon",
@@ -22,11 +31,14 @@
     "crawl:items": "python3 scripts/crawl-52poke-db.py items"
   },
   "dependencies": {
+    "@fakedplains/smogon-calc": "^0.11.0",
     "@hono/node-server": "^2.0.0",
+    "@smogon/calc": "^0.11.0",
     "hono": "^4.12.15",
     "vite": "^8.0.10"
   },
   "devDependencies": {
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "wrangler": "^3.99.0"
   }
 }
