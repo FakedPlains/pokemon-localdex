@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  packages: read   # 读取 GitHub Packages（@fakedplains/smogon-calc）
 
 jobs:
   deploy:
@@ -23,11 +24,13 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+        env:
+          # 让 .npmrc 中的 ${GITHUB_TOKEN} 占位符生效，用于拉取 @fakedplains 私有包
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build web frontend
         run: npm run build:web
         env:
-          # Cloudflare Pages 使用根路径
           GITHUB_PAGES: "false"
 
       - name: Deploy to Cloudflare Pages
@@ -56,6 +59,8 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run D1 migration
         uses: cloudflare/wrangler-action@v3
