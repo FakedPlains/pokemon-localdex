@@ -69,7 +69,7 @@ pokemon（主表）
 
 **具体约束**：
 
-- `battle-core` 和 `d1-battle-core` 的查询函数签名统一为 `opts: { id?: string | number; nameZh?: string }` 格式，优先通过 `id` 查询，仅在 `id` 缺失时才降级到 `nameZh`
+- `battle-core` 的查询函数签名统一为 `opts: { id?: string | number; nameZh?: string }` 格式，优先通过 `id` 查询，仅在 `id` 缺失时才降级到 `nameZh`
 - 宝可梦形态查询优先使用 `formId`（`pokemon_forms.id`）直接定位，`formKey`（如 "超级喷火龙x"）作为 fallback 保留，用于 formId 缺失时的降级查询
 - 前端在选择宝可梦/形态/招式/特性/道具时，必须同时保存数据库 ID 和中文名，API 请求中优先传递 ID
 - 中文名仅作为 fallback 和界面显示使用，不作为主要查询条件
@@ -101,16 +101,21 @@ attacker: {
 **后端查询函数签名**：
 
 ```typescript
-// battle-core（同步，node:sqlite）
-function queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): string | undefined
+// sqlite-store 提供的 NameResolver（同步，node:sqlite）
+interface NameResolver {
+  queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): string | undefined;
+  queryMoveNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined;
+  queryAbilityNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined;
+  queryItemNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined;
+}
 
-// d1-battle-core（异步，D1Database）
-async function queryPokemonFormNameEn(db: D1Database, opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): Promise<string | undefined>
-
-// 招式/特性/道具查询
-function queryMoveNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined
-function queryAbilityNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined
-function queryItemNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined
+// d1-store 提供的 DbAdapter（异步，D1Database）
+interface DbAdapter {
+  queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): Promise<string | undefined>;
+  queryMoveNameEn(opts: { id?: string | number; nameZh?: string }): Promise<string | undefined>;
+  queryAbilityNameEn(opts: { id?: string | number; nameZh?: string }): Promise<string | undefined>;
+  queryItemNameEn(opts: { id?: string | number; nameZh?: string }): Promise<string | undefined>;
+}
 ```
 
 **数据流转**：
@@ -131,9 +136,10 @@ function queryItemNameEn(opts: { id?: string | number; nameZh?: string }): strin
 SQLite 和 Supabase 的 schema 必须保持同步。修改数据库结构时：
 
 1. 先修改 `supabase/schema.sql`（作为 source of truth）
-2. 同步修改 `packages/sqlite-store/src/index.ts` 中的类型定义和查询语句
+2. 同步修改 `packages/store/sqlite-store/src/index.ts` 中的类型定义和查询语句
 3. 同步修改 `packages/supabase-store/src/index.ts` 中的查询逻辑
-4. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/sqlite_upsert.py`
+4. 同步修改 `packages/store/d1-store/src/index.ts` 中的查询逻辑
+5. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/sqlite_upsert.py`
 
 ---
 
@@ -391,19 +397,21 @@ npx taro build --type weapp
 
 | 包 | 职责 | 禁止事项 |
 |----|------|---------|
-| `packages/battle-core` | 纯计算逻辑 | 不得有 I/O、不得依赖 Node.js 特有 API |
-| `packages/sqlite-store` | SQLite 查询 | 不得有业务逻辑，只做数据映射 |
+| `packages/battle-core` | 纯计算逻辑 | 不得有 I/O、不得包含 SQL、不得依赖 Node.js 特有 API |
+| `packages/store/shared-types` | 共享类型/常量/辅助函数 | 不得有 I/O、不得依赖运行时特定 API |
+| `packages/store/sqlite-store` | SQLite 查询 + NameResolver | 不得有业务逻辑，只做数据映射 |
+| `packages/store/d1-store` | D1 查询 + DbAdapter | 与 sqlite-store 保持接口一致 |
 | `packages/supabase-store` | Supabase 查询 | 与 sqlite-store 保持接口一致 |
 | `packages/crawler_py` | 数据采集 | 不得直接被 API 层调用 |
 | `apps/api` | HTTP 路由 | 不得包含数据库查询逻辑（委托给 store 包） |
 | `apps/web` | UI 展示 | 不得直接操作数据库 |
 | `apps/miniprogram` | 小程序 UI | 不得引入 Node.js 专有模块 |
 
-### 8.2 sqlite-store 与 supabase-store 接口一致性
+### 8.2 store 包接口一致性
 
-这是项目最重要的架构约束之一。每次修改任一 store 包的函数签名时，必须同步修改另一个包，保持接口完全一致。
+这是项目最重要的架构约束之一。sqlite-store、d1-store 和 supabase-store 三个包必须保持接口完全一致。每次修改任一 store 包的函数签名时，必须同步修改其他包。
 
-检查方式：两个包的 `src/index.ts` 导出的函数名和参数类型必须完全相同。
+sqlite-store 和 d1-store 的共享类型、常量和辅助函数统一定义在 `packages/store/shared-types`（`@pokemon-localdex/store-types`）中，不得在各自包内重复定义。
 
 ### 8.3 常量管理
 

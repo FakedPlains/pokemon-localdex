@@ -99,16 +99,18 @@ pokemon-localdex/
 │       └── project.config.json 微信开发者工具项目配置（AppID: wx6f183945e108152a）
 │
 ├── packages/
-│   ├── battle-core/            伤害计算核心（Node.js 版，node:sqlite 同步查询）
-│   │   └── src/index.ts        calculateDamage() 函数
-│   ├── d1-battle-core/         伤害计算核心（Workers 版，D1 异步查询）
-│   │   └── src/index.ts        calculateDamage() 函数（基于 @fakedplains/smogon-calc）
-│   ├── d1-store/               D1 查询适配层（与 sqlite-store 同接口）
-│   │   └── src/index.ts        类型定义 + 查询函数（D1 async API）
+│   ├── battle-core/            统一伤害计算引擎（同步 + 异步双入口）
+│   │   ├── src/index.ts        calculateDamage() / calculateDamageAsync()
+│   │   └── src/types.ts        类型定义（DamageCalcInput、NameResolver、DbAdapter 等）
+│   ├── store/                  数据存储层
+│   │   ├── shared-types/       共享类型、常量和辅助函数（@pokemon-localdex/store-types）
+│   │   │   └── src/index.ts    StatBlock、PokemonEntry、GENERATIONS、TYPE_NAMES 等
+│   │   ├── sqlite-store/       SQLite 查询适配（node:sqlite 同步 API）
+│   │   │   └── src/index.ts    查询函数 + NameResolver 实现
+│   │   └── d1-store/           D1 查询适配（Cloudflare D1 异步 API）
+│   │       └── src/index.ts    查询函数 + DbAdapter 实现
 │   ├── crawler_py/             Python 爬虫（52Poké → SQLite）
 │   │   └── localdex_crawler/   爬虫核心模块
-│   ├── sqlite-store/           SQLite 查询适配层（TypeScript）
-│   │   └── src/index.ts        类型定义 + 查询函数（node:sqlite）
 │   └── supabase-store/         Supabase 查询适配层（TypeScript）
 │       └── src/index.ts        与 sqlite-store 同接口，底层用 supabase-js
 │
@@ -157,9 +159,9 @@ Python 爬虫，唯一数据源为 52Poké Wiki。核心职责：
 
 模块分工：`cli.py`（命令行入口）→ `fetcher.py`（HTTP + 缓存）→ `pokemon.py` / `catalog.py`（页面解析）→ `sqlite_upsert.py`（数据库写入）
 
-### 3.2 存储层（sqlite-store / d1-store / supabase-store）
+### 3.2 存储层（packages/store/ + supabase-store）
 
-三个可互换的 TypeScript 包，对外暴露**完全相同的函数签名**：
+存储层由四个包组成，其中 sqlite-store、d1-store 和 supabase-store 对外暴露**完全相同的函数签名**：
 
 ```typescript
 listPokemonFromSqlite / listPokemonFromD1 / listPokemonFromSupabase
@@ -170,11 +172,13 @@ listMovesFromSqlite   / listMovesFromD1   / listMovesFromSupabase
 
 API 层通过 `DATA_SOURCE` 环境变量动态 `import` 对应的包，切换对上层完全透明。
 
-**sqlite-store** 使用 Node.js 22 内置的 `node:sqlite`（`DatabaseSync`），无需额外依赖。
+**shared-types**（`packages/store/shared-types`，包名 `@pokemon-localdex/store-types`）集中定义了 sqlite-store 和 d1-store 共用的类型（`StatBlock`、`PokemonEntry`、`MoveEntry` 等）、常量（`GENERATIONS`、`GAME_VERSIONS`、`TYPE_NAMES`、`TYPE_ALIASES` 等）和辅助函数（`normalizeTypeName`、`splitTypeNames`、`statBlockFromRow`、`sourceFromRow` 等）。
 
-**d1-store** 使用 Cloudflare D1 异步 API，在 Workers 运行时中通过 binding 访问数据库。D1 是 SQLite 兼容的边缘数据库，表结构与本地 SQLite 完全一致。
+**sqlite-store**（`packages/store/sqlite-store`）使用 Node.js 22 内置的 `node:sqlite`（`DatabaseSync`），无需额外依赖。同时提供 `NameResolver` 实现供 battle-core 同步入口使用。
 
-**supabase-store** 使用 `@supabase/supabase-js` 客户端，通过 Supabase REST API 查询。
+**d1-store**（`packages/store/d1-store`）使用 Cloudflare D1 异步 API，在 Workers 运行时中通过 binding 访问数据库。同时提供 `DbAdapter` 实现供 battle-core 异步入口使用。D1 是 SQLite 兼容的边缘数据库，表结构与本地 SQLite 完全一致。
+
+**supabase-store**（`packages/supabase-store`）使用 `@supabase/supabase-js` 客户端，通过 Supabase REST API 查询。
 
 ### 3.3 API 层（apps/api）
 
@@ -182,7 +186,7 @@ API 层通过 `DATA_SOURCE` 环境变量动态 `import` 对应的包，切换对
 
 **本地模式**（`server.ts` 入口）：运行在 Node.js 22，默认监听 `0.0.0.0:3030`。根据 `DATA_SOURCE` 环境变量（默认 `sqlite`）动态导入 sqlite-store 或 supabase-store。
 
-**Worker 模式**（`worker.ts` 入口）：运行在 Cloudflare Workers，使用 D1 binding 通过 d1-store 和 d1-battle-core 访问数据。
+**Worker 模式**（`worker.ts` 入口）：运行在 Cloudflare Workers，使用 D1 binding 通过 d1-store 查询数据，通过 battle-core（异步入口）执行伤害计算。
 
 关键设计：
 - 所有路由**同时挂载在 `/` 和 `/api` 前缀**下，兼容 Vite dev proxy 和 Pages Functions 代理两种模式
@@ -225,9 +229,7 @@ Taro 4.2.0 + React 18，编译为微信小程序原生代码。
 
 ### 3.7 核心库
 
-**battle-core**（Node.js 版）：纯 TypeScript 伤害计算库，使用 `node:sqlite` 同步查询做中英文名称映射。仅在本地 API 模式下使用。
-
-**d1-battle-core**（Workers 版）：与 battle-core 逻辑一致，使用 D1 异步 API 做名称映射。基于 `@fakedplains/smogon-calc` 计算引擎，支持完整的伤害计算（含本系加成、属性克制、天气、急所、乱数范围、道具和特性影响）。Worker 接收中文名称参数后通过 D1 查询英文名，再调用计算引擎。
+**battle-core**：统一的伤害计算包，类型定义在 `src/types.ts`，计算逻辑在 `src/index.ts`。提供两个入口函数：`calculateDamage(resolver)` 接收同步 `NameResolver`（由 sqlite-store 提供），用于本地 API 模式；`calculateDamageAsync(adapter)` 接收异步 `DbAdapter`（由 d1-store 提供），用于 Workers 模式。基于 `@fakedplains/smogon-calc` 计算引擎，支持完整的伤害计算（含本系加成、属性克制、天气、急所、乱数范围、道具和特性影响）。SQL 查询逻辑已下沉到各自的 store 包中，battle-core 不包含任何 SQL。
 
 ---
 

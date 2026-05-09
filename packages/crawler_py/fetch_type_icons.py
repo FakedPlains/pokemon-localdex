@@ -25,7 +25,7 @@ except ImportError:
     from PIL import Image
 
 # ── 项目路径 ──────────────────────────────────────────────
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DB_PATH = PROJECT_ROOT / "data" / "sqlite" / "localdex.sqlite"
 ICONS_DIR = PROJECT_ROOT / "data" / "type-icons"
 

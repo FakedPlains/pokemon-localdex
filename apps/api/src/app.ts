@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
+import { createNameResolver } from "../../../packages/store/sqlite-store/src/index.ts";
 
 // ── 数据源选择：通过 DATA_SOURCE 环境变量切换 ──
 // DATA_SOURCE=supabase  → 使用 Supabase (PostgreSQL)
@@ -45,7 +46,7 @@ if (useSupabase) {
   console.log("[API] Data source: Supabase (PostgreSQL)");
 } else if (!useD1) {
   // SQLite 模式（默认，Node.js 本地开发）
-  const sq = await import("../../../packages/sqlite-store/src/index.ts");
+  const sq = await import("../../../packages/store/sqlite-store/src/index.ts");
   listPokemon = sq.listPokemonFromSqlite;
   getPokemon = sq.getPokemonFromSqlite;
   getLearnsetMetaFn = sq.getLearnsetMeta;
@@ -284,8 +285,8 @@ apiRoutes.delete("/teams/:id", async (c) => {
 });
 
 apiRoutes.post("/battle/damage", async (c) => {
-  const result = calculateDamage(await c.req.json());
-  return c.json({ data: result });
+const result = calculateDamage(createNameResolver(), await c.req.json());
+return c.json({ data: result });
 });
 
 // 挂载到根路径（Vite dev proxy 模式）和 /api 前缀（生产模式）

@@ -2,268 +2,70 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-// ── Type definitions ──
+// ── Re-export shared types ──
 
-export type StatBlock = {
-  hp: number;
-  atk: number;
-  def: number;
-  spa: number;
-  spd: number;
-  spe: number;
-};
+export type {
+  StatBlock,
+  SourceMeta,
+  ImageAsset,
+  FormStatVariant,
+  FormTypeVariant,
+  FormAbilityVariant,
+  PokemonFormEntry,
+  EvolutionStep,
+  PokemonSummary,
+  PokemonEntry,
+  MoveGenerationRecord,
+  MoveEntry,
+  AbilityGenerationRecord,
+  AbilityEntry,
+  ItemGenerationRecord,
+  ItemEntry,
+  LearnsetRecord,
+  TeamMember,
+  BattleTeam,
+  PaginationParams,
+  PaginatedResult,
+} from "@pokemon-localdex/store-types";
 
-export type SourceMeta = {
-  url: string;
-  title: string;
-  fetchedAt: string;
-};
+import type {
+  StatBlock,
+  SourceMeta,
+  ImageAsset,
+  FormStatVariant,
+  PokemonFormEntry,
+  EvolutionStep,
+  PokemonSummary,
+  PokemonEntry,
+  MoveGenerationRecord,
+  MoveEntry,
+  AbilityGenerationRecord,
+  AbilityEntry,
+  ItemGenerationRecord,
+  ItemEntry,
+  LearnsetRecord,
+  TeamMember,
+  BattleTeam,
+  PaginationParams,
+  PaginatedResult,
+} from "@pokemon-localdex/store-types";
 
-export type ImageAsset = {
-  url: string;
-  alt?: string;
-};
+// ── Constants & helpers from shared package ──
 
-export type FormStatVariant = {
-  generationStart?: number;
-  generationEnd?: number;
-  baseStats: StatBlock;
-};
+import {
+  GENERATIONS,
+  GAME_VERSIONS,
+  GAME_VERSION_NAMES,
+  TYPE_NAMES,
+  TYPE_ALIASES,
+  normalizeTypeName,
+  typeLegacyId,
+  splitTypeNames,
+  statBlockFromRow,
+  sourceFromRow,
+} from "@pokemon-localdex/store-types";
 
-export type FormTypeVariant = {
-  generationStart?: number;
-  generationEnd?: number;
-  primaryType?: string;
-  secondaryType?: string;
-};
-
-export type FormAbilityVariant = {
-  generationStart?: number;
-  generationEnd?: number;
-  abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }>;
-};
-
-export type PokemonFormEntry = {
-  id: number;
-  formKey: string;
-  nameZh: string;
-  formType: string;
-  isDefault: boolean;
-  sortOrder: number;
-  primaryType?: string;
-  secondaryType?: string;
-  abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }>;
-  baseStats?: StatBlock;
-  images: Record<string, ImageAsset>;
-  /** 该形态必须携带的道具（如 Mega 石、原始宝珠等），为 null/undefined 表示无绑定 */
-  requiredItem?: { id: string; nameZh: string; slug: string; imageUrl?: string };
-  /** Generation-specific stat variants (when stats changed across generations) */
-  statVariants?: FormStatVariant[];
-  /** Generation-specific type variants (when types changed across generations) */
-  typeVariants?: FormTypeVariant[];
-  /** Generation-specific ability variants (when abilities changed across generations) */
-  abilityVariants?: FormAbilityVariant[];
-};
-
-export type EvolutionStep = {
-  fromPokemonId?: number;
-  fromNameZh?: string;
-  fromFormKey?: string;
-  toPokemonId: number;
-  toNameZh: string;
-  toFormKey?: string;
-  stage: number;
-  method?: string;
-  condition?: string;
-  item?: string;
-  level?: number;
-  toTypes?: string[];
-  toImage?: ImageAsset;
-};
-
-export type PokemonSummary = {
-  id: number;
-  dexNumber: number;
-  slug: string;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  primaryType?: string;
-  secondaryType?: string;
-  abilities: string[];
-  hiddenAbility?: string;
-  baseStats?: StatBlock;
-  image?: ImageAsset;
-  shinyImage?: ImageAsset;
-  generations: number[];
-};
-
-export type PokemonEntry = PokemonSummary & {
-  category?: string;
-  heightM?: number;
-  weightKg?: number;
-  forms: PokemonFormEntry[];
-  evolutionChain: EvolutionStep[];
-  source?: SourceMeta;
-};
-
-export type MoveGenerationRecord = {
-  generation: number;
-  gameVersionCode?: string;
-  gameVersionName?: string;
-  versionExclusive?: boolean;
-  type?: string;
-  category?: string;
-  power?: number;
-  accuracy?: number;
-  pp?: number;
-  description: string;
-  notes?: string;
-};
-
-export type MoveEntry = {
-  id: string;
-  number?: number;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  type?: string;
-  category?: string;
-  power?: number;
-  accuracy?: number;
-  pp?: number;
-  description?: string;
-  effectDetail?: string;
-  introducedGeneration?: number;
-  generations: MoveGenerationRecord[];
-  source?: SourceMeta;
-};
-
-export type AbilityGenerationRecord = {
-  generation: number;
-  gameVersionCode?: string;
-  gameVersionName?: string;
-  versionExclusive?: boolean;
-  description: string;
-  notes?: string;
-};
-
-export type AbilityEntry = {
-  id: string;
-  number?: number;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  description?: string;
-  effectDetail?: string;
-  introducedGeneration?: number;
-  generations: AbilityGenerationRecord[];
-  source?: SourceMeta;
-};
-
-export type ItemGenerationRecord = {
-  generation: number;
-  gameVersionCode?: string;
-  gameVersionName?: string;
-  versionExclusive?: boolean;
-  description: string;
-  notes?: string;
-};
-
-export type ItemEntry = {
-  id: string;
-  slug: string;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  category?: string;
-  effectSummary?: string;
-  effectDetail?: string;
-  introducedGeneration?: number;
-  imageUrl?: string;
-  generations: ItemGenerationRecord[];
-  source?: SourceMeta;
-};
-
-export type LearnsetRecord = {
-  moveId?: number;
-  moveNameZh: string;
-  learnMethod: string;
-  level?: number;
-  tmNumber?: string;
-  moveType?: string;
-  moveCategory?: string;
-  movePower?: number;
-  moveAccuracy?: number;
-  movePP?: number;
-};
-
-export type TeamMember = {
-  slot: number;
-  pokemonId: number;
-  formKey: string;
-  nameZh?: string;
-  level: number;
-  itemId?: number;
-  abilityId?: number;
-  nature?: string;
-  moves: (number | null)[];
-  ivs: Partial<StatBlock>;
-  evs: Partial<StatBlock>;
-};
-
-export type BattleTeam = {
-  id: string;
-  name: string;
-  format: string;
-  members: TeamMember[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-// ── Constants ──
-
-const ROOT = resolve(import.meta.dirname, "../../../");
-
-const GENERATIONS = [
-  [1, "第一世代", "Generation I"],
-  [2, "第二世代", "Generation II"],
-  [3, "第三世代", "Generation III"],
-  [4, "第四世代", "Generation IV"],
-  [5, "第五世代", "Generation V"],
-  [6, "第六世代", "Generation VI"],
-  [7, "第七世代", "Generation VII"],
-  [8, "第八世代", "Generation VIII"],
-  [9, "第九世代", "Generation IX"],
-  [99, "Champions", "Champions"],
-] as const;
-
-const GAME_VERSIONS: Array<[string, string, number]> = [
-  ["RG", "红/绿", 1], ["B", "蓝", 1], ["Y", "黄", 1],
-  ["GS", "金/银", 2], ["C", "水晶", 2],
-  ["RS", "红宝石/蓝宝石", 3], ["E", "绿宝石", 3], ["FRLG", "火红/叶绿", 3],
-  ["DP", "钻石/珍珠", 4], ["Pt", "白金", 4], ["HGSS", "心金/魂银", 4],
-  ["BW", "黑/白", 5], ["B2W2", "黑2/白2", 5],
-  ["XY", "X/Y", 6], ["ORAS", "欧米伽红宝石/阿尔法蓝宝石", 6],
-  ["SM", "太阳/月亮", 7], ["USUM", "究极之日/究极之月", 7], ["LPLE", "Let's Go 皮卡丘/伊布", 7],
-  ["SWSH", "剑/盾", 8], ["SWSHE", "剑/盾 铠之孤岛+冠之雪原", 8], ["BDSP", "晶灿钻石/明亮珍珠", 8], ["LA", "传说 阿尔宙斯", 8],
-  ["SV", "朱/紫", 9], ["SVT", "朱/紫 零之秘宝", 9], ["ZA", "传说 Z-A", 9],
-  ["CHAMP", "冠军", 99],
-];
-
-const GAME_VERSION_NAMES = new Map<string, string>(
-  GAME_VERSIONS.map(([code, nameZh]) => [code, nameZh])
-);
-
-const TYPE_NAMES = [
-  "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
-  "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精",
-];
-
-const TYPE_ALIASES: Record<string, string> = {
-  電: "电", 飛行: "飞行", 蟲: "虫", 龍: "龙",
-  惡: "恶", 鋼: "钢", 格鬥: "格斗", 幽靈: "幽灵",
-};
+const ROOT = resolve(import.meta.dirname, "../../../../");
 
 // ── Helpers ──
 
@@ -275,32 +77,6 @@ function resolveDatabasePath() {
 
 function ensureDbDir() {
   mkdirSync(dirname(resolveDatabasePath()), { recursive: true });
-}
-
-function normalizeTypeName(type: string | undefined) {
-  return type ? (TYPE_ALIASES[type] || type).trim() : "";
-}
-
-function typeLegacyId(type: string | undefined) {
-  const normalized = normalizeTypeName(type);
-  return normalized ? `type-${normalized}` : undefined;
-}
-
-function splitTypeNames(type: string | undefined) {
-  const normalized = normalizeTypeName(type);
-  if (!normalized) return [];
-  if (TYPE_NAMES.includes(normalized)) return [normalized];
-  const compact = normalized.replace(/\s+/g, "");
-  const result: string[] = [];
-  let rest = compact;
-  const candidates = [...TYPE_NAMES, ...Object.keys(TYPE_ALIASES)].sort((a, b) => b.length - a.length);
-  while (rest) {
-    const match = candidates.find((c) => rest.startsWith(c));
-    if (!match) break;
-    result.push(normalizeTypeName(match));
-    rest = rest.slice(match.length);
-  }
-  return rest ? [normalized] : [...new Set(result)];
 }
 
 // ── Database ──
@@ -967,26 +743,11 @@ export function resetSchema() {
   ensureSchema();
 }
 
-// ── Query helpers ──
-
-function statBlockFromRow(row: Record<string, unknown>): StatBlock | undefined {
-  if (row.hp === null || row.hp === undefined) return undefined;
-  return { hp: Number(row.hp), atk: Number(row.atk), def: Number(row.def), spa: Number(row.spa), spd: Number(row.spd), spe: Number(row.spe) };
-}
-
-function sourceFromRow(row: Record<string, unknown>): SourceMeta | undefined {
-  return row.source_url || row.source_title || row.source_fetched_at
-    ? { url: String(row.source_url ?? ""), title: String(row.source_title ?? ""), fetchedAt: String(row.source_fetched_at ?? "") }
-    : undefined;
-}
-
 // ── Pokemon queries (N+1 eliminated) ──
 
 /**
  * 列表查询：单次 JOIN 获取所有宝可梦的默认形态信息。
  */
-export type PaginationParams = { offset?: number; limit?: number };
-export type PaginatedResult<T> = { items: T[]; total: number };
 
 export function listPokemonFromSqlite(filters?: { query?: string; type?: string | string[]; generation?: number } & PaginationParams) {
   const db = openDatabase();
@@ -1837,6 +1598,114 @@ export function hasSqliteData() {
   }
 }
 
-// ── Export helpers for crawler ──
+// ── Re-export helpers for crawler ──
 
-export { normalizeTypeName, splitTypeNames, typeLegacyId, GENERATIONS, GAME_VERSIONS, TYPE_NAMES, TYPE_ALIASES };
+export { normalizeTypeName, splitTypeNames, typeLegacyId, GENERATIONS, GAME_VERSIONS, GAME_VERSION_NAMES, TYPE_NAMES, TYPE_ALIASES, statBlockFromRow, sourceFromRow } from "@pokemon-localdex/store-types";
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 名称解析器（供 battle-core 伤害计算使用）
+// ══════════════════════════════════════════════════════════════════════════════
+
+import type { NameResolver, PokemonNameQuery, EntityNameQuery } from "@pokemon-localdex/battle-core";
+
+export type { NameResolver };
+
+/**
+ * 创建基于 SQLite 的同步名称解析器。
+ * 实现 @pokemon-localdex/battle-core 的 NameResolver 接口。
+ * 查询优先级：数据库 ID > formKey > 中文名
+ */
+export function createNameResolver(): NameResolver {
+  const db = openDatabase();
+
+  return {
+    queryPokemonFormNameEn(opts: PokemonNameQuery): string | undefined {
+      // 1. 通过 formId 直接查询
+      if (opts.formId) {
+        const row = db.prepare(
+          "SELECT name_en FROM pokemon_forms WHERE id = ? AND name_en IS NOT NULL LIMIT 1"
+        ).get(String(opts.formId)) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+
+      // 2. 通过 pokemonId + formKey 查询
+      if (opts.pokemonId && opts.formKey && opts.formKey !== "default") {
+        const row = db.prepare(
+          "SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND form_key = ? AND name_en IS NOT NULL LIMIT 1"
+        ).get(String(opts.pokemonId), opts.formKey) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+
+      // 3. 通过 formKey 直接匹配
+      if (opts.formKey && opts.formKey !== "default") {
+        const row = db.prepare(
+          "SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1"
+        ).get(opts.formKey) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+
+      // 4. 通过 pokemonId 查默认形态
+      if (opts.pokemonId) {
+        const row = db.prepare(
+          "SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 AND name_en IS NOT NULL LIMIT 1"
+        ).get(String(opts.pokemonId)) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+        const pkRow = db.prepare(
+          "SELECT name_en FROM pokemon WHERE id = ? LIMIT 1"
+        ).get(String(opts.pokemonId)) as { name_en: string } | undefined;
+        if (pkRow?.name_en) return pkRow.name_en;
+      }
+
+      // 5. 通过中文名 fallback
+      if (opts.nameZh) {
+        const formByName = db.prepare(
+          "SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1"
+        ).get(opts.nameZh) as { name_en: string } | undefined;
+        if (formByName?.name_en) return formByName.name_en;
+
+        const row = db.prepare(
+          "SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1"
+        ).get(opts.nameZh) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+
+      return undefined;
+    },
+
+    queryMoveNameEn(opts: EntityNameQuery): string | undefined {
+      if (opts.id) {
+        const row = db.prepare("SELECT name_en FROM moves WHERE id = ? LIMIT 1").get(String(opts.id)) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+      if (opts.nameZh) {
+        const row = db.prepare("SELECT name_en FROM moves WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+      return undefined;
+    },
+
+    queryAbilityNameEn(opts: EntityNameQuery): string | undefined {
+      if (opts.id) {
+        const row = db.prepare("SELECT name_en FROM abilities WHERE id = ? LIMIT 1").get(String(opts.id)) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+      if (opts.nameZh) {
+        const row = db.prepare("SELECT name_en FROM abilities WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+      return undefined;
+    },
+
+    queryItemNameEn(opts: EntityNameQuery): string | undefined {
+      if (opts.id) {
+        const row = db.prepare("SELECT name_en FROM items WHERE id = ? LIMIT 1").get(String(opts.id)) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+      if (opts.nameZh) {
+        const row = db.prepare("SELECT name_en FROM items WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as { name_en: string } | undefined;
+        if (row?.name_en) return row.name_en;
+      }
+      return undefined;
+    },
+  };
+}
