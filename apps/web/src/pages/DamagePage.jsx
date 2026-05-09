@@ -138,99 +138,216 @@ function SimpleStatEditor({ member, detail, isChampions, onChange, boosts, onBoo
   );
 }
 
+
 // ══════════════════════════════════════════════════════════════
-//  子组件：招式搜索选择
+//  子组件：招式槽位面板（4个招式，样式与盒子一致）
 // ══════════════════════════════════════════════════════════════
 
-function MoveSearch({ allMoves, generation, onSelect, selectedMove, onSearch, searching }) {
+function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelectSlot, onSetMove, pokemonId, generation }) {
+  const [editingSlot, setEditingSlot] = useState(null);
   const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
+  const [learnset, setLearnset] = useState([]);
+  const [learnsetLoaded, setLearnsetLoaded] = useState(false);
+  const [searchResults, setSearchResults] = useState(null);
+  const [loading, setLoading] = useState(false);
   const wrapRef = useRef(null);
+  const searchTimer = useRef(null);
+  const learnsetPokemonRef = useRef(null);
 
-  const filtered = useMemo(() => {
-    return allMoves.slice(0, 30);
-  }, [allMoves]);
+  // pokemonId 变化时重置 learnset 缓存标记
+  useEffect(() => {
+    if (pokemonId !== learnsetPokemonRef.current) {
+      setLearnset([]);
+      setLearnsetLoaded(false);
+      learnsetPokemonRef.current = pokemonId;
+    }
+  }, [pokemonId]);
 
+  // 懒加载：仅在打开编辑面板且尚未加载时请求 learnset
+  useEffect(() => {
+    if (editingSlot === null || !pokemonId || learnsetLoaded) return;
+    let cancelled = false;
+    setLoading(true);
+    unifiedApi(`/pokemon/${pokemonId}/learnset/meta`).then((meta) => {
+      if (cancelled) return;
+      const gens = meta.data?.generations || [];
+      const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
+      const formKeys = meta.data?.formKeys || [];
+      const form = formKeys[0] || "default";
+      return unifiedApi(`/pokemon/${pokemonId}/learnset?generation=${latestGen}&form=${form}`);
+    }).then((r) => {
+      if (cancelled || !r) return;
+      const entries = r.data || [];
+      const seen = new Set();
+      const list = [];
+      for (const entry of entries) {
+        const name = entry.moveNameZh || entry.moveId;
+        if (name && !seen.has(name)) {
+          seen.add(name);
+          list.push({
+            value: name,
+            label: name,
+            moveId: entry.moveId ?? null,
+            moveType: entry.moveType || "",
+            moveCategory: entry.moveCategory || "",
+            movePower: entry.movePower ?? null,
+            moveAccuracy: entry.moveAccuracy ?? null,
+            movePP: entry.movePP ?? null,
+            moveDescription: entry.moveDescription || "",
+          });
+        }
+      }
+      setLearnset(list);
+      setLearnsetLoaded(true);
+      setLoading(false);
+    }).catch(() => { if (!cancelled) { setLearnset([]); setLearnsetLoaded(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [editingSlot, pokemonId, learnsetLoaded]);
+
+  // 搜索招式（防抖，走 /moves API）
+  useEffect(() => {
+    if (editingSlot === null) return;
+    if (!query.trim()) { setSearchResults(null); return; }
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    setLoading(true);
+    searchTimer.current = setTimeout(() => {
+      unifiedApi(`/moves?q=${encodeURIComponent(query.trim())}&limit=50`).then((r) => {
+        setSearchResults((r.data || []).map((m) => ({
+          value: m.nameZh || String(m.id),
+          label: m.nameZh || String(m.id),
+          moveId: m.id || null,
+          moveType: m.type || "",
+          moveCategory: m.category || "",
+          movePower: m.power ?? null,
+          moveAccuracy: m.accuracy ?? null,
+          movePP: m.pp ?? null,
+          moveDescription: m.description || "",
+        })));
+        setLoading(false);
+      }).catch(() => { setSearchResults([]); setLoading(false); });
+    }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [query, editingSlot]);
+
+  // 点击外部关闭编辑
   useEffect(() => {
     const handler = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setEditingSlot(null);
+        setQuery("");
+        setSearchResults(null);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleSelect = (move) => {
-    onSelect(move);
-    setQuery("");
-    setOpen(false);
+  const displayedMoves = searchResults !== null ? searchResults : learnset;
+
+  const handleSlotClick = (index) => {
+    if (moves[index]) {
+      onSelectSlot(index);
+    } else {
+      setEditingSlot(index);
+      setQuery("");
+      setSearchResults(null);
+    }
   };
 
-  const handleInputChange = (e) => {
-    const val = e.target.value;
-    setQuery(val);
-    setOpen(true);
-    if (onSearch) onSearch(val);
+  const handleEditSlot = (index, e) => {
+    e.stopPropagation();
+    setEditingSlot(index);
+    setQuery("");
+    setSearchResults(null);
+  };
+
+  const handlePickMove = (opt) => {
+    if (editingSlot !== null) {
+      onSetMove(editingSlot, opt);
+      setEditingSlot(null);
+      setQuery("");
+      setSearchResults(null);
+    }
+  };
+
+  const handleClearSlot = (index, e) => {
+    e.stopPropagation();
+    onSetMove(index, null);
+    if (selectedIndex === index) onSelectSlot(null);
   };
 
   return (
-    <div className="dc-move-search" ref={wrapRef}>
-      <div className="dc-inline-search-input-wrap">
-        <svg className="dc-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4 4" />
-        </svg>
-        <input
-          className="dc-inline-search-input"
-          placeholder="搜索招式..."
-          value={query}
-          onChange={handleInputChange}
-          onFocus={() => setOpen(true)}
-        />
-        {query && (
-          <button className="dc-inline-search-clear" onClick={() => { setQuery(""); }}>×</button>
-        )}
+    <div className="dc-move-slots" ref={wrapRef}>
+      {/* 4个招式槽位（盒子样式） */}
+      <div className="dc-move-slots-grid">
+        {[0, 1, 2, 3].map((i) => {
+          const moveName = moves[i];
+          const info = movesInfo?.[moveName] || {};
+          const moveType = info.type || info.moveType || "";
+          const isSelected = selectedIndex === i && !!moveName;
+          if (moveName) {
+            return (
+              <div
+                key={i}
+                className={`box-card-move type-bg-${moveType || "unknown"} dc-move-slot-card${isSelected ? " dc-move-slot-card-active" : ""}`}
+                onClick={() => handleSlotClick(i)}
+              >
+                {moveType && (
+                  <img className="box-card-move-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${moveType}@sm.png`} alt={moveType} />
+                )}
+                <span className="box-card-move-name">{moveName}</span>
+                {info.power > 0 && <span className="box-card-move-power">{info.power}</span>}
+                <button className="dc-move-slot-clear-btn" onClick={(e) => handleClearSlot(i, e)} title="清除">×</button>
+              </div>
+            );
+          }
+          return (
+            <button
+              key={i}
+              className="dc-move-slot-empty-btn"
+              onClick={() => handleSlotClick(i)}
+            >
+              招式 {i + 1}
+            </button>
+          );
+        })}
       </div>
-      {open && (
-        <div className="dc-inline-search-dropdown dc-move-dropdown">
-          {searching && <div className="dc-dropdown-hint">搜索中…</div>}
-          {!searching && filtered.length === 0 && query.trim() && <div className="dc-dropdown-hint">无匹配招式</div>}
-          {!searching && filtered.length === 0 && !query.trim() && <div className="dc-dropdown-hint">输入关键词搜索招式</div>}
-          {filtered.map((m) => {
-            const record = resolveMoveGenerationRecord(m, generation);
-            const type = record?.type || m.type || "";
-            const power = record?.power ?? m.power ?? 0;
-            const cat = record?.category || m.category || "";
-            return (
-              <button key={m.slug || m.id} className="dc-dropdown-item dc-move-item" onClick={() => handleSelect(m)}>
-                <span className="dc-move-item-name">{m.nameZh || m.slug}</span>
-                {type && <TypeChip type={type} size="xs" />}
-                <span className="dc-move-item-meta">
-                  {cat === "physical" ? "物理" : cat === "special" ? "特殊" : "变化"}
-                  {power > 0 && (" 威力" + power)}
+
+      {/* 招式搜索面板 */}
+      {editingSlot !== null && (
+        <div className="dc-move-panel-overlay">
+          <div className="dc-move-panel-header">
+            <input
+              className="dc-move-panel-search-input"
+              placeholder="搜索招式…"
+              value={query}
+              autoFocus
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {query && <button className="dc-move-panel-search-clear" onClick={() => { setQuery(""); setSearchResults(null); }}>✕</button>}
+            <button className="dc-move-panel-close" onClick={() => { setEditingSlot(null); setQuery(""); setSearchResults(null); }}>取消</button>
+          </div>
+          <div className="dc-move-panel-list">
+            {loading && <div className="dc-move-panel-hint">加载中…</div>}
+            {!loading && displayedMoves.length === 0 && <div className="dc-move-panel-hint">{query.trim() ? "无匹配结果" : "暂无招式数据"}</div>}
+            {!loading && displayedMoves.map((opt) => (
+              <div
+                key={opt.value}
+                className={`dc-move-panel-item${moves.includes(opt.value) ? " dc-move-panel-item-selected" : ""}`}
+                onClick={() => handlePickMove(opt)}
+              >
+                <span className={`dc-move-panel-item-type type-bg-${opt.moveType || "unknown"}`}>
+                  {opt.moveType && <img className="box-card-move-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${opt.moveType}@sm.png`} alt="" />}
+                  {opt.moveType || "—"}
                 </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {selectedMove && !open && (
-        <div className="dc-move-selected">
-          <span className="dc-move-selected-name">{selectedMove.nameZh || selectedMove.slug}</span>
-          {(() => {
-            const record = resolveMoveGenerationRecord(selectedMove, generation);
-            const type = record?.type || selectedMove.type || "";
-            const power = record?.power ?? selectedMove.power ?? 0;
-            const cat = record?.category || selectedMove.category || "";
-            return (
-              <>
-                {type && <TypeChip type={type} size="xs" />}
-                <span className="dc-move-selected-meta">
-                  {cat === "physical" ? "物理" : cat === "special" ? "特殊" : "变化"}
-                  {power > 0 && (" 威力" + power)}
+                <span className="dc-move-panel-item-name">{opt.label}</span>
+                <span className="dc-move-panel-item-cat">
+                  {opt.moveCategory === "physical" ? "物理" : opt.moveCategory === "special" ? "特殊" : "变化"}
                 </span>
-              </>
-            );
-          })()}
-          <button className="dc-move-selected-clear" onClick={() => onSelect(null)}>×</button>
+                <span className="dc-move-panel-item-power">{opt.movePower ?? "—"}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -309,7 +426,7 @@ function SimplePokemonList({ search, onSelect }) {
 //  子组件：宝可梦配置面板（攻击方/防守方通用）
 // ══════════════════════════════════════════════════════════════
 
-function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onClear, boosts, onBoostChange, level }) {
+function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onClear, boosts, onBoostChange, level, onMovesSync }) {
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerTab, setPickerTab] = useState("search"); // "search" | "box" | "team"
   const [itemQuery, setItemQuery] = useState("");
@@ -421,12 +538,13 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
     let result;
     if (abilities.length > 0) {
       result = abilities.map((ab) => ({
+        id: ab.abilityId ? String(ab.abilityId) : "",
         name: ab.nameZh || ab.abilityId || "",
         isHidden: !!ab.isHidden,
       }));
     } else {
-      const topAbilities = (detail.abilities || []).map((a) => ({ name: a, isHidden: false }));
-      if (detail.hiddenAbility) topAbilities.push({ name: detail.hiddenAbility, isHidden: true });
+      const topAbilities = (detail.abilities || []).map((a) => ({ id: "", name: a, isHidden: false }));
+      if (detail.hiddenAbility) topAbilities.push({ id: "", name: detail.hiddenAbility, isHidden: true });
       result = topAbilities;
     }
     // 只有当列表内容真正变化时才更新（避免空数组闪烁）
@@ -543,6 +661,8 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
       sps: finalSps,
       statMode: targetMode,
     });
+    // 同步招式到槽位
+    if (onMovesSync) onMovesSync(cfg);
     setPickerSearch("");
   };
 
@@ -651,15 +771,18 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
               </div>
               {/* 特性按钮紧跟属性后面 */}
               <div className="dc-ability-inline">
-                {abilityList.length > 0 ? abilityList.map((ab) => (
-                  <button
-                    key={ab.name}
-                    className={"dc-ability-btn" + (member.abilityId === ab.name ? " dc-ability-btn-active" : "") + (ab.isHidden ? " dc-ability-btn-hidden" : "")}
-                    onClick={() => onChange({ ...member, abilityId: ab.name, abilityName: ab.name })}
-                  >
-                    {ab.name}{ab.isHidden ? " (隐)" : ""}
-                  </button>
-                )) : (
+                {abilityList.length > 0 ? abilityList.map((ab) => {
+                  const isActive = (ab.id && member.abilityId === ab.id) || member.abilityName === ab.name || member.abilityId === ab.name;
+                  return (
+                    <button
+                      key={ab.name}
+                      className={"dc-ability-btn" + (isActive ? " dc-ability-btn-active" : "") + (ab.isHidden ? " dc-ability-btn-hidden" : "")}
+                      onClick={() => onChange({ ...member, abilityId: ab.id || ab.name, abilityName: ab.name })}
+                    >
+                      {ab.name}{ab.isHidden ? " (隐)" : ""}
+                    </button>
+                  );
+                }) : (
                   <input
                     className="dc-ability-input"
                     type="text"
@@ -816,7 +939,13 @@ export default function DamagePage() {
   // ── 等级（攻守共享） ──
   const [level, setLevel] = useState(50);
 
-  // ── 招式 ──
+  // ── 招式（攻守双方各4个槽位） ──
+  const [atkMoves, setAtkMoves] = useState(["", "", "", ""]);
+  const [atkMovesInfo, setAtkMovesInfo] = useState({});
+  const [atkSelectedSlot, setAtkSelectedSlot] = useState(null);
+  const [defMoves, setDefMoves] = useState(["", "", "", ""]);
+  const [defMovesInfo, setDefMovesInfo] = useState({});
+  const [defSelectedSlot, setDefSelectedSlot] = useState(null);
   const [selectedMove, setSelectedMove] = useState(null);
   const [critical, setCritical] = useState(false);
 
@@ -859,22 +988,114 @@ export default function DamagePage() {
   const [calculating, setCalculating] = useState(false);
 
   // ── 全局数据 ──
-  const [allMoves, setAllMoves] = useState([]);
   const [attackerDetail, setAttackerDetail] = useState(null);
   const [defenderDetail, setDefenderDetail] = useState(null);
-  const [moveSearching, setMoveSearching] = useState(false);
 
-  // 招式按需搜索（不再一次性全量加载）
-  const moveSearchTimer = useRef(null);
-  const searchMoves = useCallback((keyword) => {
-    if (!keyword || keyword.trim().length === 0) { setAllMoves([]); setMoveSearching(false); return; }
-    if (moveSearchTimer.current) clearTimeout(moveSearchTimer.current);
-    setMoveSearching(true);
-    moveSearchTimer.current = setTimeout(() => {
-      unifiedApi("/moves?q=" + encodeURIComponent(keyword.trim())).then((r) => {
-        setAllMoves(r.data || []);
-      }).catch(() => setAllMoves([])).finally(() => setMoveSearching(false));
-    }, 200);
+  // 攻击方设置招式槽位（opt 来自 learnset 或 /moves 搜索结果）
+  const handleAtkSetMove = useCallback((index, opt) => {
+    if (!opt) {
+      setAtkMoves((prev) => { const next = [...prev]; next[index] = ""; return next; });
+      setAtkSelectedSlot(null);
+      setSelectedMove(null);
+      return;
+    }
+    const name = opt.value || opt.label || "";
+    const moveId = opt.moveId || null;
+    setAtkMoves((prev) => { const next = [...prev]; next[index] = name; return next; });
+    setAtkMovesInfo((prev) => ({
+      ...prev,
+      [name]: { moveId, type: opt.moveType || "", power: opt.movePower ?? 0, category: opt.moveCategory || "", _opt: opt }
+    }));
+    // 自动选中刚设置的招式
+    setAtkSelectedSlot(index);
+    // 获取完整 move 对象用于计算（优先用 moveId）
+    const fetchMove = moveId
+      ? unifiedApi(`/moves/${moveId}`)
+      : unifiedApi(`/moves?q=${encodeURIComponent(name)}&limit=5`);
+    fetchMove.then((r) => {
+      const found = moveId ? r.data : (r.data || []).find((m) => m.nameZh === name || m.slug === name);
+      if (found) setSelectedMove(found);
+    }).catch(() => {});
+  }, []);
+
+  // 攻击方选中招式槽位
+  const handleAtkSelectSlot = useCallback((index) => {
+    if (index === null) { setAtkSelectedSlot(null); setSelectedMove(null); return; }
+    setAtkSelectedSlot(index);
+    const moveName = atkMoves[index];
+    if (!moveName) return;
+    const info = atkMovesInfo[moveName];
+    if (info?._opt?._moveObj) {
+      setSelectedMove(info._opt._moveObj);
+    } else {
+      // 优先用 moveId 获取完整 move 对象
+      const moveId = info?.moveId;
+      const fetchMove = moveId
+        ? unifiedApi(`/moves/${moveId}`)
+        : unifiedApi(`/moves?q=${encodeURIComponent(moveName)}&limit=5`);
+      fetchMove.then((r) => {
+        const found = moveId ? r.data : (r.data || []).find((m) => m.nameZh === moveName || m.slug === moveName);
+        if (found) setSelectedMove(found);
+      }).catch(() => {});
+    }
+  }, [atkMoves, atkMovesInfo]);
+
+  // 防守方设置招式槽位
+  const handleDefSetMove = useCallback((index, opt) => {
+    if (!opt) {
+      setDefMoves((prev) => { const next = [...prev]; next[index] = ""; return next; });
+      return;
+    }
+    const name = opt.value || opt.label || "";
+    const moveId = opt.moveId || null;
+    setDefMoves((prev) => { const next = [...prev]; next[index] = name; return next; });
+    setDefMovesInfo((prev) => ({
+      ...prev,
+      [name]: { moveId, type: opt.moveType || "", power: opt.movePower ?? 0, category: opt.moveCategory || "", _opt: opt }
+    }));
+  }, []);
+
+  // 从盒子导入时同步招式到槽位（补全缺失的招式信息）
+  const syncMovesFromConfig = useCallback((cfg, side) => {
+    const moves = cfg.moves || ["", "", "", ""];
+    const info = { ...(cfg._movesInfo || {}) };
+
+    if (side === "atk") {
+      setAtkMoves(moves);
+      setAtkMovesInfo(info);
+      setAtkSelectedSlot(null);
+    } else {
+      setDefMoves(moves);
+      setDefMovesInfo(info);
+      setDefSelectedSlot(null);
+    }
+
+    // 找出有招式名但缺少 type 信息的招式，通过 API 补全
+    const missing = moves.filter((name) => name && (!info[name] || !info[name].type));
+    if (missing.length === 0) return;
+
+    // 优先用 moveId 查询，降级用名称搜索
+    for (const name of missing) {
+      const moveId = info[name]?.moveId;
+      const fetchPromise = moveId
+        ? unifiedApi(`/moves/${moveId}`)
+        : unifiedApi(`/moves?q=${encodeURIComponent(name)}&limit=5`);
+
+      fetchPromise.then((r) => {
+        // /moves/:id 返回 { data: {...} }，/moves?q= 返回 { data: [...] }
+        const found = moveId
+          ? r.data
+          : (r.data || []).find((m) => m.nameZh === name || m.slug === name);
+        if (found) {
+          const patch = { moveId: found.id || moveId, type: found.type || "", power: found.power ?? 0, category: found.category || "" };
+          if (side === "atk") {
+            setAtkMovesInfo((prev) => ({ ...prev, [name]: { ...prev[name], ...patch } }));
+          } else {
+            setDefMovesInfo((prev) => ({ ...prev, [name]: { ...prev[name], ...patch } }));
+          }
+        }
+      }).catch(() => {});
+    }
   }, []);
 
   // 加载攻击方详情
@@ -944,9 +1165,7 @@ export default function DamagePage() {
 
   // ── 伤害计算 ──
   const handleCalculate = useCallback(async () => {
-    if (!selectedMove) { window.alert("请先选择一个招式"); return; }
-    if (!attacker.pokemonId) { window.alert("请选择攻击方宝可梦"); return; }
-    if (!defender.pokemonId) { window.alert("请选择防守方宝可梦"); return; }
+    if (!selectedMove || !attacker.pokemonId || !defender.pokemonId) return;
 
     setCalculating(true);
     try {
@@ -1064,9 +1283,48 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
     defStealthRock, defSpikes, defReflect, defLightScreen, defAuroraVeil,
     defProtect, defHelpingHand, defTailwind, defBoost, defSwitchingOut]);
 
+  // 用 ref 保存最新的 handleCalculate，避免 useEffect 因引用变化过度触发
+  const calcRef = useRef(handleCalculate);
+  calcRef.current = handleCalculate;
+
+  // 选中招式后立即计算（仅 selectedMove 变化时触发）
+  useEffect(() => {
+    if (selectedMove && attacker.pokemonId && defender.pokemonId) {
+      calcRef.current();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMove]);
+
+  // 其他参数变化时防抖重新计算（500ms）
+  const depsForRecalc = JSON.stringify([
+    attacker.pokemonId, attacker.formId, attacker.nature, attacker.abilityId, attacker.itemId,
+    attacker.evs, attacker.sps, attacker.ivs,
+    defender.pokemonId, defender.formId, defender.nature, defender.abilityId, defender.itemId,
+    defender.evs, defender.sps, defender.ivs,
+    level, generation, isChampions, critical, battleMode, weather, terrain,
+    gravity, magicRoom, wonderRoom, atkStatus,
+    atkBoost, defBoost,
+    atkStealthRock, atkSpikes, atkReflect, atkLightScreen, atkAuroraVeil,
+    atkProtect, atkHelpingHand, atkTailwind, atkSwitchingOut,
+    defStealthRock, defSpikes, defReflect, defLightScreen, defAuroraVeil,
+    defProtect, defHelpingHand, defTailwind, defSwitchingOut,
+  ]);
+  useEffect(() => {
+    if (!selectedMove || !attacker.pokemonId || !defender.pokemonId) return;
+    const timer = setTimeout(() => calcRef.current(), 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depsForRecalc]);
+
   const handleReset = useCallback(() => {
     setAttacker({ ...createDraftMember(), statMode: isChampions ? "champions" : "classic" });
     setDefender({ ...createDraftMember(), statMode: isChampions ? "champions" : "classic" });
+    setAtkMoves(["", "", "", ""]);
+    setAtkMovesInfo({});
+    setAtkSelectedSlot(null);
+    setDefMoves(["", "", "", ""]);
+    setDefMovesInfo({});
+    setDefSelectedSlot(null);
     setSelectedMove(null);
     setResult(null);
   }, [isChampions]);
@@ -1099,112 +1357,52 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
           </div>
         </div>
 
-        {/* ── 三栏主体：攻击方 | 场地+招式+结果 | 防守方 ── */}
+        {/* ── 三栏主体：攻击方 | 中栏(场地+结果) | 防守方 ── */}
         <div className="dc-main-layout">
 
-          {/* ═══ 左栏：攻击方 ═══ */}
+          {/* ═══ 左栏：攻击方招式 + 宝可梦 ═══ */}
           <div className="dc-side-col">
+            {/* 攻击方招式槽位 */}
+            {attacker.pokemonId && (
+              <div className="dc-move-section dc-move-section-side">
+                <span className="dc-section-title">攻击方招式</span>
+                <MoveSlotPanel
+                  moves={atkMoves}
+                  movesInfo={atkMovesInfo}
+                  selectedIndex={atkSelectedSlot}
+                  onSelectSlot={handleAtkSelectSlot}
+                  pokemonId={attacker.pokemonId}
+                  generation={generation}
+                  onSetMove={handleAtkSetMove}
+                />
+              </div>
+            )}
             <PokemonConfigPanel
               title="攻击方"
               member={attacker}
               detail={attackerDetail}
               isChampions={isChampions}
               onChange={setAttacker}
-              onClear={() => { setAttacker({ ...createDraftMember(), statMode: isChampions ? "champions" : "classic" }); setResult(null); }}
+              onClear={() => { setAttacker({ ...createDraftMember(), statMode: isChampions ? "champions" : "classic" }); setAtkMoves(["", "", "", ""]); setAtkMovesInfo({}); setAtkSelectedSlot(null); setSelectedMove(null); setResult(null); }}
               boosts={atkBoost}
               onBoostChange={(key, val) => setAtkBoost((prev) => ({ ...prev, [key]: Math.max(-6, Math.min(6, val)) }))}
               level={level}
-            />
-            {/* 攻击方状态 */}
-            <StatusPanel
-              label="攻击方"
-              status={atkStatus} setStatus={setAtkStatus}
-              stealthRock={atkStealthRock} setStealthRock={setAtkStealthRock}
-              spikes={atkSpikes} setSpikes={setAtkSpikes}
-              reflect={atkReflect} setReflect={setAtkReflect}
-              lightScreen={atkLightScreen} setLightScreen={setAtkLightScreen}
-              auroraVeil={atkAuroraVeil} setAuroraVeil={setAtkAuroraVeil}
-              protect={atkProtect} setProtect={setAtkProtect}
-              helpingHand={atkHelpingHand} setHelpingHand={setAtkHelpingHand}
-              tailwind={atkTailwind} setTailwind={setAtkTailwind}
-              switchingOut={atkSwitchingOut} setSwitchingOut={setAtkSwitchingOut}
+              onMovesSync={(cfg) => syncMovesFromConfig(cfg, "atk")}
             />
           </div>
 
-          {/* ═══ 中栏：场地 + 招式 + 计算结果 ═══ */}
+          {/* ═══ 中栏：结果 + 等级 + 场地 + 状态 ═══ */}
           <div className="dc-center-col">
-            {/* 等级 */}
-            <div className="dc-level-section">
-              <span className="dc-section-title">等级</span>
-              <input
-                className="dc-level-input"
-                type="number"
-                min={1}
-                max={100}
-                value={level}
-                onChange={(e) => setLevel(Math.max(1, Math.min(100, Number(e.target.value) || 50)))}
-              />
-            </div>
-
-            {/* 场地环境 */}
-            <div className="dc-field-section">
-              <span className="dc-section-title">场地环境</span>
-              <div className="dc-field-group">
-                {/* 天气切换 */}
-                <div className="dc-seg-field">
-                  <span className="dc-seg-label">天气</span>
-                  <div className="dc-seg-switcher">
-                    {[{ v: "sun", l: "晴天" }, { v: "harshSunlight", l: "大日照" }, { v: "rain", l: "雨天" }, { v: "heavyRain", l: "大雨" }, { v: "sand", l: "沙暴" }, { v: "hail", l: "雪" }, { v: "strongWinds", l: "乱流" }].map((w) => (
-                      <button key={w.v} className={"dc-seg-btn" + (weather === w.v ? " dc-seg-btn-active" : "")} onClick={() => setWeather(weather === w.v ? "none" : w.v)}>{w.l}</button>
-                    ))}
-                  </div>
-                </div>
-                {/* 场地切换 */}
-                <div className="dc-seg-field">
-                  <span className="dc-seg-label">场地</span>
-                  <div className="dc-seg-switcher">
-                    {[{ v: "electric", l: "电气" }, { v: "grassy", l: "青草" }, { v: "misty", l: "薄雾" }, { v: "psychic", l: "精神" }].map((t) => (
-                      <button key={t.v} className={"dc-seg-btn" + (terrain === t.v ? " dc-seg-btn-active" : "")} onClick={() => setTerrain(terrain === t.v ? "none" : t.v)}>{t.l}</button>
-                    ))}
-                  </div>
-                </div>
-                {/* 其他开关 */}
-                <div className="dc-field-row">
-                  <button className={"dc-toggle" + (gravity ? " dc-toggle-on" : "")} onClick={() => setGravity(!gravity)}>重力</button>
-                  <button className={"dc-toggle" + (magicRoom ? " dc-toggle-on" : "")} onClick={() => setMagicRoom(!magicRoom)}>魔法空间</button>
-                  <button className={"dc-toggle" + (wonderRoom ? " dc-toggle-on" : "")} onClick={() => setWonderRoom(!wonderRoom)}>奇妙空间</button>
-                  <button className={"dc-toggle" + (critical ? " dc-toggle-on" : "")} onClick={() => setCritical(!critical)}>暴击</button>
-                </div>
-              </div>
-            </div>
-
-            {/* 招式选择 + 计算按钮 */}
-            <div className="dc-move-section">
-              <span className="dc-section-title">招式</span>
-              <MoveSearch
-                allMoves={allMoves}
-                generation={generation}
-                selectedMove={selectedMove}
-                onSelect={setSelectedMove}
-                onSearch={searchMoves}
-                searching={moveSearching}
-              />
-              <button
-                className="dc-calc-btn"
-                onClick={handleCalculate}
-                disabled={calculating || !selectedMove || !attacker.pokemonId || !defender.pokemonId}
-              >
-                {calculating ? "计算中..." : "计算伤害"}
-              </button>
-            </div>
-
-            {/* 计算结果 */}
+            {/* 计算结果（顶部） */}
             <div className="dc-result-section">
               {result ? (
-                <div className="dc-result-card">
+                <div className={`dc-result-card${calculating ? " dc-result-updating" : ""}`}>
                   <div className="dc-result-headline">
                     <strong>{result.attackerName}</strong>
-                    <span> 的 {result.moveName} → </span>
+                    <span> 的 {result.moveName}</span>
+                    {result.moveType && <TypeChip type={result.moveType} size="sm" />}
+                    <span className="dc-result-category">{result.category === "physical" ? "物理" : "特殊"}</span>
+                    <span> → </span>
                     <strong>{result.defenderName}</strong>
                   </div>
                   <div className="dc-result-numbers">
@@ -1226,48 +1424,122 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
                       {((result.min / result.defHp) * 100).toFixed(1)}% - {((result.max / result.defHp) * 100).toFixed(1)}% HP
                     </div>
                   )}
-                  <div className="dc-result-meta">
-                    {result.moveType && <TypeChip type={result.moveType} size="sm" />}
-                    <span>{result.category === "physical" ? "物理" : "特殊"}</span>
-                  </div>
                   {result.description && (
                     <div className="dc-result-desc"><code>{result.description}</code></div>
                   )}
                 </div>
+              ) : calculating ? (
+                <div className="dc-result-card dc-result-loading">
+                  <span>计算中...</span>
+                </div>
               ) : (
                 <div className="dc-result-empty">
-                  <p>选择攻守双方宝可梦和招式后点击计算</p>
+                  <p>选择攻守双方宝可梦并点击招式开始计算</p>
                 </div>
               )}
             </div>
+
+            {/* 等级 */}
+            <div className="dc-level-section">
+              <span className="dc-section-title">等级</span>
+              <input
+                className="dc-level-input"
+                type="number"
+                min={1}
+                max={100}
+                value={level}
+                onChange={(e) => setLevel(Math.max(1, Math.min(100, Number(e.target.value) || 50)))}
+              />
+            </div>
+
+            {/* 场地环境 */}
+            <div className="dc-field-section">
+              <span className="dc-section-title">场地环境</span>
+              <div className="dc-field-group">
+                <div className="dc-seg-field">
+                  <span className="dc-seg-label">天气</span>
+                  <div className="dc-seg-switcher">
+                    {[{ v: "sun", l: "晴天" }, { v: "harshSunlight", l: "大日照" }, { v: "rain", l: "雨天" }, { v: "heavyRain", l: "大雨" }, { v: "sand", l: "沙暴" }, { v: "hail", l: "雪" }, { v: "strongWinds", l: "乱流" }].map((w) => (
+                      <button key={w.v} className={"dc-seg-btn" + (weather === w.v ? " dc-seg-btn-active" : "")} onClick={() => setWeather(weather === w.v ? "none" : w.v)}>{w.l}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="dc-seg-field">
+                  <span className="dc-seg-label">场地</span>
+                  <div className="dc-seg-switcher">
+                    {[{ v: "electric", l: "电气" }, { v: "grassy", l: "青草" }, { v: "misty", l: "薄雾" }, { v: "psychic", l: "精神" }].map((t) => (
+                      <button key={t.v} className={"dc-seg-btn" + (terrain === t.v ? " dc-seg-btn-active" : "")} onClick={() => setTerrain(terrain === t.v ? "none" : t.v)}>{t.l}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="dc-field-row">
+                  <button className={"dc-toggle" + (gravity ? " dc-toggle-on" : "")} onClick={() => setGravity(!gravity)}>重力</button>
+                  <button className={"dc-toggle" + (magicRoom ? " dc-toggle-on" : "")} onClick={() => setMagicRoom(!magicRoom)}>魔法空间</button>
+                  <button className={"dc-toggle" + (wonderRoom ? " dc-toggle-on" : "")} onClick={() => setWonderRoom(!wonderRoom)}>奇妙空间</button>
+                  <button className={"dc-toggle" + (critical ? " dc-toggle-on" : "")} onClick={() => setCritical(!critical)}>暴击</button>
+                </div>
+              </div>
+            </div>
+
+            {/* 攻守双方状态（场地环境下方） */}
+            <div className="dc-status-row">
+              <StatusPanel
+                label="攻击方"
+                status={atkStatus} setStatus={setAtkStatus}
+                stealthRock={atkStealthRock} setStealthRock={setAtkStealthRock}
+                spikes={atkSpikes} setSpikes={setAtkSpikes}
+                reflect={atkReflect} setReflect={setAtkReflect}
+                lightScreen={atkLightScreen} setLightScreen={setAtkLightScreen}
+                auroraVeil={atkAuroraVeil} setAuroraVeil={setAtkAuroraVeil}
+                protect={atkProtect} setProtect={setAtkProtect}
+                helpingHand={atkHelpingHand} setHelpingHand={setAtkHelpingHand}
+                tailwind={atkTailwind} setTailwind={setAtkTailwind}
+                switchingOut={atkSwitchingOut} setSwitchingOut={setAtkSwitchingOut}
+              />
+              <StatusPanel
+                label="防守方"
+                status={defStatus} setStatus={setDefStatus}
+                stealthRock={defStealthRock} setStealthRock={setDefStealthRock}
+                spikes={defSpikes} setSpikes={setDefSpikes}
+                reflect={defReflect} setReflect={setDefReflect}
+                lightScreen={defLightScreen} setLightScreen={setDefLightScreen}
+                auroraVeil={defAuroraVeil} setAuroraVeil={setDefAuroraVeil}
+                protect={defProtect} setProtect={setDefProtect}
+                helpingHand={defHelpingHand} setHelpingHand={setDefHelpingHand}
+                tailwind={defTailwind} setTailwind={setDefTailwind}
+                switchingOut={defSwitchingOut} setSwitchingOut={setDefSwitchingOut}
+              />
+            </div>
           </div>
 
-          {/* ═══ 右栏：防守方 ═══ */}
+          {/* ═══ 右栏：防守方招式 + 宝可梦 ═══ */}
           <div className="dc-side-col">
+            {/* 防守方招式槽位 */}
+            {defender.pokemonId && (
+              <div className="dc-move-section dc-move-section-side">
+                <span className="dc-section-title">防守方招式</span>
+                <MoveSlotPanel
+                  moves={defMoves}
+                  movesInfo={defMovesInfo}
+                  selectedIndex={defSelectedSlot}
+                  onSelectSlot={(i) => setDefSelectedSlot(i)}
+                  pokemonId={defender.pokemonId}
+                  generation={generation}
+                  onSetMove={handleDefSetMove}
+                />
+              </div>
+            )}
             <PokemonConfigPanel
               title="防守方"
               member={defender}
               detail={defenderDetail}
               isChampions={isChampions}
               onChange={setDefender}
-              onClear={() => { setDefender({ ...createDraftMember(), statMode: isChampions ? "champions" : "classic" }); setResult(null); }}
+              onClear={() => { setDefender({ ...createDraftMember(), statMode: isChampions ? "champions" : "classic" }); setDefMoves(["", "", "", ""]); setDefMovesInfo({}); setDefSelectedSlot(null); setResult(null); }}
               boosts={defBoost}
               onBoostChange={(key, val) => setDefBoost((prev) => ({ ...prev, [key]: Math.max(-6, Math.min(6, val)) }))}
               level={level}
-            />
-            {/* 防守方状态 */}
-            <StatusPanel
-              label="防守方"
-              status={defStatus} setStatus={setDefStatus}
-              stealthRock={defStealthRock} setStealthRock={setDefStealthRock}
-              spikes={defSpikes} setSpikes={setDefSpikes}
-              reflect={defReflect} setReflect={setDefReflect}
-              lightScreen={defLightScreen} setLightScreen={setDefLightScreen}
-              auroraVeil={defAuroraVeil} setAuroraVeil={setDefAuroraVeil}
-              protect={defProtect} setProtect={setDefProtect}
-              helpingHand={defHelpingHand} setHelpingHand={setDefHelpingHand}
-              tailwind={defTailwind} setTailwind={setDefTailwind}
-              switchingOut={defSwitchingOut} setSwitchingOut={setDefSwitchingOut}
+              onMovesSync={(cfg) => syncMovesFromConfig(cfg, "def")}
             />
           </div>
 

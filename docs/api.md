@@ -2,23 +2,13 @@
 
 ## 概述
 
-Pokemon LocalDex 提供两种数据访问方式：后端 Hono API（供 Web 端使用）和小程序端直连 Supabase PostgREST REST API。两种方式查询同一个 Supabase（PostgreSQL）数据库，返回的数据结构保持一致。
+Pokemon LocalDex 提供统一的后端 Hono API，供 Web 端和小程序端共同使用。
 
-### Hono API（Web 端）
+API 层基于 [Hono](https://hono.dev/) 框架构建，运行在 Node.js 22 上（本地）或 Cloudflare Workers（生产），提供 RESTful 风格的查询接口和少量写入接口。本地 API 服务默认监听 `0.0.0.0:3030`，可通过环境变量 `HOST` 和 `PORT` 调整。
 
-API 层基于 [Hono](https://hono.dev/) 框架构建，运行在 Node.js 22 上，提供 RESTful 风格的只读查询接口和少量写入接口。API 服务默认监听 `0.0.0.0:3030`，可通过环境变量 `HOST` 和 `PORT` 调整。
+数据源为 SQLite（本地开发）或 Cloudflare D1（生产部署）。
 
-API 支持两种数据源，通过 `DATA_SOURCE` 环境变量切换：`sqlite`（默认）使用本地 SQLite 数据库，`supabase` 使用 Supabase（PostgreSQL）。两种模式下接口行为完全一致，仅底层查询实现不同。
-
-所有接口同时挂载在根路径和 `/api` 前缀下。例如 `/pokemon` 和 `/api/pokemon` 返回相同结果。这是为了兼容两种运行模式：Vite 开发模式下前端通过 proxy 将 `/api/xxx` 转发为 `/xxx`；生产模式下 API 服务器直接托管 SPA 静态资源，前端请求 `/api/xxx` 直接匹配。
-
-### Supabase PostgREST（小程序端）
-
-小程序端不经过 Hono API，而是通过 `Taro.request` 直接调用 Supabase 的 PostgREST REST API。封装代码位于 `apps/miniprogram/src/utils/supabase.js`，业务查询逻辑位于 `apps/miniprogram/src/utils/api.js`。
-
-PostgREST 的请求格式为 `GET {SUPABASE_URL}/rest/v1/{table}?{params}`，每个请求需要携带 `apikey` 和 `Authorization: Bearer {anon_key}` 头。查询参数使用 PostgREST 语法，例如 `select=*`、`or=(cond1,cond2)`、`order=column.asc`、`limit=20`。
-
-小程序端的 API 函数与 Web 端返回相同的数据结构（`{ data: ... }` 格式），页面组件无需关心底层数据源差异。
+所有接口同时挂载在根路径和 `/api` 前缀下。例如 `/pokemon` 和 `/api/pokemon` 返回相同结果。这是为了兼容两种运行模式：Vite 开发模式下前端通过 proxy 将 `/api/xxx` 转发为 `/xxx`；生产模式下 Pages Functions 通过 Service Binding 将 `/api/*` 请求转发给 Worker。
 
 ## 启动方式
 
@@ -26,14 +16,11 @@ PostgREST 的请求格式为 `GET {SUPABASE_URL}/rest/v1/{table}?{params}`，每
 # 默认启动（SQLite 数据源，0.0.0.0:3030）
 npm run dev:api
 
-# 使用 Supabase 数据源
-DATA_SOURCE=supabase SUPABASE_URL=https://xxx.supabase.co SUPABASE_SERVICE_ROLE_KEY=xxx npm run dev:api
-
 # 自定义地址和端口
 HOST=127.0.0.1 PORT=8080 npm run dev:api
 ```
 
-启动前需要确保对应的数据源可用：SQLite 模式下 `data/sqlite/localdex.sqlite` 必须存在；Supabase 模式下环境变量 `SUPABASE_URL` 和 `SUPABASE_SERVICE_ROLE_KEY` 必须正确配置。
+启动前需要确保 SQLite 数据库存在：`data/sqlite/localdex.sqlite`。
 
 环境变量可以写在 `apps/api/.env` 文件中（参考 `.env.example`）。
 
@@ -56,7 +43,6 @@ API 启用了全局 CORS，允许任意来源访问。
 | limit | number | 每页条数，传入后启用分页模式 |
 | offset | number | 偏移量，默认 0 |
 
-小程序端的分页行为与 Hono API 一致，通过 PostgREST 的 `limit` 和 `offset` 参数实现，总数通过 `Prefer: count=exact` 头和 `Content-Range` 响应头获取。
 
 ## 宝可梦
 
@@ -81,7 +67,6 @@ GET /api/pokemon?q=皮卡&type=电&generation=1
 GET /api/pokemon?limit=20&offset=0
 ```
 
-小程序端对应函数：`fetchPokemonList({ q, type, generation, limit, offset })`。注意属性和世代筛选在小程序端通过客户端过滤实现（PostgREST 不支持嵌套表的直接过滤）。
 
 ### GET /pokemon/:id
 
@@ -255,7 +240,7 @@ GET /api/pokemon/25/learnset/meta
 
 返回伤害计算结果，包含最小伤害、最大伤害和乱数范围。
 
-注意：此接口仅在后端 API 模式下可用。GitHub Pages 静态部署（前端直连 Supabase）模式和小程序端均不支持伤害计算。
+小程序端和 Web 端均通过此接口实现伤害计算。
 
 ## 健康检查
 
@@ -267,32 +252,14 @@ GET /api/pokemon/25/learnset/meta
 { "ok": true, "service": "pokemon-localdex-api", "dataSource": "sqlite" }
 ```
 
-`dataSource` 字段值为 `sqlite` 或 `supabase`，反映当前 API 使用的数据源。
+`dataSource` 字段值为 `sqlite` 或 `d1`，反映当前 API 使用的数据源。
 
 ## 静态资源
 
 生产模式下，API 服务器同时托管前端静态资源。静态文件按以下优先级查找：先查 `dist/` 目录（Vite 构建产物），再查 `apps/web/public/` 目录。所有未匹配的 GET 请求会回退到 `index.html`，以支持 SPA 的客户端路由。
 
-## 前端直连模式
+## 小程序端 API 调用
 
-当前端配置 `VITE_DATA_SOURCE=supabase` 时（GitHub Pages 部署默认配置），前端会绕过 Hono API，通过 `@supabase/supabase-js` 直接查询 Supabase。此模式下上述所有 GET 查询接口的功能由前端 `supabaseApi.js` 中的对应函数实现，返回格式与 API 响应保持一致。POST 接口（队伍保存）降级为 localStorage 存储，伤害计算不可用。
+小程序端通过 `Taro.request` 调用同一套后端 Hono API，封装代码位于 `apps/miniprogram/src/utils/api.js`。
 
-## 小程序端 Supabase REST 封装
-
-小程序端的数据访问层由两个文件组成：
-
-**supabase.js** — 底层 PostgREST 请求封装。提供 `query(table, options)` 和 `queryOne(table, options)` 两个函数。`query` 函数接受 `select`、`filters`、`or`、`order`、`limit`、`offset`、`count`、`single` 等参数，将它们转换为 PostgREST 查询字符串，通过 `Taro.request` 发起请求。`or` 参数会自动包裹括号（PostgREST 要求 `or` 值必须用括号包裹）。`count` 模式通过 `Prefer: count=exact` 头实现，总数从 `Content-Range` 响应头解析。
-
-**api.js** — 业务查询层。封装了所有数据查询函数，包括 `fetchPokemonList`、`fetchPokemonDetail`、`fetchMovesList`、`fetchMoveDetail`、`fetchAbilitiesList`、`fetchAbilityDetail`、`fetchItemsList`、`fetchItemDetail`、`fetchLearnsetMeta`、`fetchPokemonLearnset`。这些函数的返回格式与 Web 端 API 响应保持一致，页面组件可以直接使用。
-
-### PostgREST 查询注意事项
-
-在使用 PostgREST REST API 时需要注意以下几点：
-
-**or 参数格式**：PostgREST 的 `or` 参数值必须用括号包裹，例如 `or=(id.eq.1,name_zh.eq.皮卡丘)`。小程序端的 `supabase.js` 会自动处理括号包裹。
-
-**避免 single 模式**：PostgREST 的 `Accept: application/vnd.pgrst.object+json`（single 模式）在结果不恰好为 1 条时会返回 406 错误。小程序端的详情查询使用 `query` + `limit:1` 替代，更加健壮。
-
-**嵌套表查询**：PostgREST 支持通过 `select` 参数进行关联表查询（如 `pokemon_forms!inner(pokemon_form_types(type_name))`），但不支持对嵌套表的直接过滤。属性筛选等需要在客户端完成。
-
-**关联查询语法**：使用 `!inner` 后缀进行 inner join（如 `pokemon_forms!inner(...)`），使用 `!left` 后缀进行 left join（如 `moves!left(...)`）。
+API 基址址通过 `.env` 文件中的 `API_BASE_URL` 配置，在编译时通过 Taro `defineConstants` 注入。小程序端封装了与 Web 端相同的查询函数：`fetchPokemonList`、`fetchPokemonDetail`、`fetchMovesList`、`fetchMoveDetail`、`fetchAbilitiesList`、`fetchAbilityDetail`、`fetchItemsList`、`fetchItemDetail`、`fetchLearnsetMeta`、`fetchPokemonLearnset`。返回格式与 Web 端保持一致。

@@ -1,0 +1,550 @@
+/* ═══════════════════════════════════════════════════════
+   Moves Page — Accordion Layout (like Abilities)
+   ═══════════════════════════════════════════════════════ */
+
+.mv-page {
+  display: grid;
+  gap: 18px;
+}
+
+.mv-panel {
+  padding-bottom: 24px;
+}
+
+.mv-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 22px 24px 0;
+}
+
+.mv-header .panel-title {
+  flex-shrink: 0;
+}
+
+.mv-header .panel-subtitle {
+  margin: 0;
+}
+
+.mv-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 24px 20px;
+}
+
+/* ── Search wrapper ── */
+.mv-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.mv-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.mv-search {
+  width: 100%;
+  padding: 9px 14px 9px 36px;
+  border: 1px solid rgba(31, 42, 31, 0.10);
+  border-radius: 10px;
+  background: rgba(255, 248, 236, 0.6);
+  font-size: 13px;
+  color: var(--ink);
+  transition: border-color 200ms, background 200ms, box-shadow 200ms;
+}
+
+.mv-search::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.mv-search:focus {
+  outline: none;
+  border-color: rgba(217, 79, 61, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+/* ── Filter selects row ── */
+.mv-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mv-filter-select {
+  flex: 1 1 0;
+  min-width: 90px;
+  padding: 7px 28px 7px 12px;
+  border: 1px solid rgba(31, 42, 31, 0.10);
+  border-radius: 999px;
+  background: rgba(255, 248, 236, 0.6) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235f6b5c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 200ms, background-color 200ms, box-shadow 200ms;
+}
+
+.mv-filter-select:focus {
+  outline: none;
+  border-color: rgba(217, 79, 61, 0.35);
+  background-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+.mv-empty {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* ── Column Header (table head) ── */
+.mv-list-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  margin: 0 24px 4px;
+  border-bottom: 2px solid rgba(31, 42, 31, 0.08);
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  user-select: none;
+}
+
+.mv-col-no    { width: 38px; flex: 0 0 38px; }
+.mv-col-name  { flex: 1 1 80px; min-width: 60px; }
+.mv-col-type  { width: 100px; flex: 0 0 100px; }
+.mv-col-cat   { width: 80px; flex: 0 0 80px; }
+.mv-col-pow,
+.mv-col-acc,
+.mv-col-pp    { width: 40px; flex: 0 0 40px; text-align: center; font-variant-numeric: tabular-nums; }
+.mv-col-arrow { width: 18px; flex: 0 0 18px; }
+
+/* ── List Container ── */
+.mv-list {
+display: flex;
+flex-direction: column;
+padding: 0 24px;
+gap: 6px;
+}
+
+/* ── Row Item ── */
+.mv-row-item {
+  border-radius: 10px;
+  overflow: hidden;
+  transition: background 150ms ease;
+}
+
+.mv-row-item:hover {
+  filter: brightness(0.97);
+}
+
+.mv-row-expanded {
+  border: 1px solid rgba(217, 79, 61, 0.15);
+  border-radius: 12px;
+  margin: 4px 0;
+}
+
+/* ── Row Header (clickable) ── */
+.mv-row-header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 16px;
+  padding-right: 240px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.mv-row-header:hover {
+  background: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Left side: number + name (row 1, col 1) ── */
+.mv-row-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* ── Right side: type + category + stats + arrow (absolutely centered) ── */
+.mv-row-right {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Description line ── */
+.mv-row-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  padding-left: 48px;
+}
+
+.mv-row-number {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  font-family: "JetBrains Mono", "SF Mono", monospace;
+  width: 38px;
+  flex: 0 0 38px;
+}
+
+.mv-row-name {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex: 1 1 80px;
+  min-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Type column with icon ── */
+.mv-row-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100px;
+  flex: 0 0 100px;
+}
+
+.mv-type-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.55);
+}
+
+/* ── Category column with icon ── */
+.mv-row-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  width: 80px;
+  flex: 0 0 80px;
+}
+
+.mv-cat-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.55);
+}
+
+/* ── TypeIconChip: icon merged into type-chip ── */
+.mv-icon-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* ── CategoryChip: pill with wiki colors ── */
+.mv-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 4px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  line-height: 1;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Shared chip icon (inside TypeIconChip & CategoryChip) ── */
+.mv-chip-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  vertical-align: middle;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+/* ── Numeric stat columns ── */
+.mv-row-pow,
+.mv-row-acc,
+.mv-row-pp {
+  width: 40px;
+  flex: 0 0 40px;
+  text-align: center;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.mv-row-arrow {
+  font-size: 12px;
+  color: var(--muted);
+  transition: transform 200ms ease;
+  width: 18px;
+  flex: 0 0 18px;
+  text-align: center;
+}
+
+.mv-row-arrow-open {
+  transform: rotate(180deg);
+}
+
+/* ── Expanded Detail Panel ── */
+.mv-row-detail {
+  padding: 0 16px 16px 60px;
+  border-top: 1px solid rgba(31, 42, 31, 0.06);
+}
+
+.mv-detail-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 14px;
+}
+
+.mv-name-tag {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mv-name-ja {
+  background: rgba(217, 79, 61, 0.08);
+  color: var(--accent-strong);
+}
+
+.mv-name-en {
+  background: rgba(59, 132, 197, 0.1);
+  color: #1a5276;
+}
+
+.mv-name-gen {
+  background: rgba(138, 166, 90, 0.12);
+  color: #3d5a1e;
+}
+
+/* ── Stats Grid ── */
+.mv-detail-stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mv-detail-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 42, 31, 0.05);
+  min-width: 64px;
+}
+
+.mv-detail-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mv-detail-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.mv-detail-type-wrap,
+.mv-detail-cat-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ── Effect Detail ── */
+.mv-detail-effect {
+  margin-top: 14px;
+}
+
+.mv-detail-effect-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mv-detail-effect-text {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink);
+  white-space: pre-line;
+}
+
+/* ── Generation Changes ── */
+.mv-gen-section {
+  margin-top: 16px;
+}
+
+.mv-gen-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.mv-gen-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mv-gen-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 42, 31, 0.05);
+}
+
+.mv-gen-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.mv-gen-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, rgba(138, 166, 90, 0.18), rgba(138, 166, 90, 0.08));
+  color: #3d5a1e;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mv-gen-version {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: linear-gradient(135deg, rgba(90, 130, 180, 0.16), rgba(90, 130, 180, 0.06));
+  color: #2a4a6e;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mv-gen-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+/* ── Wiki Link (inline icon in detail names) ── */
+.mv-wiki-link,
+.ab-wiki-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  color: var(--muted);
+  opacity: 0.6;
+  transition: opacity 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.mv-wiki-link:hover,
+.ab-wiki-link:hover {
+  opacity: 1;
+  color: var(--accent, #d94f3d);
+}
+
+/* ── Source Link ── */
+.mv-source {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(31, 42, 31, 0.06);
+}
+
+.mv-source a {
+  font-size: 12px;
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.mv-source a:hover {
+  text-decoration: underline;
+}
+
+/* ── Infinite Scroll Sentinel ── */
+.mv-load-more {
+display: flex;
+justify-content: center;
+padding: 24px 24px 8px;
+}
+

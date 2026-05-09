@@ -362,15 +362,24 @@ const [isNewConfig, setIsNewConfig] = useState(false);
     return () => window.removeEventListener("localdex-migration-done", handleMigrationDone);
   }, []);
 
-  // 新建/编辑时自动滚动到编辑区域
+  // 新建/编辑时自动滚动到编辑区域（仅在首次打开编辑器时触发，避免输入时反复滚动）
+  const prevEditingConfigRef = useRef(null);
   useEffect(() => {
-    if (editingConfig && editorRef.current) {
+    const wasEditing = prevEditingConfigRef.current != null;
+    const isEditing = editingConfig != null;
+    prevEditingConfigRef.current = editingConfig;
+    // 只在从"未编辑"切换到"编辑中"时滚动
+    if (isEditing && !wasEditing && editorRef.current) {
       setTimeout(() => editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
     }
   }, [editingConfig]);
 
+  const prevEditingTeamRef = useRef(null);
   useEffect(() => {
-    if (editingTeam && teamEditorRef.current) {
+    const wasEditing = prevEditingTeamRef.current != null;
+    const isEditing = editingTeam != null;
+    prevEditingTeamRef.current = editingTeam;
+    if (isEditing && !wasEditing && teamEditorRef.current) {
       setTimeout(() => teamEditorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
     }
   }, [editingTeam]);

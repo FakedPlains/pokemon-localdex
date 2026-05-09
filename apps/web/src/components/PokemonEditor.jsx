@@ -278,6 +278,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
           moves.push({
             value: name,
             label: name,
+            moveId: entry.moveId ?? null,
             moveType: entry.moveType || "",
             moveCategory: entry.moveCategory || "",
             movePower: entry.movePower ?? null,
@@ -342,7 +343,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     // 保存招式类型信息以便展示
     if (moveOpt && value) {
       const movesInfo = { ...(config._movesInfo || {}) };
-      movesInfo[value] = { type: moveOpt.moveType || "", power: moveOpt.movePower ?? "", category: moveOpt.moveCategory || "" };
+      movesInfo[value] = { moveId: moveOpt.moveId ?? null, type: moveOpt.moveType || "", power: moveOpt.movePower ?? "", category: moveOpt.moveCategory || "" };
       draft._movesInfo = movesInfo;
     }
     onChange(draft);

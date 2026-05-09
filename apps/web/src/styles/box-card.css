@@ -1,0 +1,416 @@
+/* ══════════════════════════════════════════════
+   BoxCard — 盒子宝可梦卡片
+   ══════════════════════════════════════════════ */
+
+.box-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px 20px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(255, 248, 240, 0.7));
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+/* 顶栏：名称 + 菜单 */
+.box-card-header {
+display: flex;
+align-items: center;
+gap: 8px;
+min-height: 28px;
+}
+
+.box-card-header .box-card-name {
+display: flex;
+align-items: baseline;
+gap: 4px;
+flex-shrink: 0;
+}
+
+.box-card-title {
+font-size: 12px;
+font-weight: 500;
+color: var(--muted);
+flex: 1;
+min-width: 0;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+}
+
+.box-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(64, 50, 28, 0.08);
+}
+
+/* 左右布局容器 */
+.box-card-body {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+}
+
+.box-card-left {
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+gap: 10px;
+flex-shrink: 0;
+width: 110px;
+}
+
+.box-card-right {
+display: flex;
+flex-direction: column;
+justify-content: center;
+gap: 10px;
+flex: 1;
+min-width: 0;
+}
+
+/* 三点菜单 */
+.box-card-menu {
+position: relative;
+flex-shrink: 0;
+margin-left: auto;
+z-index: 10;
+}
+
+.box-card-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.box-card-menu-btn:hover {
+  background: rgba(31, 42, 31, 0.12);
+  color: var(--ink);
+}
+
+.box-card-menu-btn svg {
+  display: block;
+}
+
+.box-card-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 100px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(64, 50, 28, 0.14);
+  overflow: hidden;
+  animation: ss-fade-in 0.12s ease-out;
+  z-index: 100;
+}
+
+.box-card-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 9px 16px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.box-card-dropdown button:hover {
+  background: rgba(31, 42, 31, 0.05);
+}
+
+.box-card-dropdown button:not(:last-child) {
+  border-bottom: 1px solid rgba(31, 42, 31, 0.06);
+}
+
+/* 图片区域 */
+.box-card-thumb {
+position: relative;
+width: 92px;
+height: 92px;
+display: grid;
+place-items: center;
+border-radius: 16px;
+background:
+radial-gradient(circle, rgba(255, 213, 107, 0.2) 0%, transparent 70%),
+rgba(255, 255, 255, 0.5);
+flex-shrink: 0;
+}
+
+.box-card-thumb > img:first-child {
+width: 76px;
+height: 76px;
+object-fit: contain;
+}
+
+.box-card-thumb-empty {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--muted);
+  opacity: 0.4;
+}
+
+/* 道具叠加 */
+.box-card-item-overlay {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* 属性图标（只显示图标，不显示文字） */
+.box-card-types {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.box-card-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  padding: 3px;
+}
+
+.box-card-type-icon img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+/* 宝可梦属性图标底色 */
+.box-card-type-icon.type-草 { background: #77CC55; }
+.box-card-type-icon.type-毒 { background: #AA5599; }
+.box-card-type-icon.type-电 { background: #FFCC33; }
+.box-card-type-icon.type-水 { background: #3399FF; }
+.box-card-type-icon.type-火 { background: #FF4422; }
+.box-card-type-icon.type-一般 { background: #BBBBAA; }
+.box-card-type-icon.type-冰 { background: #77DDFF; }
+.box-card-type-icon.type-格斗 { background: #BB5544; }
+.box-card-type-icon.type-地面 { background: #DDBB55; }
+.box-card-type-icon.type-飞行 { background: #6699FF; }
+.box-card-type-icon.type-超能力 { background: #FF5599; }
+.box-card-type-icon.type-虫 { background: #AABB22; }
+.box-card-type-icon.type-岩石 { background: #BBAA66; }
+.box-card-type-icon.type-幽灵 { background: #6666BB; }
+.box-card-type-icon.type-龙 { background: #7766EE; }
+.box-card-type-icon.type-恶 { background: #775544; }
+.box-card-type-icon.type-钢 { background: #AAAABB; }
+.box-card-type-icon.type-妖精 { background: #FFAAFF; }
+
+/* 名字 + 等级（已移至 header） */
+.box-card-name strong {
+font-size: 14px;
+font-weight: 700;
+color: var(--ink);
+}
+
+.box-card-level {
+font-size: 11px;
+font-weight: 600;
+color: var(--muted);
+}
+
+/* 特性 + 性格 */
+.box-card-meta {
+display: flex;
+gap: 4px;
+justify-content: center;
+flex-wrap: wrap;
+}
+
+.box-card-tag {
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* 招式列表 */
+.box-card-moves {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.box-card-move {
+display: flex;
+align-items: center;
+gap: 6px;
+font-size: 12px;
+color: white;
+padding: 5px 10px;
+border-radius: 8px;
+font-weight: 500;
+min-width: 0;
+}
+
+.cfg-move-slot {
+cursor: pointer;
+transition: opacity 0.15s, box-shadow 0.15s;
+font-size: 13px;
+padding: 7px 12px;
+}
+
+.cfg-move-slot:hover {
+opacity: 0.85;
+box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.box-card-move-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+
+.box-card-move-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.box-card-move-power {
+  font-size: 11px;
+  opacity: 0.85;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+/* 招式属性底色 */
+.type-bg-草 { background: #77CC55; --type-color: #77CC55; }
+.type-bg-毒 { background: #AA5599; --type-color: #AA5599; }
+.type-bg-电 { background: #FFCC33; color: #352a00; --type-color: #FFCC33; }
+.type-bg-水 { background: #3399FF; --type-color: #3399FF; }
+.type-bg-火 { background: #FF4422; --type-color: #FF4422; }
+.type-bg-一般 { background: #BBBBAA; --type-color: #BBBBAA; }
+.type-bg-冰 { background: #77DDFF; color: #12343a; --type-color: #77DDFF; }
+.type-bg-格斗 { background: #BB5544; --type-color: #BB5544; }
+.type-bg-地面 { background: #DDBB55; --type-color: #DDBB55; }
+.type-bg-飞行 { background: #6699FF; --type-color: #6699FF; }
+.type-bg-超能力 { background: #FF5599; --type-color: #FF5599; }
+.type-bg-虫 { background: #AABB22; --type-color: #AABB22; }
+.type-bg-岩石 { background: #BBAA66; --type-color: #BBAA66; }
+.type-bg-幽灵 { background: #6666BB; --type-color: #6666BB; }
+.type-bg-龙 { background: #7766EE; --type-color: #7766EE; }
+.type-bg-恶 { background: #775544; --type-color: #775544; }
+.type-bg-钢 { background: #AAAABB; --type-color: #AAAABB; }
+.type-bg-妖精 { background: #FFAAFF; --type-color: #FFAAFF; }
+.type-bg-unknown { background: #7b8481; --type-color: #7b8481; }
+
+/* 电/冰属性深色文字时图标不反色 */
+.type-bg-电 .box-card-move-icon,
+.type-bg-冰 .box-card-move-icon {
+  filter: none;
+  opacity: 0.8;
+}
+.type-bg-电 .box-card-move-power,
+.type-bg-冰 .box-card-move-power {
+  color: inherit;
+}
+
+/* 努力值 / 个体值 — 纯数字表格 */
+.box-card-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(31, 42, 31, 0.08);
+}
+
+.box-card-stats-header,
+.box-card-stats-row {
+  display: grid;
+  grid-template-columns: 30px repeat(6, 1fr);
+  gap: 2px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.box-card-stats-header span {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.box-card-stats-tag {
+  font-size: 11px;
+  color: var(--ink);
+  font-weight: 700;
+  text-align: right;
+  padding-right: 2px;
+}
+
+.box-card-stats-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  opacity: 0.8;
+  font-weight: 500;
+}
+
+.box-card-stats-num.has-val {
+  color: var(--ink);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.box-card-stats-total {
+  font-size: 12px;
+  color: var(--ink);
+  text-align: right;
+  font-weight: 600;
+}
+
+.box-card-stats-tag-iv {
+  color: #59c3d0;
+}
+
+.box-card-stats-tag-ev {
+  color: #d98837;
+}
+
+.box-card-stats-tag-sp {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.box-card-tag-mode {
+  font-size: 9px;
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+

@@ -1,0 +1,146 @@
+/* ═══════════════════════════════════════════════════════
+   Moves Tab (inside drawer)
+   ═══════════════════════════════════════════════════════ */
+
+.mv-gen-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mv-gen-pill {
+  width: auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(138, 166, 90, 0.12);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 200ms, color 200ms;
+}
+
+.mv-gen-pill:hover {
+  background: rgba(138, 166, 90, 0.22);
+  transform: none;
+  box-shadow: none;
+}
+
+.mv-gen-pill-active {
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+}
+
+.mv-gen-pill-active:hover {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+}
+
+.mv-version-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.mv-version-pill {
+  width: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: background 200ms, color 200ms;
+}
+
+.mv-version-pill:hover {
+  background: rgba(100, 140, 200, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+.mv-version-pill-active {
+  color: white;
+  background: linear-gradient(135deg, #5b8bd4, #3a6bb5);
+  border-color: #5b8bd4;
+}
+
+.mv-version-pill-active:hover {
+  background: linear-gradient(135deg, #4a7ac3, #2f5da6);
+}
+
+.mv-method-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.mv-method-pill {
+  width: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: background 200ms, color 200ms;
+}
+
+.mv-method-pill:hover {
+  background: rgba(138, 166, 90, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+.mv-method-pill-active {
+  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.mv-method-pill-active:hover {
+  background: var(--accent-strong);
+}
+
+.mv-table {
+  display: grid;
+  gap: 4px;
+  max-height: 480px;
+  overflow: auto;
+}
+
+.mv-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 1.4fr) minmax(80px, 1fr) minmax(60px, 0.7fr) minmax(60px, 0.7fr) 48px 48px 40px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.mv-row:nth-child(even) { background: rgba(255, 255, 255, 0.3); }
+
+.mv-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(247, 244, 233, 0.96);
+  backdrop-filter: blur(6px);
+}
+
+.mv-move-name {
+  font-weight: 600;
+  color: var(--accent-strong);
+}
+

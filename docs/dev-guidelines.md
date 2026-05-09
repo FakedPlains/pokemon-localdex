@@ -131,15 +131,14 @@ interface DbAdapter {
                    → 最后降级到 nameZh 文本匹配
 ```
 
-### 2.4 数据库双轨制
+### 2.4 数据库 Schema 管理
 
-SQLite 和 Supabase 的 schema 必须保持同步。修改数据库结构时：
+修改数据库结构时：
 
-1. 先修改 `supabase/schema.sql`（作为 source of truth）
+1. 先修改 `schema/d1-schema.sql`（作为 source of truth）
 2. 同步修改 `packages/store/sqlite-store/src/index.ts` 中的类型定义和查询语句
-3. 同步修改 `packages/supabase-store/src/index.ts` 中的查询逻辑
-4. 同步修改 `packages/store/d1-store/src/index.ts` 中的查询逻辑
-5. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/sqlite_upsert.py`
+3. 同步修改 `packages/store/d1-store/src/index.ts` 中的查询逻辑
+4. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/sqlite_upsert.py`
 
 ---
 
@@ -147,40 +146,24 @@ SQLite 和 Supabase 的 schema 必须保持同步。修改数据库结构时：
 
 ### 3.1 API 层（apps/api）
 
-通过 `DATA_SOURCE` 环境变量控制：
-
-```bash
-DATA_SOURCE=sqlite    # 使用本地 SQLite（本地开发默认）
-DATA_SOURCE=supabase  # 使用 Supabase
-DATA_SOURCE=d1        # 使用 Cloudflare D1（Worker 生产模式）
-```
-
-切换逻辑在 `apps/api/src/app.ts` 顶部，动态 `import` 对应的 store 包。**不要在路由处理函数内部做数据源判断**，所有切换逻辑集中在模块导入处。
+本地开发使用 SQLite，生产环境使用 Cloudflare D1。切换逻辑在 `apps/api/src/app.ts` 顶部，动态 `import` 对应的 store 包。**不要在路由处理函数内部做数据源判断**，所有切换逻辑集中在模块导入处。
 
 ### 3.2 Web 层（apps/web）
 
-通过 `VITE_DATA_SOURCE` 环境变量控制：
+所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。
 
-```bash
-VITE_DATA_SOURCE=         # 留空：走 API（本地开发默认；生产走 Pages Functions 代理到 Worker）
-VITE_DATA_SOURCE=supabase # 直连 Supabase（备用模式）
-```
-
-统一入口是 `apps/web/src/utils/api.js` 中的 `unifiedApi` 对象，**所有页面和 hook 必须通过 `unifiedApi` 调用，不得直接 import `supabaseApi.js` 或直接 `fetch("/api/...")`**。
+统一入口是 `apps/web/src/utils/api.js` 中的 `unifiedApi` 对象，**所有页面和 hook 必须通过 `unifiedApi` 调用**。
 
 ### 3.3 小程序层（apps/miniprogram）
 
-小程序**只支持 Supabase 模式**，凭证通过 Taro `defineConstants` 在编译时注入：
+小程序通过 `Taro.request` 调用后端 Hono API，API 基址通过 Taro `defineConstants` 在编译时注入：
 
 ```javascript
 // apps/miniprogram/config/index.js
 defineConstants: {
-  SUPABASE_URL: JSON.stringify(process.env.SUPABASE_URL),
-  SUPABASE_ANON_KEY: JSON.stringify(process.env.SUPABASE_ANON_KEY),
+  API_BASE_URL: JSON.stringify(process.env.API_BASE_URL),
 }
 ```
-
-**注意**：小程序不使用 `@supabase/supabase-js`，而是自行封装的 `utils/supabase.js`（基于 `Taro.request`）。不要尝试在小程序中引入 supabase-js，它依赖 `fetch`、`WebSocket` 等浏览器 API，在小程序环境中不可用。
 
 ---
 
@@ -273,6 +256,44 @@ DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 
 **道具图片预览**：选中道具后，道具图片和名称以 flex 布局展示在搜索框位置，点击可清除选择恢复搜索框。不要使用绝对定位覆盖输入框的方式（会导致图片和文字重叠）。
 
+### 4.8 CSS 模块化开发规范
+
+项目样式采用模块化架构，所有 CSS 文件位于 `apps/web/src/styles/` 目录下，按页面或功能拆分为独立模块。
+
+**目录结构与职责**：
+
+| 文件 | 职责 | 前缀/命名空间 |
+|------|------|--------------|
+| `base.css` | CSS 变量、reset、body 基础样式 | `--` 变量 |
+| `nav.css` | 顶部导航栏、搜索框、过滤面板 | `.nav-`、`.filter-` |
+| `pokedex.css` | 图鉴页 Master-Detail 布局 | `.pokedex-` |
+| `stat-calculator.css` | 能力值计算器 | `.stat-calc-` |
+| `abilities.css` | 特性页面 | `.ability-` |
+| `moves.css` | 招式页面 | `.move-` |
+| `items.css` | 道具页面 | `.item-` |
+| `responsive.css` | 响应式断点（`@media` 查询） | — |
+| `teams.css` | 盒子 & 队伍管理 | `.team-`、`.box-` |
+| `box-card.css` | 盒子卡片 + 属性底色（`.type-bg-*`） | `.box-card-`、`.type-bg-` |
+| `modal.css` | 通用弹窗 | `.modal-` |
+| `pokemon-editor.css` | 配置编辑器 | `.editor-` |
+| `common.css` | Toast、Version Tags、视图切换 | `.toast-`、`.version-` |
+| `damage-v1.css` | 旧版伤害计算器 | `.damage-` |
+| `damage.css` | 新版伤害计算器 | `.dc-` |
+| `type-chart.css` | 属性克制表 | `.type-chart-` |
+
+**入口与打包机制**：
+
+`index.css` 通过 `@import` 汇总所有模块，`main.jsx` 中通过 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 `@import` 解析并合并为单个 CSS 文件，生产环境只产生一次 HTTP 请求。这与将 CSS 放在 `public/` 目录下通过 `<link>` 引入有本质区别——后者的 `@import` 会在运行时逐个发起 HTTP 请求，每个模块一次请求，严重影响首屏性能。
+
+**开发规范**：
+
+- 新增页面样式时，创建对应的 CSS 文件并在 `index.css` 中添加 `@import`
+- 每个模块使用独立的类名前缀（如 `dc-` 用于 damage calculator），避免跨模块命名冲突
+- 公共变量（颜色、间距、圆角等）统一定义在 `base.css` 的 `:root` 中
+- `box-card.css` 中的 `.type-bg-*` 类同时定义了 `--type-color` CSS 变量，供其他模块通过 `var(--type-color)` 引用属性颜色
+- 响应式样式集中在 `responsive.css` 中管理，不要在各模块内分散编写 `@media` 查询
+- 不要在 `public/` 目录下放置 CSS 文件，所有样式必须通过 `src/styles/` 走 Vite 打包流程
+
 ---
 
 ## 五、爬虫开发规范
@@ -317,9 +338,9 @@ DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 
 以下文件**绝对不能提交到 Git**：
 
-- `apps/api/.env`（含 Supabase Service Role Key，权限极高）
-- `apps/web/.env.local`（含 Supabase Anon Key）
-- `apps/miniprogram/.env`（含 Supabase Anon Key）
+- `apps/api/.env`
+- `apps/web/.env.local`
+- `apps/miniprogram/.env`
 
 `.env.production` 文件中凭证字段留空（值为空字符串），实际值由 GitHub Actions Secrets 在 CI 构建时注入。
 
@@ -401,7 +422,6 @@ npx taro build --type weapp
 | `packages/store/shared-types` | 共享类型/常量/辅助函数 | 不得有 I/O、不得依赖运行时特定 API |
 | `packages/store/sqlite-store` | SQLite 查询 + NameResolver | 不得有业务逻辑，只做数据映射 |
 | `packages/store/d1-store` | D1 查询 + DbAdapter | 与 sqlite-store 保持接口一致 |
-| `packages/supabase-store` | Supabase 查询 | 与 sqlite-store 保持接口一致 |
 | `packages/crawler_py` | 数据采集 | 不得直接被 API 层调用 |
 | `apps/api` | HTTP 路由 | 不得包含数据库查询逻辑（委托给 store 包） |
 | `apps/web` | UI 展示 | 不得直接操作数据库 |
@@ -409,7 +429,7 @@ npx taro build --type weapp
 
 ### 8.2 store 包接口一致性
 
-这是项目最重要的架构约束之一。sqlite-store、d1-store 和 supabase-store 三个包必须保持接口完全一致。每次修改任一 store 包的函数签名时，必须同步修改其他包。
+这是项目最重要的架构约束之一。sqlite-store 和 d1-store 两个包必须保持接口完全一致。每次修改任一 store 包的函数签名时，必须同步修改另一个包。
 
 sqlite-store 和 d1-store 的共享类型、常量和辅助函数统一定义在 `packages/store/shared-types`（`@pokemon-localdex/store-types`）中，不得在各自包内重复定义。
 
@@ -501,12 +521,11 @@ npm install react@18.3.1 react-dom@18.3.1
 
 ### 数据库变更流程
 
-1. 修改 `supabase/schema.sql`
-2. 修改 `packages/sqlite-store/src/index.ts`（类型 + 查询）
-3. 修改 `packages/supabase-store/src/index.ts`（查询）
+1. 修改 `schema/d1-schema.sql`
+2. 修改 `packages/store/sqlite-store/src/index.ts`（类型 + 查询）
+3. 修改 `packages/store/d1-store/src/index.ts`（查询）
 4. 修改爬虫写入逻辑（如有）
 5. 本地重建 SQLite：删除 `data/sqlite/localdex.sqlite` 后重新爬取
-6. 如需同步到 Supabase：运行 `scripts/migrate-to-supabase.mjs`
 
 ### 发布前检查清单
 
@@ -514,6 +533,5 @@ npm install react@18.3.1 react-dom@18.3.1
 - [ ] `npm run check:sqlite` 通过
 - [ ] `npm run build:web` 无报错
 - [ ] 本地模式（SQLite + API）功能正常
-- [ ] 在线模式（Supabase 直连）功能正常（需配置 `.env.local`）
 - [ ] 小程序构建无报错，微信开发者工具预览正常
 - [ ] 没有将 `.env` 文件提交到 Git
