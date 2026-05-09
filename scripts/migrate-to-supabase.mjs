@@ -188,14 +188,14 @@ async function main() {
   if (mode === "dump") {
     console.log("正在生成 SQL dump ...");
     const sql = generateSQLDump(db);
-    const outPath = resolve(ROOT, "supabase/seed.sql");
+    const outPath = resolve(ROOT, "schema/seed.sql");
     mkdirSync(dirname(outPath), { recursive: true });
     writeFileSync(outPath, sql, "utf-8");
     console.log(`\n✅ 已生成: ${outPath}`);
     console.log(`   文件大小: ${(Buffer.byteLength(sql) / 1024 / 1024).toFixed(1)} MB`);
     console.log("\n使用方法:");
-    console.log("  1. 在 Supabase Dashboard → SQL Editor 中先执行 supabase/schema.sql");
-    console.log("  2. 再执行 supabase/seed.sql 导入数据");
+    console.log("  1. 在 Supabase Dashboard → SQL Editor 中先执行 schema/supabase-schema.sql");
+    console.log("  2. 再执行 schema/seed.sql 导入数据");
     console.log("  或使用 supabase CLI:");
     console.log("  supabase db reset  (会自动执行 migrations + seed)");
   } else {
