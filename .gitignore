@@ -26,12 +26,6 @@ __pycache__/
 # Teams data (user-specific)
 data/teams.json
 
-# Supabase seed data (generated, too large for git)
-supabase/seed.sql
-
-# Supabase CLI temp files
-supabase/.temp/
-
 # Logs and local runtime output
 *.log
 npm-debug.log*

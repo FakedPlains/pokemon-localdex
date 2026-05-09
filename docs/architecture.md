@@ -30,14 +30,14 @@ Pokemon LocalDex 的架构围绕四个核心目标展开：数据必须完全来
 └──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
 ```
 
-**小程序模式**通过 Taro 编译为微信小程序，直连 Supabase PostgREST REST API：
+**小程序模式**通过 Taro 编译为微信小程序，调用后端 Hono API：
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  小程序端     │     │  图片代理     │     │  云端存储     │
-│  Taro React  │────▶│  wsrv.nl     │     │  Supabase    │
-│  (apps/      │     │  (图片加载)   │     │  (PostgREST) │
-│  miniprogram)│─────┼──────────────┼────▶│              │
+│  小程序端     │     │  图片代理     │     │  后端 API    │
+│  Taro React  │────▶│  wsrv.nl     │     │  Hono API    │
+│  (apps/      │     │  (图片加载)   │     │  (Worker/    │
+│  miniprogram)│─────┼──────────────┼────▶│   本地)      │
 └──────────────┘     └──────────────┘     └──────────────┘
 ```
 
@@ -57,7 +57,7 @@ pokemon-localdex/
 │   │   │   ├── pages/        七个页面（Pokedex、Moves、Abilities、Items、Teams、Damage、TypeChart）
 │   │   │   ├── components/   公共组件（TypeChip、CustomSelect、SearchSelect、StatCalculator 等）
 │   │   │   ├── hooks/        数据请求 hook（useApi、useInfiniteApi）
-│   │   │   └── utils/        工具函数（api、supabaseApi、constants、helpers、teamStorage、migrateStorage）
+│   │   │   └── utils/        工具函数（api、constants、helpers、teamStorage、migrateStorage）
 │   │   ├── .env          本地开发环境变量（VITE_DATA_SOURCE 留空）
 │   │   └── vite.config.js  base: "/" 固定，无需条件切换
 │   └── miniprogram/      微信小程序客户端（Taro + React）
@@ -65,7 +65,7 @@ pokemon-localdex/
 │       ├── src/
 │       │   ├── components/   公共组件（SafeImage、TypeChip、StatBar、Loading）
 │       │   ├── pages/        页面（pokedex、pokemon-detail、moves、abilities、items）
-│       │   ├── utils/        工具函数（supabase.js、api.js、config.js、constants.js）
+│       │   ├── utils/        工具函数（api.js、config.js、constants.js）
 │       │   ├── assets/       静态资源（TabBar 图标）
 │       │   ├── app.js        应用入口
 │       │   ├── app.config.js 小程序路由和 TabBar 配置
@@ -86,16 +86,12 @@ pokemon-localdex/
 │   │   ├── localdex_crawler/    爬虫核心包
 │   │   ├── raw_pages/           原始页面缓存
 │   │   └── requirements.txt     Python 依赖
-│   └── supabase-store/  Supabase 查询适配（与 sqlite-store 同接口）
 ├── functions/
 │   └── api/[[path]].ts   Pages Function：通过 Service Binding 代理 /api/* 到 Worker
 ├── schema/               所有数据库 schema 统一管理
-│   ├── d1-schema.sql         D1/SQLite 数据库 schema
-│   ├── supabase-schema.sql   Supabase（PostgreSQL）数据库 schema
-│   └── migrations/           Supabase 增量迁移文件
+│   └── d1-schema.sql         D1/SQLite 数据库 schema
 ├── scripts/              Node.js 数据工具脚本
-│   ├── fill-form-names.mjs       批量填充形态英文名
-│   └── migrate-to-supabase.mjs   SQLite → Supabase 数据迁移
+│   └── fill-form-names.mjs       批量填充形态英文名
 ├── data/
 │   ├── raw/              原始抓取页面缓存（gitignored）
 │   └── sqlite/           本地 SQLite 数据库
@@ -120,15 +116,13 @@ pokemon-localdex/
 
 ### 存储层
 
-存储层提供三个可互换的数据访问包，对外暴露相同的函数签名（`listPokemonFromXxx`、`getPokemonFromXxx` 等），API 层通过环境变量动态选择。
+存储层提供两个可互换的数据访问包，对外暴露相同的函数签名（`listPokemonFromXxx`、`getPokemonFromXxx` 等），API 层通过环境变量动态选择。
 
 **shared-types**（`packages/store/shared-types`）是共享类型包（`@pokemon-localdex/store-types`），集中定义了 sqlite-store 和 d1-store 共用的类型（`StatBlock`、`PokemonEntry`、`MoveEntry` 等）、常量（`GENERATIONS`、`GAME_VERSIONS`、`TYPE_NAMES`、`TYPE_ALIASES` 等）和辅助函数（`normalizeTypeName`、`splitTypeNames`、`statBlockFromRow`、`sourceFromRow` 等）。两个 store 包通过 `import` 和 `re-export` 使用这些共享定义。
 
 **sqlite-store**（`packages/store/sqlite-store`）是 SQLite 查询适配包，提供查询函数，支持按数字 ID、slug 和中文名多种方式查询；处理形态数据的聚合，将数据库中的扁平行组装为嵌套的形态结构（包含 `statVariants`、`typeVariants`、`abilityVariants`）。同时提供 `NameResolver` 实现供 battle-core 同步入口使用。项目使用 Node.js 22 的实验性 `node:sqlite` 模块，无需额外的 SQLite 绑定依赖。
 
 **d1-store**（`packages/store/d1-store`）与 sqlite-store 导出相同的类型和函数签名，底层使用 Cloudflare D1 的异步 API。同时提供 `DbAdapter` 实现供 battle-core 异步入口使用。D1 是 Cloudflare 提供的 SQLite 兼容边缘数据库，表结构与本地 SQLite 完全一致。Worker 在 Cloudflare 运行时中通过 D1 binding 访问数据库。
-
-**supabase-store**（`packages/supabase-store`）通过 `@supabase/supabase-js` 客户端访问 Supabase（PostgreSQL）。它与 sqlite-store 导出相同的类型和函数签名，但底层使用 Supabase REST API 查询。Supabase 的表结构与 SQLite 完全对应（schema 定义在 `schema/supabase-schema.sql`），数据通过 SQLite 导出后导入 Supabase。
 
 ### 伤害计算层
 
@@ -146,7 +140,7 @@ pokemon-localdex/
 
 API 层基于 Hono 框架，提供统一的 RESTful 查询入口。根据运行环境有两种模式：
 
-**本地模式**（`server.ts` 入口）：启动时根据 `DATA_SOURCE` 环境变量（默认 `sqlite`）动态导入对应的存储层包，监听 `0.0.0.0:3030`。
+**本地模式**（`server.ts` 入口）：启动时使用 sqlite-store，监听 `0.0.0.0:3030`。
 
 **Worker 模式**（`worker.ts` 入口）：在 Cloudflare Workers 运行时中执行，使用 D1 binding 通过 `d1-store` 查询数据，通过 `battle-core`（异步入口）执行伤害计算。Hono 的 `app.fetch()` 适配 Workers 的 `fetch` handler 接口。
 
@@ -169,7 +163,7 @@ service = "pokemon-localdex-api"
 
 展示层是一个 React SPA，由 Vite 构建。样式采用模块化 CSS 架构，所有样式文件位于 `src/styles/` 目录下，按页面/功能拆分为 16 个独立模块，通过 `index.css` 统一汇总，再由 `main.jsx` 中的 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 CSS 合并、压缩为单个文件，生产环境零额外 HTTP 请求。前端通过 `VITE_DATA_SOURCE` 环境变量决定数据获取方式。
 
-当 `VITE_DATA_SOURCE` 为空或 `api` 时，所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。当 `VITE_DATA_SOURCE=supabase` 时，前端通过 `supabaseApi.js` 中的函数直接查询 Supabase，GET 请求完全绕过后端。这一切换逻辑封装在 `api.js` 的 `unifiedApi()` 函数中，上层组件和 hook 无需感知数据源差异。
+所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。
 
 **Vite base 路径**：固定为 `"/"`，Cloudflare Pages 在根路径提供服务，无需子路径前缀。
 
@@ -189,7 +183,7 @@ service = "pokemon-localdex-api"
 
 小程序端基于 Taro 4.2.0 框架开发，使用 React 语法编写，通过 Webpack 5 编译为微信小程序原生代码。
 
-**数据获取**：小程序端不使用 `@supabase/supabase-js` SDK（该 SDK 依赖浏览器 `fetch`、`URL` 等 API，在小程序环境中不可用），而是自行封装了一个轻量的 Supabase PostgREST REST API 客户端（`src/utils/supabase.js`）。该客户端通过 `Taro.request` 发起 HTTP 请求，手动拼接 PostgREST 查询参数（`select`、`or`、`order`、`limit`、`offset` 等），并处理认证头（`apikey` 和 `Authorization`）。
+**数据获取**：小程序端通过 `Taro.request` 调用后端 Hono API（与 Web 端共用同一套 API 接口），API 基址通过编译时 `defineConstants` 注入。
 
 **图片加载**：微信小程序对网络请求有严格的域名白名单限制。宝可梦图片托管在 `s1.52poke.com`、`s2.52poke.com` 等域名上，无法直接添加到白名单。小程序端通过 `SafeImage` 组件将这些外部图片 URL 代理到 `wsrv.nl` 图片代理服务加载，格式为 `https://wsrv.nl/?url={encodedUrl}`。
 
@@ -233,10 +227,9 @@ Cloudflare D1 (pokemon-localdex-d1)
 
 ### 小程序模式
 
-1. **数据同步**：与在线模式共享同一个 Supabase 数据库
-2. **查询**：Taro 小程序通过自封装的 PostgREST 客户端（`Taro.request`）直连 Supabase REST API
-3. **图片加载**：外部图片通过 `wsrv.nl` 代理服务加载，绕过微信域名白名单限制
-4. **展示**：Taro 编译为微信小程序原生组件，渲染界面
+1. **查询**：Taro 小程序通过 `Taro.request` 调用后端 Hono API
+2. **图片加载**：外部图片通过 `wsrv.nl` 代理服务加载，绕过微信域名白名单限制
+3. **展示**：Taro 编译为微信小程序原生组件，渲染界面
 
 队伍数据保存在浏览器 localStorage 中。小程序端暂不支持队伍功能。
 
@@ -281,7 +274,6 @@ GitHub Actions 工作流（`.github/workflows/deploy-cf.yml`）在每次推送�
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API Token（Workers/Pages/D1 权限）|
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID |
 
-**Supabase 凭证**（小程序使用）：目前直接写在 `apps/miniprogram/src/utils/config.js` 中（使用 anon key，权限受 RLS 策略限制）。
 
 ### 环境变量文件
 
@@ -292,7 +284,7 @@ GitHub Actions 工作流（`.github/workflows/deploy-cf.yml`）在每次推送�
 | `apps/api/.env.example` | API 配置模板 | `DATA_SOURCE=sqlite` |
 | `wrangler.toml` | Pages 配置 | Service Binding 声明 |
 | `wrangler.worker.toml` | Worker 配置 | D1 binding、`DATA_SOURCE=d1` |
-| `apps/miniprogram/src/utils/config.js` | 小程序配置 | Supabase URL、anon key、分页大小 |
+| `apps/miniprogram/src/utils/config.js` | 小程序配置 | API 基址、分页大小 |
 | GitHub Secrets | CI 部署 | `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` |
 
 `.env` 和 `.env.*` 被 `.gitignore` 排除，但 `.env.production` 和 `.env.example` 例外。
@@ -303,7 +295,7 @@ GitHub Actions 工作流（`.github/workflows/deploy-cf.yml`）在每次推送�
 
 | 域名类型 | 域名 | 用途 |
 |---------|------|------|
-| request 合法域名 | `https://lonaljgaevutlyswrelm.supabase.co` | Supabase REST API 请求 |
+| request 合法域名 | 后端 API 部署域名 | API 请求 |
 | downloadFile 合法域名 | `https://wsrv.nl` | 图片代理服务 |
 
 开发阶段可在微信开发者工具中勾选「不校验合法域名」跳过此限制。
@@ -318,6 +310,5 @@ Web 端使用 `@vitejs/plugin-react@5.2.0`（而非 v6.x），因为 v6.x 要求
 
 - **本地数据库**：`data/sqlite/localdex.sqlite`，存储所有宝可梦、招式、特性、道具数据
 - **生产数据库**：Cloudflare D1（`pokemon-localdex-d1`），SQLite 兼容，表结构与本地 SQLite 一致
-- **小程序数据库**：Supabase（PostgreSQL），表结构与 SQLite 对应，schema 定义在 `schema/supabase-schema.sql`
 - **队伍数据**：浏览器 localStorage
 - **页面缓存**：`data/raw/`，存储爬虫抓取的原始 HTML（gitignored）
