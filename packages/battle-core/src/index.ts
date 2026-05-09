@@ -68,9 +68,9 @@ function queryPokemonNameEn(opts: { id?: string | number; nameZh?: string }): st
 
 /**
  * 通过 formId 查询形态英文名
- * 优先级：formId > pokemonId（默认形态） > nameZh
+ * 优先级：formId > pokemonId+formKey > formKey > pokemonId（默认形态） > nameZh
  */
-function queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; nameZh?: string }): string | undefined {
+function queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): string | undefined {
   const db = openDb();
 
   // 1. 通过 formId 直接查询
@@ -81,7 +81,23 @@ function queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: st
     if (row?.name_en) { db.close(); return row.name_en; }
   }
 
-  // 2. 通过 pokemonId 查默认形态
+  // 2. 通过 pokemonId + formKey 查询（fallback）
+  if (opts.pokemonId && opts.formKey && opts.formKey !== "default") {
+    const row = db.prepare(
+      "SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND form_key = ? AND name_en IS NOT NULL LIMIT 1"
+    ).get(String(opts.pokemonId), opts.formKey) as { name_en: string } | undefined;
+    if (row?.name_en) { db.close(); return row.name_en; }
+  }
+
+  // 3. 通过 formKey 直接匹配（fallback）
+  if (opts.formKey && opts.formKey !== "default") {
+    const row = db.prepare(
+      "SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1"
+    ).get(opts.formKey) as { name_en: string } | undefined;
+    if (row?.name_en) { db.close(); return row.name_en; }
+  }
+
+  // 4. 通过 pokemonId 查默认形态
   if (opts.pokemonId) {
     const row = db.prepare(
       "SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 AND name_en IS NOT NULL LIMIT 1"
@@ -94,7 +110,7 @@ function queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: st
     if (pkRow?.name_en) { db.close(); return pkRow.name_en; }
   }
 
-  // 3. 通过中文名 fallback
+  // 5. 通过中文名 fallback
   if (opts.nameZh) {
     const formByName = db.prepare(
       "SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1"
@@ -181,6 +197,7 @@ export type PokemonCalcInput = {
   pokemonId?: string | number;  // 宝可梦数据库 ID（优先）
   formId?: string | number;     // 形态数据库 ID（优先）
   name?: string;                // 宝可梦中文名（fallback）
+  formKey?: string;             // 形态 key（fallback，如 "超级喷火龙x"）
   level?: number;               // 等级，默认 50
   nature?: string;              // 性格中文名，默认 "认真"
   abilityId?: string | number;  // 特性数据库 ID（优先）
@@ -335,6 +352,7 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
   const atkNameEn = queryPokemonFormNameEn({
     pokemonId: input.attacker.pokemonId,
     formId: input.attacker.formId,
+    formKey: input.attacker.formKey,
     nameZh: input.attacker.name,
   }) || input.attacker.name || "Pikachu";
   const atkAbilityEn = (input.attacker.abilityId || input.attacker.ability)
@@ -367,6 +385,7 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
   const defNameEn = queryPokemonFormNameEn({
     pokemonId: input.defender.pokemonId,
     formId: input.defender.formId,
+    formKey: input.defender.formKey,
     nameZh: input.defender.name,
   }) || input.defender.name || "Pikachu";
   const defAbilityEn = (input.defender.abilityId || input.defender.ability)

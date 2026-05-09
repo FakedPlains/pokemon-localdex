@@ -63,14 +63,14 @@ pokemon（主表）
 
 数据库主键索引查询（`WHERE id = ?`）的性能远优于文本字段匹配（`WHERE name_zh = ?`），且不存在同名歧义问题。所有查询函数必须遵循以下优先级：
 
-**宝可梦形态查询优先级**：`formId` → `pokemonId`（默认形态） → `nameZh`（中文名 fallback）
+**宝可梦形态查询优先级**：`formId` → `pokemonId + formKey` → `formKey` → `pokemonId`（默认形态） → `nameZh`（中文名 fallback）
 
 **招式/特性/道具查询优先级**：`id` → `nameZh`（中文名 fallback）
 
 **具体约束**：
 
 - `battle-core` 和 `d1-battle-core` 的查询函数签名统一为 `opts: { id?: string | number; nameZh?: string }` 格式，优先通过 `id` 查询，仅在 `id` 缺失时才降级到 `nameZh`
-- 宝可梦形态查询使用 `formId`（`pokemon_forms.id`）直接定位，不再使用 `formKey`（如 "超级喷火龙x"）进行文本匹配
+- 宝可梦形态查询优先使用 `formId`（`pokemon_forms.id`）直接定位，`formKey`（如 "超级喷火龙x"）作为 fallback 保留，用于 formId 缺失时的降级查询
 - 前端在选择宝可梦/形态/招式/特性/道具时，必须同时保存数据库 ID 和中文名，API 请求中优先传递 ID
 - 中文名仅作为 fallback 和界面显示使用，不作为主要查询条件
 
@@ -88,12 +88,13 @@ attacker: {
   item: "喷火龙进化石X" // 仅作 fallback
 }
 
-// 错误：使用 formKey 文本匹配
+// 降级：使用 formKey 作为 fallback（formId 不可用时）
 attacker: {
   pokemonId: "2",
-  formKey: "超级喷火龙x",  // ❌ 不要使用 formKey
+  formKey: "超级喷火龙x",  // ✅ 作为 fallback 可以使用
   name: "喷火龙",
-  ability: "硬爪",          // ❌ 没有传 abilityId
+  abilityId: "42",
+  ability: "硬爪",
 }
 ```
 
@@ -101,10 +102,10 @@ attacker: {
 
 ```typescript
 // battle-core（同步，node:sqlite）
-function queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; nameZh?: string }): string | undefined
+function queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): string | undefined
 
 // d1-battle-core（异步，D1Database）
-async function queryPokemonFormNameEn(db: D1Database, opts: { pokemonId?: string | number; formId?: string | number; nameZh?: string }): Promise<string | undefined>
+async function queryPokemonFormNameEn(db: D1Database, opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): Promise<string | undefined>
 
 // 招式/特性/道具查询
 function queryMoveNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined
@@ -116,11 +117,13 @@ function queryItemNameEn(opts: { id?: string | number; nameZh?: string }): strin
 
 ```
 前端选择形态 → 保存 form.id 到 state（formId）
-前端发起计算 → 请求体携带 formId
-后端收到请求 → queryPokemonFormNameEn({ formId }) → 直接 WHERE id = ? 查询
-                                                   → 命中则返回英文名
-                                                   → 未命中则降级到 pokemonId 默认形态
-                                                   → 再未命中则降级到 nameZh 文本匹配
+前端发起计算 → 请求体携带 formId（优先）和 formKey（fallback）
+后端收到请求 → queryPokemonFormNameEn({ formId, formKey, pokemonId, nameZh })
+                   → formId 命中则直接返回
+                   → 未命中则尝试 pokemonId + formKey 组合查询
+                   → 再未命中则尝试 formKey 单独匹配
+                   → 再未命中则降级到 pokemonId 默认形态
+                   → 最后降级到 nameZh 文本匹配
 ```
 
 ### 2.4 数据库双轨制

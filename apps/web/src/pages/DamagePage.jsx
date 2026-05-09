@@ -947,6 +947,7 @@ export default function DamagePage() {
 attacker: {
 pokemonId: attacker.pokemonId || "",
 formId: attacker.formId || "",
+formKey: attacker.formKey || "",
 name: attacker.nameZh || (attackerDetail?.nameZh) || "",
             level: Number(level || 50),
             nature: attacker.nature || "认真",
@@ -962,6 +963,7 @@ name: attacker.nameZh || (attackerDetail?.nameZh) || "",
 defender: {
 pokemonId: defender.pokemonId || "",
 formId: defender.formId || "",
+formKey: defender.formKey || "",
 name: defender.nameZh || (defenderDetail?.nameZh) || "",
             level: Number(level || 50),
             nature: defender.nature || "认真",

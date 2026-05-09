@@ -119,7 +119,7 @@ const STATUS_MAP: Record<string, string> = {
 
 async function queryPokemonFormNameEn(
   db: D1Database,
-  opts: { pokemonId?: string | number; formId?: string | number; nameZh?: string }
+  opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }
 ): Promise<string | undefined> {
   // 1. 通过 formId 直接查询
   if (opts.formId) {
@@ -130,7 +130,25 @@ async function queryPokemonFormNameEn(
     if (row?.name_en) return row.name_en;
   }
 
-  // 2. 通过 pokemonId 查默认形态
+  // 2. 通过 pokemonId + formKey 查询（fallback）
+  if (opts.pokemonId && opts.formKey && opts.formKey !== "default") {
+    const row = await db
+      .prepare(`SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND form_key = ? AND name_en IS NOT NULL LIMIT 1`)
+      .bind(String(opts.pokemonId), opts.formKey)
+      .first<{ name_en: string }>();
+    if (row?.name_en) return row.name_en;
+  }
+
+  // 3. 通过 formKey 直接匹配（fallback）
+  if (opts.formKey && opts.formKey !== "default") {
+    const row = await db
+      .prepare(`SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1`)
+      .bind(opts.formKey)
+      .first<{ name_en: string }>();
+    if (row?.name_en) return row.name_en;
+  }
+
+  // 4. 通过 pokemonId 查默认形态
   if (opts.pokemonId) {
     const row = await db
       .prepare(`SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 AND name_en IS NOT NULL LIMIT 1`)
@@ -144,7 +162,7 @@ async function queryPokemonFormNameEn(
     if (pkRow?.name_en) return pkRow.name_en;
   }
 
-  // 3. 通过中文名 fallback
+  // 5. 通过中文名 fallback
   if (opts.nameZh) {
     const row3 = await db
       .prepare(`SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1`)
@@ -243,6 +261,7 @@ export type StatsTable = {
 export type PokemonCalcInput = {
   pokemonId?: string | number;
   formId?: string | number;
+  formKey?: string;
   name?: string;
   level?: number;
   nature?: string;
@@ -336,14 +355,14 @@ export async function calculateDamageD1(
     defItemEn,
     moveNameEn,
   ] = await Promise.all([
-    queryPokemonFormNameEn(db, { pokemonId: input.attacker.pokemonId, formId: input.attacker.formId, nameZh: input.attacker.name }),
+    queryPokemonFormNameEn(db, { pokemonId: input.attacker.pokemonId, formId: input.attacker.formId, formKey: input.attacker.formKey, nameZh: input.attacker.name }),
     (input.attacker.abilityId || input.attacker.ability)
       ? queryAbilityNameEn(db, { id: input.attacker.abilityId, nameZh: input.attacker.ability })
       : Promise.resolve(undefined),
     (input.attacker.itemId || input.attacker.item)
       ? queryItemNameEn(db, { id: input.attacker.itemId, nameZh: input.attacker.item })
       : Promise.resolve(undefined),
-    queryPokemonFormNameEn(db, { pokemonId: input.defender.pokemonId, formId: input.defender.formId, nameZh: input.defender.name }),
+    queryPokemonFormNameEn(db, { pokemonId: input.defender.pokemonId, formId: input.defender.formId, formKey: input.defender.formKey, nameZh: input.defender.name }),
     (input.defender.abilityId || input.defender.ability)
       ? queryAbilityNameEn(db, { id: input.defender.abilityId, nameZh: input.defender.ability })
       : Promise.resolve(undefined),
