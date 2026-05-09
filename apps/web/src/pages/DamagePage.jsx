@@ -318,13 +318,33 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
   const itemWrapRef = useRef(null);
   const img = member.imageUrl || (detail ? getPokemonPreviewImage(detail)?.url : "") || "";
 
-  // detail 加载后自动设置默认 formId（如果 member 还没有 formId）
+  // detail 加载后：
+  // 1. 如果 member 已有 formKey（如从盒子导入），补全 formId 并触发道具绑定
+  // 2. 否则自动设置默认形态
   useEffect(() => {
-    if (!detail || member.formId) return;
+    if (!detail) return;
     const forms = detail.forms || [];
-    const defaultForm = forms.find((f) => f.isDefault) || forms[0];
-    if (defaultForm?.id) {
-      onChange({ ...member, formId: defaultForm.id, formKey: defaultForm.formKey });
+    if (member.formId) return; // 已有完整 formId，无需处理
+
+    if (member.formKey) {
+      // 从盒子导入时有 formKey 但无 formId，补全 formId 并绑定道具
+      const matchedForm = forms.find((f) => f.formKey === member.formKey) || forms[0];
+      if (matchedForm) {
+        const updates = { formId: matchedForm.id || "", formKey: matchedForm.formKey };
+        // 自动绑定形态道具
+        if (matchedForm.requiredItem) {
+          updates.itemId = matchedForm.requiredItem.id ? String(matchedForm.requiredItem.id) : (matchedForm.requiredItem.slug || "");
+          updates.itemName = matchedForm.requiredItem.nameZh || "";
+          updates.itemImageUrl = matchedForm.requiredItem.imageUrl || "";
+        }
+        onChange({ ...member, ...updates });
+      }
+    } else {
+      // 无形态信息，设置默认形态
+      const defaultForm = forms.find((f) => f.isDefault) || forms[0];
+      if (defaultForm?.id) {
+        onChange({ ...member, formId: defaultForm.id, formKey: defaultForm.formKey });
+      }
     }
   }, [detail]); // eslint-disable-line react-hooks/exhaustive-deps
 
