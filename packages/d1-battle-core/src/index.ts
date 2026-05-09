@@ -115,83 +115,114 @@ const STATUS_MAP: Record<string, string> = {
   冰冻: "frz",
 };
 
-// ── D1 名称查询（异步） ──
+// ── D1 名称查询（异步，优先 formId） ──
 
 async function queryPokemonFormNameEn(
   db: D1Database,
-  nameZh: string,
-  formKey?: string
+  opts: { pokemonId?: string | number; formId?: string | number; nameZh?: string }
 ): Promise<string | undefined> {
-  // 1. 有 formKey 且不是 default：先按 form_key + pokemon 中文名查
-  if (formKey && formKey !== "default") {
+  // 1. 通过 formId 直接查询
+  if (opts.formId) {
     const row = await db
-      .prepare(
-        `SELECT pf.name_en FROM pokemon_forms pf
-         JOIN pokemon p ON pf.pokemon_id = p.id
-         WHERE pf.form_key = ? AND p.name_zh = ? LIMIT 1`
-      )
-      .bind(formKey, nameZh)
+      .prepare(`SELECT name_en FROM pokemon_forms WHERE id = ? AND name_en IS NOT NULL LIMIT 1`)
+      .bind(String(opts.formId))
       .first<{ name_en: string }>();
     if (row?.name_en) return row.name_en;
-
-    // 2. 只用 form_key 查（不依赖 nameZh）
-    const row2 = await db
-      .prepare(
-        `SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1`
-      )
-      .bind(formKey)
-      .first<{ name_en: string }>();
-    if (row2?.name_en) return row2.name_en;
   }
 
-  // 3. 用中文名查 pokemon_forms（形态中文名直接传入的情况）
-  const row3 = await db
-    .prepare(
-      `SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1`
-    )
-    .bind(nameZh)
-    .first<{ name_en: string }>();
-  if (row3?.name_en) return row3.name_en;
+  // 2. 通过 pokemonId 查默认形态
+  if (opts.pokemonId) {
+    const row = await db
+      .prepare(`SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 AND name_en IS NOT NULL LIMIT 1`)
+      .bind(String(opts.pokemonId))
+      .first<{ name_en: string }>();
+    if (row?.name_en) return row.name_en;
+    const pkRow = await db
+      .prepare(`SELECT name_en FROM pokemon WHERE id = ? LIMIT 1`)
+      .bind(String(opts.pokemonId))
+      .first<{ name_en: string }>();
+    if (pkRow?.name_en) return pkRow.name_en;
+  }
 
-  // 4. fallback：查基础宝可梦表
-  const row4 = await db
-    .prepare(`SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1`)
-    .bind(nameZh)
-    .first<{ name_en: string }>();
-  return row4?.name_en ?? undefined;
+  // 3. 通过中文名 fallback
+  if (opts.nameZh) {
+    const row3 = await db
+      .prepare(`SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1`)
+      .bind(opts.nameZh)
+      .first<{ name_en: string }>();
+    if (row3?.name_en) return row3.name_en;
+
+    const row4 = await db
+      .prepare(`SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1`)
+      .bind(opts.nameZh)
+      .first<{ name_en: string }>();
+    if (row4?.name_en) return row4.name_en;
+  }
+
+  return undefined;
 }
 
 async function queryMoveNameEn(
   db: D1Database,
-  nameZh: string
+  opts: { id?: string | number; nameZh?: string }
 ): Promise<string | undefined> {
-  const row = await db
-    .prepare(`SELECT name_en FROM moves WHERE name_zh = ? LIMIT 1`)
-    .bind(nameZh)
-    .first<{ name_en: string }>();
-  return row?.name_en ?? undefined;
+  if (opts.id) {
+    const row = await db
+      .prepare(`SELECT name_en FROM moves WHERE id = ? LIMIT 1`)
+      .bind(String(opts.id))
+      .first<{ name_en: string }>();
+    if (row?.name_en) return row.name_en;
+  }
+  if (opts.nameZh) {
+    const row = await db
+      .prepare(`SELECT name_en FROM moves WHERE name_zh = ? LIMIT 1`)
+      .bind(opts.nameZh)
+      .first<{ name_en: string }>();
+    if (row?.name_en) return row.name_en;
+  }
+  return undefined;
 }
 
 async function queryAbilityNameEn(
   db: D1Database,
-  nameZh: string
+  opts: { id?: string | number; nameZh?: string }
 ): Promise<string | undefined> {
-  const row = await db
-    .prepare(`SELECT name_en FROM abilities WHERE name_zh = ? LIMIT 1`)
-    .bind(nameZh)
-    .first<{ name_en: string }>();
-  return row?.name_en ?? undefined;
+  if (opts.id) {
+    const row = await db
+      .prepare(`SELECT name_en FROM abilities WHERE id = ? LIMIT 1`)
+      .bind(String(opts.id))
+      .first<{ name_en: string }>();
+    if (row?.name_en) return row.name_en;
+  }
+  if (opts.nameZh) {
+    const row = await db
+      .prepare(`SELECT name_en FROM abilities WHERE name_zh = ? LIMIT 1`)
+      .bind(opts.nameZh)
+      .first<{ name_en: string }>();
+    if (row?.name_en) return row.name_en;
+  }
+  return undefined;
 }
 
 async function queryItemNameEn(
   db: D1Database,
-  nameZh: string
+  opts: { id?: string | number; nameZh?: string }
 ): Promise<string | undefined> {
-  const row = await db
-    .prepare(`SELECT name_en FROM items WHERE name_zh = ? LIMIT 1`)
-    .bind(nameZh)
-    .first<{ name_en: string }>();
-  return row?.name_en ?? undefined;
+  if (opts.id) {
+    const row = await db
+      .prepare(`SELECT name_en FROM items WHERE id = ? LIMIT 1`)
+      .bind(String(opts.id))
+      .first<{ name_en: string }>();
+    if (row?.name_en) return row.name_en;
+  }
+  if (opts.nameZh) {
+    const row = await db
+      .prepare(`SELECT name_en FROM items WHERE name_zh = ? LIMIT 1`)
+      .bind(opts.nameZh)
+      .first<{ name_en: string }>();
+    if (row?.name_en) return row.name_en;
+  }
+  return undefined;
 }
 
 function natureZhToEn(natureZh: string): string {
@@ -209,36 +240,30 @@ export type StatsTable = {
   spe: number;
 };
 
+export type PokemonCalcInput = {
+  pokemonId?: string | number;
+  formId?: string | number;
+  name?: string;
+  level?: number;
+  nature?: string;
+  abilityId?: string | number;
+  ability?: string;
+  itemId?: string | number;
+  item?: string;
+  evs?: Partial<StatsTable>;
+  ivs?: Partial<StatsTable>;
+  boosts?: Partial<StatsTable>;
+  status?: string;
+  teraType?: string;
+};
+
 export type DamageCalcInput = {
   generation: number;
-  attacker: {
-    name: string;
-    formKey?: string;
-    level?: number;
-    nature?: string;
-    ability?: string;
-    item?: string;
-    evs?: Partial<StatsTable>;
-    ivs?: Partial<StatsTable>;
-    boosts?: Partial<StatsTable>;
-    status?: string;
-    teraType?: string;
-  };
-  defender: {
-    name: string;
-    formKey?: string;
-    level?: number;
-    nature?: string;
-    ability?: string;
-    item?: string;
-    evs?: Partial<StatsTable>;
-    ivs?: Partial<StatsTable>;
-    boosts?: Partial<StatsTable>;
-    status?: string;
-    teraType?: string;
-  };
+  attacker: PokemonCalcInput;
+  defender: PokemonCalcInput;
   move: {
-    name: string;
+    id?: string | number;
+    name?: string;
     isCrit?: boolean;
     hits?: number;
   };
@@ -311,21 +336,21 @@ export async function calculateDamageD1(
     defItemEn,
     moveNameEn,
   ] = await Promise.all([
-    queryPokemonFormNameEn(db, input.attacker.name, input.attacker.formKey),
-    input.attacker.ability
-      ? queryAbilityNameEn(db, input.attacker.ability)
+    queryPokemonFormNameEn(db, { pokemonId: input.attacker.pokemonId, formId: input.attacker.formId, nameZh: input.attacker.name }),
+    (input.attacker.abilityId || input.attacker.ability)
+      ? queryAbilityNameEn(db, { id: input.attacker.abilityId, nameZh: input.attacker.ability })
       : Promise.resolve(undefined),
-    input.attacker.item
-      ? queryItemNameEn(db, input.attacker.item)
+    (input.attacker.itemId || input.attacker.item)
+      ? queryItemNameEn(db, { id: input.attacker.itemId, nameZh: input.attacker.item })
       : Promise.resolve(undefined),
-    queryPokemonFormNameEn(db, input.defender.name, input.defender.formKey),
-    input.defender.ability
-      ? queryAbilityNameEn(db, input.defender.ability)
+    queryPokemonFormNameEn(db, { pokemonId: input.defender.pokemonId, formId: input.defender.formId, nameZh: input.defender.name }),
+    (input.defender.abilityId || input.defender.ability)
+      ? queryAbilityNameEn(db, { id: input.defender.abilityId, nameZh: input.defender.ability })
       : Promise.resolve(undefined),
-    input.defender.item
-      ? queryItemNameEn(db, input.defender.item)
+    (input.defender.itemId || input.defender.item)
+      ? queryItemNameEn(db, { id: input.defender.itemId, nameZh: input.defender.item })
       : Promise.resolve(undefined),
-    queryMoveNameEn(db, input.move.name),
+    queryMoveNameEn(db, { id: input.move.id, nameZh: input.move.name }),
   ]);
 
   // ── 构建攻击方 ──
@@ -336,7 +361,7 @@ export async function calculateDamageD1(
     ? (STATUS_MAP[input.attacker.status] ?? "")
     : "";
 
-  const attacker = new Pokemon(gen, atkNameEn ?? input.attacker.name, {
+  const attacker = new Pokemon(gen, atkNameEn ?? input.attacker.name ?? "Pikachu", {
     level: input.attacker.level ?? 50,
     nature: natureZhToEn(input.attacker.nature ?? "认真"),
     ability: (atkAbilityEn || input.attacker.ability) || undefined,
@@ -356,7 +381,7 @@ export async function calculateDamageD1(
     ? (STATUS_MAP[input.defender.status] ?? "")
     : "";
 
-  const defender = new Pokemon(gen, defNameEn ?? input.defender.name, {
+  const defender = new Pokemon(gen, defNameEn ?? input.defender.name ?? "Pikachu", {
     level: input.defender.level ?? 50,
     nature: natureZhToEn(input.defender.nature ?? "认真"),
     ability: (defAbilityEn || input.defender.ability) || undefined,
@@ -369,7 +394,7 @@ export async function calculateDamageD1(
   });
 
   // ── 构建招式 ──
-  const move = new Move(gen, moveNameEn ?? input.move.name, {
+  const move = new Move(gen, moveNameEn ?? input.move.name ?? "Tackle", {
     isCrit: input.move.isCrit ?? false,
     hits: input.move.hits,
   });

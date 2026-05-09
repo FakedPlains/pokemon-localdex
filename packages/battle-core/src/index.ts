@@ -51,97 +51,110 @@ function openDb(): DatabaseSync {
 }
 
 /**
- * 通过中文名查询宝可梦英文名
+ * 通过 ID 或中文名查询宝可梦英文名（优先 ID）
  */
-function queryPokemonNameEn(nameZh: string): string | undefined {
+function queryPokemonNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined {
   const db = openDb();
-  const row = db.prepare(
-    "SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
-  db.close();
-  return row?.name_en || undefined;
-}
-
-/**
- * 通过 formKey 和宝可梦中文名查询形态英文名
- * 优先用 formKey 精确匹配，fallback 到基础宝可梦名
- */
-function queryPokemonFormNameEn(nameZh: string, formKey?: string): string | undefined {
-  const db = openDb();
-  
-  // 如果有 formKey 且不是 default，尝试通过 form_key 查询
-  if (formKey && formKey !== "default") {
-    const formRow = db.prepare(`
-      SELECT pf.name_en
-      FROM pokemon_forms pf
-      JOIN pokemon p ON pf.pokemon_id = p.id
-      WHERE pf.form_key = ? AND p.name_zh = ?
-      LIMIT 1
-    `).get(formKey, nameZh) as { name_en: string } | undefined;
-    if (formRow?.name_en) {
-      db.close();
-      return formRow.name_en;
-    }
-    
-    // 也尝试用 form_key 直接匹配（不依赖 nameZh）
-    const formRow2 = db.prepare(`
-      SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1
-    `).get(formKey) as { name_en: string } | undefined;
-    if (formRow2?.name_en) {
-      db.close();
-      return formRow2.name_en;
-    }
+  let row: { name_en: string } | undefined;
+  if (opts.id) {
+    row = db.prepare("SELECT name_en FROM pokemon WHERE id = ? LIMIT 1").get(String(opts.id)) as typeof row;
   }
-  
-  // fallback: 用中文名查 pokemon_forms 表（形态中文名可能直接传入）
-  const formByName = db.prepare(`
-    SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1
-  `).get(nameZh) as { name_en: string } | undefined;
-  if (formByName?.name_en) {
-    db.close();
-    return formByName.name_en;
+  if (!row?.name_en && opts.nameZh) {
+    row = db.prepare("SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as typeof row;
   }
-  
-  // 最终 fallback: 查基础宝可梦表
-  const row = db.prepare(
-    "SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
   db.close();
   return row?.name_en || undefined;
 }
 
 /**
- * 通过中文名查询招式英文名
+ * 通过 formId 查询形态英文名
+ * 优先级：formId > pokemonId（默认形态） > nameZh
  */
-function queryMoveNameEn(nameZh: string): string | undefined {
+function queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; nameZh?: string }): string | undefined {
   const db = openDb();
-  const row = db.prepare(
-    "SELECT name_en FROM moves WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
+
+  // 1. 通过 formId 直接查询
+  if (opts.formId) {
+    const row = db.prepare(
+      "SELECT name_en FROM pokemon_forms WHERE id = ? AND name_en IS NOT NULL LIMIT 1"
+    ).get(String(opts.formId)) as { name_en: string } | undefined;
+    if (row?.name_en) { db.close(); return row.name_en; }
+  }
+
+  // 2. 通过 pokemonId 查默认形态
+  if (opts.pokemonId) {
+    const row = db.prepare(
+      "SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 AND name_en IS NOT NULL LIMIT 1"
+    ).get(String(opts.pokemonId)) as { name_en: string } | undefined;
+    if (row?.name_en) { db.close(); return row.name_en; }
+    // fallback: 查 pokemon 表
+    const pkRow = db.prepare(
+      "SELECT name_en FROM pokemon WHERE id = ? LIMIT 1"
+    ).get(String(opts.pokemonId)) as { name_en: string } | undefined;
+    if (pkRow?.name_en) { db.close(); return pkRow.name_en; }
+  }
+
+  // 3. 通过中文名 fallback
+  if (opts.nameZh) {
+    const formByName = db.prepare(
+      "SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1"
+    ).get(opts.nameZh) as { name_en: string } | undefined;
+    if (formByName?.name_en) { db.close(); return formByName.name_en; }
+
+    const row = db.prepare(
+      "SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1"
+    ).get(opts.nameZh) as { name_en: string } | undefined;
+    if (row?.name_en) { db.close(); return row.name_en; }
+  }
+
+  db.close();
+  return undefined;
+}
+
+/**
+ * 通过 ID 或中文名查询招式英文名（优先 ID）
+ */
+function queryMoveNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined {
+  const db = openDb();
+  let row: { name_en: string } | undefined;
+  if (opts.id) {
+    row = db.prepare("SELECT name_en FROM moves WHERE id = ? LIMIT 1").get(String(opts.id)) as typeof row;
+  }
+  if (!row?.name_en && opts.nameZh) {
+    row = db.prepare("SELECT name_en FROM moves WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as typeof row;
+  }
   db.close();
   return row?.name_en || undefined;
 }
 
 /**
- * 通过中文名查询特性英文名
+ * 通过 ID 或中文名查询特性英文名（优先 ID）
  */
-function queryAbilityNameEn(nameZh: string): string | undefined {
+function queryAbilityNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined {
   const db = openDb();
-  const row = db.prepare(
-    "SELECT name_en FROM abilities WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
+  let row: { name_en: string } | undefined;
+  if (opts.id) {
+    row = db.prepare("SELECT name_en FROM abilities WHERE id = ? LIMIT 1").get(String(opts.id)) as typeof row;
+  }
+  if (!row?.name_en && opts.nameZh) {
+    row = db.prepare("SELECT name_en FROM abilities WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as typeof row;
+  }
   db.close();
   return row?.name_en || undefined;
 }
 
 /**
- * 通过中文名查询道具英文名
+ * 通过 ID 或中文名查询道具英文名（优先 ID）
  */
-function queryItemNameEn(nameZh: string): string | undefined {
+function queryItemNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined {
   const db = openDb();
-  const row = db.prepare(
-    "SELECT name_en FROM items WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
+  let row: { name_en: string } | undefined;
+  if (opts.id) {
+    row = db.prepare("SELECT name_en FROM items WHERE id = ? LIMIT 1").get(String(opts.id)) as typeof row;
+  }
+  if (!row?.name_en && opts.nameZh) {
+    row = db.prepare("SELECT name_en FROM items WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as typeof row;
+  }
   db.close();
   return row?.name_en || undefined;
 }
@@ -164,42 +177,36 @@ export type StatsTable = {
   spe: number;
 };
 
+export type PokemonCalcInput = {
+  pokemonId?: string | number;  // 宝可梦数据库 ID（优先）
+  formId?: string | number;     // 形态数据库 ID（优先）
+  name?: string;                // 宝可梦中文名（fallback）
+  level?: number;               // 等级，默认 50
+  nature?: string;              // 性格中文名，默认 "认真"
+  abilityId?: string | number;  // 特性数据库 ID（优先）
+  ability?: string;             // 特性中文名（fallback）
+  itemId?: string | number;     // 道具数据库 ID（优先）
+  item?: string;                // 道具中文名（fallback）
+  evs?: Partial<StatsTable>;
+  ivs?: Partial<StatsTable>;
+  boosts?: Partial<StatsTable>;
+  status?: string;              // 状态: "burn" | "paralysis" | "poison" | "sleep" | ""
+  teraType?: string;            // 太晶属性中文名
+};
+
 export type DamageCalcInput = {
   generation: number;  // 世代 1-9
 
   // 攻击方
-  attacker: {
-    name: string;           // 宝可梦中文名
-    formKey?: string;       // 形态 key（如 "超级喷火龙y"）
-    level?: number;         // 等级，默认 50
-    nature?: string;        // 性格中文名，默认 "认真"
-    ability?: string;       // 特性中文名
-    item?: string;          // 道具中文名
-    evs?: Partial<StatsTable>;
-    ivs?: Partial<StatsTable>;
-    boosts?: Partial<StatsTable>;
-    status?: string;        // 状态: "burn" | "paralysis" | "poison" | "sleep" | ""
-    teraType?: string;      // 太晶属性中文名
-  };
+  attacker: PokemonCalcInput;
 
   // 防守方
-  defender: {
-    name: string;
-    formKey?: string;       // 形态 key
-    level?: number;
-    nature?: string;
-    ability?: string;
-    item?: string;
-    evs?: Partial<StatsTable>;
-    ivs?: Partial<StatsTable>;
-    boosts?: Partial<StatsTable>;
-    status?: string;
-    teraType?: string;
-  };
+  defender: PokemonCalcInput;
 
   // 招式
   move: {
-    name: string;           // 招式中文名
+    id?: string | number;   // 招式数据库 ID（优先）
+    name?: string;          // 招式中文名（fallback）
     isCrit?: boolean;       // 是否暴击
     hits?: number;          // 连续攻击次数
   };
@@ -318,19 +325,23 @@ const STATUS_MAP: Record<string, string> = {
 /**
  * 使用 @smogon/calc 进行伤害计算
  *
- * 接收中文名称，实时查询数据库获取英文名，然后调用 @smogon/calc
+ * 优先通过数据库 ID 查询英文名，中文名作为 fallback
  */
 export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
   // generation=0 为 Champions 模式，fork 版 calc 库原生支持（calculateChampions）
   const gen = input.generation as GenerationNum;
 
   // ── 解析攻击方 ──
-  const atkNameEn = queryPokemonFormNameEn(input.attacker.name, input.attacker.formKey) || input.attacker.name;
-  const atkAbilityEn = input.attacker.ability
-    ? (queryAbilityNameEn(input.attacker.ability) || input.attacker.ability)
+  const atkNameEn = queryPokemonFormNameEn({
+    pokemonId: input.attacker.pokemonId,
+    formId: input.attacker.formId,
+    nameZh: input.attacker.name,
+  }) || input.attacker.name || "Pikachu";
+  const atkAbilityEn = (input.attacker.abilityId || input.attacker.ability)
+    ? (queryAbilityNameEn({ id: input.attacker.abilityId, nameZh: input.attacker.ability }) || input.attacker.ability)
     : undefined;
-  const atkItemEn = input.attacker.item
-    ? (queryItemNameEn(input.attacker.item) || input.attacker.item)
+  const atkItemEn = (input.attacker.itemId || input.attacker.item)
+    ? (queryItemNameEn({ id: input.attacker.itemId, nameZh: input.attacker.item }) || input.attacker.item)
     : undefined;
   const atkNatureEn = natureZhToEn(input.attacker.nature || "认真");
   const atkTeraType = input.attacker.teraType
@@ -353,12 +364,16 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
   });
 
   // ── 解析防守方 ──
-  const defNameEn = queryPokemonFormNameEn(input.defender.name, input.defender.formKey) || input.defender.name;
-  const defAbilityEn = input.defender.ability
-    ? (queryAbilityNameEn(input.defender.ability) || input.defender.ability)
+  const defNameEn = queryPokemonFormNameEn({
+    pokemonId: input.defender.pokemonId,
+    formId: input.defender.formId,
+    nameZh: input.defender.name,
+  }) || input.defender.name || "Pikachu";
+  const defAbilityEn = (input.defender.abilityId || input.defender.ability)
+    ? (queryAbilityNameEn({ id: input.defender.abilityId, nameZh: input.defender.ability }) || input.defender.ability)
     : undefined;
-  const defItemEn = input.defender.item
-    ? (queryItemNameEn(input.defender.item) || input.defender.item)
+  const defItemEn = (input.defender.itemId || input.defender.item)
+    ? (queryItemNameEn({ id: input.defender.itemId, nameZh: input.defender.item }) || input.defender.item)
     : undefined;
   const defNatureEn = natureZhToEn(input.defender.nature || "认真");
   const defTeraType = input.defender.teraType
@@ -381,7 +396,7 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
   });
 
   // ── 解析招式 ──
-  const moveNameEn = queryMoveNameEn(input.move.name) || input.move.name;
+  const moveNameEn = queryMoveNameEn({ id: input.move.id, nameZh: input.move.name }) || input.move.name || "Tackle";
   const move = new Move(gen, moveNameEn, {
     isCrit: input.move.isCrit || false,
     hits: input.move.hits,

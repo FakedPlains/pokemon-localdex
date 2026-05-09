@@ -318,6 +318,16 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
   const itemWrapRef = useRef(null);
   const img = member.imageUrl || (detail ? getPokemonPreviewImage(detail)?.url : "") || "";
 
+  // detail 加载后自动设置默认 formId（如果 member 还没有 formId）
+  useEffect(() => {
+    if (!detail || member.formId) return;
+    const forms = detail.forms || [];
+    const defaultForm = forms.find((f) => f.isDefault) || forms[0];
+    if (defaultForm?.id) {
+      onChange({ ...member, formId: defaultForm.id, formKey: defaultForm.formKey });
+    }
+  }, [detail]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // 形态列表（过滤超极巨化）
   const formOptions = useMemo(() => {
     if (!detail) return [];
@@ -326,6 +336,7 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
       .filter((f) => f.formType !== "gmax" && !/超极巨化/.test(f.nameZh || ""))
       .map((f) => ({
         value: f.formKey,
+        formId: f.id,
         label: f.nameZh || f.formKey || "默认形态",
       }));
   }, [detail]);
@@ -345,6 +356,7 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
       ? (firstAbility.nameZh || firstAbility.abilityId || "")
       : (detail.abilities?.[0] || "");
     const updates = {
+      formId: form.id || "",
       formKey,
       formName: form.nameZh || form.formKey || "",
       primaryType: form.primaryType || detail.primaryType || "",
@@ -503,6 +515,7 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
       itemId: cfg.itemId || "",
       itemName: cfg.itemName || "",
       itemImageUrl: cfg.itemImageUrl || "",
+      formId: cfg.formId || "",
       formKey: cfg.formKey || "",
       formName: cfg.formName || "",
       ivs: finalIvs,
@@ -931,30 +944,37 @@ export default function DamagePage() {
         method: "POST",
         body: JSON.stringify({
           generation: gen,
-          attacker: {
-            name: attacker.nameZh || (attackerDetail?.nameZh) || "",
-            formKey: attacker.formKey || "",
+attacker: {
+pokemonId: attacker.pokemonId || "",
+formId: attacker.formId || "",
+name: attacker.nameZh || (attackerDetail?.nameZh) || "",
             level: Number(level || 50),
             nature: attacker.nature || "认真",
-            ability: attacker.abilityName || attacker.abilityId || "",
-            item: attacker.itemName || attacker.itemId || "",
+            abilityId: attacker.abilityId || "",
+            ability: attacker.abilityName || "",
+            itemId: attacker.itemId || "",
+            item: attacker.itemName || "",
             evs: resolveEvs(attacker),
             ivs: attacker.ivs || {},
             boosts: Object.values(atkBoost).some((v) => v !== 0) ? atkBoost : undefined,
             status: atkStatus !== "none" ? atkStatus : "",
           },
-          defender: {
-            name: defender.nameZh || (defenderDetail?.nameZh) || "",
-            formKey: defender.formKey || "",
+defender: {
+pokemonId: defender.pokemonId || "",
+formId: defender.formId || "",
+name: defender.nameZh || (defenderDetail?.nameZh) || "",
             level: Number(level || 50),
             nature: defender.nature || "认真",
-            ability: defender.abilityName || defender.abilityId || "",
-            item: defender.itemName || defender.itemId || "",
+            abilityId: defender.abilityId || "",
+            ability: defender.abilityName || "",
+            itemId: defender.itemId || "",
+            item: defender.itemName || "",
             evs: resolveEvs(defender),
             ivs: defender.ivs || {},
             boosts: Object.values(defBoost).some((v) => v !== 0) ? defBoost : undefined,
           },
           move: {
+            id: selectedMove.id || "",
             name: selectedMove.nameZh || selectedMove.slug || "",
             isCrit: critical,
           },

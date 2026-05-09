@@ -44,6 +44,7 @@ export type FormAbilityVariant = {
 };
 
 export type PokemonFormEntry = {
+  id: number;
   formKey: string;
   nameZh: string;
   formType: string;
@@ -1302,6 +1303,7 @@ export function getPokemonFromSqlite(idOrSlug: string) {
     const latestAbility = abilityEntries.find((a) => a.genEnd === undefined) || abilityEntries[0];
 
     const entry: PokemonFormEntry = {
+      id: fid,
       formKey: String(f.form_key),
       nameZh: String(f.name_zh),
       formType: String(f.form_type),
