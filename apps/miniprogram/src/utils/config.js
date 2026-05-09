@@ -1,7 +1,7 @@
 /**
  * API 配置 —— 小程序端
  *
- * 通过后端 API 获取数据，不再直连 Supabase。
+ * 通过后端 Hono API 获取数据。
  * API_BASE_URL 通过 Taro defineConstants 在编译时注入。
  *
  * 使用方式：

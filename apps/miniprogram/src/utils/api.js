@@ -2,7 +2,6 @@
  * 数据 API 层 —— 小程序端
  *
  * 通过后端 Hono API 获取数据，返回格式与页面组件期望的一致。
- * 不再直连 Supabase，所有数据请求都走后端 API。
  */
 
 import Taro from '@tarojs/taro'
