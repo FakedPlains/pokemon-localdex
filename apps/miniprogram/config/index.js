@@ -22,8 +22,7 @@ const config = {
   outputRoot: 'dist',
   plugins: ['@tarojs/plugin-framework-react'],
   defineConstants: {
-    SUPABASE_URL: JSON.stringify(process.env.SUPABASE_URL || ''),
-    SUPABASE_ANON_KEY: JSON.stringify(process.env.SUPABASE_ANON_KEY || ''),
+    API_BASE_URL: JSON.stringify(process.env.API_BASE_URL || 'https://pokemon-localdex.pages.dev'),
   },
   copy: {
     patterns: [],

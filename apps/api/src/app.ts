@@ -6,15 +6,13 @@ import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
 import { createNameResolver } from "../../../packages/store/sqlite-store/src/index.ts";
 
 // ── 数据源选择：通过 DATA_SOURCE 环境变量切换 ──
-// DATA_SOURCE=supabase  → 使用 Supabase (PostgreSQL)
 // DATA_SOURCE=d1        → 使用 Cloudflare D1（Workers 环境）
 // DATA_SOURCE=sqlite    → 使用本地 SQLite（默认）
 
 const DATA_SOURCE = (process.env.DATA_SOURCE || "sqlite").toLowerCase();
-const useSupabase = DATA_SOURCE === "supabase";
 const useD1 = DATA_SOURCE === "d1";
 
-// ── 数据层接口（统一签名，兼容三种数据源） ──
+// ── 数据层接口（统一签名，兼容两种数据源） ──
 let listPokemon: any;
 let getPokemon: any;
 let getLearnsetMetaFn: any;
@@ -31,20 +29,7 @@ let listTeamsFn: (() => any) | null = null;
 let saveTeamFn: ((input: any) => any) | null = null;
 let deleteTeamFn: ((id: string) => any) | null = null;
 
-if (useSupabase) {
-  const sb = await import("../../../packages/supabase-store/src/index.ts");
-  listPokemon = sb.listPokemonFromSupabase;
-  getPokemon = sb.getPokemonFromSupabase;
-  getLearnsetMetaFn = sb.getLearnsetMeta;
-  getPokemonLearnsetFn = sb.getPokemonLearnset;
-  listItems = sb.listItemsFromSupabase;
-  getItem = sb.getItemFromSupabase;
-  listMoves = sb.listMovesFromSupabase;
-  getMove = sb.getMoveFromSupabase;
-  listAbilities = sb.listAbilitiesFromSupabase;
-  getAbility = sb.getAbilityFromSupabase;
-  console.log("[API] Data source: Supabase (PostgreSQL)");
-} else if (!useD1) {
+if (!useD1) {
   // SQLite 模式（默认，Node.js 本地开发）
   const sq = await import("../../../packages/store/sqlite-store/src/index.ts");
   listPokemon = sq.listPokemonFromSqlite;

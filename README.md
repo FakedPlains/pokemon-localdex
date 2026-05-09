@@ -1,6 +1,6 @@
 # Pokemon LocalDex
 
-一个宝可梦资料库，数据统一来源于 [52Poké Wiki](https://wiki.52poke.com/)，支持本地 SQLite、云端 Supabase 和 Cloudflare D1 三种数据源。提供 Web 端和微信小程序端两种客户端，Web 端部署到 Cloudflare Pages，通过 Service Binding 代理到 Worker 访问 D1 数据库。
+一个宝可梦资料库，数据统一来源于 [52Poké Wiki](https://wiki.52poke.com/)，支持本地 SQLite 和 Cloudflare D1 两种数据源。提供 Web 端和微信小程序端两种客户端，Web 端部署到 Cloudflare Pages，通过 Service Binding 代理到 Worker 访问 D1 数据库。
 
 > 本项目使用 Git LFS 管理大文件（SQLite 数据库和 normalized JSON），克隆后需执行 `git lfs pull` 获取完整数据文件。
 
@@ -8,9 +8,9 @@
 
 ## 功能概览
 
-Pokemon LocalDex 提供宝可梦系列游戏的完整资料查询、队伍构筑和伤害计算能力。所有数据通过爬虫从 52Poké Wiki 采集，支持三种运行模式：本地模式使用 SQLite 数据库，通过 Hono API 提供服务；生产模式前端部署到 Cloudflare Pages，通过 Pages Functions + Service Binding 代理到 Worker，Worker 从 D1 数据库读取数据；小程序模式通过 Supabase PostgREST REST API 直连数据库。
+Pokemon LocalDex 提供宝可梦系列游戏的完整资料查询、队伍构筑和伤害计算能力。所有数据通过爬虫从 52Poké Wiki 采集，支持两种运行模式：本地模式使用 SQLite 数据库，通过 Hono API 提供服务；生产模式前端部署到 Cloudflare Pages，通过 Pages Functions + Service Binding 代理到 Worker，Worker 从 D1 数据库读取数据。
 
-项目同时提供微信小程序端，基于 Taro 框架（React 语法）开发，通过 Supabase PostgREST REST API 直连数据库，无需后端服务。小程序端包含图鉴、招式、特性、道具四个核心页面，以及宝可梦详情页。
+项目同时提供微信小程序端，基于 Taro 框架（React 语法）开发，通过后端 Hono API 获取数据。小程序端包含图鉴、招式、特性、道具四个核心页面，以及宝可梦详情页、工具箱（属性相克表、队伍构建、伤害计算）。
 
 ## 快速开始
 
@@ -54,14 +54,6 @@ npm run dev:web
 
 前端的 `.env` 文件中 `VITE_DATA_SOURCE` 留空即走 Hono API 模式。Vite 会将 `/api` 前缀的请求代理到 `http://127.0.0.1:3030`。
 
-### 本地开发（Supabase 模式）
-
-如果希望本地开发时也使用 Supabase 作为数据源，有两种方式。
-
-后端切换：设置环境变量 `DATA_SOURCE=supabase` 启动 API 服务，同时需要配置 `SUPABASE_URL` 和 `SUPABASE_SERVICE_ROLE_KEY`。
-
-前端直连：在 `apps/web/.env` 中设置 `VITE_DATA_SOURCE=supabase` 并配置 Supabase URL 和 anon key，前端会绕过 Hono API 直接查询 Supabase。
-
 ### 小程序开发
 
 小程序端位于 `apps/miniprogram/`，基于 Taro 4.2.0 框架开发，使用 React 语法编写，编译为微信小程序。
@@ -77,11 +69,11 @@ npx taro build --type weapp
 
 编译产物输出到 `apps/miniprogram/dist/` 目录，用微信开发者工具打开该目录即可预览和调试。小程序 AppID 为 `wx6f183945e108152a`。
 
-小程序端直连 Supabase PostgREST REST API，不依赖后端服务。Supabase 连接配置位于 `apps/miniprogram/src/utils/config.js`。
+小程序端通过后端 API 获取数据，API 地址通过 `.env` 文件中的 `API_BASE_URL` 配置，在编译时注入。
 
 **微信后台域名配置**：需要在微信公众平台的「开发管理 → 开发设置 → 服务器域名」中添加以下合法域名：
 
-- request 合法域名：`https://lonaljgaevutlyswrelm.supabase.co`
+- request 合法域名：`https://pokemon-localdex.pages.dev`
 - downloadFile 合法域名：`https://wsrv.nl`（图片代理服务）
 
 ### 验证
@@ -110,12 +102,10 @@ pokemon-localdex/
 │   │   ├── shared-types/   共享类型、常量和辅助函数（@pokemon-localdex/store-types）
 │   │   ├── sqlite-store/   SQLite 查询适配（node:sqlite 同步 API）
 │   │   └── d1-store/       D1 查询适配（Cloudflare D1 异步 API）
-│   ├── crawler_py/         Python 爬虫（52Poké 数据采集 → SQLite）
-│   └── supabase-store/     Supabase 查询适配（与 sqlite-store 同接口）
+│   └── crawler_py/         Python 爬虫（52Poké 数据采集 → SQLite）
 ├── functions/              Cloudflare Pages Functions（Service Binding 代理）
 │   └── api/[[path]].ts     将 /api/* 请求代理到 Worker
-├── schema/                 D1 数据库 schema
-├── supabase/               Supabase 数据库 schema
+├── schema/                 数据库 schema（D1 + 历史遗留）
 ├── scripts/                爬虫入口脚本
 ├── data/                   本地数据（SQLite [LFS]、页面缓存）
 ├── docs/                   技术文档
@@ -126,25 +116,21 @@ pokemon-localdex/
 
 ## 数据源架构
 
-项目支持三种数据源，通过环境变量和部署模式切换，代码层面保持统一的接口。
+项目支持两种数据源，通过环境变量和部署模式切换，代码层面保持统一的接口。
 
 **SQLite 模式**（本地开发默认）：Python 爬虫采集数据写入 SQLite，Hono API 通过 `sqlite-store` 包读取数据库，前端通过 API 获取数据。完整链路为 `React SPA → Hono API → sqlite-store → SQLite`。
 
 **D1 模式**（Cloudflare Pages 生产部署）：数据存储在 Cloudflare D1（SQLite 兼容），Worker 通过 `packages/store/d1-store` 包读取数据库，前端通过 Pages Functions 的 Service Binding 代理请求到 Worker。链路为 `React SPA → Pages Functions → Service Binding → Worker → d1-store → D1`。
 
-**Supabase 模式**（小程序 + 备用）：数据存储在 Supabase（PostgreSQL），小程序通过 `Taro.request` 直连 Supabase PostgREST REST API。Web 前端也支持通过 `@supabase/supabase-js` 直连查询。
+**小程序模式**：小程序通过 `Taro.request` 调用后端 API（与 Web 端共用同一套 API），API 地址在编译时通过 `defineConstants` 注入。
 
 环境变量控制：
 
 | 变量 | 位置 | 值 | 效果 |
 |------|------|------|------|
 | `DATA_SOURCE` | 后端 | `sqlite`（默认） | API 使用 SQLite |
-| `DATA_SOURCE` | 后端 | `supabase` | API 使用 Supabase |
 | `DATA_SOURCE` | Worker | `d1` | Worker 使用 D1 |
-| `VITE_DATA_SOURCE` | 前端 | 空（默认） | 前端走 Hono API |
-| `VITE_DATA_SOURCE` | 前端 | `supabase` | 前端直连 Supabase |
-
-小程序端的 Supabase 配置直接写在 `apps/miniprogram/src/utils/config.js` 中，不通过环境变量控制。
+| `API_BASE_URL` | 小程序 | 后端地址 | 小程序请求的 API 基地址 |
 
 ## Cloudflare Pages 部署
 
@@ -219,7 +205,7 @@ Pages Functions（`functions/api/[[path]].ts`）通过 Service Binding 将所有
 
 ### 小程序端
 
-小程序端提供轻量级的宝可梦资料查询功能，包含四个 Tab 页面和一个详情页：
+小程序端提供宝可梦资料查询和对战工具功能，包含五个 Tab 页面和多个子页面：
 
 **图鉴页**：宝可梦列表，支持按名称/编号搜索和属性筛选，展示图鉴编号、名称、属性标签和缩略图。点击进入详情页，展示完整信息包括属性、种族值条形图、特性、进化链等。
 
@@ -229,7 +215,9 @@ Pages Functions（`functions/api/[[path]].ts`）通过 Service Binding 将所有
 
 **道具页**：道具列表，支持按名称搜索，展示道具图标、名称和效果说明。
 
-小程序端的技术特点：通过 `SafeImage` 组件将外部图片（52Poké Wiki 等域名）代理到 `wsrv.nl` 服务加载，绕过微信小程序的域名白名单限制；使用自封装的 Supabase PostgREST 客户端（`supabase.js`）替代官方 SDK，适配小程序的 `Taro.request` 网络接口。
+**工具箱页**：包含属性相克表（18 属性完整克制关系矩阵）、队伍构建（本地存储队伍管理）、伤害计算（调用后端 API 计算伤害范围）三个工具。
+
+小程序端的技术特点：通过 `SafeImage` 组件将外部图片（52Poké Wiki 等域名）代理到 `wsrv.nl` 服务加载，绕过微信小程序的域名白名单限制；通过 `Taro.request` 调用后端 Hono API 获取数据。
 
 ### 数据采集
 
@@ -244,7 +232,6 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、939 个招式、3
 | 后端 API | Hono + Node.js 22（本地）/ Cloudflare Workers（生产）|
 | 本地数据库 | SQLite（node:sqlite） |
 | 生产数据库 | Cloudflare D1（SQLite 兼容） |
-| 小程序数据库 | Supabase（PostgreSQL） |
 | 爬虫 | Python 3.10+ + BeautifulSoup4 |
 | 大文件管理 | Git LFS（SQLite、normalized JSON） |
 | 部署 | Cloudflare Pages + Workers + GitHub Actions |
@@ -255,7 +242,6 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、939 个招式、3
 
 ### 近期
 
-- 属性克制表可视化，展示完整的 18 属性相克关系
 - 特性拥有者列表：在特性详情页展示拥有该特性的宝可梦
 - 招式学习者列表：在招式详情页展示可学习该招式的宝可梦
 - 道具数据补全，扩充道具采集覆盖范围
@@ -276,9 +262,9 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、939 个招式、3
 
 详细的技术文档位于 `docs/` 目录：
 
-- [系统架构](docs/architecture.md) — 整体架构设计、三种数据源、部署模式、小程序架构
+- [系统架构](docs/architecture.md) — 整体架构设计、数据源、部署模式、小程序架构
 - [数据库设计](docs/database.md) — SQLite/D1 表结构、索引和关系说明
-- [API 接口](docs/api.md) — RESTful API 端点、参数和响应格式、小程序端 REST 封装
+- [API 接口](docs/api.md) — RESTful API 端点、参数和响应格式
 - [爬虫指南](docs/crawler.md) — 爬虫命令、参数和运行流程
 
 ## 数据来源

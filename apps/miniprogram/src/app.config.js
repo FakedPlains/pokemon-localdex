@@ -4,7 +4,11 @@ export default defineAppConfig({
     'pages/pokemon-detail/index',
     'pages/moves/index',
     'pages/abilities/index',
-    'pages/items/index'
+    'pages/items/index',
+    'pages/tools/index',
+    'pages/type-chart/index',
+    'pages/teams/index',
+    'pages/damage/index'
   ],
   window: {
     backgroundTextStyle: 'light',
@@ -42,6 +46,12 @@ export default defineAppConfig({
         text: '道具',
         iconPath: 'assets/tabbar/items.png',
         selectedIconPath: 'assets/tabbar/items-active.png'
+      },
+      {
+        pagePath: 'pages/tools/index',
+        text: '工具',
+        iconPath: 'assets/tabbar/tools.png',
+        selectedIconPath: 'assets/tabbar/tools-active.png'
       }
     ]
   }
