@@ -53,6 +53,7 @@ pokemon-localdex/
 │   │       └── worker.ts Cloudflare Workers 入口
 │   ├── web/              React SPA 客户端（Vite 构建）
 │   │   ├── src/
+│   │   │   ├── styles/       模块化 CSS（16 个文件，Vite 打包合并）
 │   │   │   ├── pages/        七个页面（Pokedex、Moves、Abilities、Items、Teams、Damage、TypeChart）
 │   │   │   ├── components/   公共组件（TypeChip、CustomSelect、SearchSelect、StatCalculator 等）
 │   │   │   ├── hooks/        数据请求 hook（useApi、useInfiniteApi）
@@ -166,7 +167,7 @@ service = "pokemon-localdex-api"
 
 ### Web 展示层（apps/web）
 
-展示层是一个 React SPA，由 Vite 构建。前端通过 `VITE_DATA_SOURCE` 环境变量决定数据获取方式。
+展示层是一个 React SPA，由 Vite 构建。样式采用模块化 CSS 架构，所有样式文件位于 `src/styles/` 目录下，按页面/功能拆分为 16 个独立模块，通过 `index.css` 统一汇总，再由 `main.jsx` 中的 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 CSS 合并、压缩为单个文件，生产环境零额外 HTTP 请求。前端通过 `VITE_DATA_SOURCE` 环境变量决定数据获取方式。
 
 当 `VITE_DATA_SOURCE` 为空或 `api` 时，所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。当 `VITE_DATA_SOURCE=supabase` 时，前端通过 `supabaseApi.js` 中的函数直接查询 Supabase，GET 请求完全绕过后端。这一切换逻辑封装在 `api.js` 的 `unifiedApi()` 函数中，上层组件和 hook 无需感知数据源差异。
 

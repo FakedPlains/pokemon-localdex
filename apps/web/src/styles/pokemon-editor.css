@@ -1,0 +1,1286 @@
+/* ══════════════════════════════════════════════
+   新版配置编辑器 — 内联四栏布局
+   ══════════════════════════════════════════════ */
+
+.cfg-inline-wrap {
+  margin-top: 16px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  scroll-margin-top: 80px;
+}
+
+/* ── 顶部工具栏 ── */
+.cfg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.cfg-toolbar strong {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.cfg-toolbar-search {
+  flex: 0 1 320px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 30px;
+  border: 1px solid rgba(31, 42, 31, 0.10);
+  border-radius: 999px;
+  background: rgba(255, 248, 236, 0.6);
+  transition: border-color 200ms, background 200ms, box-shadow 200ms;
+}
+
+.cfg-toolbar-search:focus-within {
+  border-color: rgba(217, 79, 61, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+.cfg-toolbar-search-icon {
+  width: 13px;
+  height: 13px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.cfg-toolbar-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--ink);
+  outline: none;
+  line-height: 1.4;
+}
+
+.cfg-toolbar-search-input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.cfg-toolbar-search-clear {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.08);
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cfg-toolbar-search-clear:hover {
+  background: rgba(217, 79, 61, 0.15);
+  color: var(--accent-strong);
+}
+
+/* 已选择宝可梦时的显示 */
+.cfg-toolbar-pokemon {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cfg-toolbar-pokemon-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.cfg-toolbar-pokemon-change {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  color: var(--accent-strong);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.cfg-toolbar-pokemon-change:hover {
+  background: rgba(217, 79, 61, 0.08);
+  border-color: rgba(217, 79, 61, 0.3);
+}
+
+.cfg-toolbar-name {
+  width: 140px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  height: 30px;
+  border: 1px solid rgba(31, 42, 31, 0.10);
+  border-radius: 999px;
+  background: rgba(255, 248, 236, 0.6);
+  font-size: 12px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 200ms, background 200ms, box-shadow 200ms;
+}
+
+.cfg-toolbar-name:focus {
+  border-color: rgba(217, 79, 61, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+.cfg-toolbar-name::placeholder {
+  color: var(--muted);
+  opacity: 0.65;
+  font-size: 12px;
+}
+
+.cfg-toolbar-cancel {
+  flex-shrink: 0;
+  margin-left: 8px;
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cfg-toolbar-cancel:hover {
+  background: rgba(217, 79, 61, 0.08);
+  border-color: rgba(217, 79, 61, 0.3);
+  color: var(--accent-strong);
+}
+
+/* ── 宝可梦选择网格 ── */
+.cfg-pokemon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.cfg-pokemon-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+
+.cfg-pokemon-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(217, 79, 61, 0.12);
+  transform: translateY(-1px);
+}
+
+.cfg-pokemon-card img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+
+.cfg-pokemon-card span {
+  font-size: 11px;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* ── 宝可梦选择列表（横向表格） ── */
+.cfg-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.cfg-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  transition: border-color 0.2s;
+}
+
+.cfg-picker-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+.cfg-picker-search-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.cfg-picker-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+}
+
+.cfg-picker-input::placeholder {
+  color: var(--muted);
+}
+
+.cfg-picker-clear {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.08);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cfg-picker-clear:hover {
+  background: rgba(217, 79, 61, 0.15);
+  color: var(--accent-strong);
+}
+
+.cfg-picker-count {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.cfg-picker-table-wrap {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.cfg-picker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+.cfg-picker-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(255, 248, 236, 0.95);
+  backdrop-filter: blur(4px);
+}
+
+.cfg-picker-table th {
+  padding: 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.cfg-picker-table th:first-child {
+padding-left: 18px;
+}
+
+.cfg-th-img { width: 6%; }
+.cfg-th-name { width: 12%; }
+.cfg-th-types { width: 14%; }
+.cfg-th-abilities { width: 20%; }
+
+.cfg-picker-table th.cfg-th-stat {
+width: 6.8%;
+text-align: center;
+cursor: pointer;
+transition: color 0.15s;
+}
+
+.cfg-th-stat:hover {
+  color: var(--ink);
+}
+
+.cfg-th-stat-active {
+  color: var(--accent-strong);
+}
+
+.cfg-sort-arrow {
+  font-size: 9px;
+  margin-left: 2px;
+}
+
+.cfg-picker-row {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.cfg-picker-row:hover {
+  background: rgba(217, 79, 61, 0.05);
+}
+
+.cfg-picker-row:active {
+  background: rgba(217, 79, 61, 0.1);
+}
+
+.cfg-picker-row td {
+padding: 6px 4px;
+border-bottom: 1px solid rgba(31, 42, 31, 0.04);
+vertical-align: middle;
+}
+
+.cfg-picker-row td:first-child {
+padding-left: 18px;
+}
+
+.cfg-td-img img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.cfg-td-name {
+  overflow: hidden;
+}
+
+.cfg-td-name-zh {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13px;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cfg-td-name-en {
+  font-size: 11px;
+  color: var(--muted);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cfg-td-types {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cfg-td-types .type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  font-size: 11px;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin-right: 3px;
+}
+
+.cfg-td-types .type-chip-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.cfg-td-abilities {
+white-space: normal;
+overflow: visible;
+text-overflow: clip;
+}
+
+.cfg-ability-pill {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--ink);
+  white-space: nowrap;
+  vertical-align: middle;
+  margin-right: 3px;
+}
+
+.cfg-ability-ha {
+  background: rgba(139, 94, 167, 0.12);
+  color: #6b4d8a;
+}
+
+.cfg-td-stat {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.cfg-td-bst {
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+
+.cfg-picker-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ── 配置区 ── */
+.cfg-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cfg-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  align-items: stretch;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+}
+
+.cfg-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: space-between;
+  height: 100%;
+  min-width: 0;
+}
+
+/* 第一栏：图片 + 特性 + 道具 */
+.cfg-col-first {
+  gap: 0;
+  padding: 0 24px;
+  justify-content: flex-start;
+}
+
+.cfg-first-inner {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  flex: 1;
+}
+
+.cfg-first-img {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.cfg-first-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  padding-top: 0;
+  justify-content: center;
+}
+
+.cfg-preview-img {
+  width: 90px;
+  height: 90px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--line);
+  overflow: visible;
+  position: relative;
+}
+
+.cfg-preview-img > img:first-child {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+}
+
+/* 道具图片叠加在宝可梦图片右下角 */
+.cfg-item-overlay {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.cfg-preview-empty {
+  font-size: 28px;
+  color: var(--muted);
+}
+
+.cfg-types {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.cfg-types .type-chip {
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 999px;
+}
+
+.cfg-types .type-chip-icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* 第二栏：招式 */
+.cfg-col-moves {
+  gap: 8px;
+  padding: 0 24px;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  justify-content: center;
+}
+
+/* ── 形态切换滑块（toolbar 内联） ── */
+.cfg-form-slider-inline {
+  display: inline-flex;
+  background: rgba(31, 42, 31, 0.06);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 1px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.cfg-form-slider-item {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.cfg-form-slider-item:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.cfg-form-slider-active {
+  background: #fff;
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* ── 闪光标识（图片左上角，圆形容器，与道具风格统一） ── */
+.cfg-shiny-badge {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px solid var(--line);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.2s;
+  user-select: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.cfg-shiny-badge:hover {
+  opacity: 1;
+  transform: scale(1.12);
+  border-color: #f5c842;
+  box-shadow: 0 2px 8px rgba(245, 200, 66, 0.3);
+}
+
+.cfg-shiny-badge-active {
+  opacity: 1;
+  background: linear-gradient(135deg, #fff8e1, #fff3cd);
+  border-color: #f5c842;
+  box-shadow: 0 0 0 2px rgba(245, 200, 66, 0.25), 0 2px 8px rgba(245, 200, 66, 0.4);
+  animation: shiny-pulse 2s ease-in-out infinite;
+}
+
+@keyframes shiny-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(245, 200, 66, 0.25), 0 2px 8px rgba(245, 200, 66, 0.4); }
+  50% { box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.35), 0 2px 12px rgba(245, 200, 66, 0.6); }
+}
+
+.cfg-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 0;
+  margin-bottom: 2px;
+}
+
+.cfg-section-mode-badge {
+  font-size: 9px;
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-left: 4px;
+  text-transform: none;
+  letter-spacing: 0;
+  vertical-align: middle;
+}
+
+.cfg-ability-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+
+/* 通用 slot 按钮 */
+.cfg-slot-btn {
+  display: block;
+  width: 100%;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.cfg-slot-btn:hover {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.cfg-slot-btn.cfg-slot-active {
+  border-color: var(--accent);
+  background: rgba(217, 79, 61, 0.06);
+  box-shadow: 0 0 0 2px rgba(217, 79, 61, 0.1);
+}
+
+/* 道具锁定态 */
+.cfg-slot-btn.cfg-slot-locked {
+  cursor: not-allowed;
+  opacity: 0.65;
+  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--line);
+  border-style: dashed;
+  pointer-events: none;
+}
+
+.cfg-section-lock-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #888;
+  vertical-align: middle;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* 第三栏：能力值概览 */
+.cfg-col-stats {
+  cursor: pointer;
+  padding: 0 24px;
+  transition: background 0.15s;
+  justify-content: center;
+}
+
+.cfg-col-stats:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.cfg-stats-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+}
+
+.cfg-stat-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cfg-stat-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  width: 28px;
+  text-transform: uppercase;
+}
+
+.cfg-stat-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(31, 42, 31, 0.08);
+  overflow: hidden;
+}
+
+.cfg-stat-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+.cfg-stat-row:nth-child(1) .cfg-stat-fill { background: #8AC654; }
+.cfg-stat-row:nth-child(2) .cfg-stat-fill { background: #F8CB3C; }
+.cfg-stat-row:nth-child(3) .cfg-stat-fill { background: #D98837; }
+.cfg-stat-row:nth-child(4) .cfg-stat-fill { background: #59C3D0; }
+.cfg-stat-row:nth-child(5) .cfg-stat-fill { background: #5890CD; }
+.cfg-stat-row:nth-child(6) .cfg-stat-fill { background: #A456D0; }
+
+.cfg-stat-val {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  opacity: 0.8;
+  width: 24px;
+  text-align: right;
+}
+
+.cfg-stat-total {
+  font-size: 12px;
+  color: var(--ink);
+  text-align: center;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* ── 道具搜索框（内联在道具位置） ── */
+.cfg-item-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 7px 12px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 2px rgba(217, 79, 61, 0.1);
+  height: 35px;
+  box-sizing: border-box;
+}
+
+.cfg-item-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--ink);
+  min-width: 0;
+  padding: 0;
+  border-radius: 0;
+  width: auto;
+  line-height: 1.4;
+}
+
+.cfg-item-search-input::placeholder {
+  color: var(--muted);
+}
+
+.cfg-item-search-clear {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.cfg-item-search-clear:hover {
+  color: var(--ink);
+}
+
+.cfg-item-search-close {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.cfg-item-search-close:hover {
+  color: var(--accent-strong);
+  background: rgba(217, 79, 61, 0.08);
+}
+
+/* 道具按钮中已选道具展示 */
+.cfg-item-selected {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cfg-item-selected-img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+/* ── 道具面板列表 ── */
+.cfg-item-panel-list {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.cfg-item-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid rgba(31, 42, 31, 0.04);
+}
+
+.cfg-item-panel-row:hover {
+  background: rgba(217, 79, 61, 0.05);
+}
+
+.cfg-item-panel-row-active {
+  background: rgba(217, 79, 61, 0.08);
+}
+
+.cfg-item-panel-img {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+
+.cfg-item-panel-img img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.cfg-item-panel-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cfg-item-panel-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.cfg-item-panel-desc {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── 下方联动面板 ── */
+.cfg-bottom-panel {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+}
+
+.cfg-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 248, 236, 0.5);
+}
+
+.cfg-panel-search {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.cfg-panel-search:focus {
+  border-color: var(--accent);
+}
+
+.cfg-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.cfg-panel-close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.cfg-panel-close:hover {
+  background: rgba(217, 79, 61, 0.12);
+  color: var(--accent-strong);
+}
+
+.cfg-panel-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+  padding: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.cfg-panel-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.cfg-panel-item:hover {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.cfg-panel-item.cfg-panel-item-active {
+  border-color: var(--accent);
+  background: rgba(217, 79, 61, 0.08);
+}
+
+.cfg-panel-item-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cfg-panel-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.cfg-panel-stats {
+  padding: 16px;
+}
+
+/* ── 招式搜索框（内联在招式按钮位置） ── */
+.cfg-move-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(217, 79, 61, 0.1);
+  height: 35px;
+  box-sizing: border-box;
+}
+
+.cfg-move-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--ink);
+  padding: 0;
+  border-radius: 0;
+  width: auto;
+  line-height: 1.4;
+}
+
+.cfg-move-search-input::placeholder {
+  color: var(--muted);
+}
+
+.cfg-move-search-clear {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.cfg-move-search-clear:hover {
+  color: var(--ink);
+}
+
+.cfg-move-search-close {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.cfg-move-search-close:hover {
+  color: var(--accent-strong);
+  background: rgba(217, 79, 61, 0.08);
+}
+
+/* ── 招式面板表格 ── */
+.cfg-move-panel-wrap {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.cfg-move-panel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+.cfg-move-panel-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgba(255, 248, 236, 0.95);
+  backdrop-filter: blur(4px);
+}
+
+.cfg-move-panel-table th,
+.cfg-move-panel-table td {
+padding: 8px 6px;
+font-size: 12px;
+vertical-align: middle;
+}
+
+.cfg-move-panel-table th:first-child,
+.cfg-move-panel-table td:first-child {
+padding-left: 16px;
+}
+
+.cfg-move-panel-table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.cfg-move-panel-table td {
+  text-align: left;
+}
+
+.cfg-move-panel-table .cfg-mth-cat,
+.cfg-move-panel-table .cfg-mth-num { text-align: center; }
+
+.cfg-move-panel-table .cfg-mtd-cat,
+.cfg-move-panel-table .cfg-mtd-num { text-align: center; }
+
+.cfg-mth-name { width: 13%; }
+.cfg-mth-type { width: 10%; }
+.cfg-mth-cat { width: 5%; }
+.cfg-mth-num { width: 7%; }
+.cfg-mth-desc { width: auto; overflow: hidden; }
+
+.cfg-move-panel-table .cfg-mtd-desc {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0;
+}
+
+.cfg-move-panel-row {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.cfg-move-panel-row:hover {
+  background: rgba(217, 79, 61, 0.05);
+}
+
+.cfg-move-panel-row:active {
+  background: rgba(217, 79, 61, 0.1);
+}
+
+.cfg-move-panel-row-active {
+  background: rgba(217, 79, 61, 0.08);
+}
+
+.cfg-move-panel-row td {
+  border-bottom: 1px solid rgba(31, 42, 31, 0.04);
+}
+
+.cfg-mtd-name {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cfg-mtd-type .type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  font-size: 11px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.cfg-mtd-type .type-chip-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.cfg-mtd-cat {
+  text-align: center;
+}
+
+.cfg-move-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.cfg-move-cat-chip img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.cfg-move-cat-物理 { background: #FF4400; }
+.cfg-move-cat-特殊 { background: #2266CC; }
+.cfg-move-cat-变化 { background: #999999; }
+
+.cfg-mtd-num {
+  color: var(--ink);
+}
+
+.cfg-mtd-desc {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 底部操作栏 ── */
+.cfg-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.cfg-actions button {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.cfg-actions button.secondary {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+

@@ -1,0 +1,21 @@
+/* ══════════════════════════════════════════════
+   Pokemon LocalDex — Style Entry Point
+   Vite 会将所有 @import 合并打包为单个 CSS 文件
+   ══════════════════════════════════════════════ */
+
+@import "./base.css";
+@import "./nav.css";
+@import "./pokedex.css";
+@import "./stat-calculator.css";
+@import "./abilities.css";
+@import "./moves.css";
+@import "./items.css";
+@import "./responsive.css";
+@import "./teams.css";
+@import "./box-card.css";
+@import "./modal.css";
+@import "./pokemon-editor.css";
+@import "./common.css";
+@import "./damage-v1.css";
+@import "./damage.css";
+@import "./type-chart.css";

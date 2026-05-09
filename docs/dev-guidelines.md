@@ -273,6 +273,44 @@ DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 
 **道具图片预览**：选中道具后，道具图片和名称以 flex 布局展示在搜索框位置，点击可清除选择恢复搜索框。不要使用绝对定位覆盖输入框的方式（会导致图片和文字重叠）。
 
+### 4.8 CSS 模块化开发规范
+
+项目样式采用模块化架构，所有 CSS 文件位于 `apps/web/src/styles/` 目录下，按页面或功能拆分为独立模块。
+
+**目录结构与职责**：
+
+| 文件 | 职责 | 前缀/命名空间 |
+|------|------|--------------|
+| `base.css` | CSS 变量、reset、body 基础样式 | `--` 变量 |
+| `nav.css` | 顶部导航栏、搜索框、过滤面板 | `.nav-`、`.filter-` |
+| `pokedex.css` | 图鉴页 Master-Detail 布局 | `.pokedex-` |
+| `stat-calculator.css` | 能力值计算器 | `.stat-calc-` |
+| `abilities.css` | 特性页面 | `.ability-` |
+| `moves.css` | 招式页面 | `.move-` |
+| `items.css` | 道具页面 | `.item-` |
+| `responsive.css` | 响应式断点（`@media` 查询） | — |
+| `teams.css` | 盒子 & 队伍管理 | `.team-`、`.box-` |
+| `box-card.css` | 盒子卡片 + 属性底色（`.type-bg-*`） | `.box-card-`、`.type-bg-` |
+| `modal.css` | 通用弹窗 | `.modal-` |
+| `pokemon-editor.css` | 配置编辑器 | `.editor-` |
+| `common.css` | Toast、Version Tags、视图切换 | `.toast-`、`.version-` |
+| `damage-v1.css` | 旧版伤害计算器 | `.damage-` |
+| `damage.css` | 新版伤害计算器 | `.dc-` |
+| `type-chart.css` | 属性克制表 | `.type-chart-` |
+
+**入口与打包机制**：
+
+`index.css` 通过 `@import` 汇总所有模块，`main.jsx` 中通过 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 `@import` 解析并合并为单个 CSS 文件，生产环境只产生一次 HTTP 请求。这与将 CSS 放在 `public/` 目录下通过 `<link>` 引入有本质区别——后者的 `@import` 会在运行时逐个发起 HTTP 请求，每个模块一次请求，严重影响首屏性能。
+
+**开发规范**：
+
+- 新增页面样式时，创建对应的 CSS 文件并在 `index.css` 中添加 `@import`
+- 每个模块使用独立的类名前缀（如 `dc-` 用于 damage calculator），避免跨模块命名冲突
+- 公共变量（颜色、间距、圆角等）统一定义在 `base.css` 的 `:root` 中
+- `box-card.css` 中的 `.type-bg-*` 类同时定义了 `--type-color` CSS 变量，供其他模块通过 `var(--type-color)` 引用属性颜色
+- 响应式样式集中在 `responsive.css` 中管理，不要在各模块内分散编写 `@media` 查询
+- 不要在 `public/` 目录下放置 CSS 文件，所有样式必须通过 `src/styles/` 走 Vite 打包流程
+
 ---
 
 ## 五、爬虫开发规范

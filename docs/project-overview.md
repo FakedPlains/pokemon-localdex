@@ -33,7 +33,25 @@ pokemon-localdex/
 │   ├── web/                    React SPA（Vite 构建）
 │   │   ├── src/
 │   │   │   ├── App.jsx         路由入口（hash 路由）
-│   │   │   ├── main.jsx        React 挂载点（含启动时数据迁移）
+│   │   │   ├── main.jsx        React 挂载点（含启动时数据迁移 + CSS 入口导入）
+│   │   │   ├── styles/          模块化 CSS（Vite 打包合并）
+│   │   │   │   ├── index.css            入口文件（@import 所有模块）
+│   │   │   │   ├── base.css             CSS 变量、reset、body
+│   │   │   │   ├── nav.css              顶部导航栏、搜索框、过滤面板
+│   │   │   │   ├── pokedex.css          图鉴页面 Master-Detail 布局
+│   │   │   │   ├── stat-calculator.css  能力值计算器
+│   │   │   │   ├── abilities.css        特性页面
+│   │   │   │   ├── moves.css            招式页面
+│   │   │   │   ├── items.css            道具页面
+│   │   │   │   ├── responsive.css       响应式断点
+│   │   │   │   ├── teams.css            盒子 & 队伍管理
+│   │   │   │   ├── box-card.css         盒子卡片 + 属性底色
+│   │   │   │   ├── modal.css            通用弹窗
+│   │   │   │   ├── pokemon-editor.css   配置编辑器
+│   │   │   │   ├── common.css           Toast、Version Tags、视图切换
+│   │   │   │   ├── damage-v1.css        旧版伤害计算器
+│   │   │   │   ├── damage.css           新版伤害计算器（dc- 前缀）
+│   │   │   │   └── type-chart.css       属性克制表
 │   │   │   ├── pages/          七个页面组件
 │   │   │   │   ├── PokedexPage.jsx      图鉴页（列表 + 详情抽屉）
 │   │   │   │   ├── MovesPage.jsx        招式页
@@ -66,7 +84,6 @@ pokemon-localdex/
 │   │   │       └── migrateStorage.js    localStorage 数据迁移（v3：中文名→数字ID，含 abilityId）
 │   │   ├── public/
 │   │   │   └── assets/
-│   │   │       ├── styles.css           全局样式
 │   │   │       └── type-icons/          属性图标（PNG）
 │   │   ├── .env                本地开发（VITE_DATA_SOURCE 留空，走 API）
 │   │   └── vite.config.js      Vite 配置（proxy、base:"/"、outDir:"../../dist"）

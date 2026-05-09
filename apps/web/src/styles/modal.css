@@ -1,0 +1,213 @@
+/* ══════════════════════════════════════════════
+   Modal — 通用弹窗
+   ══════════════════════════════════════════════ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  animation: modal-fade-in 180ms ease;
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-container {
+  position: relative;
+  width: 100%;
+  max-width: 780px;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #fffdf8, #fff8f0);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 64px rgba(64, 50, 28, 0.18), 0 4px 16px rgba(64, 50, 28, 0.08);
+  animation: modal-slide-up 220ms ease;
+  overflow: hidden;
+}
+
+@keyframes modal-slide-up {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(31, 42, 31, 0.08);
+  flex-shrink: 0;
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.modal-header-extra {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 16px;
+  min-width: 0;
+}
+
+.modal-header-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-header-search .ss-trigger {
+  border-radius: 999px;
+  background: rgba(255, 248, 236, 0.6);
+  border: 1px solid rgba(31, 42, 31, 0.10);
+  padding: 7px 30px 7px 14px;
+  font-size: 13px;
+  transition: border-color 200ms, background 200ms, box-shadow 200ms;
+}
+
+.modal-header-search .ss-trigger:hover,
+.modal-header-search .ss-trigger:focus {
+  border-color: rgba(217, 79, 61, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+.modal-header-input {
+  width: 120px;
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border: 1px solid rgba(31, 42, 31, 0.10);
+  border-radius: 999px;
+  background: rgba(255, 248, 236, 0.6);
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 200ms, background 200ms, box-shadow 200ms;
+}
+
+.modal-header-input:focus {
+  border-color: rgba(217, 79, 61, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+.modal-header-input::placeholder {
+  color: var(--muted);
+  opacity: 0.65;
+  font-size: 12px;
+}
+
+.modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.modal-close-btn:hover {
+  background: rgba(31, 42, 31, 0.12);
+  color: var(--ink);
+}
+
+.modal-body {
+  padding: 20px 24px 24px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 弹窗内编辑器样式微调 */
+.modal-body .team-member-editor {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+/* ── 编辑器顶部：图片 + 基本信息 ── */
+.te-header {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 24px;
+align-items: start;
+margin-bottom: 20px;
+padding-bottom: 20px;
+border-bottom: 1px solid var(--line);
+}
+
+.te-header-preview {
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+gap: 8px;
+}
+
+.te-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.te-inline-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ── 招式区域 ── */
+.te-moves-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.te-moves-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* 移动端适配 */
+@media (max-width: 640px) {
+  .modal-backdrop {
+    padding: 12px;
+  }
+  .modal-container {
+    max-width: 100%;
+    max-height: calc(100vh - 24px);
+    border-radius: 18px;
+  }
+  .modal-header {
+    padding: 16px 18px 12px;
+  }
+  .modal-body {
+    padding: 16px 18px 20px;
+  }
+}
+
