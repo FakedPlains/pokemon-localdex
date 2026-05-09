@@ -19,7 +19,6 @@
     "d1:create": "wrangler d1 create pokemon-localdex-d1",
     "d1:migrate": "wrangler d1 execute pokemon-localdex-d1 --file=schema/d1-schema.sql",
     "d1:migrate:remote": "wrangler d1 execute pokemon-localdex-d1 --remote --file=schema/d1-schema.sql",
-    "d1:import": "node --enable-source-maps scripts/import-to-d1.mjs",
     "worker:dev": "wrangler dev --config wrangler.worker.toml",
     "worker:deploy": "wrangler deploy --config wrangler.worker.toml",
     "deploy:cf": "npm run build:web && wrangler pages deploy dist --project-name=pokemon-localdex --commit-dirty=true",
@@ -34,12 +33,9 @@
   "dependencies": {
     "@fakedplains/smogon-calc": "^0.11.0",
     "@hono/node-server": "^2.0.0",
-    "@smogon/calc": "^0.11.0",
-    "hono": "^4.12.15",
-    "vite": "^8.0.10"
+    "hono": "^4.12.15"
   },
   "devDependencies": {
-    "postgres": "^3.4.9",
     "wrangler": "^3.99.0"
   }
 }
