@@ -2,7 +2,7 @@ name: Deploy to Cloudflare Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, test]
   workflow_dispatch:
 
 permissions:
@@ -45,7 +45,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=pokemon-localdex --branch=main
+          command: pages deploy dist --project-name=pokemon-localdex --branch=${{ github.ref_name }}
 
   # 可选：D1 schema 迁移（仅在 schema/d1-schema.sql 变更时触发）
   migrate-d1:

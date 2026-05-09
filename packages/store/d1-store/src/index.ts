@@ -13,221 +13,46 @@
 
 // ── Re-export all shared types ──
 
-export type StatBlock = {
-  hp: number;
-  atk: number;
-  def: number;
-  spa: number;
-  spd: number;
-  spe: number;
-};
+export type {
+  StatBlock,
+  SourceMeta,
+  ImageAsset,
+  FormStatVariant,
+  FormTypeVariant,
+  FormAbilityVariant,
+  PokemonFormEntry,
+  EvolutionStep,
+  PokemonSummary,
+  PokemonEntry,
+  MoveGenerationRecord,
+  MoveEntry,
+  AbilityGenerationRecord,
+  AbilityEntry,
+  ItemGenerationRecord,
+  ItemEntry,
+  LearnsetRecord,
+  TeamMember,
+  BattleTeam,
+  PaginationParams,
+  PaginatedResult,
+} from "@pokemon-localdex/store-types";
 
-export type SourceMeta = {
-  url: string;
-  title: string;
-  fetchedAt: string;
-};
-
-export type ImageAsset = {
-  url: string;
-  alt?: string;
-};
-
-export type FormStatVariant = {
-  generationStart?: number;
-  generationEnd?: number;
-  baseStats: StatBlock;
-};
-
-export type FormTypeVariant = {
-  generationStart?: number;
-  generationEnd?: number;
-  primaryType?: string;
-  secondaryType?: string;
-};
-
-export type FormAbilityVariant = {
-  generationStart?: number;
-  generationEnd?: number;
-  abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }>;
-};
-
-export type PokemonFormEntry = {
-  formKey: string;
-  nameZh: string;
-  formType: string;
-  isDefault: boolean;
-  sortOrder: number;
-  primaryType?: string;
-  secondaryType?: string;
-  abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }>;
-  baseStats?: StatBlock;
-  images: Record<string, ImageAsset>;
-  requiredItem?: { id: string; nameZh: string; slug: string; imageUrl?: string };
-  statVariants?: FormStatVariant[];
-  typeVariants?: FormTypeVariant[];
-  abilityVariants?: FormAbilityVariant[];
-};
-
-export type EvolutionStep = {
-  fromPokemonId?: number;
-  fromNameZh?: string;
-  fromFormKey?: string;
-  toPokemonId: number;
-  toNameZh: string;
-  toFormKey?: string;
-  stage: number;
-  method?: string;
-  condition?: string;
-  item?: string;
-  level?: number;
-  toTypes?: string[];
-  toImage?: ImageAsset;
-};
-
-export type PokemonSummary = {
-  id: number;
-  dexNumber: number;
-  slug: string;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  primaryType?: string;
-  secondaryType?: string;
-  abilities: string[];
-  hiddenAbility?: string;
-  baseStats?: StatBlock;
-  image?: ImageAsset;
-  shinyImage?: ImageAsset;
-  generations: number[];
-};
-
-export type PokemonEntry = PokemonSummary & {
-  category?: string;
-  heightM?: number;
-  weightKg?: number;
-  forms: PokemonFormEntry[];
-  evolutionChain: EvolutionStep[];
-  source?: SourceMeta;
-};
-
-export type MoveGenerationRecord = {
-  generation: number;
-  gameVersionCode?: string;
-  gameVersionName?: string;
-  versionExclusive?: boolean;
-  type?: string;
-  category?: string;
-  power?: number;
-  accuracy?: number;
-  pp?: number;
-  description: string;
-  notes?: string;
-};
-
-export type MoveEntry = {
-  id: string;
-  number?: number;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  type?: string;
-  category?: string;
-  power?: number;
-  accuracy?: number;
-  pp?: number;
-  description?: string;
-  effectDetail?: string;
-  introducedGeneration?: number;
-  generations: MoveGenerationRecord[];
-  source?: SourceMeta;
-};
-
-export type AbilityGenerationRecord = {
-  generation: number;
-  gameVersionCode?: string;
-  gameVersionName?: string;
-  versionExclusive?: boolean;
-  description: string;
-  notes?: string;
-};
-
-export type AbilityEntry = {
-  id: string;
-  number?: number;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  description?: string;
-  effectDetail?: string;
-  introducedGeneration?: number;
-  generations: AbilityGenerationRecord[];
-  source?: SourceMeta;
-};
-
-export type ItemGenerationRecord = {
-  generation: number;
-  gameVersionCode?: string;
-  gameVersionName?: string;
-  versionExclusive?: boolean;
-  description: string;
-  notes?: string;
-};
-
-export type ItemEntry = {
-  id: string;
-  slug: string;
-  nameZh: string;
-  nameJa?: string;
-  nameEn?: string;
-  category?: string;
-  effectSummary?: string;
-  effectDetail?: string;
-  introducedGeneration?: number;
-  imageUrl?: string;
-  generations: ItemGenerationRecord[];
-  source?: SourceMeta;
-};
-
-export type LearnsetRecord = {
-  moveId?: number;
-  moveNameZh: string;
-  learnMethod: string;
-  level?: number;
-  tmNumber?: string;
-  moveType?: string;
-  moveCategory?: string;
-  movePower?: number;
-  moveAccuracy?: number;
-  movePP?: number;
-  moveDescription?: string;
-};
-
-export type BattleTeam = {
-  id: string;
-  name: string;
-  format: string;
-  members: TeamMember[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type TeamMember = {
-  slot: number;
-  pokemonId: number;
-  formKey: string;
-  nameZh?: string;
-  level: number;
-  itemId?: number;
-  abilityId?: number;
-  nature?: string;
-  moves: (number | null)[];
-  ivs: Partial<StatBlock>;
-  evs: Partial<StatBlock>;
-};
-
-export type PaginationParams = { offset?: number; limit?: number };
-export type PaginatedResult<T> = { items: T[]; total: number };
+import type {
+  StatBlock,
+  ImageAsset,
+  PokemonFormEntry,
+  EvolutionStep,
+  PokemonSummary,
+  PokemonEntry,
+  MoveEntry,
+  AbilityEntry,
+  ItemEntry,
+  LearnsetRecord,
+  BattleTeam,
+  TeamMember,
+  PaginationParams,
+  PaginatedResult,
+} from "@pokemon-localdex/store-types";
 
 // ── D1 type shim ──
 // Cloudflare D1 Database binding interface (subset used here)
@@ -256,44 +81,13 @@ export interface D1ExecResult {
   duration: number;
 }
 
-// ── Constants ──
+// ── Constants & helpers from shared package ──
 
-const GAME_VERSIONS: Array<[string, string, number]> = [
-  ["RG", "红/绿", 1], ["B", "蓝", 1], ["Y", "黄", 1],
-  ["GS", "金/银", 2], ["C", "水晶", 2],
-  ["RS", "红宝石/蓝宝石", 3], ["E", "绿宝石", 3], ["FRLG", "火红/叶绿", 3],
-  ["DP", "钻石/珍珠", 4], ["Pt", "白金", 4], ["HGSS", "心金/魂银", 4],
-  ["BW", "黑/白", 5], ["B2W2", "黑2/白2", 5],
-  ["XY", "X/Y", 6], ["ORAS", "欧米伽红宝石/阿尔法蓝宝石", 6],
-  ["SM", "太阳/月亮", 7], ["USUM", "究极之日/究极之月", 7], ["LPLE", "Let's Go 皮卡丘/伊布", 7],
-  ["SWSH", "剑/盾", 8], ["SWSHE", "剑/盾 铠之孤岛+冠之雪原", 8], ["BDSP", "晶灿钻石/明亮珍珠", 8], ["LA", "传说 阿尔宙斯", 8],
-  ["SV", "朱/紫", 9], ["SVT", "朱/紫 零之秘宝", 9], ["ZA", "传说 Z-A", 9],
-  ["CHAMP", "冠军", 99],
-];
-
-const GAME_VERSION_NAMES = new Map<string, string>(
-  GAME_VERSIONS.map(([code, nameZh]) => [code, nameZh])
-);
-
-// ── Helpers ──
-
-function statBlockFromRow(row: Record<string, unknown>): StatBlock | undefined {
-  if (row.hp === null || row.hp === undefined) return undefined;
-  return {
-    hp: Number(row.hp), atk: Number(row.atk), def: Number(row.def),
-    spa: Number(row.spa), spd: Number(row.spd), spe: Number(row.spe),
-  };
-}
-
-function sourceFromRow(row: Record<string, unknown>): SourceMeta | undefined {
-  return row.source_url || row.source_title || row.source_fetched_at
-    ? {
-        url: String(row.source_url ?? ""),
-        title: String(row.source_title ?? ""),
-        fetchedAt: String(row.source_fetched_at ?? ""),
-      }
-    : undefined;
-}
+import {
+  GAME_VERSION_NAMES,
+  statBlockFromRow,
+  sourceFromRow,
+} from "@pokemon-localdex/store-types";
 
 // ── D1Store class ──
 
@@ -654,6 +448,7 @@ export class D1Store {
       const latestAbility = abilityEntries.find((a) => a.genEnd === undefined) || abilityEntries[0];
 
       const entry: PokemonFormEntry = {
+        id: fid,
         formKey: String(f.form_key),
         nameZh: String(f.name_zh),
         formType: String(f.form_type),
@@ -1231,3 +1026,144 @@ export class D1Store {
 export function createD1Store(db: D1Database): D1Store {
   return new D1Store(db);
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DbAdapter 实现（异步名称解析，供 d1-battle-core 使用）
+// ══════════════════════════════════════════════════════════════════════════════
+
+import type {
+  DbAdapter,
+  PokemonNameQuery,
+  EntityNameQuery,
+} from "@pokemon-localdex/battle-core";
+
+class D1DbAdapter implements DbAdapter {
+  constructor(private db: D1Database) {}
+
+  async queryPokemonFormNameEn(opts: PokemonNameQuery): Promise<string | undefined> {
+    // 1. 通过 formId 直接查询
+    if (opts.formId) {
+      const row = await this.db
+        .prepare("SELECT name_en FROM pokemon_forms WHERE id = ? AND name_en IS NOT NULL LIMIT 1")
+        .bind(String(opts.formId))
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+    }
+
+    // 2. 通过 pokemonId + formKey 查询（fallback）
+    if (opts.pokemonId && opts.formKey && opts.formKey !== "default") {
+      const row = await this.db
+        .prepare("SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND form_key = ? AND name_en IS NOT NULL LIMIT 1")
+        .bind(String(opts.pokemonId), opts.formKey)
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+    }
+
+    // 3. 通过 formKey 直接匹配（fallback）
+    if (opts.formKey && opts.formKey !== "default") {
+      const row = await this.db
+        .prepare("SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1")
+        .bind(opts.formKey)
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+    }
+
+    // 4. 通过 pokemonId 查默认形态
+    if (opts.pokemonId) {
+      const row = await this.db
+        .prepare("SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 AND name_en IS NOT NULL LIMIT 1")
+        .bind(String(opts.pokemonId))
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+      const pkRow = await this.db
+        .prepare("SELECT name_en FROM pokemon WHERE id = ? LIMIT 1")
+        .bind(String(opts.pokemonId))
+        .first<{ name_en: string }>();
+      if (pkRow?.name_en) return pkRow.name_en;
+    }
+
+    // 5. 通过中文名 fallback
+    if (opts.nameZh) {
+      const row = await this.db
+        .prepare("SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1")
+        .bind(opts.nameZh)
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+
+      const pkRow = await this.db
+        .prepare("SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1")
+        .bind(opts.nameZh)
+        .first<{ name_en: string }>();
+      if (pkRow?.name_en) return pkRow.name_en;
+    }
+
+    return undefined;
+  }
+
+  async queryMoveNameEn(opts: EntityNameQuery): Promise<string | undefined> {
+    if (opts.id) {
+      const row = await this.db
+        .prepare("SELECT name_en FROM moves WHERE id = ? LIMIT 1")
+        .bind(String(opts.id))
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+    }
+    if (opts.nameZh) {
+      const row = await this.db
+        .prepare("SELECT name_en FROM moves WHERE name_zh = ? LIMIT 1")
+        .bind(opts.nameZh)
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+    }
+    return undefined;
+  }
+
+  async queryAbilityNameEn(opts: EntityNameQuery): Promise<string | undefined> {
+    if (opts.id) {
+      const row = await this.db
+        .prepare("SELECT name_en FROM abilities WHERE id = ? LIMIT 1")
+        .bind(String(opts.id))
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+    }
+    if (opts.nameZh) {
+      const row = await this.db
+        .prepare("SELECT name_en FROM abilities WHERE name_zh = ? LIMIT 1")
+        .bind(opts.nameZh)
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+    }
+    return undefined;
+  }
+
+  async queryItemNameEn(opts: EntityNameQuery): Promise<string | undefined> {
+    if (opts.id) {
+      const row = await this.db
+        .prepare("SELECT name_en FROM items WHERE id = ? LIMIT 1")
+        .bind(String(opts.id))
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+    }
+    if (opts.nameZh) {
+      const row = await this.db
+        .prepare("SELECT name_en FROM items WHERE name_zh = ? LIMIT 1")
+        .bind(opts.nameZh)
+        .first<{ name_en: string }>();
+      if (row?.name_en) return row.name_en;
+    }
+    return undefined;
+  }
+}
+
+/**
+ * 工厂函数：创建 DbAdapter 实例（异步名称解析器）。
+ * 供 d1-battle-core 使用：
+ *   import { createDbAdapter } from "@pokemon-localdex/d1-store";
+ *   const adapter = createDbAdapter(env.DB);
+ *   const result = await calculateDamageWithAdapter(adapter, input);
+ */
+export function createDbAdapter(db: D1Database): DbAdapter {
+  return new D1DbAdapter(db);
+}
+
+export type { DbAdapter, PokemonNameQuery, EntityNameQuery } from "@pokemon-localdex/battle-core";
