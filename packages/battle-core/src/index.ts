@@ -1,15 +1,45 @@
 /**
- * battle-core: 伤害计算引擎
+ * @pokemon-localdex/battle-core
  *
- * 使用 @fakedplains/smogon-calc（fork 版，支持 Champions gen 0）作为底层计算库，
- * 通过实时查询 SQLite 数据库将中文名称映射为英文名称，再传入计算。
+ * 统一伤害计算引擎。
+ *
+ * 对外提供两个入口：
+ *   - calculateDamage(resolver, input)     — 同步版，配合 sqlite-store 的 NameResolver
+ *   - calculateDamageAsync(adapter, input) — 异步版，配合 d1-store 的 DbAdapter
+ *
+ * 调用方自行从 store 包创建 resolver/adapter 传入。
  */
+
 import { calculate, Pokemon, Move, Field } from "@fakedplains/smogon-calc";
 import type { GenerationNum } from "@fakedplains/smogon-calc/dist/data/interface";
 
-// ── 中英文名称映射（性格是固定的，不需要查数据库） ──
+import type {
+  DamageCalcInput,
+  DamageCalcResult,
+  NameResolver,
+  DbAdapter,
+  ResolvedNames,
+} from "./types.ts";
 
-const NATURE_ZH_TO_EN: Record<string, string> = {
+// 重新导出所有类型
+export type {
+  StatsTable,
+  PokemonCalcInput,
+  SideInput,
+  DamageCalcInput,
+  DamageCalcResult,
+  PokemonNameQuery,
+  EntityNameQuery,
+  NameResolver,
+  DbAdapter,
+  ResolvedNames,
+} from "./types.ts";
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 常量映射
+// ══════════════════════════════════════════════════════════════════════════════
+
+export const NATURE_ZH_TO_EN: Record<string, string> = {
   勤奋: "Hardy",
   怕寂寞: "Lonely",
   固执: "Adamant",
@@ -37,232 +67,7 @@ const NATURE_ZH_TO_EN: Record<string, string> = {
   自大: "Sassy",
 };
 
-// ── SQLite 名称查询工具 ──
-
-import { DatabaseSync } from "node:sqlite";
-import { resolve } from "node:path";
-
-const DB_PATH = process.env.LOCALDEX_DB_PATH
-  ? resolve(process.env.LOCALDEX_DB_PATH)
-  : resolve(import.meta.dirname, "../../../data/sqlite/localdex.sqlite");
-
-function openDb(): DatabaseSync {
-  return new DatabaseSync(DB_PATH, { open: true });
-}
-
-/**
- * 通过中文名查询宝可梦英文名
- */
-function queryPokemonNameEn(nameZh: string): string | undefined {
-  const db = openDb();
-  const row = db.prepare(
-    "SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
-  db.close();
-  return row?.name_en || undefined;
-}
-
-/**
- * 通过 formKey 和宝可梦中文名查询形态英文名
- * 优先用 formKey 精确匹配，fallback 到基础宝可梦名
- */
-function queryPokemonFormNameEn(nameZh: string, formKey?: string): string | undefined {
-  const db = openDb();
-  
-  // 如果有 formKey 且不是 default，尝试通过 form_key 查询
-  if (formKey && formKey !== "default") {
-    const formRow = db.prepare(`
-      SELECT pf.name_en
-      FROM pokemon_forms pf
-      JOIN pokemon p ON pf.pokemon_id = p.id
-      WHERE pf.form_key = ? AND p.name_zh = ?
-      LIMIT 1
-    `).get(formKey, nameZh) as { name_en: string } | undefined;
-    if (formRow?.name_en) {
-      db.close();
-      return formRow.name_en;
-    }
-    
-    // 也尝试用 form_key 直接匹配（不依赖 nameZh）
-    const formRow2 = db.prepare(`
-      SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1
-    `).get(formKey) as { name_en: string } | undefined;
-    if (formRow2?.name_en) {
-      db.close();
-      return formRow2.name_en;
-    }
-  }
-  
-  // fallback: 用中文名查 pokemon_forms 表（形态中文名可能直接传入）
-  const formByName = db.prepare(`
-    SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1
-  `).get(nameZh) as { name_en: string } | undefined;
-  if (formByName?.name_en) {
-    db.close();
-    return formByName.name_en;
-  }
-  
-  // 最终 fallback: 查基础宝可梦表
-  const row = db.prepare(
-    "SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
-  db.close();
-  return row?.name_en || undefined;
-}
-
-/**
- * 通过中文名查询招式英文名
- */
-function queryMoveNameEn(nameZh: string): string | undefined {
-  const db = openDb();
-  const row = db.prepare(
-    "SELECT name_en FROM moves WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
-  db.close();
-  return row?.name_en || undefined;
-}
-
-/**
- * 通过中文名查询特性英文名
- */
-function queryAbilityNameEn(nameZh: string): string | undefined {
-  const db = openDb();
-  const row = db.prepare(
-    "SELECT name_en FROM abilities WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
-  db.close();
-  return row?.name_en || undefined;
-}
-
-/**
- * 通过中文名查询道具英文名
- */
-function queryItemNameEn(nameZh: string): string | undefined {
-  const db = openDb();
-  const row = db.prepare(
-    "SELECT name_en FROM items WHERE name_zh = ? LIMIT 1"
-  ).get(nameZh) as { name_en: string } | undefined;
-  db.close();
-  return row?.name_en || undefined;
-}
-
-/**
- * 性格中文转英文
- */
-function natureZhToEn(natureZh: string): string {
-  return NATURE_ZH_TO_EN[natureZh] || "Serious";
-}
-
-// ── 类型定义 ──
-
-export type StatsTable = {
-  hp: number;
-  atk: number;
-  def: number;
-  spa: number;
-  spd: number;
-  spe: number;
-};
-
-export type DamageCalcInput = {
-  generation: number;  // 世代 1-9
-
-  // 攻击方
-  attacker: {
-    name: string;           // 宝可梦中文名
-    formKey?: string;       // 形态 key（如 "超级喷火龙y"）
-    level?: number;         // 等级，默认 50
-    nature?: string;        // 性格中文名，默认 "认真"
-    ability?: string;       // 特性中文名
-    item?: string;          // 道具中文名
-    evs?: Partial<StatsTable>;
-    ivs?: Partial<StatsTable>;
-    boosts?: Partial<StatsTable>;
-    status?: string;        // 状态: "burn" | "paralysis" | "poison" | "sleep" | ""
-    teraType?: string;      // 太晶属性中文名
-  };
-
-  // 防守方
-  defender: {
-    name: string;
-    formKey?: string;       // 形态 key
-    level?: number;
-    nature?: string;
-    ability?: string;
-    item?: string;
-    evs?: Partial<StatsTable>;
-    ivs?: Partial<StatsTable>;
-    boosts?: Partial<StatsTable>;
-    status?: string;
-    teraType?: string;
-  };
-
-  // 招式
-  move: {
-    name: string;           // 招式中文名
-    isCrit?: boolean;       // 是否暴击
-    hits?: number;          // 连续攻击次数
-  };
-
-  // 场地
-  field?: {
-    gameType?: "singles" | "doubles";
-    weather?: string;       // "none" | "sun" | "rain" | "sand" | "hail" | "snow"
-    terrain?: string;       // "none" | "electric" | "grassy" | "misty" | "psychic"
-    isGravity?: boolean;
-    isMagicRoom?: boolean;
-    isWonderRoom?: boolean;
-
-    // 攻击方场地效果
-    attackerSide?: {
-      isSR?: boolean;
-      spikes?: number;
-      isReflect?: boolean;
-      isLightScreen?: boolean;
-      isAuroraVeil?: boolean;
-      isProtected?: boolean;
-      isSeeded?: boolean;
-      isSaltCured?: boolean;
-      isTailwind?: boolean;
-      isHelpingHand?: boolean;
-      isPowerTrick?: boolean;
-      isFriendGuard?: boolean;
-      isSwitching?: "in" | "out";
-    };
-
-    // 防守方场地效果
-    defenderSide?: {
-      isSR?: boolean;
-      spikes?: number;
-      isReflect?: boolean;
-      isLightScreen?: boolean;
-      isAuroraVeil?: boolean;
-      isProtected?: boolean;
-      isSeeded?: boolean;
-      isSaltCured?: boolean;
-      isTailwind?: boolean;
-      isHelpingHand?: boolean;
-      isPowerTrick?: boolean;
-      isFriendGuard?: boolean;
-      isSwitching?: "in" | "out";
-    };
-  };
-};
-
-export type DamageCalcResult = {
-  min: number;
-  max: number;
-  average: number;
-  minPercent: number;
-  maxPercent: number;
-  defenderHp: number;
-  description: string;      // @smogon/calc 生成的完整描述
-  damageRolls: number[];    // 所有 16 个乱数伤害值
-};
-
-// ── 天气/场地/属性 中文→英文映射 ──
-
-const WEATHER_MAP: Record<string, string | undefined> = {
+export const WEATHER_MAP: Record<string, string | undefined> = {
   none: undefined,
   sun: "Sun",
   rain: "Rain",
@@ -271,7 +76,7 @@ const WEATHER_MAP: Record<string, string | undefined> = {
   snow: "Snow",
 };
 
-const TERRAIN_MAP: Record<string, string | undefined> = {
+export const TERRAIN_MAP: Record<string, string | undefined> = {
   none: undefined,
   electric: "Electric",
   grassy: "Grassy",
@@ -279,7 +84,7 @@ const TERRAIN_MAP: Record<string, string | undefined> = {
   psychic: "Psychic",
 };
 
-const TYPE_ZH_TO_EN: Record<string, string> = {
+export const TYPE_ZH_TO_EN: Record<string, string> = {
   一般: "Normal",
   火: "Fire",
   水: "Water",
@@ -300,7 +105,7 @@ const TYPE_ZH_TO_EN: Record<string, string> = {
   妖精: "Fairy",
 };
 
-const STATUS_MAP: Record<string, string> = {
+export const STATUS_MAP: Record<string, string> = {
   burn: "brn",
   paralysis: "par",
   poison: "psn",
@@ -313,26 +118,25 @@ const STATUS_MAP: Record<string, string> = {
   冰冻: "frz",
 };
 
-// ── 主计算函数 ──
+// ══════════════════════════════════════════════════════════════════════════════
+// 工具函数
+// ══════════════════════════════════════════════════════════════════════════════
+
+export function natureZhToEn(natureZh: string): string {
+  return NATURE_ZH_TO_EN[natureZh] || "Serious";
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 核心计算逻辑（纯函数，与数据库无关）
+// ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * 使用 @smogon/calc 进行伤害计算
- *
- * 接收中文名称，实时查询数据库获取英文名，然后调用 @smogon/calc
+ * 执行伤害计算。接受已解析的英文名称，不涉及任何数据库操作。
  */
-export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
-  // generation=0 为 Champions 模式，fork 版 calc 库原生支持（calculateChampions）
+export function executeCalc(input: DamageCalcInput, names: ResolvedNames): DamageCalcResult {
   const gen = input.generation as GenerationNum;
 
-  // ── 解析攻击方 ──
-  const atkNameEn = queryPokemonFormNameEn(input.attacker.name, input.attacker.formKey) || input.attacker.name;
-  const atkAbilityEn = input.attacker.ability
-    ? (queryAbilityNameEn(input.attacker.ability) || input.attacker.ability)
-    : undefined;
-  const atkItemEn = input.attacker.item
-    ? (queryItemNameEn(input.attacker.item) || input.attacker.item)
-    : undefined;
-  const atkNatureEn = natureZhToEn(input.attacker.nature || "认真");
+  // ── 构建攻击方 ──
   const atkTeraType = input.attacker.teraType
     ? (TYPE_ZH_TO_EN[input.attacker.teraType] || input.attacker.teraType)
     : undefined;
@@ -340,11 +144,11 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
     ? (STATUS_MAP[input.attacker.status] || "")
     : "";
 
-  const attacker = new Pokemon(gen, atkNameEn, {
+  const attacker = new Pokemon(gen, names.atkNameEn, {
     level: input.attacker.level || 50,
-    nature: atkNatureEn,
-    ability: atkAbilityEn,
-    item: atkItemEn,
+    nature: natureZhToEn(input.attacker.nature || "认真"),
+    ability: names.atkAbilityEn || undefined,
+    item: names.atkItemEn || undefined,
     evs: input.attacker.evs as any,
     ivs: input.attacker.ivs as any,
     boosts: input.attacker.boosts as any,
@@ -352,15 +156,7 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
     teraType: atkTeraType as any,
   });
 
-  // ── 解析防守方 ──
-  const defNameEn = queryPokemonFormNameEn(input.defender.name, input.defender.formKey) || input.defender.name;
-  const defAbilityEn = input.defender.ability
-    ? (queryAbilityNameEn(input.defender.ability) || input.defender.ability)
-    : undefined;
-  const defItemEn = input.defender.item
-    ? (queryItemNameEn(input.defender.item) || input.defender.item)
-    : undefined;
-  const defNatureEn = natureZhToEn(input.defender.nature || "认真");
+  // ── 构建防守方 ──
   const defTeraType = input.defender.teraType
     ? (TYPE_ZH_TO_EN[input.defender.teraType] || input.defender.teraType)
     : undefined;
@@ -368,11 +164,11 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
     ? (STATUS_MAP[input.defender.status] || "")
     : "";
 
-  const defender = new Pokemon(gen, defNameEn, {
+  const defender = new Pokemon(gen, names.defNameEn, {
     level: input.defender.level || 50,
-    nature: defNatureEn,
-    ability: defAbilityEn,
-    item: defItemEn,
+    nature: natureZhToEn(input.defender.nature || "认真"),
+    ability: names.defAbilityEn || undefined,
+    item: names.defItemEn || undefined,
     evs: input.defender.evs as any,
     ivs: input.defender.ivs as any,
     boosts: input.defender.boosts as any,
@@ -380,14 +176,13 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
     teraType: defTeraType as any,
   });
 
-  // ── 解析招式 ──
-  const moveNameEn = queryMoveNameEn(input.move.name) || input.move.name;
-  const move = new Move(gen, moveNameEn, {
+  // ── 构建招式 ──
+  const move = new Move(gen, names.moveNameEn, {
     isCrit: input.move.isCrit || false,
     hits: input.move.hits,
   });
 
-  // ── 解析场地 ──
+  // ── 构建场地 ──
   const fieldInput = input.field || {};
   const field = new Field({
     gameType: fieldInput.gameType === "doubles" ? "Doubles" : "Singles",
@@ -407,7 +202,6 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
   const [min, max] = result.range();
   const defenderHp = defender.originalCurHP || defender.rawStats.hp;
 
-  // 获取所有 16 个乱数伤害值
   let damageRolls: number[] = [];
   if (Array.isArray(result.damage)) {
     if (Array.isArray(result.damage[0])) {
@@ -427,7 +221,6 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
   const minPercent = defenderHp > 0 ? Number(((min / defenderHp) * 100).toFixed(1)) : 0;
   const maxPercent = defenderHp > 0 ? Number(((max / defenderHp) * 100).toFixed(1)) : 0;
 
-  // 获取描述文本
   let description = "";
   try {
     description = result.fullDesc();
@@ -447,3 +240,132 @@ export function calculateDamage(input: DamageCalcInput): DamageCalcResult {
   };
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// 同步版入口
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 同步伤害计算函数。
+ * 接受一个 NameResolver 实例（同步），解析所有名称后执行计算。
+ * 配合 sqlite-store 的 createNameResolver() 使用。
+ *
+ * @example
+ * ```ts
+ * import { calculateDamage } from "@pokemon-localdex/battle-core";
+ * import { createNameResolver } from "@pokemon-localdex/sqlite-store";
+ * const result = calculateDamage(createNameResolver(), input);
+ * ```
+ */
+export function calculateDamage(
+  resolver: NameResolver,
+  input: DamageCalcInput
+): DamageCalcResult {
+  const atkNameEn = resolver.queryPokemonFormNameEn({
+    pokemonId: input.attacker.pokemonId,
+    formId: input.attacker.formId,
+    formKey: input.attacker.formKey,
+    nameZh: input.attacker.name,
+  }) || input.attacker.name || "Pikachu";
+
+  const atkAbilityEn = (input.attacker.abilityId || input.attacker.ability)
+    ? (resolver.queryAbilityNameEn({ id: input.attacker.abilityId, nameZh: input.attacker.ability }) || input.attacker.ability)
+    : undefined;
+
+  const atkItemEn = (input.attacker.itemId || input.attacker.item)
+    ? (resolver.queryItemNameEn({ id: input.attacker.itemId, nameZh: input.attacker.item }) || input.attacker.item)
+    : undefined;
+
+  const defNameEn = resolver.queryPokemonFormNameEn({
+    pokemonId: input.defender.pokemonId,
+    formId: input.defender.formId,
+    formKey: input.defender.formKey,
+    nameZh: input.defender.name,
+  }) || input.defender.name || "Pikachu";
+
+  const defAbilityEn = (input.defender.abilityId || input.defender.ability)
+    ? (resolver.queryAbilityNameEn({ id: input.defender.abilityId, nameZh: input.defender.ability }) || input.defender.ability)
+    : undefined;
+
+  const defItemEn = (input.defender.itemId || input.defender.item)
+    ? (resolver.queryItemNameEn({ id: input.defender.itemId, nameZh: input.defender.item }) || input.defender.item)
+    : undefined;
+
+  const moveNameEn = resolver.queryMoveNameEn({ id: input.move.id, nameZh: input.move.name }) || input.move.name || "Tackle";
+
+  return executeCalc(input, {
+    atkNameEn,
+    atkAbilityEn,
+    atkItemEn,
+    defNameEn,
+    defAbilityEn,
+    defItemEn,
+    moveNameEn,
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 异步版入口
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 异步伤害计算函数。
+ * 接受一个 DbAdapter 实例（异步），并行查询所有名称映射后执行计算。
+ * 配合 d1-store 的 createDbAdapter() 使用。
+ *
+ * @example
+ * ```ts
+ * import { calculateDamageAsync } from "@pokemon-localdex/battle-core";
+ * import { createDbAdapter } from "@pokemon-localdex/d1-store";
+ * const result = await calculateDamageAsync(createDbAdapter(env.DB), input);
+ * ```
+ */
+export async function calculateDamageAsync(
+  adapter: DbAdapter,
+  input: DamageCalcInput
+): Promise<DamageCalcResult> {
+  const [
+    atkNameEn,
+    atkAbilityEn,
+    atkItemEn,
+    defNameEn,
+    defAbilityEn,
+    defItemEn,
+    moveNameEn,
+  ] = await Promise.all([
+    adapter.queryPokemonFormNameEn({
+      pokemonId: input.attacker.pokemonId,
+      formId: input.attacker.formId,
+      formKey: input.attacker.formKey,
+      nameZh: input.attacker.name,
+    }),
+    (input.attacker.abilityId || input.attacker.ability)
+      ? adapter.queryAbilityNameEn({ id: input.attacker.abilityId, nameZh: input.attacker.ability })
+      : Promise.resolve(undefined),
+    (input.attacker.itemId || input.attacker.item)
+      ? adapter.queryItemNameEn({ id: input.attacker.itemId, nameZh: input.attacker.item })
+      : Promise.resolve(undefined),
+    adapter.queryPokemonFormNameEn({
+      pokemonId: input.defender.pokemonId,
+      formId: input.defender.formId,
+      formKey: input.defender.formKey,
+      nameZh: input.defender.name,
+    }),
+    (input.defender.abilityId || input.defender.ability)
+      ? adapter.queryAbilityNameEn({ id: input.defender.abilityId, nameZh: input.defender.ability })
+      : Promise.resolve(undefined),
+    (input.defender.itemId || input.defender.item)
+      ? adapter.queryItemNameEn({ id: input.defender.itemId, nameZh: input.defender.item })
+      : Promise.resolve(undefined),
+    adapter.queryMoveNameEn({ id: input.move.id, nameZh: input.move.name }),
+  ]);
+
+  return executeCalc(input, {
+    atkNameEn: atkNameEn || input.attacker.name || "Pikachu",
+    atkAbilityEn: atkAbilityEn || input.attacker.ability || undefined,
+    atkItemEn: atkItemEn || input.attacker.item || undefined,
+    defNameEn: defNameEn || input.defender.name || "Pikachu",
+    defAbilityEn: defAbilityEn || input.defender.ability || undefined,
+    defItemEn: defItemEn || input.defender.item || undefined,
+    moveNameEn: moveNameEn || input.move.name || "Tackle",
+  });
+}

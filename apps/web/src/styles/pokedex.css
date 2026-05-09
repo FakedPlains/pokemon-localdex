@@ -1,0 +1,777 @@
+/* ═══════════════════════════════════════════════════════
+   POKEDEX PAGE — Master-Detail Layout
+   ═══════════════════════════════════════════════════════ */
+
+.dex-page { display: flex; flex-direction: column; gap: 18px; }
+
+/* ── Header ── */
+.dex-header { padding: 22px 24px 20px; }
+.dex-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dex-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Filter Sections (chip-based) ── */
+.dex-filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dex-filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.dex-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dex-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  cursor: pointer;
+  transition: background 180ms, color 180ms, border-color 180ms, box-shadow 180ms;
+  white-space: nowrap;
+}
+
+.dex-filter-chip:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(31, 42, 31, 0.15);
+  transform: none;
+  box-shadow: none;
+}
+
+.dex-filter-chip-active {
+  color: white !important;
+  background: linear-gradient(135deg, var(--grass), #6b9a3a) !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 8px rgba(138, 166, 90, 0.25);
+}
+
+.dex-filter-chip-active:hover {
+  background: linear-gradient(135deg, #7aaf4a, #5a8a2e) !important;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(138, 166, 90, 0.3);
+}
+
+/* Type icon in filter chip */
+.dex-filter-type-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 50%;
+  padding: 3px;
+  background: rgba(31, 42, 31, 0.45);
+}
+
+/* Per-type icon backgrounds (matching type-chip colors) */
+.dex-filter-chip-type[data-type="一般"] .dex-filter-type-icon { background: #BBBBAA; }
+.dex-filter-chip-type[data-type="火"] .dex-filter-type-icon { background: #FF4422; }
+.dex-filter-chip-type[data-type="水"] .dex-filter-type-icon { background: #3399FF; }
+.dex-filter-chip-type[data-type="电"] .dex-filter-type-icon { background: #FFCC33; }
+.dex-filter-chip-type[data-type="草"] .dex-filter-type-icon { background: #77CC55; }
+.dex-filter-chip-type[data-type="冰"] .dex-filter-type-icon { background: #77DDFF; }
+.dex-filter-chip-type[data-type="格斗"] .dex-filter-type-icon { background: #BB5544; }
+.dex-filter-chip-type[data-type="毒"] .dex-filter-type-icon { background: #AA5599; }
+.dex-filter-chip-type[data-type="地面"] .dex-filter-type-icon { background: #DDBB55; }
+.dex-filter-chip-type[data-type="飞行"] .dex-filter-type-icon { background: #6699FF; }
+.dex-filter-chip-type[data-type="超能力"] .dex-filter-type-icon { background: #FF5599; }
+.dex-filter-chip-type[data-type="虫"] .dex-filter-type-icon { background: #AABB22; }
+.dex-filter-chip-type[data-type="岩石"] .dex-filter-type-icon { background: #BBAA66; }
+.dex-filter-chip-type[data-type="幽灵"] .dex-filter-type-icon { background: #6666BB; }
+.dex-filter-chip-type[data-type="龙"] .dex-filter-type-icon { background: #7766EE; }
+.dex-filter-chip-type[data-type="恶"] .dex-filter-type-icon { background: #775544; }
+.dex-filter-chip-type[data-type="钢"] .dex-filter-type-icon { background: #AAAABB; }
+.dex-filter-chip-type[data-type="妖精"] .dex-filter-type-icon { background: #FFAAFF; }
+
+/* ── Per-type active chip backgrounds ── */
+.dex-filter-chip-type-active {
+  color: white !important;
+  border-color: transparent !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.dex-filter-chip-type-active:hover {
+  transform: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+.dex-filter-chip-type-active .dex-filter-type-icon {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.dex-filter-chip-type-active[data-type="一般"] { background: #BBBBAA; }
+.dex-filter-chip-type-active[data-type="火"] { background: #FF4422; }
+.dex-filter-chip-type-active[data-type="水"] { background: #3399FF; }
+.dex-filter-chip-type-active[data-type="电"] { background: #FFCC33; color: #352a00 !important; }
+.dex-filter-chip-type-active[data-type="草"] { background: #77CC55; }
+.dex-filter-chip-type-active[data-type="冰"] { background: #77DDFF; color: #12343a !important; }
+.dex-filter-chip-type-active[data-type="格斗"] { background: #BB5544; }
+.dex-filter-chip-type-active[data-type="毒"] { background: #AA5599; }
+.dex-filter-chip-type-active[data-type="地面"] { background: #DDBB55; }
+.dex-filter-chip-type-active[data-type="飞行"] { background: #6699FF; }
+.dex-filter-chip-type-active[data-type="超能力"] { background: #FF5599; }
+.dex-filter-chip-type-active[data-type="虫"] { background: #AABB22; }
+.dex-filter-chip-type-active[data-type="岩石"] { background: #BBAA66; }
+.dex-filter-chip-type-active[data-type="幽灵"] { background: #6666BB; }
+.dex-filter-chip-type-active[data-type="龙"] { background: #7766EE; }
+.dex-filter-chip-type-active[data-type="恶"] { background: #775544; }
+.dex-filter-chip-type-active[data-type="钢"] { background: #AAAABB; }
+.dex-filter-chip-type-active[data-type="妖精"] { background: #FFAAFF; }
+
+/* ── Search wrapper ── */
+.dex-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dex-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.dex-search {
+  width: 100%;
+  padding: 9px 14px 9px 36px;
+  border: 1px solid rgba(31, 42, 31, 0.10);
+  border-radius: 10px;
+  background: rgba(255, 248, 236, 0.6);
+  font-size: 13px;
+  color: var(--ink);
+  transition: border-color 200ms, background 200ms, box-shadow 200ms;
+}
+
+.dex-search::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.dex-search:focus {
+  outline: none;
+  border-color: rgba(217, 79, 61, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+
+/* ── Master-Detail Body ── */
+.dex-body {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.dex-body-split {
+  /* no viewport lock — page scrolls naturally */
+}
+
+/* ── Left: List Panel ── */
+.dex-list-panel {
+  padding: 0;
+  flex: 1 1 100%;
+  min-width: 0;
+  transition: flex 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+              max-width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dex-list-panel-narrow {
+  flex: 0 0 340px;
+  max-width: 340px;
+  /* no overflow-y: auto — scrolls with the page */
+}
+
+.dex-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  transition: gap 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* When detail is open, switch to compact single-column list */
+.dex-list-compact {
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding: 8px;
+}
+
+.dex-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+/* ── Unified Item (card ↔ compact row) ── */
+.dex-item {
+  /* Grid-card mode (default) — vertical centered layout */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 16px 10px 14px;
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.92), rgba(248,241,226,0.88));
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+  /* Smooth morph transition for all shape properties */
+  transition: padding 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              gap 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              border-radius 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.3s ease,
+              background 0.3s ease,
+              box-shadow 0.3s ease,
+              transform 0.2s ease;
+}
+
+.dex-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(64, 50, 28, 0.1);
+}
+
+/* Compact row mode */
+.dex-item-compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border-color: rgba(31, 42, 31, 0.06);
+  background: linear-gradient(160deg, rgba(255,255,255,0.85), rgba(248,241,226,0.7));
+  text-align: left;
+  box-shadow: 0 1px 4px rgba(64, 50, 28, 0.04);
+}
+
+.dex-item-compact:hover {
+  transform: none;
+  box-shadow: 0 4px 14px rgba(64, 50, 28, 0.08);
+  border-color: rgba(31, 42, 31, 0.12);
+  background: linear-gradient(160deg, rgba(255,255,255,0.95), rgba(248,241,226,0.85));
+}
+
+/* Active (selected) item */
+.dex-item-active {
+  background: linear-gradient(135deg, rgba(255,248,240,0.98), rgba(255,240,224,0.95));
+  border-color: rgba(217, 79, 61, 0.3);
+  box-shadow: 0 2px 8px rgba(217, 79, 61, 0.08);
+  scroll-margin-top: 72px; /* clear the sticky nav bar */
+}
+
+.dex-item-active:hover {
+  transform: none;
+  background: linear-gradient(135deg, rgba(255,248,240,0.98), rgba(255,240,224,0.95));
+}
+
+/* ── Item Image ── */
+.dex-item-img {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              height 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              border-radius 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dex-item-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.dex-item-compact .dex-item-img {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.dex-card-placeholder {
+  font-size: 28px;
+  color: var(--muted);
+  opacity: 0.4;
+  transition: font-size 0.3s ease;
+}
+
+.dex-item-compact .dex-card-placeholder {
+  font-size: 16px;
+}
+
+/* ── Item Info ── */
+.dex-item-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  transition: align-items 0.3s ease;
+}
+
+.dex-item-compact .dex-item-info {
+  flex: 1;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.dex-item-dex {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  transition: font-size 0.3s ease;
+}
+
+.dex-item-compact .dex-item-dex {
+  font-size: 10px;
+}
+
+.dex-item-name {
+  font-size: 14px;
+  text-align: center;
+  transition: text-align 0.3s ease;
+}
+
+.dex-item-compact .dex-item-name {
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dex-item-en {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: text-align 0.3s ease;
+}
+
+.dex-item-compact .dex-item-en {
+  text-align: left;
+}
+
+/* ── Item Types ── */
+.dex-item-types {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: gap 0.3s ease;
+}
+
+.dex-item-compact .dex-item-types {
+  gap: 3px;
+  justify-content: flex-end;
+}
+
+/* ── Right: Detail Panel (sticky) ── */
+.dex-detail-panel {
+  position: sticky;
+  top: 72px; /* below the sticky nav */
+  padding: 24px;
+  overflow-y: auto;
+  max-height: calc(100vh - 84px);
+  transform-origin: top center;
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.dex-detail-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+  z-index: 2;
+}
+
+.dex-detail-close:hover {
+  background: rgba(217, 79, 61, 0.1);
+  color: var(--accent-strong);
+  transform: none;
+  box-shadow: none;
+}
+
+.dex-drawer-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding: 40px;
+  color: var(--muted);
+}
+
+/* ── Drawer Hero ── */
+.drawer-hero {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.drawer-img-box {
+  display: grid;
+  place-items: center;
+}
+
+.drawer-img-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.drawer-img-inner img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 8px;
+}
+
+.drawer-img-empty {
+  width: 150px;
+  height: 150px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(31, 42, 31, 0.04);
+  color: var(--muted);
+}
+
+.drawer-img-toggle {
+  display: flex;
+  gap: 4px;
+  background: rgba(31, 42, 31, 0.06);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.drawer-img-toggle button {
+  padding: 5px 14px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.drawer-img-toggle button:hover {
+  background: rgba(255,255,255,0.5);
+  transform: none;
+  box-shadow: none;
+}
+
+.drawer-img-toggle button.active {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* ── Drawer Intro ── */
+.drawer-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.drawer-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.drawer-dex {
+  font-size: 14px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.drawer-name {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.drawer-en {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.drawer-wiki-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  color: var(--muted);
+  opacity: 0.6;
+  transition: opacity 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.drawer-wiki-link:hover {
+  opacity: 1;
+  color: var(--accent, #d94f3d);
+}
+
+.drawer-types-row { display: flex; gap: 6px; }
+
+.drawer-meta-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.drawer-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(31, 42, 31, 0.05);
+  font-size: 13px;
+}
+
+.drawer-meta-key { color: var(--muted); font-size: 11px; }
+.drawer-meta-val { font-weight: 600; }
+
+.drawer-abilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.drawer-ability-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.drawer-ability-chip {
+  position: relative;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(138, 166, 90, 0.15);
+  color: #3d5a1e;
+}
+
+.drawer-ability-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.drawer-ability-link:hover {
+  background: rgba(138, 166, 90, 0.28);
+  box-shadow: 0 1px 4px rgba(61, 90, 30, 0.1);
+}
+
+.drawer-ability-hidden {
+  background: rgba(217, 79, 61, 0.1);
+  color: var(--accent-strong);
+}
+.drawer-ability-hidden.drawer-ability-link:hover {
+  background: rgba(217, 79, 61, 0.2);
+  box-shadow: 0 1px 4px rgba(217, 79, 61, 0.1);
+}
+
+/* Ability tooltip */
+.ability-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(30, 36, 30, 0.92);
+  color: #f0f0f0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+  width: max-content;
+  max-width: 240px;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.ability-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(30, 36, 30, 0.92);
+}
+.drawer-ability-chip:hover .ability-tooltip {
+display: block;
+}
+
+/* Move link in learnset table */
+.drawer-move-link {
+position: relative;
+color: inherit;
+text-decoration: none;
+border-bottom: 1px dashed rgba(100, 140, 80, 0.4);
+transition: color 0.15s, border-color 0.15s;
+}
+.drawer-move-link:hover {
+color: var(--accent-strong, #3d5a1e);
+border-bottom-color: var(--accent-strong, #3d5a1e);
+}
+
+/* Move tooltip – pops downward, left-aligned to avoid clipping */
+.move-tooltip {
+display: none;
+position: absolute;
+top: calc(100% + 8px);
+left: 0;
+padding: 8px 12px;
+border-radius: 8px;
+background: rgba(30, 36, 30, 0.92);
+color: #f0f0f0;
+font-size: 12px;
+font-weight: 400;
+line-height: 1.5;
+white-space: normal;
+width: max-content;
+max-width: 240px;
+z-index: 100;
+pointer-events: none;
+box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.move-tooltip::after {
+content: "";
+position: absolute;
+bottom: 100%;
+left: 12px;
+border: 5px solid transparent;
+border-bottom-color: rgba(30, 36, 30, 0.92);
+}
+.drawer-move-link:hover .move-tooltip {
+display: block;
+}
+
+/* ── Form Selector ── */
+.drawer-form-selector {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.drawer-form-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.drawer-form-chip {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--muted);
+  transition: background 200ms, color 200ms;
+}
+
+.drawer-form-chip:hover {
+  background: rgba(31, 42, 31, 0.1);
+  color: var(--ink);
+  transform: none;
+  box-shadow: none;
+}
+
+.drawer-form-chip-active {
+  background: rgba(217, 79, 61, 0.12) !important;
+  color: var(--accent-strong) !important;
+}
+
+/* ── Drawer Tabs ── */
+.drawer-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(31, 42, 31, 0.06);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.drawer-tab {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  transition: background 200ms, color 200ms;
+}
+
+.drawer-tab:hover {
+  background: rgba(255,255,255,0.5);
+  color: var(--ink);
+  transform: none;
+  box-shadow: none;
+}
+
+.drawer-tab-active {
+  background: white !important;
+  color: var(--ink) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.drawer-tab-body { min-height: 120px; }
+

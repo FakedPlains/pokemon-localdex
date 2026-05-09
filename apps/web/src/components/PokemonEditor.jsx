@@ -134,6 +134,8 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
         const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
         const detailBaseStats = selectedForm?.baseStats || r.data?.baseStats;
         const updates = {};
+        // 补全 formId（从盒子导入时可能只有 formKey 没有 formId）
+        if (!config.formId && selectedForm?.id) updates.formId = selectedForm.id;
         if (shinyUrl && !config.shinyImageUrl) updates.shinyImageUrl = shinyUrl;
         if (detailBaseStats && !config.baseStats) updates.baseStats = detailBaseStats;
         // 默认选中第一个特性
@@ -206,6 +208,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       ? (firstAbility.nameZh || "")
       : (pokemonDetail.abilities?.[0] || "");
     const updates = {
+      formId: form.id || "",
       formKey,
       formName: form.nameZh || form.formKey || "",
       primaryType: form.primaryType || pokemonDetail.primaryType || "",
@@ -275,6 +278,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
           moves.push({
             value: name,
             label: name,
+            moveId: entry.moveId ?? null,
             moveType: entry.moveType || "",
             moveCategory: entry.moveCategory || "",
             movePower: entry.movePower ?? null,
@@ -339,7 +343,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     // 保存招式类型信息以便展示
     if (moveOpt && value) {
       const movesInfo = { ...(config._movesInfo || {}) };
-      movesInfo[value] = { type: moveOpt.moveType || "", power: moveOpt.movePower ?? "", category: moveOpt.moveCategory || "" };
+      movesInfo[value] = { moveId: moveOpt.moveId ?? null, type: moveOpt.moveType || "", power: moveOpt.movePower ?? "", category: moveOpt.moveCategory || "" };
       draft._movesInfo = movesInfo;
     }
     onChange(draft);

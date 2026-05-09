@@ -103,11 +103,14 @@ pokemon-localdex/
 │   ├── web/                React SPA 客户端（Vite 构建）
 │   └── miniprogram/        微信小程序客户端（Taro + React）
 ├── packages/
-│   ├── battle-core/        伤害计算与队伍规则核心（Node.js 版）
-│   ├── d1-battle-core/     伤害计算核心（Cloudflare Workers D1 版）
-│   ├── d1-store/           D1 查询适配层
+│   ├── battle-core/        统一伤害计算引擎（同步 + 异步双入口）
+│   │   ├── src/index.ts    calculateDamage() / calculateDamageAsync()
+│   │   └── src/types.ts    计算相关类型定义（DamageCalcInput、NameResolver、DbAdapter 等）
+│   ├── store/              数据存储层
+│   │   ├── shared-types/   共享类型、常量和辅助函数（@pokemon-localdex/store-types）
+│   │   ├── sqlite-store/   SQLite 查询适配（node:sqlite 同步 API）
+│   │   └── d1-store/       D1 查询适配（Cloudflare D1 异步 API）
 │   ├── crawler_py/         Python 爬虫（52Poké 数据采集 → SQLite）
-│   ├── sqlite-store/       SQLite 建表、查询适配与类型定义
 │   └── supabase-store/     Supabase 查询适配（与 sqlite-store 同接口）
 ├── functions/              Cloudflare Pages Functions（Service Binding 代理）
 │   └── api/[[path]].ts     将 /api/* 请求代理到 Worker
@@ -127,7 +130,7 @@ pokemon-localdex/
 
 **SQLite 模式**（本地开发默认）：Python 爬虫采集数据写入 SQLite，Hono API 通过 `sqlite-store` 包读取数据库，前端通过 API 获取数据。完整链路为 `React SPA → Hono API → sqlite-store → SQLite`。
 
-**D1 模式**（Cloudflare Pages 生产部署）：数据存储在 Cloudflare D1（SQLite 兼容），Worker 通过 `d1-store` 包读取数据库，前端通过 Pages Functions 的 Service Binding 代理请求到 Worker。链路为 `React SPA → Pages Functions → Service Binding → Worker → d1-store → D1`。
+**D1 模式**（Cloudflare Pages 生产部署）：数据存储在 Cloudflare D1（SQLite 兼容），Worker 通过 `packages/store/d1-store` 包读取数据库，前端通过 Pages Functions 的 Service Binding 代理请求到 Worker。链路为 `React SPA → Pages Functions → Service Binding → Worker → d1-store → D1`。
 
 **Supabase 模式**（小程序 + 备用）：数据存储在 Supabase（PostgreSQL），小程序通过 `Taro.request` 直连 Supabase PostgREST REST API。Web 前端也支持通过 `@supabase/supabase-js` 直连查询。
 

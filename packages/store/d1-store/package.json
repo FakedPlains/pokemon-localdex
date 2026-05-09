@@ -1,0 +1,10 @@
+{
+  "name": "@pokemon-localdex/d1-store",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@pokemon-localdex/battle-core": "*",
+    "@pokemon-localdex/store-types": "*"
+  }
+}

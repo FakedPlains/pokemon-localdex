@@ -12,9 +12,9 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { createD1Store } from "../../../packages/d1-store/src/index.ts";
-import type { D1Database } from "../../../packages/d1-store/src/index.ts";
-import { calculateDamageD1 } from "../../../packages/d1-battle-core/src/index.ts";
+import { createD1Store, createDbAdapter } from "../../../packages/store/d1-store/src/index.ts";
+import type { D1Database } from "../../../packages/store/d1-store/src/index.ts";
+import { calculateDamageAsync } from "../../../packages/battle-core/src/index.ts";
 
 // Cloudflare Workers Env 类型
 export interface Env {
@@ -192,7 +192,7 @@ api.delete("/teams/:id", async (c) => {
 api.post("/battle/damage", async (c) => {
   try {
     const input = await c.req.json();
-    const result = await calculateDamageD1(c.env.DB, input);
+    const result = await calculateDamageAsync(createDbAdapter(c.env.DB), input);
     return c.json({ data: result });
   } catch (err: any) {
     return c.json({ error: err?.message ?? "Calculation failed" }, 400);

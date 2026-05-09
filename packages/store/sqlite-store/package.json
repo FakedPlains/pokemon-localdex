@@ -1,0 +1,10 @@
+{
+  "name": "@pokemon-localdex/sqlite-store",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@pokemon-localdex/battle-core": "*",
+    "@pokemon-localdex/store-types": "*"
+  }
+}

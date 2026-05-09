@@ -57,14 +57,89 @@ pokemon（主表）
 - `generation_end` 为 `null` 表示"至今有效"
 - 查询特定世代数据时，过滤条件为：`generation_start <= target_gen AND (generation_end IS NULL OR generation_end >= target_gen)`
 
-### 2.3 数据库双轨制
+### 2.3 ID 优先查询原则
+
+**核心规范：查询任何信息时，能用数据库数字 ID 则必须优先使用 ID，以提升查询速度和准确性。**
+
+数据库主键索引查询（`WHERE id = ?`）的性能远优于文本字段匹配（`WHERE name_zh = ?`），且不存在同名歧义问题。所有查询函数必须遵循以下优先级：
+
+**宝可梦形态查询优先级**：`formId` → `pokemonId + formKey` → `formKey` → `pokemonId`（默认形态） → `nameZh`（中文名 fallback）
+
+**招式/特性/道具查询优先级**：`id` → `nameZh`（中文名 fallback）
+
+**具体约束**：
+
+- `battle-core` 的查询函数签名统一为 `opts: { id?: string | number; nameZh?: string }` 格式，优先通过 `id` 查询，仅在 `id` 缺失时才降级到 `nameZh`
+- 宝可梦形态查询优先使用 `formId`（`pokemon_forms.id`）直接定位，`formKey`（如 "超级喷火龙x"）作为 fallback 保留，用于 formId 缺失时的降级查询
+- 前端在选择宝可梦/形态/招式/特性/道具时，必须同时保存数据库 ID 和中文名，API 请求中优先传递 ID
+- 中文名仅作为 fallback 和界面显示使用，不作为主要查询条件
+
+**前端传参示例**：
+
+```javascript
+// 正确：传递 formId
+attacker: {
+  pokemonId: "2",      // pokemon.id
+  formId: "6862",      // pokemon_forms.id（超级喷火龙X）
+  name: "喷火龙",      // 仅作 fallback
+  abilityId: "42",     // abilities.id
+  ability: "硬爪",     // 仅作 fallback
+  itemId: "123",       // items.id
+  item: "喷火龙进化石X" // 仅作 fallback
+}
+
+// 降级：使用 formKey 作为 fallback（formId 不可用时）
+attacker: {
+  pokemonId: "2",
+  formKey: "超级喷火龙x",  // ✅ 作为 fallback 可以使用
+  name: "喷火龙",
+  abilityId: "42",
+  ability: "硬爪",
+}
+```
+
+**后端查询函数签名**：
+
+```typescript
+// sqlite-store 提供的 NameResolver（同步，node:sqlite）
+interface NameResolver {
+  queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): string | undefined;
+  queryMoveNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined;
+  queryAbilityNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined;
+  queryItemNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined;
+}
+
+// d1-store 提供的 DbAdapter（异步，D1Database）
+interface DbAdapter {
+  queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): Promise<string | undefined>;
+  queryMoveNameEn(opts: { id?: string | number; nameZh?: string }): Promise<string | undefined>;
+  queryAbilityNameEn(opts: { id?: string | number; nameZh?: string }): Promise<string | undefined>;
+  queryItemNameEn(opts: { id?: string | number; nameZh?: string }): Promise<string | undefined>;
+}
+```
+
+**数据流转**：
+
+```
+前端选择形态 → 保存 form.id 到 state（formId）
+前端发起计算 → 请求体携带 formId（优先）和 formKey（fallback）
+后端收到请求 → queryPokemonFormNameEn({ formId, formKey, pokemonId, nameZh })
+                   → formId 命中则直接返回
+                   → 未命中则尝试 pokemonId + formKey 组合查询
+                   → 再未命中则尝试 formKey 单独匹配
+                   → 再未命中则降级到 pokemonId 默认形态
+                   → 最后降级到 nameZh 文本匹配
+```
+
+### 2.4 数据库双轨制
 
 SQLite 和 Supabase 的 schema 必须保持同步。修改数据库结构时：
 
 1. 先修改 `supabase/schema.sql`（作为 source of truth）
-2. 同步修改 `packages/sqlite-store/src/index.ts` 中的类型定义和查询语句
+2. 同步修改 `packages/store/sqlite-store/src/index.ts` 中的类型定义和查询语句
 3. 同步修改 `packages/supabase-store/src/index.ts` 中的查询逻辑
-4. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/sqlite_upsert.py`
+4. 同步修改 `packages/store/d1-store/src/index.ts` 中的查询逻辑
+5. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/sqlite_upsert.py`
 
 ---
 
@@ -198,6 +273,44 @@ DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 
 **道具图片预览**：选中道具后，道具图片和名称以 flex 布局展示在搜索框位置，点击可清除选择恢复搜索框。不要使用绝对定位覆盖输入框的方式（会导致图片和文字重叠）。
 
+### 4.8 CSS 模块化开发规范
+
+项目样式采用模块化架构，所有 CSS 文件位于 `apps/web/src/styles/` 目录下，按页面或功能拆分为独立模块。
+
+**目录结构与职责**：
+
+| 文件 | 职责 | 前缀/命名空间 |
+|------|------|--------------|
+| `base.css` | CSS 变量、reset、body 基础样式 | `--` 变量 |
+| `nav.css` | 顶部导航栏、搜索框、过滤面板 | `.nav-`、`.filter-` |
+| `pokedex.css` | 图鉴页 Master-Detail 布局 | `.pokedex-` |
+| `stat-calculator.css` | 能力值计算器 | `.stat-calc-` |
+| `abilities.css` | 特性页面 | `.ability-` |
+| `moves.css` | 招式页面 | `.move-` |
+| `items.css` | 道具页面 | `.item-` |
+| `responsive.css` | 响应式断点（`@media` 查询） | — |
+| `teams.css` | 盒子 & 队伍管理 | `.team-`、`.box-` |
+| `box-card.css` | 盒子卡片 + 属性底色（`.type-bg-*`） | `.box-card-`、`.type-bg-` |
+| `modal.css` | 通用弹窗 | `.modal-` |
+| `pokemon-editor.css` | 配置编辑器 | `.editor-` |
+| `common.css` | Toast、Version Tags、视图切换 | `.toast-`、`.version-` |
+| `damage-v1.css` | 旧版伤害计算器 | `.damage-` |
+| `damage.css` | 新版伤害计算器 | `.dc-` |
+| `type-chart.css` | 属性克制表 | `.type-chart-` |
+
+**入口与打包机制**：
+
+`index.css` 通过 `@import` 汇总所有模块，`main.jsx` 中通过 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 `@import` 解析并合并为单个 CSS 文件，生产环境只产生一次 HTTP 请求。这与将 CSS 放在 `public/` 目录下通过 `<link>` 引入有本质区别——后者的 `@import` 会在运行时逐个发起 HTTP 请求，每个模块一次请求，严重影响首屏性能。
+
+**开发规范**：
+
+- 新增页面样式时，创建对应的 CSS 文件并在 `index.css` 中添加 `@import`
+- 每个模块使用独立的类名前缀（如 `dc-` 用于 damage calculator），避免跨模块命名冲突
+- 公共变量（颜色、间距、圆角等）统一定义在 `base.css` 的 `:root` 中
+- `box-card.css` 中的 `.type-bg-*` 类同时定义了 `--type-color` CSS 变量，供其他模块通过 `var(--type-color)` 引用属性颜色
+- 响应式样式集中在 `responsive.css` 中管理，不要在各模块内分散编写 `@media` 查询
+- 不要在 `public/` 目录下放置 CSS 文件，所有样式必须通过 `src/styles/` 走 Vite 打包流程
+
 ---
 
 ## 五、爬虫开发规范
@@ -322,19 +435,21 @@ npx taro build --type weapp
 
 | 包 | 职责 | 禁止事项 |
 |----|------|---------|
-| `packages/battle-core` | 纯计算逻辑 | 不得有 I/O、不得依赖 Node.js 特有 API |
-| `packages/sqlite-store` | SQLite 查询 | 不得有业务逻辑，只做数据映射 |
+| `packages/battle-core` | 纯计算逻辑 | 不得有 I/O、不得包含 SQL、不得依赖 Node.js 特有 API |
+| `packages/store/shared-types` | 共享类型/常量/辅助函数 | 不得有 I/O、不得依赖运行时特定 API |
+| `packages/store/sqlite-store` | SQLite 查询 + NameResolver | 不得有业务逻辑，只做数据映射 |
+| `packages/store/d1-store` | D1 查询 + DbAdapter | 与 sqlite-store 保持接口一致 |
 | `packages/supabase-store` | Supabase 查询 | 与 sqlite-store 保持接口一致 |
 | `packages/crawler_py` | 数据采集 | 不得直接被 API 层调用 |
 | `apps/api` | HTTP 路由 | 不得包含数据库查询逻辑（委托给 store 包） |
 | `apps/web` | UI 展示 | 不得直接操作数据库 |
 | `apps/miniprogram` | 小程序 UI | 不得引入 Node.js 专有模块 |
 
-### 8.2 sqlite-store 与 supabase-store 接口一致性
+### 8.2 store 包接口一致性
 
-这是项目最重要的架构约束之一。每次修改任一 store 包的函数签名时，必须同步修改另一个包，保持接口完全一致。
+这是项目最重要的架构约束之一。sqlite-store、d1-store 和 supabase-store 三个包必须保持接口完全一致。每次修改任一 store 包的函数签名时，必须同步修改其他包。
 
-检查方式：两个包的 `src/index.ts` 导出的函数名和参数类型必须完全相同。
+sqlite-store 和 d1-store 的共享类型、常量和辅助函数统一定义在 `packages/store/shared-types`（`@pokemon-localdex/store-types`）中，不得在各自包内重复定义。
 
 ### 8.3 常量管理
 

@@ -1,4 +1,5 @@
 import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
+import { createNameResolver } from "../../../packages/store/sqlite-store/src/index.ts";
 import {
   getAbilityFromSqlite,
   getItemFromSqlite,
@@ -8,7 +9,7 @@ import {
   listItemsFromSqlite,
   listMovesFromSqlite,
   listPokemonFromSqlite
-} from "../../../packages/sqlite-store/src/index.ts";
+} from "../../../packages/store/sqlite-store/src/index.ts";
 
 if (!hasSqliteData()) {
   console.error("No SQLite data found. Run the crawler first: python3 scripts/crawl-52poke-db.py all");
@@ -43,7 +44,7 @@ console.log("pokemon detail:", getPokemonFromSqlite("皮卡丘")?.generationAvai
 console.log("item detail:", getItemFromSqlite("气势披带")?.nameEn);
 console.log("ability detail:", getAbilityFromSqlite("静电")?.effectDetail?.slice(0, 50));
 
-const damage = calculateDamage({
+const damage = calculateDamage(createNameResolver(), {
   generation: 9,
   attacker: { name: "皮卡丘", level: 50 },
   defender: { name: "喷火龙", level: 50 },
