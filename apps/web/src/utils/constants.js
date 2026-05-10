@@ -61,6 +61,61 @@ export const NATURE_EFFECTS = {
 
 export const GENERATION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
+/* ── 属性背景色 RGB 基础值（不含 alpha） ── */
+const TYPE_BG_RGB = {
+  一般: "187,187,170",
+  火:   "255,68,34",
+  水:   "51,153,255",
+  电:   "255,204,51",
+  草:   "119,204,85",
+  冰:   "119,221,255",
+  格斗: "187,85,68",
+  毒:   "170,85,153",
+  地面: "221,187,85",
+  飞行: "102,153,255",
+  超能力:"255,85,153",
+  虫:   "170,187,34",
+  岩石: "187,170,102",
+  幽灵: "102,102,187",
+  龙:   "119,102,238",
+  恶:   "119,85,68",
+  钢:   "170,170,187",
+  妖精: "255,170,255",
+};
+
+/**
+ * 生成指定透明度的属性背景色映射
+ * @param {number} alpha - 透明度 (0~1)，默认 0.10
+ * @returns {Record<string, string>} 属性名 → rgba 字符串
+ */
+export function makeTypeBgColors(alpha = 0.10) {
+  return Object.fromEntries(
+    Object.entries(TYPE_BG_RGB).map(([k, rgb]) => [k, `rgba(${rgb},${alpha})`])
+  );
+}
+
+/** 招式页行底色（alpha=0.10） */
+export const TYPE_BG_COLORS = makeTypeBgColors(0.10);
+
+/** 宝可梦卡片底色（alpha=0.18） */
+export const TYPE_BG_COLORS_CARD = makeTypeBgColors(0.18);
+
+/* ── 分类颜色映射（参考 52Poké Wiki 配色） ── */
+export const CATEGORY_COLORS = {
+  物理: { bg: "#FF4400", text: "#FFCC00" },
+  特殊: { bg: "#2266CC", text: "#BBEEFF" },
+  变化: { bg: "#999999", text: "#EEEEEE" },
+};
+
+/* ── 图标路径工具 ── */
+export function typeIconSrc(typeName) {
+  return `${import.meta.env.BASE_URL}assets/type-icons/type-${typeName}@sm.png`;
+}
+
+export function categoryIconSrc(category) {
+  return `${import.meta.env.BASE_URL}assets/type-icons/category-${category}@sm.png`;
+}
+
 /**
  * 完整 18 属性相克表（第六世代起）
  * 行 = 攻击方属性，列 = 防守方属性

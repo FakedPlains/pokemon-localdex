@@ -1,15 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
+import { parseExpandParam } from "../utils/helpers.js";
 import Loading from "../components/Loading.jsx";
-
-function parseExpandParam() {
-  const hash = window.location.hash || "";
-  const qIdx = hash.indexOf("?");
-  if (qIdx < 0) return null;
-  const params = new URLSearchParams(hash.slice(qIdx));
-  return params.get("expand") || null;
-}
+import GenerationTimeline from "../components/GenerationTimeline.jsx";
+import WikiLink from "../components/WikiLink.jsx";
 
 export default function ItemsPage({ query = "" }) {
   const [expanded, setExpanded] = useState(null);
@@ -128,7 +123,7 @@ export default function ItemsPage({ query = "" }) {
                 {isExpanded && (
                   <div className="it-row-detail">
                     {!detail ? (
-                      <div className="it-detail-loading">
+                      <div className="shared-detail-loading">
                         <div className="pulse-dot" />
                         <span>加载中…</span>
                       </div>
@@ -143,70 +138,41 @@ export default function ItemsPage({ query = "" }) {
 
                         {/* 名称标签 */}
                         <div className="it-detail-names">
-                          {detail.nameJa && <span className="it-name-tag it-name-ja">{detail.nameJa}</span>}
-                          {detail.nameEn && <span className="it-name-tag it-name-en">{detail.nameEn}</span>}
+                          {detail.nameJa && <span className="shared-name-tag shared-name-ja">{detail.nameJa}</span>}
+                          {detail.nameEn && <span className="shared-name-tag shared-name-en">{detail.nameEn}</span>}
                           {detail.introducedGeneration && (
-                            <span className="it-name-tag it-name-gen">第 {detail.introducedGeneration} 世代引入</span>
+                            <span className="shared-name-tag shared-name-gen">第 {detail.introducedGeneration} 世代引入</span>
                           )}
                           {detail.category && (
-                            <span className="it-name-tag it-name-cat">{detail.category}</span>
+                            <span className="shared-name-tag it-name-cat">{detail.category}</span>
                           )}
-                          {detail.source?.url && (
-                            <a href={detail.source.url} target="_blank" rel="noopener noreferrer" className="it-wiki-link" title={detail.source.title || "Wiki"}>
-                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
-                                <path d="M9 2h5v5" /><path d="M14 2 7.5 8.5" />
-                              </svg>
-                            </a>
-                          )}
+                          <WikiLink url={detail.source?.url} title={detail.source?.title || "Wiki"} />
                         </div>
 
                         {/* 效果说明 */}
-                        <div className="it-detail-effect">
-                          <div className="it-detail-effect-title">效果说明</div>
-                          <div className="it-detail-effect-text">
+                        <div className="shared-detail-effect">
+                          <div className="shared-detail-effect-title">效果说明</div>
+                          <div className="shared-detail-effect-text">
                             {detail.effectSummary || "暂无说明"}
                           </div>
                         </div>
 
                         {/* 效果详情 */}
                         {detail.effectDetail && (
-                          <div className="it-detail-effect">
-                            <div className="it-detail-effect-title">效果详情</div>
-                            <div className="it-detail-effect-text">
+                          <div className="shared-detail-effect">
+                            <div className="shared-detail-effect-title">效果详情</div>
+                            <div className="shared-detail-effect-text">
                               {detail.effectDetail}
                             </div>
                           </div>
                         )}
 
                         {/* 世代变更 */}
-                        {detail.generations?.length > 0 && (
-                          <div className="it-gen-section">
-                            <div className="it-gen-title">世代变更</div>
-                            <div className="it-gen-timeline">
-                              {detail.generations.map((record, i) => (
-                                <div key={i} className={`it-gen-item${record.versionExclusive ? ' it-gen-exclusive' : ''}`}>
-                                  <div className="it-gen-badges">
-                                    <div className="it-gen-badge">
-                                      {record.generation === 99 ? "Champions" : `Gen ${record.generation}`}
-                                    </div>
-                                    {(record.gameVersionName || record.gameVersionCode) && (
-                                      <div className="it-gen-version">{record.gameVersionName || record.gameVersionCode}</div>
-                                    )}
-                                    {record.versionExclusive && (
-                                      <div className="it-gen-exclusive-tag">仅限</div>
-                                    )}
-                                  </div>
-                                  <div className="it-gen-text">{record.description}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                        <GenerationTimeline generations={detail.generations} />
 
                         {/* 来源 */}
                         {detail.source?.url && (
-                          <div className="it-source">
+                          <div className="shared-source">
                             <a href={detail.source.url} target="_blank" rel="noopener noreferrer">
                               来源：{detail.source.title || "52Poké Wiki"}
                             </a>

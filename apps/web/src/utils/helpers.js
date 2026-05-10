@@ -1,5 +1,18 @@
 import { ALL_TYPE_OPTIONS, TYPE_ALIASES, NATURE_EFFECTS, STAT_KEYS, LEARN_METHOD_LABELS } from "./constants.js";
 
+/**
+ * 从 hash 路由的 query string 中解析 expand 参数
+ * 用于 #/moves?expand=123、#/abilities?expand=456 等场景
+ * @returns {string|null}
+ */
+export function parseExpandParam() {
+  const hash = window.location.hash || "";
+  const qIdx = hash.indexOf("?");
+  if (qIdx < 0) return null;
+  const params = new URLSearchParams(hash.slice(qIdx));
+  return params.get("expand") || null;
+}
+
 export function normalizeTypeName(type) {
   return TYPE_ALIASES[String(type || "").trim()] || String(type || "").trim();
 }

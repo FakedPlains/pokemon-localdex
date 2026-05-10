@@ -208,6 +208,8 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 
 ### 4.5 公共组件说明
 
+#### 4.5.1 业务组件
+
 **CustomSelect** — 自定义下拉选择框，支持选项分组和自定义渲染。用于 DamagePage 中的性格选择等场景。
 
 **SearchSelect** — 带异步搜索功能的下拉框，支持远程搜索和本地过滤。用于 DamagePage 中的宝可梦、招式、道具、特性搜索选择。
@@ -219,6 +221,79 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 **PokemonPickerList** — 宝可梦选择列表组件，用于从列表中选择宝可梦。
 
 **StatCalculator** — 能力值计算器，支持 EV/IV 输入和实际能力值计算，同时支持 Champions 赛制的 SP 模式。
+
+#### 4.5.2 跨页面共享组件
+
+以下组件从多个页面中提取而来，**新页面开发时必须优先使用这些共享组件，不要重复定义**。
+
+**WikiLink** (`components/WikiLink.jsx`) — Wiki 外链图标组件。接受 `url`、`title`（默认 `"Wiki"`）和可选 `className` 属性。当 `url` 为空时不渲染。已在 MovesPage、AbilitiesPage、ItemsPage、PokedexPage 中使用。
+
+```jsx
+import WikiLink from "../components/WikiLink.jsx";
+<WikiLink url={detail.source?.url} title="52Poké Wiki" />
+```
+
+**GenerationTimeline** (`components/GenerationTimeline.jsx`) — 世代变更时间线组件。接受 `generations` 数组（每项包含 `generation`、`description` 等字段）和可选 `title`（默认 `"世代变更"`）。当 `generations` 为空时不渲染。已在 MovesPage、AbilitiesPage、ItemsPage 中使用。
+
+```jsx
+import GenerationTimeline from "../components/GenerationTimeline.jsx";
+<GenerationTimeline generations={detail.generations} title="世代变更" />
+```
+
+**PokemonGrid** (`components/PokemonGrid.jsx`) — 可学习该招式/拥有该特性的宝可梦网格组件。接受 `apiPath`（API 请求路径，如 `/moves/123/pokemon`）和可选 `title`。已在 MovesPage、AbilitiesPage 中使用。
+
+```jsx
+import PokemonGrid from "../components/PokemonGrid.jsx";
+<PokemonGrid apiPath={`/moves/${moveId}/pokemon`} title="可学习的宝可梦" />
+```
+
+**Modal** (`components/Modal.jsx`) — 通用弹窗组件，基于 `createPortal` 渲染到 `document.body`。支持 Escape 键关闭、点击遮罩关闭、锁定 body 滚动。接受 `open`、`onClose`、`title`、`headerExtra` 和 `children` 属性。已在 TeamsPage 中使用。
+
+```jsx
+import Modal from "../components/Modal.jsx";
+<Modal open={showModal} onClose={() => setShowModal(false)} title="选择队伍">
+  {/* 弹窗内容 */}
+</Modal>
+```
+
+**ViewToggle** (`components/ViewToggle.jsx`) — 卡片/列表视图切换组件。接受 `mode`（`"card"` 或 `"list"`）和 `onChange` 回调。已在 PokedexPage、TeamsPage 中使用。
+
+```jsx
+import ViewToggle from "../components/ViewToggle.jsx";
+<ViewToggle mode={viewMode} onChange={setViewMode} />
+```
+
+#### 4.5.3 共享工具函数与常量
+
+**`parseExpandParam()`** (`utils/helpers.js`) — 从 URL hash 中解析 `expand` 参数，用于从其他页面跳转后自动展开指定条目。已在 MovesPage、AbilitiesPage、ItemsPage 中使用。
+
+```jsx
+import { parseExpandParam } from "../utils/helpers.js";
+const pendingExpandRef = useRef(parseExpandParam());
+```
+
+**`TYPE_BG_COLORS` / `TYPE_BG_COLORS_CARD`** (`utils/constants.js`) — 属性背景色映射。`TYPE_BG_COLORS` 使用 0.10 透明度（用于名称标签），`TYPE_BG_COLORS_CARD` 使用 0.18 透明度（用于卡片背景）。通过 `makeTypeBgColors(alpha)` 工厂函数生成，避免重复定义。
+
+```jsx
+import { TYPE_BG_COLORS, TYPE_BG_COLORS_CARD } from "../utils/constants.js";
+const bgColor = TYPE_BG_COLORS[typeName] || "rgba(0,0,0,0.06)";
+```
+
+**`typeIconSrc(type)` / `categoryIconSrc(category)`** (`utils/constants.js`) — 属性图标和分类图标的 URL 生成函数。
+
+```jsx
+import { typeIconSrc, categoryIconSrc } from "../utils/constants.js";
+<img src={typeIconSrc("fire")} alt="fire" />
+<img src={categoryIconSrc("physical")} alt="physical" />
+```
+
+#### 4.5.4 共享 CSS（`styles/shared.css`）
+
+`shared.css` 定义了跨页面复用的样式类，使用 `shared-` 前缀。为保持向后兼容，部分选择器同时包含旧前缀（`mv-`、`ab-`、`it-`）作为多选择器。
+
+主要共享类名：`shared-name-tag`、`shared-name-ja`、`shared-name-en`、`shared-name-gen`、`shared-detail-effect`、`shared-detail-effect-title`、`shared-detail-effect-text`、`shared-detail-loading`、`shared-gen-timeline`、`shared-gen-item`、`shared-pokemon-section`、`shared-pokemon-grid`、`shared-wiki-link`、`shared-source`。
+
+**开发规范**：新页面中使用 `shared-` 前缀的类名，不要再创建带页面前缀的重复样式。如需扩展共享样式，在 `shared.css` 中添加并使用 `shared-` 前缀。
 
 ### 4.6 ID 使用规范
 
@@ -267,6 +342,7 @@ DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 | 文件 | 职责 | 前缀/命名空间 |
 |------|------|--------------|
 | `base.css` | CSS 变量、reset、body 基础样式 | `--` 变量 |
+| `shared.css` | 跨页面共享样式（名称标签、世代时间线、Wiki 链接等） | `.shared-` |
 | `nav.css` | 顶部导航栏、搜索框、过滤面板 | `.nav-`、`.filter-` |
 | `pokedex.css` | 图鉴页 Master-Detail 布局 | `.pokedex-` |
 | `stat-calculator.css` | 能力值计算器 | `.stat-calc-` |

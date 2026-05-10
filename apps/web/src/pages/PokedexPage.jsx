@@ -1,19 +1,20 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api, unifiedApi } from "../utils/api.js";
+import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
-import { STAT_KEYS } from "../utils/constants.js";
+import { STAT_KEYS, LEARN_METHOD_LABELS } from "../utils/constants.js";
 import {
   getPokemonPreviewImage,
   resolvePokemonDisplayVariant,
   describeLearnsetEntry
 } from "../utils/helpers.js";
-import { LEARN_METHOD_LABELS } from "../utils/constants.js";
 import { saveBoxConfig, getTeams, saveTeam } from "../utils/teamStorage.js";
 import { useToast } from "../components/Toast.jsx";
 import TypeChip from "../components/TypeChip.jsx";
 import StatCalculator from "../components/StatCalculator.jsx";
 import Loading from "../components/Loading.jsx";
+import WikiLink from "../components/WikiLink.jsx";
+import ViewToggle from "../components/ViewToggle.jsx";
 
 /* ─── Main Page ─── */
 export default function PokedexPage({ query = "", types = [], generation = "", initialPokemonId = null, onInitialPokemonConsumed }) {
@@ -163,20 +164,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
       {/* 视图切换按钮（仅在未选中详情时显示） */}
       {!hasSelection && list.length > 0 && (
         <div className="dex-view-toggle">
-          <button
-            className={`box-view-btn${effectiveViewMode === "card" ? " box-view-btn-active" : ""}`}
-            onClick={() => setDexViewMode("card")}
-            title="卡片视图"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
-          </button>
-          <button
-            className={`box-view-btn${effectiveViewMode === "list" ? " box-view-btn-active" : ""}`}
-            onClick={() => setDexViewMode("list")}
-            title="列表视图"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2.5" rx="1"/><rect x="1" y="6.75" width="14" height="2.5" rx="1"/><rect x="1" y="11.5" width="14" height="2.5" rx="1"/></svg>
-          </button>
+          <ViewToggle mode={effectiveViewMode} onChange={setDexViewMode} />
         </div>
       )}
 
@@ -429,14 +417,7 @@ function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
             <span className="drawer-dex">#{String(detail.dexNumber).padStart(4, "0")}</span>
             <h3 className="drawer-name">{detail.nameZh}</h3>
             <span className="drawer-en">{detail.nameEn || ""}</span>
-            {detail.source?.url && (
-              <a href={detail.source.url} target="_blank" rel="noopener noreferrer" className="drawer-wiki-link" title={detail.source.title || "Wiki"}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
-                  <path d="M9 2h5v5" /><path d="M14 2 7.5 8.5" />
-                </svg>
-              </a>
-            )}
+            <WikiLink url={detail.source?.url} title={detail.source?.title || "Wiki"} className="drawer-wiki-link" />
           </div>
           <div className="drawer-types-row">
             <TypeChip type={display.primaryType} />

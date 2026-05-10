@@ -4,6 +4,7 @@
    ══════════════════════════════════════════════ */
 
 @import "./base.css";
+@import "./shared.css";
 @import "./nav.css";
 @import "./pokedex.css";
 @import "./stat-calculator.css";
