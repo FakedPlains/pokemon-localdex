@@ -128,10 +128,9 @@
    ══════════════════════════════════════════════ */
 
 .box-view-toggle {
-  display: flex;
-  gap: 4px;
-  margin-top: 12px;
-  justify-content: flex-end;
+display: flex;
+gap: 4px;
+flex-shrink: 0;
 }
 
 .box-view-btn {
@@ -176,8 +175,8 @@
 
 /* 列表表头 */
 .box-list-header {
-  display: grid;
-  grid-template-columns: 56px minmax(100px, 1.4fr) minmax(100px, 1fr) minmax(70px, 0.8fr) 56px repeat(6, 44px) 32px;
+display: grid;
+grid-template-columns: 56px minmax(100px, 1.4fr) minmax(100px, 1fr) minmax(70px, 0.8fr) 56px repeat(6, 72px) 32px;
   align-items: center;
   padding: 7px 14px;
   background: var(--hover);
@@ -193,14 +192,21 @@
 }
 
 .box-list-hcol-stats,
+.box-list-hcol-base,
+.box-list-hcol-combined,
 .box-list-hcol-nature {
-  text-align: center;
+text-align: center;
+}
+
+.box-list-hcol-base {
+  color: var(--ink);
+  opacity: 1;
 }
 
 /* 列表行 */
 .box-list-row {
-  display: grid;
-  grid-template-columns: 56px minmax(100px, 1.4fr) minmax(100px, 1fr) minmax(70px, 0.8fr) 56px repeat(6, 44px) 32px;
+display: grid;
+grid-template-columns: 56px minmax(100px, 1.4fr) minmax(100px, 1fr) minmax(70px, 0.8fr) 56px repeat(6, 72px) 32px;
   align-items: center;
   padding: 8px 14px;
   gap: 8px;
@@ -334,15 +340,34 @@
   font-weight: 500;
 }
 
-/* 能力值列 */
-.box-list-col-stats {
+/* 种族值 + 能力值合并列 */
+.box-list-col-combined-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0;
   text-align: center;
+  white-space: nowrap;
 }
 
-.box-list-stat-val {
+.box-list-base-val {
   font-size: 12px;
   font-weight: 600;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.box-list-combined-sep {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 0 1px;
+  opacity: 0.5;
+}
+
+.box-list-stat-val {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -365,7 +390,7 @@
 @media (max-width: 900px) {
   .box-list-header,
   .box-list-row {
-    grid-template-columns: 48px minmax(80px, 1.2fr) minmax(80px, 0.8fr) minmax(60px, 0.7fr) 48px repeat(6, 36px) 28px;
+    grid-template-columns: 48px minmax(80px, 1.2fr) minmax(80px, 0.8fr) minmax(60px, 0.7fr) 48px repeat(6, 60px) 28px;
     gap: 4px;
     padding: 6px 10px;
   }
@@ -380,8 +405,12 @@
     height: 36px;
   }
 
+  .box-list-base-val {
+    font-size: 10px;
+  }
+
   .box-list-stat-val {
-    font-size: 11px;
+    font-size: 9px;
   }
 
   .box-list-name-zh {
