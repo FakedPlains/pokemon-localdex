@@ -20,6 +20,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
   const [selectedSlug, setSelectedSlug] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailGeneration, setDetailGeneration] = useState("");
+  const [dexViewMode, setDexViewMode] = useState("card"); // "card" | "list"
 
   const detailRef = useRef(null);
   const activeCardRef = useRef(null);
@@ -154,11 +155,35 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
 
   const hasSelection = selectedSlug !== null;
 
+  // 选中详情时强制使用卡片模式（紧凑列表）
+  const effectiveViewMode = hasSelection ? "card" : dexViewMode;
+
   return (
     <div className="dex-page">
+      {/* 视图切换按钮（仅在未选中详情时显示） */}
+      {!hasSelection && list.length > 0 && (
+        <div className="dex-view-toggle">
+          <button
+            className={`box-view-btn${effectiveViewMode === "card" ? " box-view-btn-active" : ""}`}
+            onClick={() => setDexViewMode("card")}
+            title="卡片视图"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
+          </button>
+          <button
+            className={`box-view-btn${effectiveViewMode === "list" ? " box-view-btn-active" : ""}`}
+            onClick={() => setDexViewMode("list")}
+            title="列表视图"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2.5" rx="1"/><rect x="1" y="6.75" width="14" height="2.5" rx="1"/><rect x="1" y="11.5" width="14" height="2.5" rx="1"/></svg>
+          </button>
+        </div>
+      )}
+
       <div className={`dex-body${hasSelection ? " dex-body-split" : ""}`}>
         {/* Left: Pokemon list — scrolls naturally with the page */}
         <div className={`dex-list-panel${hasSelection ? " dex-list-panel-narrow" : ""}`}>
+          {effectiveViewMode === "card" ? (
           <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
             {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
             {list.map((member) => {
@@ -199,6 +224,73 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
               </div>
             )}
           </div>
+          ) : (
+          /* 列表视图 */
+          <div className="dex-table-view">
+            {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
+            <div className="dex-table-header">
+              <span className="dex-table-hcol dex-table-hcol-img"></span>
+              <span className="dex-table-hcol dex-table-hcol-dex">编号</span>
+              <span className="dex-table-hcol dex-table-hcol-name">名称</span>
+              <span className="dex-table-hcol dex-table-hcol-types">属性</span>
+              <span className="dex-table-hcol-spacer" />
+              <span className="dex-table-hcol dex-table-hcol-ability">特性</span>
+              <span className="dex-table-hcol dex-table-hcol-stats">HP</span>
+              <span className="dex-table-hcol dex-table-hcol-stats">攻击</span>
+              <span className="dex-table-hcol dex-table-hcol-stats">防御</span>
+              <span className="dex-table-hcol dex-table-hcol-stats">特攻</span>
+              <span className="dex-table-hcol dex-table-hcol-stats">特防</span>
+              <span className="dex-table-hcol dex-table-hcol-stats">速度</span>
+              <span className="dex-table-hcol dex-table-hcol-stats">合计</span>
+            </div>
+            {list.map((member) => {
+              const slug = String(member.id);
+              const image = getPokemonPreviewImage(member);
+              const bs = member.baseStats || {};
+              const total = STAT_KEYS.reduce((s, k) => s + (bs[k] || 0), 0);
+              return (
+                <div key={slug} className="dex-table-row" data-slug={slug} onClick={() => handleSelect(slug)}>
+                  <div className="dex-table-col dex-table-col-img">
+                    <div className="dex-table-thumb">
+                      {image?.url
+                        ? <img src={image.url} alt={member.nameZh} referrerPolicy="no-referrer" loading="lazy" />
+                        : <span className="dex-card-placeholder">?</span>}
+                    </div>
+                  </div>
+                  <div className="dex-table-col dex-table-col-dex">
+                    <span className="dex-table-dex">#{String(member.dexNumber || "?").padStart(4, "0")}</span>
+                  </div>
+                  <div className="dex-table-col dex-table-col-name">
+                    <strong className="dex-table-name-zh">{member.nameZh}</strong>
+                    <span className="dex-table-name-en">{member.nameEn || ""}</span>
+                  </div>
+                  <div className="dex-table-col dex-table-col-types">
+                    <TypeChip type={member.primaryType} />
+                    <TypeChip type={member.secondaryType} />
+                  </div>
+                  <div className="dex-table-col-spacer" />
+                  <div className="dex-table-col dex-table-col-ability">
+                    <span className="dex-table-ability">{(member.abilities || []).join(" / ") || "—"}</span>
+                    {member.hiddenAbility && <span className="dex-table-ability-hidden">{member.hiddenAbility}</span>}
+                  </div>
+                  {STAT_KEYS.map((k) => (
+                    <div key={k} className="dex-table-col dex-table-col-stat">
+                      <span className="dex-table-stat-val">{bs[k] ?? "—"}</span>
+                    </div>
+                  ))}
+                  <div className="dex-table-col dex-table-col-stat dex-table-col-total">
+                    <span className="dex-table-stat-val dex-table-stat-total">{total || "—"}</span>
+                  </div>
+                </div>
+              );
+            })}
+            {hasMore && (
+              <div className="dex-load-more" ref={sentinelRef}>
+                <div className="pulse-dot" />
+              </div>
+            )}
+          </div>
+          )}
         </div>
 
         {/* Right: Detail panel — sticky so it stays visible while list scrolls */}
