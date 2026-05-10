@@ -267,6 +267,42 @@ export type PaginationParams = { offset?: number; limit?: number };
 export type PaginatedResult<T> = { items: T[]; total: number };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Store 统一接口（sqlite-store 和 d1-store 共同实现）
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 两个 store 实现的公共接口。
+ * 所有方法统一返回 Promise，sqlite-store 通过适配器包装同步调用。
+ * app.ts 和 worker.ts 的共享路由层只依赖此接口。
+ */
+export interface IStore {
+  // Pokemon
+  listPokemon(filters?: { query?: string; type?: string | string[]; generation?: number } & PaginationParams): Promise<PokemonSummary[] | PaginatedResult<PokemonSummary>>;
+  getPokemon(idOrSlug: string): Promise<PokemonEntry | undefined>;
+  getLearnsetMeta(pokemonId: number): Promise<any>;
+  getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string }>;
+
+  // Moves
+  listMoves(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams): Promise<MoveEntry[] | PaginatedResult<MoveEntry>>;
+  getMove(idOrSlug: string): Promise<MoveEntry | undefined>;
+  getPokemonByMove(moveId: number): Promise<any[]>;
+
+  // Abilities
+  listAbilities(filters?: { query?: string; generation?: number } & PaginationParams): Promise<AbilityEntry[] | PaginatedResult<AbilityEntry>>;
+  getAbility(idOrName: string): Promise<AbilityEntry | undefined>;
+  getPokemonByAbility(abilityId: number): Promise<any[]>;
+
+  // Items
+  listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;
+  getItem(idOrSlug: string): Promise<ItemEntry | undefined>;
+
+  // Teams
+  listTeams(): Promise<BattleTeam[]>;
+  saveTeam(input: Partial<BattleTeam>): Promise<BattleTeam>;
+  deleteTeam(id: string): Promise<void>;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // 共享常量
 // ══════════════════════════════════════════════════════════════════════════════
 

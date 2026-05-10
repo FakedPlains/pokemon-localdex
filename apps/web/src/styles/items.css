@@ -541,6 +541,107 @@ gap: 6px;
   text-decoration: underline;
 }
 
+/* ── Pokemon Section (in move detail) ── */
+.mv-pokemon-section {
+  margin-top: 16px;
+}
+
+.mv-pokemon-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.mv-pokemon-empty {
+  padding: 16px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mv-pokemon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.mv-pokemon-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px 6px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  border: 1px solid rgba(31, 42, 31, 0.06);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+  cursor: pointer;
+}
+
+.mv-pokemon-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.mv-pokemon-card-img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.mv-pokemon-card-dex {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  font-family: "JetBrains Mono", "SF Mono", monospace;
+}
+
+.mv-pokemon-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+  word-break: keep-all;
+}
+
+.mv-pokemon-card-types {
+  display: flex;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.mv-pokemon-card-type-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.mv-pokemon-card-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #1a5276;
+  background: rgba(59, 132, 197, 0.1);
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-top: 2px;
+}
+
+.mv-detail-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  padding: 20px 0;
+  color: var(--muted);
+}
+
 /* ── Infinite Scroll Sentinel ── */
 .mv-load-more {
 display: flex;

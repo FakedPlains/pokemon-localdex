@@ -11,9 +11,64 @@ function parseExpandParam() {
   return params.get("expand") || null;
 }
 
+/* ── 属性颜色映射（用于宝可梦卡片底色） ── */
+const TYPE_BG_COLORS = {
+  一般: "rgba(187,187,170,0.18)",
+  火:   "rgba(255,68,34,0.18)",
+  水:   "rgba(51,153,255,0.18)",
+  电:   "rgba(255,204,51,0.18)",
+  草:   "rgba(119,204,85,0.18)",
+  冰:   "rgba(119,221,255,0.18)",
+  格斗: "rgba(187,85,68,0.18)",
+  毒:   "rgba(170,85,153,0.18)",
+  地面: "rgba(221,187,85,0.18)",
+  飞行: "rgba(102,153,255,0.18)",
+  超能力:"rgba(255,85,153,0.18)",
+  虫:   "rgba(170,187,34,0.18)",
+  岩石: "rgba(187,170,102,0.18)",
+  幽灵: "rgba(102,102,187,0.18)",
+  龙:   "rgba(119,102,238,0.18)",
+  恶:   "rgba(119,85,68,0.18)",
+  钢:   "rgba(170,170,187,0.18)",
+  妖精: "rgba(255,170,255,0.18)",
+};
+
+function typeIconSrc(typeName) {
+  return `${import.meta.env.BASE_URL}assets/type-icons/type-${typeName}@sm.png`;
+}
+
+/* ── 宝可梦网格组件 ── */
+function PokemonGrid({ pokemon, emptyText = "暂无数据", labelFn }) {
+  if (!pokemon || pokemon.length === 0) {
+    return <div className="ab-pokemon-empty">{emptyText}</div>;
+  }
+  return (
+    <div className="ab-pokemon-grid">
+      {pokemon.map((p) => (
+        <a
+          key={p.id}
+          className="ab-pokemon-card"
+          href={`#/pokemon?id=${p.id}`}
+          style={{ background: TYPE_BG_COLORS[p.primaryType] || "rgba(200,200,200,0.12)" }}
+        >
+          {p.image && <img className="ab-pokemon-card-img" src={p.image} alt={p.nameZh} loading="lazy" />}
+          <span className="ab-pokemon-card-dex">#{String(p.dexNumber).padStart(4, "0")}</span>
+          <span className="ab-pokemon-card-name">{p.nameZh}</span>
+          <span className="ab-pokemon-card-types">
+            {p.primaryType && <img className="ab-pokemon-card-type-icon" src={typeIconSrc(p.primaryType)} alt={p.primaryType} title={p.primaryType} />}
+            {p.secondaryType && <img className="ab-pokemon-card-type-icon" src={typeIconSrc(p.secondaryType)} alt={p.secondaryType} title={p.secondaryType} />}
+          </span>
+          {labelFn && <span className="ab-pokemon-card-label">{labelFn(p)}</span>}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export default function AbilitiesPage({ query = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
   const [detailCache, setDetailCache] = useState({});
+  const [pokemonCache, setPokemonCache] = useState({});
   const pendingExpandRef = useRef(parseExpandParam());
 
   // 构建分页请求路径
@@ -47,6 +102,11 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
       if (!detailCache[key]) {
         unifiedApi(`/abilities/${key}`).then((r) => {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
+        });
+      }
+      if (!pokemonCache[key]) {
+        unifiedApi(`/abilities/${key}/pokemon`).then((r) => {
+          setPokemonCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
       // Scroll to the ability row after DOM update
@@ -85,7 +145,12 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
         setDetailCache((prev) => ({ ...prev, [id]: r.data }));
       });
     }
-  }, [expanded, detailCache]);
+    if (!pokemonCache[id]) {
+      unifiedApi(`/abilities/${id}/pokemon`).then((r) => {
+        setPokemonCache((prev) => ({ ...prev, [id]: r.data }));
+      });
+    }
+  }, [expanded, detailCache, pokemonCache]);
 
   if (loading && abilities.length === 0) return <Loading />;
 
@@ -183,6 +248,23 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
                             </div>
                           </div>
                         )}
+
+                        {/* 拥有该特性的宝可梦 */}
+                        <div className="ab-pokemon-section">
+                          <div className="ab-pokemon-section-title">拥有该特性的宝可梦</div>
+                          {!pokemonCache[key] ? (
+                            <div className="ab-detail-loading">
+                              <div className="pulse-dot" />
+                              <span>加载中…</span>
+                            </div>
+                          ) : (
+                            <PokemonGrid
+                              pokemon={pokemonCache[key]}
+                              emptyText="暂无拥有该特性的宝可梦数据"
+                              labelFn={(p) => p.isHidden ? "隐藏特性" : null}
+                            />
+                          )}
+                        </div>
 
                         {/* 来源 */}
                         {detail.source?.url && (

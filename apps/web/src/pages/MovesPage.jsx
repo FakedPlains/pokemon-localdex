@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import Loading from "../components/Loading.jsx";
 
@@ -70,8 +71,54 @@ function parseExpandParam() {
   return params.get("expand") || null;
 }
 
+/* ── 宝可梦网格组件 ── */
+function PokemonGrid({ pokemon, emptyText = "暂无数据", labelFn }) {
+  if (!pokemon || pokemon.length === 0) {
+    return <div className="mv-pokemon-empty">{emptyText}</div>;
+  }
+  return (
+    <div className="mv-pokemon-grid">
+      {pokemon.map((p) => (
+        <a
+          key={p.id}
+          className="mv-pokemon-card"
+          href={`#/pokemon?id=${p.id}`}
+          style={{ background: TYPE_BG_COLORS[p.primaryType] || "rgba(200,200,200,0.12)" }}
+        >
+          {p.image && <img className="mv-pokemon-card-img" src={p.image} alt={p.nameZh} loading="lazy" />}
+          <span className="mv-pokemon-card-dex">#{String(p.dexNumber).padStart(4, "0")}</span>
+          <span className="mv-pokemon-card-name">{p.nameZh}</span>
+          <span className="mv-pokemon-card-types">
+            {p.primaryType && <img className="mv-pokemon-card-type-icon" src={typeIconSrc(p.primaryType)} alt={p.primaryType} title={p.primaryType} />}
+            {p.secondaryType && <img className="mv-pokemon-card-type-icon" src={typeIconSrc(p.secondaryType)} alt={p.secondaryType} title={p.secondaryType} />}
+          </span>
+          {labelFn && <span className="mv-pokemon-card-label">{labelFn(p)}</span>}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/* ── 学习方式翻译 ── */
+const LEARN_METHOD_NAMES = {
+  "升级": "升级",
+  "招式机": "招式机",
+  "遗传": "遗传",
+  "教学": "教学",
+  "level-up": "升级",
+  "machine": "招式机",
+  "egg": "遗传",
+  "tutor": "教学",
+};
+
+function formatLearnMethods(methods) {
+  if (!methods || methods.length === 0) return null;
+  return methods.map((m) => LEARN_METHOD_NAMES[m] || m).join("/");
+}
+
 export default function MovesPage({ query = "", type = "", category = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
+  const [pokemonCache, setPokemonCache] = useState({});
   const pendingExpandRef = useRef(parseExpandParam());
 
   // Reset expanded when filters change
@@ -127,7 +174,12 @@ export default function MovesPage({ query = "", type = "", category = "", genera
 
   const toggleExpand = useCallback((id) => {
     setExpanded((prev) => (prev === id ? null : id));
-  }, []);
+    if (!pokemonCache[id]) {
+      unifiedApi(`/moves/${id}/pokemon`).then((r) => {
+        setPokemonCache((prev) => ({ ...prev, [id]: r.data }));
+      });
+    }
+  }, [pokemonCache]);
 
   if (loading && moves.length === 0) return <Loading />;
 
@@ -276,6 +328,23 @@ export default function MovesPage({ query = "", type = "", category = "", genera
                         </div>
                       </div>
                     )}
+
+                    {/* 能学习该招式的宝可梦 */}
+                    <div className="mv-pokemon-section">
+                      <div className="mv-pokemon-section-title">能学习该招式的宝可梦</div>
+                      {!pokemonCache[move.id] ? (
+                        <div className="mv-detail-loading">
+                          <div className="pulse-dot" />
+                          <span>加载中…</span>
+                        </div>
+                      ) : (
+                        <PokemonGrid
+                          pokemon={pokemonCache[move.id]}
+                          emptyText="暂无能学习该招式的宝可梦数据"
+                          labelFn={(p) => formatLearnMethods(p.learnMethods)}
+                        />
+                      )}
+                    </div>
 
                     {/* 来源 */}
                     {move.source?.url && (

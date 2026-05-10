@@ -1,3 +1,16 @@
+/**
+ * @pokemon-localdex/sqlite-store
+ *
+ * Node.js SQLite 数据访问层（薄包装）。
+ *
+ * 查询逻辑全部委托给 @pokemon-localdex/drizzle-queries（DrizzleStore），
+ * 本模块只负责：
+ *   1. 数据库文件管理（路径、打开、关闭）
+ *   2. Schema 迁移（ensureSchema / migrateSchema / resetSchema）
+ *   3. 创建 Drizzle 实例并包装为 IStore
+ *   4. 同步名称解析器（createNameResolver，供 battle-core 使用）
+ */
+
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -28,46 +41,32 @@ export type {
   PaginatedResult,
 } from "@pokemon-localdex/store-types";
 
-import type {
-  StatBlock,
-  SourceMeta,
-  ImageAsset,
-  FormStatVariant,
-  PokemonFormEntry,
-  EvolutionStep,
-  PokemonSummary,
-  PokemonEntry,
-  MoveGenerationRecord,
-  MoveEntry,
-  AbilityGenerationRecord,
-  AbilityEntry,
-  ItemGenerationRecord,
-  ItemEntry,
-  LearnsetRecord,
-  TeamMember,
-  BattleTeam,
-  PaginationParams,
-  PaginatedResult,
-} from "@pokemon-localdex/store-types";
+// ── Re-export helpers for crawler ──
 
-// ── Constants & helpers from shared package ──
-
-import {
+export {
+  normalizeTypeName,
+  splitTypeNames,
+  typeLegacyId,
   GENERATIONS,
   GAME_VERSIONS,
   GAME_VERSION_NAMES,
   TYPE_NAMES,
   TYPE_ALIASES,
-  normalizeTypeName,
-  typeLegacyId,
-  splitTypeNames,
   statBlockFromRow,
   sourceFromRow,
 } from "@pokemon-localdex/store-types";
 
+// ── Drizzle ──
+
+import { drizzle } from "drizzle-orm/sqlite-proxy";
+import { createDrizzleStore, DrizzleStore } from "@pokemon-localdex/drizzle-queries";
+import type { IStore, BattleTeam } from "@pokemon-localdex/store-types";
+
 const ROOT = resolve(import.meta.dirname, "../../../../");
 
-// ── Helpers ──
+// ══════════════════════════════════════════════════════════════════════════════
+// 数据库文件管理
+// ══════════════════════════════════════════════════════════════════════════════
 
 function resolveDatabasePath() {
   return process.env.LOCALDEX_DB_PATH
@@ -78,8 +77,6 @@ function resolveDatabasePath() {
 function ensureDbDir() {
   mkdirSync(dirname(resolveDatabasePath()), { recursive: true });
 }
-
-// ── Database ──
 
 export function getDatabasePath() { return resolveDatabasePath(); }
 export function hasDatabaseFile() { return existsSync(resolveDatabasePath()); }
@@ -96,15 +93,10 @@ export function openDatabase() {
   return db;
 }
 
-/**
- * 轻量级迁移：检测旧的列结构并自动迁移。
- * 在首次打开数据库时自动执行。
- *
- * 迁移内容：
- * 1. pokemon_form_types: type_id → type_name（属性汉字）
- * 2. moves: type_id → type_name
- * 3. 所有表: generation_id → generation（世代数字）
- */
+// ══════════════════════════════════════════════════════════════════════════════
+// 轻量级迁移
+// ══════════════════════════════════════════════════════════════════════════════
+
 function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
   // ── 迁移 1: pokemon_form_types type_id → type_name ──
   try {
@@ -152,7 +144,6 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
   } catch { /* table doesn't exist yet */ }
 
   // ── 迁移 3: generation_id → generation（所有相关表）──
-  // 辅助函数：检测表是否有 generation_id 列
   const _hasCol = (table: string, col: string) => {
     try {
       const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Record<string, unknown>[];
@@ -160,7 +151,6 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
     } catch { return false; }
   };
 
-  // pokemon: introduced_generation_id → introduced_generation
   if (_hasCol("pokemon", "introduced_generation_id") && !_hasCol("pokemon", "introduced_generation")) {
     try {
       db.exec(`
@@ -172,8 +162,6 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
     } catch { /* column may already exist */ }
   }
 
-  // pokemon_forms: 移除废弃的 generation_start/generation_end 列
-  // 世代变体信息已迁移到子表（pokemon_form_stats/types/abilities）
   if (_hasCol("pokemon_forms", "generation_start")) {
     try {
       db.exec(`
@@ -200,7 +188,6 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
     } catch { /* table doesn't exist or already migrated */ }
   }
 
-  // pokemon_generation_regions: generation_id → generation
   if (_hasCol("pokemon_generation_regions", "generation_id") && !_hasCol("pokemon_generation_regions", "generation")) {
     try {
       db.exec(`
@@ -213,7 +200,6 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
     } catch { /* column may already exist */ }
   }
 
-  // pokemon_learnsets: generation_id → generation
   if (_hasCol("pokemon_learnsets", "generation_id") && !_hasCol("pokemon_learnsets", "generation")) {
     try {
       db.exec(`
@@ -226,7 +212,6 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
     } catch { /* column may already exist */ }
   }
 
-  // move_generation_records: generation_id → generation
   if (_hasCol("move_generation_records", "generation_id") && !_hasCol("move_generation_records", "generation")) {
     try {
       db.exec(`
@@ -239,7 +224,6 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
     } catch { /* column may already exist */ }
   }
 
-  // ability_generation_records: generation_id → generation
   if (_hasCol("ability_generation_records", "generation_id") && !_hasCol("ability_generation_records", "generation")) {
     try {
       db.exec(`
@@ -253,7 +237,6 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
   }
 
   // ── 迁移: items 表删除废弃的 legacy_id 列 ──
-  // legacy_id 有 UNIQUE 约束，SQLite 不支持直接 DROP，需要重建表
   if (_hasCol("items", "legacy_id")) {
     try {
       db.exec(`
@@ -280,63 +263,37 @@ function _migrateOldSchema(db: InstanceType<typeof DatabaseSync>) {
           FROM items;
         DROP TABLE items;
         ALTER TABLE _items_new RENAME TO items;
-        CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
         PRAGMA foreign_keys = ON;
       `);
-    } catch { /* table may already be migrated */ }
+    } catch { /* table doesn't exist or already migrated */ }
   }
 
-  // moves.introduced_generation: 如果存的是 generations.id 而非世代数字，需要转换
-  // 检测方式：如果 generations 表存在且 moves.introduced_generation 的值与 generations.id 匹配
-  try {
-    const genExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='generations'").get();
-    if (genExists) {
-      // 检查是否有 moves 的 introduced_generation 值对应 generations.id
-      const sample = db.prepare(`
-        SELECT m.introduced_generation, g.number
-        FROM moves m
-        JOIN generations g ON g.id = m.introduced_generation
-        WHERE m.introduced_generation IS NOT NULL
-        LIMIT 1
-      `).get() as Record<string, unknown> | undefined;
-      if (sample && Number(sample.introduced_generation) !== Number(sample.number)) {
-        // 值是 ID 而非世代数字，需要转换
-        db.exec(`
-          UPDATE moves SET introduced_generation = (
-            SELECT g.number FROM generations g WHERE g.id = moves.introduced_generation
-          ) WHERE introduced_generation IS NOT NULL;
-        `);
-      }
-      // 同样处理 abilities.introduced_generation
-      const abSample = db.prepare(`
-        SELECT a.introduced_generation, g.number
-        FROM abilities a
-        JOIN generations g ON g.id = a.introduced_generation
-        WHERE a.introduced_generation IS NOT NULL
-        LIMIT 1
-      `).get() as Record<string, unknown> | undefined;
-      if (abSample && Number(abSample.introduced_generation) !== Number(abSample.number)) {
-        db.exec(`
-          UPDATE abilities SET introduced_generation = (
-            SELECT g.number FROM generations g WHERE g.id = abilities.introduced_generation
-          ) WHERE introduced_generation IS NOT NULL;
-        `);
-      }
-    }
-  } catch { /* generations table doesn't exist, no migration needed */ }
-
-  // ── 迁移: pokemon_forms 添加 required_item_id 列（形态绑定道具） ──
-  if (_hasCol("pokemon_forms", "form_key") && !_hasCol("pokemon_forms", "required_item_id")) {
+  // ── 迁移: item_generation_records 添加 version_exclusive 列 ──
+  if (!_hasCol("item_generation_records", "version_exclusive")) {
     try {
-      db.exec(`ALTER TABLE pokemon_forms ADD COLUMN required_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL;`);
-    } catch { /* column may already exist */ }
+      db.exec(`ALTER TABLE item_generation_records ADD COLUMN version_exclusive INTEGER NOT NULL DEFAULT 0`);
+    } catch { /* column may already exist or table doesn't exist */ }
+  }
+
+  // ── 迁移: move_generation_records 添加 version_exclusive 列 ──
+  if (!_hasCol("move_generation_records", "version_exclusive")) {
+    try {
+      db.exec(`ALTER TABLE move_generation_records ADD COLUMN version_exclusive INTEGER NOT NULL DEFAULT 0`);
+    } catch { /* column may already exist or table doesn't exist */ }
+  }
+
+  // ── 迁移: ability_generation_records 添加 version_exclusive 列 ──
+  if (!_hasCol("ability_generation_records", "version_exclusive")) {
+    try {
+      db.exec(`ALTER TABLE ability_generation_records ADD COLUMN version_exclusive INTEGER NOT NULL DEFAULT 0`);
+    } catch { /* column may already exist or table doesn't exist */ }
   }
 }
 
-/**
- * 增量式确保 schema 存在。保留已有数据（moves, abilities 等）。
- * 如果检测到旧版 pokemon_forms 表结构，自动迁移。
- */
+// ══════════════════════════════════════════════════════════════════════════════
+// Schema 管理
+// ══════════════════════════════════════════════════════════════════════════════
+
 export function ensureSchema() {
   const db = openDatabase();
 
@@ -346,7 +303,6 @@ export function ensureSchema() {
     if (cols.length > 0) {
       const colNames = cols.map((c) => String(c.name));
       if (!colNames.includes("form_key")) {
-        // 旧表结构，需要迁移 pokemon 相关表
         db.exec(`
           PRAGMA foreign_keys = OFF;
           DROP TABLE IF EXISTS pokemon_moves;
@@ -373,11 +329,7 @@ export function ensureSchema() {
     }
   } catch { /* table doesn't exist yet, that's fine */ }
 
-  // type_id → type_name 和 generation_id → generation 的迁移
-  // 已在 _migrateOldSchema() 中处理（openDatabase 首次调用时自动执行）
-
   // ── 迁移: pokemon_form_stats/types/abilities 添加 generation_start/generation_end ──
-  // 旧表没有这些列且 UNIQUE 约束不同，需要 drop 重建
   try {
     const statCols = db.prepare("PRAGMA table_info(pokemon_form_stats)").all() as Record<string, unknown>[];
     if (statCols.length > 0) {
@@ -394,7 +346,6 @@ export function ensureSchema() {
     }
   } catch { /* table doesn't exist yet */ }
 
-  // image_assets 表已废弃，清理旧表
   try {
     db.exec(`DROP TABLE IF EXISTS image_assets; DROP TABLE IF EXISTS _image_assets_backup;`);
   } catch { /* table doesn't exist */ }
@@ -402,14 +353,6 @@ export function ensureSchema() {
   db.exec(`
     PRAGMA foreign_keys = OFF;
 
-    -- ============================================================
-    -- generations / game_versions / types 表已废弃
-    -- 世代直接以数字存储，游戏版本以 code 存储，属性以汉字存储
-    -- ============================================================
-
-    -- ============================================================
-    -- 宝可梦主表（精简）
-    -- ============================================================
     CREATE TABLE IF NOT EXISTS pokemon (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       dex_number INTEGER NOT NULL,
@@ -426,9 +369,6 @@ export function ensureSchema() {
       source_fetched_at TEXT
     );
 
-    -- ============================================================
-    -- 宝可梦形态（核心：形态优先架构）
-    -- ============================================================
     CREATE TABLE IF NOT EXISTS pokemon_forms (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
@@ -482,9 +422,6 @@ export function ensureSchema() {
       UNIQUE (form_id, image_kind)
     );
 
-    -- ============================================================
-    -- 进化链（含进化条件）
-    -- ============================================================
     CREATE TABLE IF NOT EXISTS evolution_chains (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       chain_id INTEGER NOT NULL,
@@ -501,9 +438,6 @@ export function ensureSchema() {
       notes TEXT
     );
 
-    -- ============================================================
-    -- 宝可梦世代可用性
-    -- ============================================================
     CREATE TABLE IF NOT EXISTS pokemon_generation_regions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
@@ -513,9 +447,6 @@ export function ensureSchema() {
       UNIQUE (pokemon_id, generation, region)
     );
 
-    -- ============================================================
-    -- 招式学习
-    -- ============================================================
     CREATE TABLE IF NOT EXISTS pokemon_learnsets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
@@ -533,9 +464,6 @@ export function ensureSchema() {
               game_version_code, learn_method, level)
     );
 
-    -- ============================================================
-    -- 招式表
-    -- ============================================================
     CREATE TABLE IF NOT EXISTS moves (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       number INTEGER,
@@ -566,9 +494,6 @@ export function ensureSchema() {
       UNIQUE (move_id, generation, game_version_code)
     );
 
-    -- ============================================================
-    -- 特性表
-    -- ============================================================
     CREATE TABLE IF NOT EXISTS abilities (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       number INTEGER,
@@ -594,9 +519,6 @@ export function ensureSchema() {
       UNIQUE (ability_id, generation)
     );
 
-    -- ============================================================
-    -- 道具表
-    -- ============================================================
     CREATE TABLE IF NOT EXISTS items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       slug TEXT NOT NULL UNIQUE,
@@ -623,9 +545,6 @@ export function ensureSchema() {
       UNIQUE (item_id, generation)
     );
 
-    -- ============================================================
-    -- 索引
-    -- ============================================================
     CREATE INDEX IF NOT EXISTS idx_pokemon_dex ON pokemon(dex_number);
     CREATE INDEX IF NOT EXISTS idx_pokemon_name ON pokemon(name_zh);
     CREATE INDEX IF NOT EXISTS idx_pokemon_slug ON pokemon(slug);
@@ -653,25 +572,26 @@ export function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_abilities_number ON abilities(number);
     CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
 
+    CREATE TABLE IF NOT EXISTS battle_teams (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '未命名队伍',
+      format TEXT NOT NULL DEFAULT 'singles',
+      members_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_battle_teams_updated ON battle_teams(updated_at);
+
     PRAGMA foreign_keys = ON;
   `);
-
-  // generations / game_versions / types 表已废弃，不再填充维度数据。
-  // 世代直接以数字存储，游戏版本以 code 存储，属性以汉字存储。
 
   db.close();
 }
 
-/**
- * 迁移旧 schema 到新 schema。保留 moves/abilities/items 数据，
- * 删除旧的 pokemon 相关表。
- */
 export function migrateSchema() {
   const db = openDatabase();
   db.exec(`
     PRAGMA foreign_keys = OFF;
-
-    -- 删除旧的 pokemon 相关表
     DROP TABLE IF EXISTS pokemon_learnsets_old;
     DROP TABLE IF EXISTS pokemon_moves;
     DROP TABLE IF EXISTS pokemon_evolution_members;
@@ -691,18 +611,12 @@ export function migrateSchema() {
     DROP TABLE IF EXISTS pokemon_learnsets;
     DROP TABLE IF EXISTS pokemon_form_images;
     DROP TABLE IF EXISTS pokemon;
-
     PRAGMA foreign_keys = ON;
   `);
   db.close();
-
-  // 重新创建所有表
   ensureSchema();
 }
 
-/**
- * 完全重建：删除所有表后重新创建。
- */
 export function resetSchema() {
   const db = openDatabase();
   db.exec(`
@@ -721,15 +635,13 @@ export function resetSchema() {
     DROP TABLE IF EXISTS moves;
     DROP TABLE IF EXISTS abilities;
     DROP TABLE IF EXISTS pokemon;
-    DROP TABLE IF EXISTS game_versions;  -- legacy, no longer used
-    DROP TABLE IF EXISTS types;  -- legacy, no longer used
-    DROP TABLE IF EXISTS generations;  -- legacy, no longer used
-    -- 旧表清理
+    DROP TABLE IF EXISTS game_versions;
+    DROP TABLE IF EXISTS types;
+    DROP TABLE IF EXISTS generations;
     DROP TABLE IF EXISTS pokemon_moves;
     DROP TABLE IF EXISTS pokemon_evolution_members;
     DROP TABLE IF EXISTS pokemon_abilities;
     DROP TABLE IF EXISTS pokemon_types;
-    DROP TABLE IF EXISTS pokemon_generation_regions;
     DROP TABLE IF EXISTS pokemon_generation_abilities;
     DROP TABLE IF EXISTS pokemon_generation_types;
     DROP TABLE IF EXISTS pokemon_generation_stats;
@@ -737,851 +649,17 @@ export function resetSchema() {
     DROP TABLE IF EXISTS pokemon_base_stats;
     DROP TABLE IF EXISTS image_assets;
     DROP TABLE IF EXISTS _image_assets_backup;
+    DROP TABLE IF EXISTS item_generation_records;
+    DROP TABLE IF EXISTS battle_teams;
     PRAGMA foreign_keys = ON;
   `);
   db.close();
   ensureSchema();
 }
 
-// ── Pokemon queries (N+1 eliminated) ──
-
-/**
- * 列表查询：单次 JOIN 获取所有宝可梦的默认形态信息。
- */
-
-export function listPokemonFromSqlite(filters?: { query?: string; type?: string | string[]; generation?: number } & PaginationParams) {
-  const db = openDatabase();
-  const conditions: string[] = [];
-  const params: Array<string | number> = [];
-
-  if (filters?.query) {
-    conditions.push("(p.name_zh LIKE ? OR p.name_ja LIKE ? OR p.name_en LIKE ? OR p.slug LIKE ? OR CAST(p.dex_number AS TEXT) LIKE ?)");
-    const v = `%${filters.query}%`;
-    params.push(v, v, v, v, v);
-  }
-  if (filters?.type) {
-    const types = Array.isArray(filters.type) ? filters.type : [filters.type];
-    if (types.length === 1) {
-      conditions.push(`EXISTS (
-        SELECT 1 FROM pokemon_form_types pft2
-        WHERE pft2.form_id = pf.id AND pft2.type_name = ?
-      )`);
-      params.push(types[0]);
-    } else if (types.length > 1) {
-      const placeholders = types.map(() => '?').join(', ');
-      conditions.push(`EXISTS (
-        SELECT 1 FROM pokemon_form_types pft2
-        WHERE pft2.form_id = pf.id AND pft2.type_name IN (${placeholders})
-      )`);
-      params.push(...types);
-    }
-  }
-  if (filters?.generation) {
-    conditions.push(`EXISTS (
-      SELECT 1 FROM pokemon_generation_regions pgr
-      WHERE pgr.pokemon_id = p.id AND pgr.generation = ?
-    )`);
-    params.push(filters.generation);
-  }
-
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const usePagination = filters?.limit !== undefined;
-
-  // 分页模式下先获取总数
-  let total = 0;
-  if (usePagination) {
-    const countRow = db.prepare(`
-      SELECT COUNT(*) AS cnt
-      FROM pokemon p
-      JOIN pokemon_forms pf ON pf.pokemon_id = p.id AND pf.is_default = 1
-      ${where}
-    `).get(...params) as Record<string, unknown>;
-    total = Number(countRow.cnt);
-  }
-
-  // 主查询：pokemon + 默认形态 + 最新种族值（generation_end IS NULL 表示最新世代）
-  const limitClause = usePagination
-    ? `LIMIT ${Number(filters!.limit)} OFFSET ${Number(filters?.offset ?? 0)}`
-    : "";
-
-  const rows = db.prepare(`
-    SELECT
-      p.id, p.dex_number, p.slug, p.name_zh, p.name_ja, p.name_en,
-      pf.id AS form_id,
-      pfs.hp, pfs.atk, pfs.def, pfs.spa, pfs.spd, pfs.spe
-    FROM pokemon p
-    JOIN pokemon_forms pf ON pf.pokemon_id = p.id AND pf.is_default = 1
-    LEFT JOIN pokemon_form_stats pfs ON pfs.form_id = pf.id AND pfs.generation_end IS NULL
-    ${where}
-    ORDER BY p.dex_number ASC
-    ${limitClause}
-  `).all(...params) as Record<string, unknown>[];
-
-  if (rows.length === 0) { db.close(); return usePagination ? { items: [], total } as PaginatedResult<PokemonSummary & { _chainId?: number }> : []; }
-
-  // 批量获取所有默认形态的属性
-  const formIds = rows.map((r) => Number(r.form_id));
-  const placeholders = formIds.map(() => "?").join(",");
-
-  const typeRows = db.prepare(`
-    SELECT pft.form_id, pft.type_name, pft.slot
-    FROM pokemon_form_types pft
-    WHERE pft.form_id IN (${placeholders})
-    ORDER BY pft.form_id, pft.slot
-  `).all(...formIds) as Record<string, unknown>[];
-
-  const typeMap = new Map<number, string[]>();
-  for (const r of typeRows) {
-    const fid = Number(r.form_id);
-    if (!typeMap.has(fid)) typeMap.set(fid, []);
-    typeMap.get(fid)!.push(String(r.type_name));
-  }
-
-  // 批量获取所有默认形态的特性
-  const abilityRows = db.prepare(`
-    SELECT pfa.form_id, pfa.ability_name_zh, pfa.is_hidden
-    FROM pokemon_form_abilities pfa
-    WHERE pfa.form_id IN (${placeholders})
-    ORDER BY pfa.form_id, pfa.slot
-  `).all(...formIds) as Record<string, unknown>[];
-
-  const abilityMap = new Map<number, { abilities: string[]; hidden?: string }>();
-  for (const r of abilityRows) {
-    const fid = Number(r.form_id);
-    if (!abilityMap.has(fid)) abilityMap.set(fid, { abilities: [] });
-    const entry = abilityMap.get(fid)!;
-    if (Number(r.is_hidden)) {
-      entry.hidden = String(r.ability_name_zh);
-    } else {
-      entry.abilities.push(String(r.ability_name_zh));
-    }
-  }
-
-  // 批量获取所有默认形态的图片
-  const imageRows = db.prepare(`
-    SELECT pfi.form_id, pfi.image_kind, pfi.url, pfi.alt
-    FROM pokemon_form_images pfi
-    WHERE pfi.form_id IN (${placeholders})
-  `).all(...formIds) as Record<string, unknown>[];
-
-  const imageMap = new Map<number, Record<string, ImageAsset>>();
-  for (const r of imageRows) {
-    const fid = Number(r.form_id);
-    if (!imageMap.has(fid)) imageMap.set(fid, {});
-    imageMap.get(fid)![String(r.image_kind)] = { url: String(r.url), alt: r.alt ? String(r.alt) : undefined };
-  }
-
-  // 批量获取世代可用性
-  const pokemonIds = rows.map((r) => Number(r.id));
-  const pPlaceholders = pokemonIds.map(() => "?").join(",");
-  const genRows = db.prepare(`
-    SELECT pgr.pokemon_id, pgr.generation
-    FROM pokemon_generation_regions pgr
-    WHERE pgr.pokemon_id IN (${pPlaceholders})
-    ORDER BY pgr.pokemon_id, pgr.generation
-  `).all(...pokemonIds) as Record<string, unknown>[];
-
-  const genMap = new Map<number, number[]>();
-  for (const r of genRows) {
-    const pid = Number(r.pokemon_id);
-    if (!genMap.has(pid)) genMap.set(pid, []);
-    const num = Number(r.generation);
-    if (!genMap.get(pid)!.includes(num)) genMap.get(pid)!.push(num);
-  }
-
-  // 批量获取进化链（用于列表页分组）
-  const evoRows = db.prepare(`
-    SELECT ec.chain_id, ec.to_pokemon_id, ec.stage, ec.sort_order
-    FROM evolution_chains ec
-    WHERE ec.to_pokemon_id IN (${pPlaceholders})
-    ORDER BY ec.chain_id, ec.sort_order
-  `).all(...pokemonIds) as Record<string, unknown>[];
-
-  const chainMap = new Map<number, number>(); // pokemonId -> chainId
-  for (const r of evoRows) {
-    chainMap.set(Number(r.to_pokemon_id), Number(r.chain_id));
-  }
-
-  db.close();
-
-  const items = rows.map((row) => {
-    const fid = Number(row.form_id);
-    const pid = Number(row.id);
-    const types = typeMap.get(fid) || [];
-    const ab = abilityMap.get(fid) || { abilities: [] };
-    const imgs = imageMap.get(fid) || {};
-    return {
-      id: pid,
-      dexNumber: Number(row.dex_number),
-      slug: String(row.slug),
-      nameZh: String(row.name_zh),
-      nameJa: row.name_ja ? String(row.name_ja) : undefined,
-      nameEn: row.name_en ? String(row.name_en) : undefined,
-      primaryType: types[0],
-      secondaryType: types[1],
-      abilities: ab.abilities,
-      hiddenAbility: ab.hidden,
-      baseStats: statBlockFromRow(row),
-      image: imgs.official,
-      shinyImage: imgs.shiny,
-      generations: genMap.get(pid) || [],
-      _chainId: chainMap.get(pid),
-    } as PokemonSummary & { _chainId?: number };
-  });
-
-  return usePagination ? { items, total } as PaginatedResult<PokemonSummary & { _chainId?: number }> : items;
-}
-
-/**
- * 详情查询：获取宝可梦的完整信息（所有形态 + 进化链）。
- */
-export function getPokemonFromSqlite(idOrSlug: string) {
-  const db = openDatabase();
-
-  // 查询 1: 基础信息
-  const row = db.prepare(`
-    SELECT p.*
-    FROM pokemon p
-    WHERE p.id = ? OR p.slug = ? OR p.name_zh = ? OR CAST(p.dex_number AS TEXT) = ?
-    LIMIT 1
-  `).get(idOrSlug, idOrSlug, idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
-
-  if (!row) { db.close(); return undefined; }
-
-  const pokemonId = Number(row.id);
-
-  // 查询 2: 所有形态（LEFT JOIN items 获取绑定道具信息）
-  const formRows = db.prepare(`
-    SELECT pf.*, i.id AS req_item_id, i.name_zh AS req_item_name_zh, i.slug AS req_item_slug, i.image_url AS req_item_image_url
-    FROM pokemon_forms pf
-    LEFT JOIN items i ON i.id = pf.required_item_id
-    WHERE pf.pokemon_id = ?
-    ORDER BY pf.sort_order ASC
-  `).all(pokemonId) as Record<string, unknown>[];
-
-  const formIds = formRows.map((f) => Number(f.id));
-  const fPlaceholders = formIds.map(() => "?").join(",") || "NULL";
-
-  // 批量获取形态种族值（可能有多条，按世代区分）
-  const fsRows = formIds.length ? db.prepare(`
-    SELECT pfs.form_id, pfs.generation_start, pfs.generation_end,
-           pfs.hp, pfs.atk, pfs.def, pfs.spa, pfs.spd, pfs.spe
-    FROM pokemon_form_stats pfs
-    WHERE pfs.form_id IN (${fPlaceholders})
-    ORDER BY pfs.form_id, pfs.generation_start ASC
-  `).all(...formIds) as Record<string, unknown>[] : [];
-
-  const fsMap = new Map<number, Array<{ genStart?: number; genEnd?: number; stats: StatBlock }>>();
-  for (const r of fsRows) {
-    const fid = Number(r.form_id);
-    if (!fsMap.has(fid)) fsMap.set(fid, []);
-    fsMap.get(fid)!.push({
-      genStart: r.generation_start !== null && r.generation_start !== undefined ? Number(r.generation_start) : undefined,
-      genEnd: r.generation_end !== null && r.generation_end !== undefined ? Number(r.generation_end) : undefined,
-      stats: statBlockFromRow(r)!,
-    });
-  }
-
-  // 批量获取形态属性（可能有多条，按世代区分）
-  const ftRows = formIds.length ? db.prepare(`
-    SELECT pft.form_id, pft.type_name, pft.slot, pft.generation_start, pft.generation_end
-    FROM pokemon_form_types pft
-    WHERE pft.form_id IN (${fPlaceholders})
-    ORDER BY pft.form_id, pft.generation_start ASC, pft.slot
-  `).all(...formIds) as Record<string, unknown>[] : [];
-
-  const ftMap = new Map<number, Array<{ genStart?: number; genEnd?: number; types: string[] }>>();
-  for (const r of ftRows) {
-    const fid = Number(r.form_id);
-    const genStart = r.generation_start !== null && r.generation_start !== undefined ? Number(r.generation_start) : undefined;
-    const genEnd = r.generation_end !== null && r.generation_end !== undefined ? Number(r.generation_end) : undefined;
-    if (!ftMap.has(fid)) ftMap.set(fid, []);
-    const arr = ftMap.get(fid)!;
-    // Group by generation range
-    let group = arr.find((g) => g.genStart === genStart && g.genEnd === genEnd);
-    if (!group) {
-      group = { genStart, genEnd, types: [] };
-      arr.push(group);
-    }
-    group.types.push(String(r.type_name));
-  }
-
-  // 批量获取形态特性（可能有多条，按世代区分），JOIN abilities 表获取 id 和 description
-  const faRows = formIds.length ? db.prepare(`
-    SELECT pfa.form_id, pfa.ability_name_zh, pfa.is_hidden, pfa.slot,
-           pfa.generation_start, pfa.generation_end,
-           a.id AS ability_id, a.description AS ability_description
-    FROM pokemon_form_abilities pfa
-    LEFT JOIN abilities a ON a.id = pfa.ability_id
-    WHERE pfa.form_id IN (${fPlaceholders})
-    ORDER BY pfa.form_id, pfa.generation_start ASC, pfa.slot
-  `).all(...formIds) as Record<string, unknown>[] : [];
-
-  const faMap = new Map<number, Array<{ genStart?: number; genEnd?: number; abilities: Array<{ nameZh: string; isHidden: boolean; abilityId?: number; description?: string }> }>>();
-  for (const r of faRows) {
-    const fid = Number(r.form_id);
-    const genStart = r.generation_start !== null && r.generation_start !== undefined ? Number(r.generation_start) : undefined;
-    const genEnd = r.generation_end !== null && r.generation_end !== undefined ? Number(r.generation_end) : undefined;
-    if (!faMap.has(fid)) faMap.set(fid, []);
-    const arr = faMap.get(fid)!;
-    let group = arr.find((g) => g.genStart === genStart && g.genEnd === genEnd);
-    if (!group) {
-      group = { genStart, genEnd, abilities: [] };
-      arr.push(group);
-    }
-    group.abilities.push({
-      nameZh: String(r.ability_name_zh),
-      isHidden: Boolean(Number(r.is_hidden)),
-      abilityId: r.ability_id != null ? Number(r.ability_id) : undefined,
-      description: r.ability_description ? String(r.ability_description) : undefined,
-    });
-  }
-
-  // 批量获取形态图片
-  const fiRows = formIds.length ? db.prepare(`
-    SELECT pfi.form_id, pfi.image_kind, pfi.url, pfi.alt
-    FROM pokemon_form_images pfi
-    WHERE pfi.form_id IN (${fPlaceholders})
-  `).all(...formIds) as Record<string, unknown>[] : [];
-
-  const fiMap = new Map<number, Record<string, ImageAsset>>();
-  for (const r of fiRows) {
-    const fid = Number(r.form_id);
-    if (!fiMap.has(fid)) fiMap.set(fid, {});
-    fiMap.get(fid)![String(r.image_kind)] = { url: String(r.url), alt: r.alt ? String(r.alt) : undefined };
-  }
-
-  const forms: PokemonFormEntry[] = formRows.map((f) => {
-    const fid = Number(f.id);
-    // Resolve stats: pick the latest (no generation_end) or the first entry
-    const statEntries = fsMap.get(fid) || [];
-    const latestStat = statEntries.find((s) => s.genEnd === undefined) || statEntries[0];
-    // Resolve types: pick the latest or the first entry
-    const typeEntries = ftMap.get(fid) || [];
-    const latestType = typeEntries.find((t) => t.genEnd === undefined) || typeEntries[0];
-    // Resolve abilities: pick the latest or the first entry
-    const abilityEntries = faMap.get(fid) || [];
-    const latestAbility = abilityEntries.find((a) => a.genEnd === undefined) || abilityEntries[0];
-
-    const entry: PokemonFormEntry = {
-      id: fid,
-      formKey: String(f.form_key),
-      nameZh: String(f.name_zh),
-      formType: String(f.form_type),
-      isDefault: Boolean(Number(f.is_default)),
-      sortOrder: Number(f.sort_order),
-      primaryType: latestType?.types[0],
-      secondaryType: latestType?.types[1],
-      abilities: latestAbility?.abilities || [],
-      baseStats: latestStat?.stats,
-      images: fiMap.get(fid) || {},
-    };
-
-    // 填充绑定道具信息（从 JOIN 结果中读取）
-    if (f.req_item_id) {
-      entry.requiredItem = {
-        id: String(f.req_item_id),
-        nameZh: String(f.req_item_name_zh),
-        slug: String(f.req_item_slug),
-        imageUrl: f.req_item_image_url ? String(f.req_item_image_url) : undefined,
-      };
-    }
-
-    // Attach generation variants if there are multiple entries
-    if (statEntries.length > 1) {
-      entry.statVariants = statEntries.map((s) => ({
-        generationStart: s.genStart,
-        generationEnd: s.genEnd,
-        baseStats: s.stats,
-      }));
-    }
-    if (typeEntries.length > 1) {
-      entry.typeVariants = typeEntries.map((t) => ({
-        generationStart: t.genStart,
-        generationEnd: t.genEnd,
-        primaryType: t.types[0],
-        secondaryType: t.types[1],
-      }));
-    }
-    if (abilityEntries.length > 1) {
-      entry.abilityVariants = abilityEntries.map((a) => ({
-        generationStart: a.genStart,
-        generationEnd: a.genEnd,
-        abilities: a.abilities,
-      }));
-    }
-
-    return entry;
-  });
-
-  // 查询 3: 进化链
-  // 先找到该宝可梦所属的 chain_id
-  const chainRow = db.prepare(`
-    SELECT chain_id FROM evolution_chains WHERE to_pokemon_id = ? LIMIT 1
-  `).get(pokemonId) as Record<string, unknown> | undefined;
-
-  let evolutionChain: EvolutionStep[] = [];
-  if (chainRow) {
-    const chainId = Number(chainRow.chain_id);
-    const evoRows = db.prepare(`
-      SELECT ec.*,
-        pf.name_zh AS from_name, pt.name_zh AS to_name,
-        fi_to.url AS to_image_url, fi_to.alt AS to_image_alt
-      FROM evolution_chains ec
-      LEFT JOIN pokemon pf ON pf.id = ec.from_pokemon_id
-      LEFT JOIN pokemon pt ON pt.id = ec.to_pokemon_id
-      LEFT JOIN pokemon_forms pf_to ON pf_to.pokemon_id = ec.to_pokemon_id AND pf_to.is_default = 1
-      LEFT JOIN pokemon_form_images fi_to ON fi_to.form_id = pf_to.id AND fi_to.image_kind = 'official'
-      WHERE ec.chain_id = ?
-      ORDER BY ec.sort_order ASC
-    `).all(chainId) as Record<string, unknown>[];
-
-    evolutionChain = evoRows.map((e) => {
-      // 获取 to_pokemon 的属性
-      const toFormRow = db.prepare(`
-        SELECT pf.id FROM pokemon_forms pf WHERE pf.pokemon_id = ? AND pf.is_default = 1 LIMIT 1
-      `).get(Number(e.to_pokemon_id)) as Record<string, unknown> | undefined;
-      let toTypes: string[] = [];
-      if (toFormRow) {
-        const tRows = db.prepare(`
-          SELECT pft.type_name FROM pokemon_form_types pft
-          WHERE pft.form_id = ? ORDER BY pft.slot
-        `).all(Number(toFormRow.id)) as Record<string, unknown>[];
-        toTypes = tRows.map((t) => String(t.type_name));
-      }
-      return {
-        fromPokemonId: e.from_pokemon_id ? Number(e.from_pokemon_id) : undefined,
-        fromNameZh: e.from_name ? String(e.from_name) : undefined,
-        fromFormKey: e.from_form_key ? String(e.from_form_key) : undefined,
-        toPokemonId: Number(e.to_pokemon_id),
-        toNameZh: String(e.to_name),
-        toFormKey: e.to_form_key ? String(e.to_form_key) : undefined,
-        stage: Number(e.stage),
-        method: e.evolution_method ? String(e.evolution_method) : undefined,
-        condition: e.evolution_condition ? String(e.evolution_condition) : undefined,
-        item: e.evolution_item ? String(e.evolution_item) : undefined,
-        level: e.evolution_level !== null ? Number(e.evolution_level) : undefined,
-        toTypes,
-        toImage: e.to_image_url ? { url: String(e.to_image_url), alt: e.to_image_alt ? String(e.to_image_alt) : undefined } : undefined,
-      };
-    });
-  }
-
-  // 查询 4: 世代可用性
-  const genRegRows = db.prepare(`
-    SELECT pgr.generation FROM pokemon_generation_regions pgr
-    WHERE pgr.pokemon_id = ?
-    ORDER BY pgr.generation
-  `).all(pokemonId) as Record<string, unknown>[];
-  const generations = [...new Set(genRegRows.map((r) => Number(r.generation)))];
-
-  db.close();
-
-  // 组装默认形态信息到顶层
-  const defaultForm = forms.find((f) => f.isDefault) || forms[0];
-
-  const result: PokemonEntry = {
-    id: pokemonId,
-    dexNumber: Number(row.dex_number),
-    slug: String(row.slug),
-    nameZh: String(row.name_zh),
-    nameJa: row.name_ja ? String(row.name_ja) : undefined,
-    nameEn: row.name_en ? String(row.name_en) : undefined,
-    primaryType: defaultForm?.primaryType,
-    secondaryType: defaultForm?.secondaryType,
-    abilities: defaultForm?.abilities.filter((a) => !a.isHidden).map((a) => a.nameZh) || [],
-    hiddenAbility: defaultForm?.abilities.find((a) => a.isHidden)?.nameZh,
-    baseStats: defaultForm?.baseStats,
-    image: defaultForm?.images.official,
-    shinyImage: defaultForm?.images.shiny,
-    generations,
-    category: row.category ? String(row.category) : undefined,
-    heightM: row.height_m !== null ? Number(row.height_m) : undefined,
-    weightKg: row.weight_kg !== null ? Number(row.weight_kg) : undefined,
-    forms,
-    evolutionChain,
-    source: sourceFromRow(row),
-  };
-
-  return result;
-}
-
-/**
- * 获取宝可梦在 learnsets 表中有哪些世代、形态和游戏版本（用于前端 UI 选择器）。
- */
-export function getLearnsetMeta(pokemonId: number) {
-  const db = openDatabase();
-  const genRows = db.prepare(`
-    SELECT DISTINCT generation FROM pokemon_learnsets
-    WHERE pokemon_id = ? ORDER BY generation
-  `).all(pokemonId) as Record<string, unknown>[];
-  const formRows = db.prepare(`
-    SELECT DISTINCT form_key FROM pokemon_learnsets
-    WHERE pokemon_id = ? ORDER BY form_key
-  `).all(pokemonId) as Record<string, unknown>[];
-
-  // 每个世代下可用的游戏版本
-  const versionRows = db.prepare(`
-    SELECT DISTINCT generation, game_version_code
-    FROM pokemon_learnsets
-    WHERE pokemon_id = ? AND game_version_code IS NOT NULL AND game_version_code != ''
-    ORDER BY generation, game_version_code
-  `).all(pokemonId) as Record<string, unknown>[];
-
-  const versionsByGen: Record<number, Array<{ code: string; name: string }>> = {};
-  for (const r of versionRows) {
-    const gen = Number(r.generation);
-    const code = String(r.game_version_code);
-    if (!versionsByGen[gen]) versionsByGen[gen] = [];
-    versionsByGen[gen].push({ code, name: GAME_VERSION_NAMES.get(code) || code });
-  }
-
-  db.close();
-  return {
-    generations: genRows.map((r) => Number(r.generation)),
-    formKeys: formRows.map((r) => String(r.form_key)),
-    versionsByGen,
-  };
-}
-
-/**
- * 获取宝可梦的招式学习列表（按世代 + 形态 + 可选游戏版本）。
- * 如果指定的 formKey 没有数据，自动 fallback 到 'default'。
- * gameVersionCode 为空字符串时表示查询无版本标记的通用数据；
- * 为 undefined 时表示不限版本（返回所有数据）。
- */
-export function getPokemonLearnset(pokemonId: number, generation: number, formKey = "default", gameVersionCode?: string) {
-  const db = openDatabase();
-
-  // 构建版本过滤条件
-  const versionCondition = gameVersionCode !== undefined
-    ? (gameVersionCode === ""
-      ? "AND (pl.game_version_code IS NULL OR pl.game_version_code = '')"
-      : "AND pl.game_version_code = ?")
-    : "";
-  const versionParams = (gameVersionCode !== undefined && gameVersionCode !== "") ? [gameVersionCode] : [];
-
-  function queryLearnset(pid: number, gen: number, fk: string) {
-    return db.prepare(`
-      SELECT pl.move_name_zh, pl.learn_method, pl.level, pl.tm_number, pl.notes,
-        pl.game_version_code,
-        m.type_name, m.category AS move_category,
-        m.power AS move_power, m.accuracy AS move_accuracy, m.pp AS move_pp, m.id AS move_id,
-        m.description AS move_description
-      FROM pokemon_learnsets pl
-      LEFT JOIN moves m ON m.id = pl.move_id
-      WHERE pl.pokemon_id = ? AND pl.generation = ? AND pl.form_key = ?
-      ${versionCondition}
-      ORDER BY pl.learn_method, pl.sort_order
-    `).all(pid, gen, fk, ...versionParams) as Record<string, unknown>[];
-  }
-
-  // 先尝试指定的 formKey
-  let rows = queryLearnset(pokemonId, generation, formKey);
-
-  // Fallback: 如果指定形态没有数据，尝试 default
-  let usedFormKey = formKey;
-  if (rows.length === 0 && formKey !== "default") {
-    rows = queryLearnset(pokemonId, generation, "default");
-    if (rows.length > 0) usedFormKey = "default";
-  }
-  // Fallback: 如果 default 也没有数据，取该宝可梦在该世代的第一个可用 form_key
-  if (rows.length === 0) {
-    const firstForm = db.prepare(`
-      SELECT DISTINCT form_key FROM pokemon_learnsets
-      WHERE pokemon_id = ? AND generation = ? LIMIT 1
-    `).get(pokemonId, generation) as Record<string, unknown> | undefined;
-    if (firstForm) {
-      const fallbackKey = String(firstForm.form_key);
-      rows = queryLearnset(pokemonId, generation, fallbackKey);
-      if (rows.length > 0) usedFormKey = fallbackKey;
-    }
-  }
-
-  db.close();
-
-  return {
-    formKey: usedFormKey,
-    gameVersionCode: gameVersionCode ?? null,
-    moves: rows.map((r) => ({
-      moveId: r.move_id !== null ? Number(r.move_id) : undefined,
-      moveNameZh: String(r.move_name_zh),
-      learnMethod: String(r.learn_method),
-      level: r.level !== null ? Number(r.level) : undefined,
-      tmNumber: r.tm_number ? String(r.tm_number) : undefined,
-      moveType: r.type_name ? String(r.type_name) : undefined,
-      moveCategory: r.move_category ? String(r.move_category) : undefined,
-      movePower: r.move_power !== null ? Number(r.move_power) : undefined,
-      moveAccuracy: r.move_accuracy !== null ? Number(r.move_accuracy) : undefined,
-      movePP: r.move_pp !== null ? Number(r.move_pp) : undefined,
-      moveDescription: r.move_description ? String(r.move_description) : undefined,
-    } as LearnsetRecord)),
-  };
-}
-
-// ── Move queries ──
-
-function hydrateMoveRow(db: DatabaseSync, row: Record<string, unknown>): MoveEntry {
-  const generations = db.prepare(`
-    SELECT mgr.*
-    FROM move_generation_records mgr
-    WHERE mgr.move_id = ?
-    ORDER BY mgr.generation ASC
-  `).all(String(row.id)) as Record<string, unknown>[];
-
-  return {
-    id: String(row.id),
-    number: row.number !== null && row.number !== undefined ? Number(row.number) : undefined,
-    nameZh: String(row.name_zh),
-    nameJa: row.name_ja ? String(row.name_ja) : undefined,
-    nameEn: row.name_en ? String(row.name_en) : undefined,
-    type: row.type_name ? String(row.type_name) : undefined,
-    category: row.category ? String(row.category) : undefined,
-    power: row.power !== null ? Number(row.power) : undefined,
-    accuracy: row.accuracy !== null && row.accuracy !== undefined ? Number(row.accuracy) : undefined,
-    pp: row.pp !== null ? Number(row.pp) : undefined,
-    description: row.description ? String(row.description) : undefined,
-    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
-    introducedGeneration: row.introduced_generation !== null && row.introduced_generation !== undefined ? Number(row.introduced_generation) : undefined,
-    generations: generations.map((g) => {
-      const code = g.game_version_code ? String(g.game_version_code) : undefined;
-      return {
-        generation: Number(g.generation),
-        gameVersionCode: code,
-        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
-        versionExclusive: g.version_exclusive === 1,
-        description: g.description ? String(g.description) : "",
-        notes: g.notes ? String(g.notes) : undefined,
-      };
-    }),
-    source: sourceFromRow(row),
-  };
-}
-
-export function listMovesFromSqlite(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams) {
-  const db = openDatabase();
-  const conditions: string[] = [];
-  const params: Array<string | number> = [];
-  if (filters?.query) {
-    conditions.push("(m.name_zh LIKE ? OR m.name_ja LIKE ? OR m.name_en LIKE ? OR CAST(m.id AS TEXT) LIKE ?)");
-    const v = `%${filters.query}%`;
-    params.push(v, v, v, v);
-  }
-  if (filters?.type) {
-    conditions.push("m.type_name = ?");
-    params.push(filters.type);
-  }
-  if (filters?.category) {
-    conditions.push("m.category = ?");
-    params.push(filters.category);
-  }
-  if (filters?.generation) {
-    conditions.push("EXISTS (SELECT 1 FROM move_generation_records mgr WHERE mgr.move_id = m.id AND mgr.generation = ?)");
-    params.push(filters.generation);
-  }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const usePagination = filters?.limit !== undefined;
-
-  let total = 0;
-  if (usePagination) {
-    const countRow = db.prepare(`SELECT COUNT(*) AS cnt FROM moves m ${where}`).get(...params) as Record<string, unknown>;
-    total = Number(countRow.cnt);
-  }
-
-  const limitClause = usePagination
-    ? `LIMIT ${Number(filters!.limit)} OFFSET ${Number(filters?.offset ?? 0)}`
-    : "";
-
-  const rows = db.prepare(`
-    SELECT m.*
-    FROM moves m
-    ${where}
-    ORDER BY m.name_zh ASC
-    ${limitClause}
-  `).all(...params) as Record<string, unknown>[];
-  const items = rows.map((r) => hydrateMoveRow(db, r));
-  db.close();
-  return usePagination ? { items, total } as PaginatedResult<MoveEntry> : items;
-}
-
-export function getMoveFromSqlite(idOrSlug: string) {
-  const db = openDatabase();
-  const row = db.prepare(`
-    SELECT m.*
-    FROM moves m
-    WHERE m.id = ? OR m.name_zh = ?
-    LIMIT 1
-  `).get(idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
-  const result = row ? hydrateMoveRow(db, row) : undefined;
-  db.close();
-  return result;
-}
-
-// ── Ability queries ──
-
-function hydrateAbilityRow(db: DatabaseSync, row: Record<string, unknown>): AbilityEntry {
-  const generations = db.prepare(`
-    SELECT agr.*
-    FROM ability_generation_records agr
-    WHERE agr.ability_id = ?
-    ORDER BY agr.generation ASC
-  `).all(String(row.id)) as Record<string, unknown>[];
-
-  return {
-    id: String(row.id),
-    number: row.number !== null && row.number !== undefined ? Number(row.number) : undefined,
-    nameZh: String(row.name_zh),
-    nameJa: row.name_ja ? String(row.name_ja) : undefined,
-    nameEn: row.name_en ? String(row.name_en) : undefined,
-    description: row.description ? String(row.description) : undefined,
-    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
-    introducedGeneration: row.introduced_generation !== null && row.introduced_generation !== undefined ? Number(row.introduced_generation) : undefined,
-    generations: generations.map((g) => {
-      const code = g.game_version_code ? String(g.game_version_code) : undefined;
-      return {
-        generation: Number(g.generation),
-        gameVersionCode: code,
-        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
-        versionExclusive: g.version_exclusive === 1,
-        description: g.description ? String(g.description) : "",
-        notes: g.notes ? String(g.notes) : undefined,
-      };
-    }),
-    source: sourceFromRow(row),
-  };
-}
-
-export function listAbilitiesFromSqlite(filters?: { query?: string; generation?: number } & PaginationParams) {
-  const db = openDatabase();
-  const conditions: string[] = [];
-  const params: Array<string | number> = [];
-  if (filters?.query) {
-    conditions.push("(a.name_zh LIKE ? OR a.name_ja LIKE ? OR a.name_en LIKE ?)");
-    const v = `%${filters.query}%`;
-    params.push(v, v, v);
-  }
-  if (filters?.generation) {
-    conditions.push("EXISTS (SELECT 1 FROM ability_generation_records agr WHERE agr.ability_id = a.id AND agr.generation = ?)");
-    params.push(filters.generation);
-  }
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const usePagination = filters?.limit !== undefined;
-
-  let total = 0;
-  if (usePagination) {
-    const countRow = db.prepare(`SELECT COUNT(*) AS cnt FROM abilities a ${where}`).get(...params) as Record<string, unknown>;
-    total = Number(countRow.cnt);
-  }
-
-  const limitClause = usePagination
-    ? `LIMIT ${Number(filters!.limit)} OFFSET ${Number(filters?.offset ?? 0)}`
-    : "";
-
-  const rows = db.prepare(`
-    SELECT a.*
-    FROM abilities a
-    ${where}
-    ORDER BY a.number ASC, a.name_zh ASC
-    ${limitClause}
-  `).all(...params) as Record<string, unknown>[];
-  const items = rows.map((r) => hydrateAbilityRow(db, r));
-  db.close();
-  return usePagination ? { items, total } as PaginatedResult<AbilityEntry> : items;
-}
-
-export function getAbilityFromSqlite(idOrName: string) {
-  const db = openDatabase();
-  const row = db.prepare(`
-    SELECT a.*
-    FROM abilities a
-    WHERE a.id = ? OR a.name_zh = ?
-    LIMIT 1
-  `).get(idOrName, idOrName) as Record<string, unknown> | undefined;
-  const result = row ? hydrateAbilityRow(db, row) : undefined;
-  db.close();
-  return result;
-}
-
-// ── Item queries ──
-
-function hydrateItemRow(db: ReturnType<typeof openDatabase>, row: Record<string, unknown>): ItemEntry {
-  const itemId = Number(row.id);
-  const genRows = db.prepare(
-    "SELECT generation, game_version_code, description, notes, version_exclusive FROM item_generation_records WHERE item_id = ? ORDER BY generation ASC"
-  ).all(itemId) as Record<string, unknown>[];
-  return {
-    id: String(row.id),
-    slug: String(row.slug),
-    nameZh: String(row.name_zh),
-    nameJa: row.name_ja ? String(row.name_ja) : undefined,
-    nameEn: row.name_en ? String(row.name_en) : undefined,
-    category: row.category ? String(row.category) : undefined,
-    effectSummary: row.effect_summary ? String(row.effect_summary) : undefined,
-    effectDetail: row.effect_detail ? String(row.effect_detail) : undefined,
-    introducedGeneration: row.introduced_generation ? Number(row.introduced_generation) : undefined,
-    imageUrl: row.image_url ? String(row.image_url) : undefined,
-    generations: genRows.map((r) => {
-      const code = r.game_version_code ? String(r.game_version_code) : undefined;
-      return {
-        generation: Number(r.generation),
-        gameVersionCode: code,
-        gameVersionName: code ? GAME_VERSION_NAMES.get(code) : undefined,
-        versionExclusive: r.version_exclusive === 1,
-        description: String(r.description ?? ""),
-        notes: r.notes ? String(r.notes) : undefined,
-      };
-    }),
-    source: sourceFromRow(row),
-  };
-}
-
-export function listItemsFromSqlite(filters?: { query?: string; category?: string } & PaginationParams) {
-const db = openDatabase();
-const conditions: string[] = [];
-const params: Array<string | number> = [];
-if (filters?.query) {
-  conditions.push("(name_zh LIKE ? OR name_ja LIKE ? OR name_en LIKE ? OR slug LIKE ? OR effect_summary LIKE ?)");
-  const v = `%${filters.query}%`;
-  params.push(v, v, v, v, v);
-}
-if (filters?.category) {
-  conditions.push("category = ?");
-  params.push(filters.category);
-}
-const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-const usePagination = filters?.limit !== undefined;
-
-let total = 0;
-if (usePagination) {
-  const countRow = db.prepare(`SELECT COUNT(*) AS cnt FROM items ${where}`).get(...params) as Record<string, unknown>;
-  total = Number(countRow.cnt);
-}
-
-const limitClause = usePagination
-  ? `LIMIT ${Number(filters!.limit)} OFFSET ${Number(filters?.offset ?? 0)}`
-  : "";
-
-const rows = db.prepare(`
-  SELECT * FROM items
-  ${where}
-  ORDER BY id ASC
-  ${limitClause}
-`).all(...params) as Record<string, unknown>[];
-const items = rows.map((r) => hydrateItemRow(db, r));
-db.close();
-return usePagination ? { items, total } as PaginatedResult<ItemEntry> : items;
-}
-
-export function getItemFromSqlite(idOrSlug: string) {
-  const db = openDatabase();
-  const row = db.prepare("SELECT * FROM items WHERE id = ? OR slug = ? OR name_zh = ? LIMIT 1").get(idOrSlug, idOrSlug, idOrSlug) as Record<string, unknown> | undefined;
-  if (!row) { db.close(); return undefined; }
-  const result = hydrateItemRow(db, row);
-  db.close();
-  return result;
-}
-
-// ── Utility ──
+// ══════════════════════════════════════════════════════════════════════════════
+// 数据检测
+// ══════════════════════════════════════════════════════════════════════════════
 
 export function hasSqliteData() {
   if (!hasDatabaseFile()) return false;
@@ -1598,12 +676,94 @@ export function hasSqliteData() {
   }
 }
 
-// ── Re-export helpers for crawler ──
+// ══════════════════════════════════════════════════════════════════════════════
+// Drizzle 实例创建（sqlite-proxy 包装 node:sqlite）
+// ══════════════════════════════════════════════════════════════════════════════
 
-export { normalizeTypeName, splitTypeNames, typeLegacyId, GENERATIONS, GAME_VERSIONS, GAME_VERSION_NAMES, TYPE_NAMES, TYPE_ALIASES, statBlockFromRow, sourceFromRow } from "@pokemon-localdex/store-types";
+/**
+ * 用 sqlite-proxy 包装 node:sqlite 的 DatabaseSync。
+ *
+ * sqlite-proxy 需要一个 async 回调 (sql, params, method) => { rows }，
+ * 我们在回调内部同步执行 DatabaseSync 的 prepare/all/get/run。
+ *
+ * 重要：Drizzle 的 mapResultRow 使用数字索引（row[columnIndex]）访问行数据，
+ * 因此回调必须返回二维数组格式（每行是值数组，按 SELECT 列顺序排列）。
+ *
+ * 使用 stmt.setReturnArrays(true) 直接获取原生数组格式，
+ * 避免 stmt.all() 返回对象时同名列被覆盖的问题（如 LEFT JOIN 时两表有同名列）。
+ */
+function createDrizzleDb() {
+  const rawDb = openDatabase();
+
+  const db = drizzle(async (sql, params, method) => {
+    try {
+      const stmt = rawDb.prepare(sql);
+
+      if (method === "run") {
+        stmt.run(...params);
+        return { rows: [] };
+      }
+
+      // 使用 setReturnArrays(true) 直接获取二维数组格式
+      // 这样即使有同名列（如 JOIN 时），也能保持正确的列顺序和值
+      stmt.setReturnArrays(true);
+      const rows = stmt.all(...params) as unknown[][];
+
+      return { rows };
+    } catch (e: any) {
+      console.error("[sqlite-proxy] SQL error:", e.message, "\nSQL:", sql);
+      throw e;
+    }
+  });
+
+  return { db, rawDb };
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 名称解析器（供 battle-core 伤害计算使用）
+// IStore 工厂（统一接口）
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 创建符合 IStore 接口的 SQLite 适配器。
+ *
+ * Teams 存储由外部注入（app.ts 使用文件存储），因此作为参数传入。
+ * 如果不传 teams 参数，则使用 DrizzleStore 内置的 SQLite teams 存储。
+ */
+export function createSqliteStore(teams?: {
+  listTeams: () => BattleTeam[];
+  saveTeam: (input: Partial<BattleTeam>) => BattleTeam;
+  deleteTeam: (id: string) => void;
+}): IStore {
+  const { db } = createDrizzleDb();
+  const store = createDrizzleStore(db);
+
+  if (!teams) {
+    return store;
+  }
+
+  // 用外部 teams 实现覆盖 DrizzleStore 的 teams 方法
+  return {
+    listPokemon: (filters) => store.listPokemon(filters),
+    getPokemon: (idOrSlug) => store.getPokemon(idOrSlug),
+    getLearnsetMeta: (pokemonId) => store.getLearnsetMeta(pokemonId),
+    getPokemonLearnset: (pokemonId, generation, formKey, gameVersionCode) =>
+      store.getPokemonLearnset(pokemonId, generation, formKey, gameVersionCode),
+    listMoves: (filters) => store.listMoves(filters),
+    getMove: (idOrSlug) => store.getMove(idOrSlug),
+    getPokemonByMove: (moveId) => store.getPokemonByMove(moveId),
+    listAbilities: (filters) => store.listAbilities(filters),
+    getAbility: (idOrName) => store.getAbility(idOrName),
+    getPokemonByAbility: (abilityId) => store.getPokemonByAbility(abilityId),
+    listItems: (filters) => store.listItems(filters),
+    getItem: (idOrSlug) => store.getItem(idOrSlug),
+    listTeams: async () => teams.listTeams(),
+    saveTeam: async (input) => teams.saveTeam(input),
+    deleteTeam: async (id) => { teams.deleteTeam(id); },
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 同步名称解析器（供 battle-core 伤害计算使用）
 // ══════════════════════════════════════════════════════════════════════════════
 
 import type { NameResolver, PokemonNameQuery, EntityNameQuery } from "@pokemon-localdex/battle-core";
@@ -1614,13 +774,15 @@ export type { NameResolver };
  * 创建基于 SQLite 的同步名称解析器。
  * 实现 @pokemon-localdex/battle-core 的 NameResolver 接口。
  * 查询优先级：数据库 ID > formKey > 中文名
+ *
+ * 注意：这里直接使用 node:sqlite 的同步 API，不经过 Drizzle，
+ * 因为 battle-core 的 calculateDamage() 需要同步接口。
  */
 export function createNameResolver(): NameResolver {
   const db = openDatabase();
 
   return {
     queryPokemonFormNameEn(opts: PokemonNameQuery): string | undefined {
-      // 1. 通过 formId 直接查询
       if (opts.formId) {
         const row = db.prepare(
           "SELECT name_en FROM pokemon_forms WHERE id = ? AND name_en IS NOT NULL LIMIT 1"
@@ -1628,7 +790,6 @@ export function createNameResolver(): NameResolver {
         if (row?.name_en) return row.name_en;
       }
 
-      // 2. 通过 pokemonId + formKey 查询
       if (opts.pokemonId && opts.formKey && opts.formKey !== "default") {
         const row = db.prepare(
           "SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND form_key = ? AND name_en IS NOT NULL LIMIT 1"
@@ -1636,7 +797,6 @@ export function createNameResolver(): NameResolver {
         if (row?.name_en) return row.name_en;
       }
 
-      // 3. 通过 formKey 直接匹配
       if (opts.formKey && opts.formKey !== "default") {
         const row = db.prepare(
           "SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1"
@@ -1644,7 +804,6 @@ export function createNameResolver(): NameResolver {
         if (row?.name_en) return row.name_en;
       }
 
-      // 4. 通过 pokemonId 查默认形态
       if (opts.pokemonId) {
         const row = db.prepare(
           "SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 AND name_en IS NOT NULL LIMIT 1"
@@ -1656,7 +815,6 @@ export function createNameResolver(): NameResolver {
         if (pkRow?.name_en) return pkRow.name_en;
       }
 
-      // 5. 通过中文名 fallback
       if (opts.nameZh) {
         const formByName = db.prepare(
           "SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1"
