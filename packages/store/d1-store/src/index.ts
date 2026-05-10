@@ -7,7 +7,6 @@
  * 本模块只负责：
  *   1. D1 类型定义
  *   2. 创建 Drizzle D1 实例并包装为 IStore
- *   3. 异步名称解析器（createDbAdapter，供 battle-core 使用）
  *
  * 使用方式：
  *   import { createD1Store } from "@pokemon-localdex/d1-store";
@@ -35,8 +34,6 @@ export type {
   ItemGenerationRecord,
   ItemEntry,
   LearnsetRecord,
-  TeamMember,
-  BattleTeam,
   PaginationParams,
   PaginatedResult,
 } from "@pokemon-localdex/store-types";
@@ -94,141 +91,3 @@ export function createD1Store(db: D1Database): D1Store {
   return createDrizzleStore(drizzleDb);
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// DbAdapter 实现（异步名称解析，供 battle-core 使用）
-// ══════════════════════════════════════════════════════════════════════════════
-
-import type {
-  DbAdapter,
-  PokemonNameQuery,
-  EntityNameQuery,
-} from "@pokemon-localdex/battle-core";
-
-class D1DbAdapter implements DbAdapter {
-  private db: D1Database;
-  constructor(db: D1Database) {
-    this.db = db;
-  }
-
-  async queryPokemonFormNameEn(opts: PokemonNameQuery): Promise<string | undefined> {
-    if (opts.formId) {
-      const row = await this.db
-        .prepare("SELECT name_en FROM pokemon_forms WHERE id = ? AND name_en IS NOT NULL LIMIT 1")
-        .bind(String(opts.formId))
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-    }
-
-    if (opts.pokemonId && opts.formKey && opts.formKey !== "default") {
-      const row = await this.db
-        .prepare("SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND form_key = ? AND name_en IS NOT NULL LIMIT 1")
-        .bind(String(opts.pokemonId), opts.formKey)
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-    }
-
-    if (opts.formKey && opts.formKey !== "default") {
-      const row = await this.db
-        .prepare("SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1")
-        .bind(opts.formKey)
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-    }
-
-    if (opts.pokemonId) {
-      const row = await this.db
-        .prepare("SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 AND name_en IS NOT NULL LIMIT 1")
-        .bind(String(opts.pokemonId))
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-      const pkRow = await this.db
-        .prepare("SELECT name_en FROM pokemon WHERE id = ? LIMIT 1")
-        .bind(String(opts.pokemonId))
-        .first<{ name_en: string }>();
-      if (pkRow?.name_en) return pkRow.name_en;
-    }
-
-    if (opts.nameZh) {
-      const row = await this.db
-        .prepare("SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1")
-        .bind(opts.nameZh)
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-
-      const pkRow = await this.db
-        .prepare("SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1")
-        .bind(opts.nameZh)
-        .first<{ name_en: string }>();
-      if (pkRow?.name_en) return pkRow.name_en;
-    }
-
-    return undefined;
-  }
-
-  async queryMoveNameEn(opts: EntityNameQuery): Promise<string | undefined> {
-    if (opts.id) {
-      const row = await this.db
-        .prepare("SELECT name_en FROM moves WHERE id = ? LIMIT 1")
-        .bind(String(opts.id))
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-    }
-    if (opts.nameZh) {
-      const row = await this.db
-        .prepare("SELECT name_en FROM moves WHERE name_zh = ? LIMIT 1")
-        .bind(opts.nameZh)
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-    }
-    return undefined;
-  }
-
-  async queryAbilityNameEn(opts: EntityNameQuery): Promise<string | undefined> {
-    if (opts.id) {
-      const row = await this.db
-        .prepare("SELECT name_en FROM abilities WHERE id = ? LIMIT 1")
-        .bind(String(opts.id))
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-    }
-    if (opts.nameZh) {
-      const row = await this.db
-        .prepare("SELECT name_en FROM abilities WHERE name_zh = ? LIMIT 1")
-        .bind(opts.nameZh)
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-    }
-    return undefined;
-  }
-
-  async queryItemNameEn(opts: EntityNameQuery): Promise<string | undefined> {
-    if (opts.id) {
-      const row = await this.db
-        .prepare("SELECT name_en FROM items WHERE id = ? LIMIT 1")
-        .bind(String(opts.id))
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-    }
-    if (opts.nameZh) {
-      const row = await this.db
-        .prepare("SELECT name_en FROM items WHERE name_zh = ? LIMIT 1")
-        .bind(opts.nameZh)
-        .first<{ name_en: string }>();
-      if (row?.name_en) return row.name_en;
-    }
-    return undefined;
-  }
-}
-
-/**
- * 工厂函数：创建 DbAdapter 实例（异步名称解析器）。
- * 供 d1-battle-core 使用：
- *   import { createDbAdapter } from "@pokemon-localdex/d1-store";
- *   const adapter = createDbAdapter(env.DB);
- *   const result = await calculateDamageWithAdapter(adapter, input);
- */
-export function createDbAdapter(db: D1Database): DbAdapter {
-  return new D1DbAdapter(db);
-}
-
-export type { DbAdapter, PokemonNameQuery, EntityNameQuery } from "@pokemon-localdex/battle-core";

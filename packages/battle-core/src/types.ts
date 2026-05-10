@@ -89,45 +89,7 @@ export type DamageCalcResult = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 名称解析查询参数类型
-// ══════════════════════════════════════════════════════════════════════════════
-
-export type PokemonNameQuery = {
-  pokemonId?: string | number;
-  formId?: string | number;
-  formKey?: string;
-  nameZh?: string;
-};
-
-export type EntityNameQuery = {
-  id?: string | number;
-  nameZh?: string;
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 同步名称解析接口（用于 sqlite-store）
-// ══════════════════════════════════════════════════════════════════════════════
-
-export interface NameResolver {
-  queryPokemonFormNameEn(opts: PokemonNameQuery): string | undefined;
-  queryMoveNameEn(opts: EntityNameQuery): string | undefined;
-  queryAbilityNameEn(opts: EntityNameQuery): string | undefined;
-  queryItemNameEn(opts: EntityNameQuery): string | undefined;
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 异步名称解析接口（用于 d1-store）
-// ══════════════════════════════════════════════════════════════════════════════
-
-export interface DbAdapter {
-  queryPokemonFormNameEn(opts: PokemonNameQuery): Promise<string | undefined>;
-  queryMoveNameEn(opts: EntityNameQuery): Promise<string | undefined>;
-  queryAbilityNameEn(opts: EntityNameQuery): Promise<string | undefined>;
-  queryItemNameEn(opts: EntityNameQuery): Promise<string | undefined>;
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 内部接口（已解析名称）
+// 已解析名称
 // ══════════════════════════════════════════════════════════════════════════════
 
 export interface ResolvedNames {
@@ -138,4 +100,35 @@ export interface ResolvedNames {
   defAbilityEn: string | undefined;
   defItemEn: string | undefined;
   moveNameEn: string;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 名称查询接口（由 store 层实现，注入给 resolveNames 使用）
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * store 层需要实现的两个原子查询能力。
+ * battle-core 的 resolveNames() 通过此接口与 store 解耦。
+ */
+export interface NameLookup {
+  /**
+   * 解析宝可梦英文名。
+   * 查询优先级由 store 实现决定（通常：formId > pokemonId+formKey > nameZh）。
+   */
+  pokemonNameEn(opts: {
+    pokemonId?: string | number;
+    formId?: string | number;
+    formKey?: string;
+    name?: string;
+  }): Promise<string | undefined>;
+
+  /**
+   * 解析实体（招式/特性/道具）英文名。
+   * 查询优先级由 store 实现决定（通常：id > nameZh）。
+   */
+  entityNameEn(
+    kind: "move" | "ability" | "item",
+    id?: string | number,
+    nameZh?: string,
+  ): Promise<string | undefined>;
 }

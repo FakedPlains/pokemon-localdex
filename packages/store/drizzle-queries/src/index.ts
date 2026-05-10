@@ -7,7 +7,7 @@
  * 所有方法均为 async（Drizzle 的 node:sqlite driver 也支持 async API）。
  */
 
-import { eq, like, and, or, sql, inArray, isNull, desc, asc } from "drizzle-orm";
+import { eq, like, and, or, sql, inArray, isNull, asc } from "drizzle-orm";
 import type { SQL, SQLiteColumn } from "drizzle-orm";
 import type { SQLiteSelectQueryBuilder } from "drizzle-orm/sqlite-core";
 
@@ -27,7 +27,6 @@ import {
   abilityGenerationRecords,
   items,
   itemGenerationRecords,
-  battleTeams,
 } from "@pokemon-localdex/drizzle-schema";
 
 import type {
@@ -44,7 +43,6 @@ import type {
   ItemEntry,
   ItemGenerationRecord,
   LearnsetRecord,
-  BattleTeam,
   PaginationParams,
   PaginatedResult,
   IStore,
@@ -1283,59 +1281,118 @@ export class DrizzleStore implements IStore {
   }
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Teams: listTeams / saveTeam / deleteTeam
+  // Battle: 原子名称查询（供 battle-core 的 resolveNames 使用）
   // ────────────────────────────────────────────────────────────────────────────
 
-  async listTeams(): Promise<BattleTeam[]> {
-    const rows = await this.db
-      .select()
-      .from(battleTeams)
-      .orderBy(desc(battleTeams.createdAt));
+  /**
+   * 解析宝可梦英文名。
+   * 查询优先级：formId > pokemonId+formKey > formKey > pokemonId > nameZh
+   */
+  async pokemonNameEn(opts: {
+    pokemonId?: string | number;
+    formId?: string | number;
+    formKey?: string;
+    name?: string;
+  }): Promise<string | undefined> {
+    // 1. 通过 formId 直接查
+    if (opts.formId) {
+      const rows = await this.db
+        .select({ nameEn: pokemonForms.nameEn })
+        .from(pokemonForms)
+        .where(eq(pokemonForms.id, Number(opts.formId)))
+        .limit(1);
+      if (rows[0]?.nameEn) return String(rows[0].nameEn);
+    }
 
-    return rows.map((r: any) => ({
-      id: String(r.id),
-      name: String(r.name),
-      format: String(r.format),
-      members: JSON.parse(String(r.membersJson || "[]")),
-      createdAt: String(r.createdAt),
-      updatedAt: String(r.updatedAt),
-    }));
+    // 2. 通过 pokemonId + formKey 查
+    if (opts.pokemonId && opts.formKey && opts.formKey !== "default") {
+      const rows = await this.db
+        .select({ nameEn: pokemonForms.nameEn })
+        .from(pokemonForms)
+        .where(and(
+          eq(pokemonForms.pokemonId, Number(opts.pokemonId)),
+          eq(pokemonForms.formKey, opts.formKey),
+        ))
+        .limit(1);
+      if (rows[0]?.nameEn) return String(rows[0].nameEn);
+    }
+
+    // 3. 仅通过 formKey 查
+    if (opts.formKey && opts.formKey !== "default") {
+      const rows = await this.db
+        .select({ nameEn: pokemonForms.nameEn })
+        .from(pokemonForms)
+        .where(eq(pokemonForms.formKey, opts.formKey))
+        .limit(1);
+      if (rows[0]?.nameEn) return String(rows[0].nameEn);
+    }
+
+    // 4. 通过 pokemonId 查默认形态，再 fallback 到 pokemon 主表
+    if (opts.pokemonId) {
+      const formRows = await this.db
+        .select({ nameEn: pokemonForms.nameEn })
+        .from(pokemonForms)
+        .where(and(eq(pokemonForms.pokemonId, Number(opts.pokemonId)), eq(pokemonForms.isDefault, 1)))
+        .limit(1);
+      if (formRows[0]?.nameEn) return String(formRows[0].nameEn);
+
+      const pkRows = await this.db
+        .select({ nameEn: pokemon.nameEn })
+        .from(pokemon)
+        .where(eq(pokemon.id, Number(opts.pokemonId)))
+        .limit(1);
+      if (pkRows[0]?.nameEn) return String(pkRows[0].nameEn);
+    }
+
+    // 5. 通过中文名查
+    if (opts.name) {
+      const formRows = await this.db
+        .select({ nameEn: pokemonForms.nameEn })
+        .from(pokemonForms)
+        .where(eq(pokemonForms.nameZh, opts.name))
+        .limit(1);
+      if (formRows[0]?.nameEn) return String(formRows[0].nameEn);
+
+      const pkRows = await this.db
+        .select({ nameEn: pokemon.nameEn })
+        .from(pokemon)
+        .where(eq(pokemon.nameZh, opts.name))
+        .limit(1);
+      if (pkRows[0]?.nameEn) return String(pkRows[0].nameEn);
+    }
+
+    return undefined;
   }
 
-  async saveTeam(input: Partial<BattleTeam>): Promise<BattleTeam> {
-    const now = new Date().toISOString();
-    const id = input.id ?? `team_${Date.now()}`;
-    const name = input.name ?? "未命名队伍";
-    const format = input.format ?? "singles";
-    const membersJson = JSON.stringify(input.members ?? []);
-    const createdAt = input.createdAt ?? now;
+  /**
+   * 解析实体（招式/特性/道具）英文名。
+   * 查询优先级：id > nameZh
+   */
+  async entityNameEn(
+    kind: "move" | "ability" | "item",
+    id?: string | number,
+    nameZh?: string,
+  ): Promise<string | undefined> {
+    const table = kind === "move" ? moves : kind === "ability" ? abilities : items;
+    if (!id && !nameZh) return undefined;
 
-    // UPSERT via raw sql (Drizzle's onConflictDoUpdate)
-    await this.db
-      .insert(battleTeams)
-      .values({
-        id,
-        name,
-        format,
-        membersJson,
-        createdAt,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: battleTeams.id,
-        set: {
-          name,
-          format,
-          membersJson,
-          updatedAt: now,
-        },
-      });
-
-    return { id, name, format, members: input.members ?? [], createdAt, updatedAt: now };
-  }
-
-  async deleteTeam(id: string): Promise<void> {
-    await this.db.delete(battleTeams).where(eq(battleTeams.id, id));
+    if (id) {
+      const rows = await this.db
+        .select({ nameEn: table.nameEn })
+        .from(table)
+        .where(eq(table.id, Number(id)))
+        .limit(1);
+      if (rows[0]?.nameEn) return String(rows[0].nameEn);
+    }
+    if (nameZh) {
+      const rows = await this.db
+        .select({ nameEn: table.nameEn })
+        .from(table)
+        .where(eq(table.nameZh, nameZh))
+        .limit(1);
+      if (rows[0]?.nameEn) return String(rows[0].nameEn);
+    }
+    return undefined;
   }
 }
 

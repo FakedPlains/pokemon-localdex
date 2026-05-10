@@ -8,7 +8,6 @@
  *   1. 数据库文件管理（路径、打开、关闭）
  *   2. Schema 迁移（ensureSchema / migrateSchema / resetSchema）
  *   3. 创建 Drizzle 实例并包装为 IStore
- *   4. 同步名称解析器（createNameResolver，供 battle-core 使用）
  */
 
 import { existsSync, mkdirSync } from "node:fs";
@@ -35,8 +34,6 @@ export type {
   ItemGenerationRecord,
   ItemEntry,
   LearnsetRecord,
-  TeamMember,
-  BattleTeam,
   PaginationParams,
   PaginatedResult,
 } from "@pokemon-localdex/store-types";
@@ -60,7 +57,7 @@ export {
 
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import { createDrizzleStore, DrizzleStore } from "@pokemon-localdex/drizzle-queries";
-import type { IStore, BattleTeam } from "@pokemon-localdex/store-types";
+import type { IStore } from "@pokemon-localdex/store-types";
 
 const ROOT = resolve(import.meta.dirname, "../../../../");
 
@@ -572,16 +569,6 @@ export function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_abilities_number ON abilities(number);
     CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
 
-    CREATE TABLE IF NOT EXISTS battle_teams (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL DEFAULT '未命名队伍',
-      format TEXT NOT NULL DEFAULT 'singles',
-      members_json TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_battle_teams_updated ON battle_teams(updated_at);
-
     PRAGMA foreign_keys = ON;
   `);
 
@@ -650,7 +637,6 @@ export function resetSchema() {
     DROP TABLE IF EXISTS image_assets;
     DROP TABLE IF EXISTS _image_assets_backup;
     DROP TABLE IF EXISTS item_generation_records;
-    DROP TABLE IF EXISTS battle_teams;
     PRAGMA foreign_keys = ON;
   `);
   db.close();
@@ -725,145 +711,9 @@ function createDrizzleDb() {
 
 /**
  * 创建符合 IStore 接口的 SQLite 适配器。
- *
- * Teams 存储由外部注入（app.ts 使用文件存储），因此作为参数传入。
- * 如果不传 teams 参数，则使用 DrizzleStore 内置的 SQLite teams 存储。
  */
-export function createSqliteStore(teams?: {
-  listTeams: () => BattleTeam[];
-  saveTeam: (input: Partial<BattleTeam>) => BattleTeam;
-  deleteTeam: (id: string) => void;
-}): IStore {
+export function createSqliteStore(): IStore {
   const { db } = createDrizzleDb();
-  const store = createDrizzleStore(db);
-
-  if (!teams) {
-    return store;
-  }
-
-  // 用外部 teams 实现覆盖 DrizzleStore 的 teams 方法
-  return {
-    listPokemon: (filters) => store.listPokemon(filters),
-    getPokemon: (idOrSlug) => store.getPokemon(idOrSlug),
-    getLearnsetMeta: (pokemonId) => store.getLearnsetMeta(pokemonId),
-    getPokemonLearnset: (pokemonId, generation, formKey, gameVersionCode) =>
-      store.getPokemonLearnset(pokemonId, generation, formKey, gameVersionCode),
-    listMoves: (filters) => store.listMoves(filters),
-    getMove: (idOrSlug) => store.getMove(idOrSlug),
-    getPokemonByMove: (moveId, pagination) => store.getPokemonByMove(moveId, pagination),
-    listAbilities: (filters) => store.listAbilities(filters),
-    getAbility: (idOrName) => store.getAbility(idOrName),
-    getPokemonByAbility: (abilityId, pagination) => store.getPokemonByAbility(abilityId, pagination),
-    listItems: (filters) => store.listItems(filters),
-    getItem: (idOrSlug) => store.getItem(idOrSlug),
-    listTeams: async () => teams.listTeams(),
-    saveTeam: async (input) => teams.saveTeam(input),
-    deleteTeam: async (id) => { teams.deleteTeam(id); },
-  };
+  return createDrizzleStore(db);
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 同步名称解析器（供 battle-core 伤害计算使用）
-// ══════════════════════════════════════════════════════════════════════════════
-
-import type { NameResolver, PokemonNameQuery, EntityNameQuery } from "@pokemon-localdex/battle-core";
-
-export type { NameResolver };
-
-/**
- * 创建基于 SQLite 的同步名称解析器。
- * 实现 @pokemon-localdex/battle-core 的 NameResolver 接口。
- * 查询优先级：数据库 ID > formKey > 中文名
- *
- * 注意：这里直接使用 node:sqlite 的同步 API，不经过 Drizzle，
- * 因为 battle-core 的 calculateDamage() 需要同步接口。
- */
-export function createNameResolver(): NameResolver {
-  const db = openDatabase();
-
-  return {
-    queryPokemonFormNameEn(opts: PokemonNameQuery): string | undefined {
-      if (opts.formId) {
-        const row = db.prepare(
-          "SELECT name_en FROM pokemon_forms WHERE id = ? AND name_en IS NOT NULL LIMIT 1"
-        ).get(String(opts.formId)) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-
-      if (opts.pokemonId && opts.formKey && opts.formKey !== "default") {
-        const row = db.prepare(
-          "SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND form_key = ? AND name_en IS NOT NULL LIMIT 1"
-        ).get(String(opts.pokemonId), opts.formKey) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-
-      if (opts.formKey && opts.formKey !== "default") {
-        const row = db.prepare(
-          "SELECT name_en FROM pokemon_forms WHERE form_key = ? AND name_en IS NOT NULL LIMIT 1"
-        ).get(opts.formKey) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-
-      if (opts.pokemonId) {
-        const row = db.prepare(
-          "SELECT name_en FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 AND name_en IS NOT NULL LIMIT 1"
-        ).get(String(opts.pokemonId)) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-        const pkRow = db.prepare(
-          "SELECT name_en FROM pokemon WHERE id = ? LIMIT 1"
-        ).get(String(opts.pokemonId)) as { name_en: string } | undefined;
-        if (pkRow?.name_en) return pkRow.name_en;
-      }
-
-      if (opts.nameZh) {
-        const formByName = db.prepare(
-          "SELECT name_en FROM pokemon_forms WHERE name_zh = ? AND name_en IS NOT NULL LIMIT 1"
-        ).get(opts.nameZh) as { name_en: string } | undefined;
-        if (formByName?.name_en) return formByName.name_en;
-
-        const row = db.prepare(
-          "SELECT name_en FROM pokemon WHERE name_zh = ? LIMIT 1"
-        ).get(opts.nameZh) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-
-      return undefined;
-    },
-
-    queryMoveNameEn(opts: EntityNameQuery): string | undefined {
-      if (opts.id) {
-        const row = db.prepare("SELECT name_en FROM moves WHERE id = ? LIMIT 1").get(String(opts.id)) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-      if (opts.nameZh) {
-        const row = db.prepare("SELECT name_en FROM moves WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-      return undefined;
-    },
-
-    queryAbilityNameEn(opts: EntityNameQuery): string | undefined {
-      if (opts.id) {
-        const row = db.prepare("SELECT name_en FROM abilities WHERE id = ? LIMIT 1").get(String(opts.id)) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-      if (opts.nameZh) {
-        const row = db.prepare("SELECT name_en FROM abilities WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-      return undefined;
-    },
-
-    queryItemNameEn(opts: EntityNameQuery): string | undefined {
-      if (opts.id) {
-        const row = db.prepare("SELECT name_en FROM items WHERE id = ? LIMIT 1").get(String(opts.id)) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-      if (opts.nameZh) {
-        const row = db.prepare("SELECT name_en FROM items WHERE name_zh = ? LIMIT 1").get(opts.nameZh) as { name_en: string } | undefined;
-        if (row?.name_en) return row.name_en;
-      }
-      return undefined;
-    },
-  };
-}

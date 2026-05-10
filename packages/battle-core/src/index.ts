@@ -3,11 +3,10 @@
  *
  * 统一伤害计算引擎。
  *
- * 对外提供两个入口：
- *   - calculateDamage(resolver, input)     — 同步版，配合 sqlite-store 的 NameResolver
- *   - calculateDamageAsync(adapter, input) — 异步版，配合 d1-store 的 DbAdapter
+ * 对外提供唯一入口：
+ *   calculateDamage(input, lookup) — 名称解析 + 伤害计算一步完成
  *
- * 调用方自行从 store 包创建 resolver/adapter 传入。
+ * 调用方只需传入 DamageCalcInput 和实现了 NameLookup 的 store 实例即可。
  */
 
 import { calculate, Pokemon, Move, Field } from "@fakedplains/smogon-calc";
@@ -16,9 +15,8 @@ import type { GenerationNum } from "@fakedplains/smogon-calc/dist/data/interface
 import type {
   DamageCalcInput,
   DamageCalcResult,
-  NameResolver,
-  DbAdapter,
   ResolvedNames,
+  NameLookup,
 } from "./types.ts";
 
 // 重新导出所有类型
@@ -28,11 +26,8 @@ export type {
   SideInput,
   DamageCalcInput,
   DamageCalcResult,
-  PokemonNameQuery,
-  EntityNameQuery,
-  NameResolver,
-  DbAdapter,
   ResolvedNames,
+  NameLookup,
 } from "./types.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -127,13 +122,60 @@ export function natureZhToEn(natureZh: string): string {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 核心计算逻辑（纯函数，与数据库无关）
+// resolveNames — 内部名称解析
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * 执行伤害计算。接受已解析的英文名称，不涉及任何数据库操作。
+ * 将伤害计算输入中的中文名/数据库 ID 解析为 @smogon/calc 所需的英文名。
+ * 由 calculateDamage 内部调用，不对外暴露。
  */
-export function executeCalc(input: DamageCalcInput, names: ResolvedNames): DamageCalcResult {
+async function resolveNames(
+  input: DamageCalcInput,
+  lookup: NameLookup,
+): Promise<ResolvedNames> {
+  const [atkNameEn, atkAbilityEn, atkItemEn, defNameEn, defAbilityEn, defItemEn, moveNameEn] =
+    await Promise.all([
+      lookup.pokemonNameEn(input.attacker),
+      lookup.entityNameEn("ability", input.attacker.abilityId, input.attacker.ability),
+      lookup.entityNameEn("item", input.attacker.itemId, input.attacker.item),
+      lookup.pokemonNameEn(input.defender),
+      lookup.entityNameEn("ability", input.defender.abilityId, input.defender.ability),
+      lookup.entityNameEn("item", input.defender.itemId, input.defender.item),
+      lookup.entityNameEn("move", input.move.id, input.move.name),
+    ]);
+
+  return {
+    atkNameEn: atkNameEn || input.attacker.name || "Pikachu",
+    atkAbilityEn: atkAbilityEn || input.attacker.ability || undefined,
+    atkItemEn: atkItemEn || input.attacker.item || undefined,
+    defNameEn: defNameEn || input.defender.name || "Pikachu",
+    defAbilityEn: defAbilityEn || input.defender.ability || undefined,
+    defItemEn: defItemEn || input.defender.item || undefined,
+    moveNameEn: moveNameEn || input.move.name || "Tackle",
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// calculateDamage — 唯一入口
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 执行伤害计算（名称解析 + smogon-calc 计算一步完成）。
+ *
+ * @param input  - 伤害计算输入（中文名/数据库 ID 均可）
+ * @param lookup - 实现了 NameLookup 的 store 实例，用于查询英文名
+ *
+ * @example
+ * ```ts
+ * import { calculateDamage } from "@pokemon-localdex/battle-core";
+ * const result = await calculateDamage(input, store);
+ * ```
+ */
+export async function calculateDamage(
+  input: DamageCalcInput,
+  lookup: NameLookup,
+): Promise<DamageCalcResult> {
+  const names = await resolveNames(input, lookup);
   const gen = input.generation as GenerationNum;
 
   // ── 构建攻击方 ──
@@ -238,134 +280,4 @@ export function executeCalc(input: DamageCalcInput, names: ResolvedNames): Damag
     description,
     damageRolls,
   };
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 同步版入口
-// ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * 同步伤害计算函数。
- * 接受一个 NameResolver 实例（同步），解析所有名称后执行计算。
- * 配合 sqlite-store 的 createNameResolver() 使用。
- *
- * @example
- * ```ts
- * import { calculateDamage } from "@pokemon-localdex/battle-core";
- * import { createNameResolver } from "@pokemon-localdex/sqlite-store";
- * const result = calculateDamage(createNameResolver(), input);
- * ```
- */
-export function calculateDamage(
-  resolver: NameResolver,
-  input: DamageCalcInput
-): DamageCalcResult {
-  const atkNameEn = resolver.queryPokemonFormNameEn({
-    pokemonId: input.attacker.pokemonId,
-    formId: input.attacker.formId,
-    formKey: input.attacker.formKey,
-    nameZh: input.attacker.name,
-  }) || input.attacker.name || "Pikachu";
-
-  const atkAbilityEn = (input.attacker.abilityId || input.attacker.ability)
-    ? (resolver.queryAbilityNameEn({ id: input.attacker.abilityId, nameZh: input.attacker.ability }) || input.attacker.ability)
-    : undefined;
-
-  const atkItemEn = (input.attacker.itemId || input.attacker.item)
-    ? (resolver.queryItemNameEn({ id: input.attacker.itemId, nameZh: input.attacker.item }) || input.attacker.item)
-    : undefined;
-
-  const defNameEn = resolver.queryPokemonFormNameEn({
-    pokemonId: input.defender.pokemonId,
-    formId: input.defender.formId,
-    formKey: input.defender.formKey,
-    nameZh: input.defender.name,
-  }) || input.defender.name || "Pikachu";
-
-  const defAbilityEn = (input.defender.abilityId || input.defender.ability)
-    ? (resolver.queryAbilityNameEn({ id: input.defender.abilityId, nameZh: input.defender.ability }) || input.defender.ability)
-    : undefined;
-
-  const defItemEn = (input.defender.itemId || input.defender.item)
-    ? (resolver.queryItemNameEn({ id: input.defender.itemId, nameZh: input.defender.item }) || input.defender.item)
-    : undefined;
-
-  const moveNameEn = resolver.queryMoveNameEn({ id: input.move.id, nameZh: input.move.name }) || input.move.name || "Tackle";
-
-  return executeCalc(input, {
-    atkNameEn,
-    atkAbilityEn,
-    atkItemEn,
-    defNameEn,
-    defAbilityEn,
-    defItemEn,
-    moveNameEn,
-  });
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 异步版入口
-// ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * 异步伤害计算函数。
- * 接受一个 DbAdapter 实例（异步），并行查询所有名称映射后执行计算。
- * 配合 d1-store 的 createDbAdapter() 使用。
- *
- * @example
- * ```ts
- * import { calculateDamageAsync } from "@pokemon-localdex/battle-core";
- * import { createDbAdapter } from "@pokemon-localdex/d1-store";
- * const result = await calculateDamageAsync(createDbAdapter(env.DB), input);
- * ```
- */
-export async function calculateDamageAsync(
-  adapter: DbAdapter,
-  input: DamageCalcInput
-): Promise<DamageCalcResult> {
-  const [
-    atkNameEn,
-    atkAbilityEn,
-    atkItemEn,
-    defNameEn,
-    defAbilityEn,
-    defItemEn,
-    moveNameEn,
-  ] = await Promise.all([
-    adapter.queryPokemonFormNameEn({
-      pokemonId: input.attacker.pokemonId,
-      formId: input.attacker.formId,
-      formKey: input.attacker.formKey,
-      nameZh: input.attacker.name,
-    }),
-    (input.attacker.abilityId || input.attacker.ability)
-      ? adapter.queryAbilityNameEn({ id: input.attacker.abilityId, nameZh: input.attacker.ability })
-      : Promise.resolve(undefined),
-    (input.attacker.itemId || input.attacker.item)
-      ? adapter.queryItemNameEn({ id: input.attacker.itemId, nameZh: input.attacker.item })
-      : Promise.resolve(undefined),
-    adapter.queryPokemonFormNameEn({
-      pokemonId: input.defender.pokemonId,
-      formId: input.defender.formId,
-      formKey: input.defender.formKey,
-      nameZh: input.defender.name,
-    }),
-    (input.defender.abilityId || input.defender.ability)
-      ? adapter.queryAbilityNameEn({ id: input.defender.abilityId, nameZh: input.defender.ability })
-      : Promise.resolve(undefined),
-    (input.defender.itemId || input.defender.item)
-      ? adapter.queryItemNameEn({ id: input.defender.itemId, nameZh: input.defender.item })
-      : Promise.resolve(undefined),
-    adapter.queryMoveNameEn({ id: input.move.id, nameZh: input.move.name }),
-  ]);
-
-  return executeCalc(input, {
-    atkNameEn: atkNameEn || input.attacker.name || "Pikachu",
-    atkAbilityEn: atkAbilityEn || input.attacker.ability || undefined,
-    atkItemEn: atkItemEn || input.attacker.item || undefined,
-    defNameEn: defNameEn || input.defender.name || "Pikachu",
-    defAbilityEn: defAbilityEn || input.defender.ability || undefined,
-    defItemEn: defItemEn || input.defender.item || undefined,
-    moveNameEn: moveNameEn || input.move.name || "Tackle",
-  });
 }

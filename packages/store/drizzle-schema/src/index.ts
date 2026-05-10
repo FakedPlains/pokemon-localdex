@@ -284,17 +284,3 @@ export const itemGenerationRecords = sqliteTable("item_generation_records", {
   uniqueIndex("uq_item_gen").on(table.itemId, table.generation),
 ]);
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 对战队伍
-// ══════════════════════════════════════════════════════════════════════════════
-
-export const battleTeams = sqliteTable("battle_teams", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull().default("未命名队伍"),
-  format: text("format").notNull().default("singles"),
-  membersJson: text("members_json").notNull().default("[]"),
-  createdAt: text("created_at").notNull(),
-  updatedAt: text("updated_at").notNull(),
-}, (table) => [
-  index("idx_battle_teams_updated").on(table.updatedAt),
-]);

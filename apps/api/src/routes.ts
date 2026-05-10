@@ -9,6 +9,7 @@
 
 import { Hono } from "hono";
 import type { IStore } from "../../../packages/store/shared-types/src/index.ts";
+import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
 
 // ── 辅助 ──
 
@@ -22,8 +23,6 @@ function numberQuery(c: any, key: string): number | undefined {
 export interface RegisterRoutesOptions<E extends object = object> {
   /** 每次请求获取 store 实例（worker 从 c.env.DB 创建，app 返回单例） */
   getStore: (c: any) => IStore;
-  /** battle/damage 处理器（两端实现不同：同步 vs 异步） */
-  damageHandler?: (c: any) => Promise<Response>;
 }
 
 /**
@@ -34,7 +33,7 @@ export function registerApiRoutes<E extends object = object>(
   api: Hono<any>,
   opts: RegisterRoutesOptions<E>,
 ): Hono<any> {
-  const { getStore, damageHandler } = opts;
+  const { getStore } = opts;
 
   // ── Pokemon ──
 
@@ -187,28 +186,18 @@ export function registerApiRoutes<E extends object = object>(
     return c.json({ data });
   });
 
-  // ── Teams ──
+  // ── Battle damage（统一实现，两端共享） ──
 
-  api.get("/teams", async (c) => {
-    const teams = await getStore(c).listTeams();
-    return c.json({ data: teams });
+  api.post("/battle/damage", async (c) => {
+    try {
+      const input = await c.req.json();
+      const store = getStore(c);
+      const result = await calculateDamage(input, store);
+      return c.json({ data: result });
+    } catch (err: any) {
+      return c.json({ error: err?.message ?? "Calculation failed" }, 400);
+    }
   });
-
-  api.post("/teams", async (c) => {
-    const saved = await getStore(c).saveTeam(await c.req.json());
-    return c.json({ data: saved }, 201);
-  });
-
-  api.delete("/teams/:id", async (c) => {
-    await getStore(c).deleteTeam(c.req.param("id"));
-    return c.json({ ok: true });
-  });
-
-  // ── Battle damage（可选，两端实现不同） ──
-
-  if (damageHandler) {
-    api.post("/battle/damage", damageHandler);
-  }
 
   return api;
 }

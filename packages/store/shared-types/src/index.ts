@@ -233,33 +233,6 @@ export type LearnsetRecord = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 队伍
-// ══════════════════════════════════════════════════════════════════════════════
-
-export type TeamMember = {
-  slot: number;
-  pokemonId: number;
-  formKey: string;
-  nameZh?: string;
-  level: number;
-  itemId?: number;
-  abilityId?: number;
-  nature?: string;
-  moves: (number | null)[];
-  ivs: Partial<StatBlock>;
-  evs: Partial<StatBlock>;
-};
-
-export type BattleTeam = {
-  id: string;
-  name: string;
-  format: string;
-  members: TeamMember[];
-  createdAt: string;
-  updatedAt: string;
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
 // 分页
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -296,10 +269,19 @@ export interface IStore {
   listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;
   getItem(idOrSlug: string): Promise<ItemEntry | undefined>;
 
-  // Teams
-  listTeams(): Promise<BattleTeam[]>;
-  saveTeam(input: Partial<BattleTeam>): Promise<BattleTeam>;
-  deleteTeam(id: string): Promise<void>;
+  // Battle: 原子名称查询（供 battle-core 的 resolveNames 编排使用）
+  pokemonNameEn(opts: {
+    pokemonId?: string | number;
+    formId?: string | number;
+    formKey?: string;
+    name?: string;
+  }): Promise<string | undefined>;
+
+  entityNameEn(
+    kind: "move" | "ability" | "item",
+    id?: string | number,
+    nameZh?: string,
+  ): Promise<string | undefined>;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

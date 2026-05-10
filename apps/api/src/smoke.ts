@@ -1,6 +1,5 @@
 import { calculateDamage } from "../../../packages/battle-core/src/index.ts";
 import {
-  createNameResolver,
   createSqliteStore,
   hasSqliteData,
 } from "../../../packages/store/sqlite-store/src/index.ts";
@@ -48,12 +47,13 @@ async function main() {
   const ability = await store.getAbility("静电");
   console.log("ability detail:", ability?.effectDetail?.slice(0, 50));
 
-  const damage = calculateDamage(createNameResolver(), {
+  const damageInput = {
     generation: 9,
     attacker: { name: "皮卡丘", level: 50 },
     defender: { name: "喷火龙", level: 50 },
     move: { name: "十万伏特" },
-  });
+  };
+  const damage = await calculateDamage(damageInput, store);
   console.log("damage sample:", damage);
 }
 

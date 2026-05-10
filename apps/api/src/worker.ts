@@ -12,9 +12,8 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { createD1Store, createDbAdapter } from "../../../packages/store/d1-store/src/index.ts";
+import { createD1Store } from "../../../packages/store/d1-store/src/index.ts";
 import type { D1Store, D1Database } from "../../../packages/store/d1-store/src/index.ts";
-import { calculateDamageAsync } from "../../../packages/battle-core/src/index.ts";
 import { registerApiRoutes } from "./routes.ts";
 
 // Cloudflare Workers Env 类型
@@ -57,15 +56,6 @@ const api = new Hono<{ Bindings: Env }>();
 
 registerApiRoutes(api, {
   getStore: (c) => getOrCreateStore(c.env.DB),
-  damageHandler: async (c) => {
-    try {
-      const input = await c.req.json();
-      const result = await calculateDamageAsync(createDbAdapter(c.env.DB), input);
-      return c.json({ data: result });
-    } catch (err: any) {
-      return c.json({ error: err?.message ?? "Calculation failed" }, 400);
-    }
-  },
 });
 
 // 挂载路由
