@@ -160,8 +160,8 @@ function BoxListRow({ config, onEdit, onDelete, onDuplicate }) {
 
       {/* 名称 */}
       <div className="box-list-col box-list-col-name">
-        <span className="box-list-name-zh">{config.formName && config.formName !== config.nameZh ? config.formName : (config.nameZh || config.pokemonId || "未命名")}</span>
-        {config.configName && <span className="box-list-config-name">{config.configName}</span>}
+        <span className="box-list-name-zh">{config.configName || config.nameZh || config.pokemonId || "未命名"}</span>
+        <span className="box-list-config-name">{config.formName && config.formName !== config.nameZh ? config.formName : (config.nameZh || "")}</span>
       </div>
 
       {/* 属性 */}
@@ -176,7 +176,7 @@ function BoxListRow({ config, onEdit, onDelete, onDuplicate }) {
 
       {/* 特性 */}
       <div className="box-list-col box-list-col-ability">
-        <span className="box-list-ability">{config.abilityId || "—"}</span>
+        <span className="box-list-ability">{config.abilityName || config.abilityId || "—"}</span>
       </div>
 
       {/* 性格 */}
@@ -184,9 +184,11 @@ function BoxListRow({ config, onEdit, onDelete, onDuplicate }) {
         <span className="box-list-nature">{config.nature || "认真"}</span>
       </div>
 
-      {/* 能力值 */}
+      {/* 种族值 / 能力值（同行展示） */}
       {STAT_KEYS.map((k) => (
-        <div key={k} className="box-list-col box-list-col-stats">
+        <div key={k} className="box-list-col box-list-col-combined-stat">
+          <span className="box-list-base-val">{baseStats?.[k] ?? "—"}</span>
+          <span className="box-list-combined-sep">/</span>
           <span className="box-list-stat-val">{finalStats?.[k] ?? "—"}</span>
         </div>
       ))}
@@ -606,16 +608,17 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                     />
                   )}
                 </div>
-              ) : (
-                <button className="cfg-new-btn" onClick={handleNewConfig}>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 3v10M3 8h10"/></svg>
-                  <span>新建配置</span>
-                </button>
-              )}
+              ) : null}
 
-              {boxConfigs.length > 0 ? (
-                <>
-                  {/* 视图切换 */}
+              {/* 操作栏：新建配置 + 视图切换（同一行） */}
+              <div className="box-action-bar">
+                {!editingConfig && (
+                  <button className="cfg-new-btn" onClick={handleNewConfig}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 3v10M3 8h10"/></svg>
+                    <span>新建配置</span>
+                  </button>
+                )}
+                {boxConfigs.length > 0 && (
                   <div className="box-view-toggle">
                     <button
                       className={`box-view-btn${boxViewMode === "card" ? " box-view-btn-active" : ""}`}
@@ -632,7 +635,11 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2.5" rx="1"/><rect x="1" y="6.75" width="14" height="2.5" rx="1"/><rect x="1" y="11.5" width="14" height="2.5" rx="1"/></svg>
                     </button>
                   </div>
+                )}
+              </div>
 
+              {boxConfigs.length > 0 ? (
+                <>
                   {boxViewMode === "card" ? (
                     <div className="te-card-grid">
                       {boxConfigs.map((config) => (
@@ -653,12 +660,12 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                         <span className="box-list-hcol box-list-hcol-types">属性</span>
                         <span className="box-list-hcol box-list-hcol-ability">特性</span>
                         <span className="box-list-hcol box-list-hcol-nature">性格</span>
-                        <span className="box-list-hcol box-list-hcol-stats">HP</span>
-                        <span className="box-list-hcol box-list-hcol-stats">攻击</span>
-                        <span className="box-list-hcol box-list-hcol-stats">防御</span>
-                        <span className="box-list-hcol box-list-hcol-stats">特攻</span>
-                        <span className="box-list-hcol box-list-hcol-stats">特防</span>
-                        <span className="box-list-hcol box-list-hcol-stats">速度</span>
+                        <span className="box-list-hcol box-list-hcol-combined" title="种族值 / 能力值">HP</span>
+                        <span className="box-list-hcol box-list-hcol-combined" title="种族值 / 能力值">攻击</span>
+                        <span className="box-list-hcol box-list-hcol-combined" title="种族值 / 能力值">防御</span>
+                        <span className="box-list-hcol box-list-hcol-combined" title="种族值 / 能力值">特攻</span>
+                        <span className="box-list-hcol box-list-hcol-combined" title="种族值 / 能力值">特防</span>
+                        <span className="box-list-hcol box-list-hcol-combined" title="种族值 / 能力值">速度</span>
                         <span className="box-list-hcol box-list-hcol-actions"></span>
                       </div>
                       {boxConfigs.map((config) => (
