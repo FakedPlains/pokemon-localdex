@@ -135,10 +135,10 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
       {/* 顶栏：名称 + 等级 + 配置名 + 菜单 */}
       <div className="box-card-header">
         <div className="box-card-name">
-          <strong>{data.formName && data.formName !== data.nameZh ? data.formName : (data.nameZh || data.pokemonId || "未命名")}</strong>
+          <strong>{data.configName || data.nameZh || data.pokemonId || "未命名"}</strong>
           <span className="box-card-level">Lv.{data.level || 50}</span>
         </div>
-        <span className="box-card-title">{data.configName || ""}</span>
+        <span className="box-card-title">{data.formName && data.formName !== data.nameZh ? data.formName : (data.nameZh || "")}</span>
         {menuActions && menuActions.length > 0 && (
           <div className="box-card-menu" ref={menuRef}>
             <button className="box-card-menu-btn" onClick={() => setMenuOpen(!menuOpen)} title="操作">
@@ -217,11 +217,17 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
               <span></span>
               <span>HP</span><span>攻击</span><span>防御</span><span>特攻</span><span>特防</span><span>速度</span>
             </div>
+            <div className="box-card-stats-row">
+              <span className="box-card-stats-tag box-card-stats-tag-base">种族</span>
+              {STAT_KEYS.map((k) => (
+                <span key={k} className="box-card-stats-num box-card-stats-num-base">{baseStats[k] ?? "—"}</span>
+              ))}
+            </div>
             {isChampions ? (
               <div className="box-card-stats-row">
                 <span className="box-card-stats-tag box-card-stats-tag-sp">SP</span>
                 {STAT_KEYS.map((k) => (
-                  <span key={k} className="box-card-stats-num">{data.sps?.[k] || 0}</span>
+                  <span key={k} className="box-card-stats-num box-card-stats-num-sp">{data.sps?.[k] || 0}</span>
                 ))}
               </div>
             ) : (
@@ -229,13 +235,13 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
                 <div className="box-card-stats-row">
                   <span className="box-card-stats-tag box-card-stats-tag-iv">个体</span>
                   {STAT_KEYS.map((k) => (
-                    <span key={k} className="box-card-stats-num">{data.ivs?.[k] ?? 31}</span>
+                    <span key={k} className="box-card-stats-num box-card-stats-num-iv">{data.ivs?.[k] ?? 31}</span>
                   ))}
                 </div>
                 <div className="box-card-stats-row">
                   <span className="box-card-stats-tag box-card-stats-tag-ev">努力</span>
                   {STAT_KEYS.map((k) => (
-                    <span key={k} className="box-card-stats-num">{data.evs?.[k] || 0}</span>
+                    <span key={k} className="box-card-stats-num box-card-stats-num-ev">{data.evs?.[k] || 0}</span>
                   ))}
                 </div>
               </>

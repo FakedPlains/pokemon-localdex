@@ -342,34 +342,37 @@ box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
 /* 努力值 / 个体值 — 纯数字表格 */
 .box-card-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: 36px repeat(6, 1fr);
+  gap: 0;
   padding-top: 8px;
   border-top: 1px solid rgba(31, 42, 31, 0.08);
+  font-size: 12px;
+  line-height: 22px;
 }
 
 .box-card-stats-header,
 .box-card-stats-row {
-  display: grid;
-  grid-template-columns: 30px repeat(6, 1fr);
-  gap: 2px;
-  text-align: center;
-  font-size: 12px;
-  line-height: 1.4;
+  display: contents;
 }
 
 .box-card-stats-header span {
   color: var(--ink);
   font-weight: 700;
+  text-align: center;
+}
+
+.box-card-stats-header span:first-child {
+  text-align: left;
 }
 
 .box-card-stats-tag {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink);
   font-weight: 700;
-  text-align: right;
-  padding-right: 2px;
+  text-align: left;
+  white-space: nowrap;
+  line-height: 22px;
 }
 
 .box-card-stats-num {
@@ -377,12 +380,14 @@ box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   color: var(--ink);
   opacity: 0.8;
   font-weight: 500;
+  text-align: center;
+  line-height: 22px;
 }
 
 .box-card-stats-num.has-val {
-  color: var(--ink);
-  opacity: 1;
-  font-weight: 600;
+color: var(--ink);
+opacity: 1;
+font-weight: 600;
 }
 
 .box-card-stats-total {
@@ -392,17 +397,51 @@ box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   font-weight: 600;
 }
 
+/* 种族值 — 黑色 */
+.box-card-stats-tag-base {
+  color: var(--ink);
+}
+
+.box-card-stats-num-base {
+  color: var(--ink);
+  font-weight: 600;
+  opacity: 1;
+}
+
+/* 个体值 — 青色 */
 .box-card-stats-tag-iv {
   color: #59c3d0;
 }
 
+.box-card-stats-num-iv {
+  color: #59c3d0;
+  opacity: 1;
+}
+
+/* 努力值 — 橙色 */
 .box-card-stats-tag-ev {
   color: #d98837;
 }
 
+.box-card-stats-num-ev {
+  color: #d98837;
+  opacity: 1;
+}
+
+/* SP — 紫色 */
 .box-card-stats-tag-sp {
   color: #7c3aed;
   font-weight: 600;
+}
+
+.box-card-stats-num-sp {
+  color: #7c3aed;
+  opacity: 1;
+}
+
+/* 能力值标签 */
+.box-card-stats-row .box-card-stats-tag:not([class*="tag-"]) {
+color: var(--ink);
 }
 
 .box-card-tag-mode {
