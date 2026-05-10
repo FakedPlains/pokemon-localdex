@@ -889,9 +889,26 @@ export class DrizzleStore implements IStore {
   // Moves: getPokemonByMove
   // ────────────────────────────────────────────────────────────────────────────
 
-  async getPokemonByMove(moveId: number): Promise<any[]> {
+  async getPokemonByMove(moveId: number, pagination?: { limit?: number; offset?: number }): Promise<any[] | { items: any[]; total: number }> {
+    const usePagination = pagination?.limit !== undefined;
+
+    // 基础查询（不含 LIMIT/OFFSET，用于 count 和全量）
+    const baseWhere = eq(pokemonLearnsets.moveId, moveId);
+
+    // 如果需要分页，先查 total
+    let total = 0;
+    if (usePagination) {
+      const countRows: any[] = await this.db
+        .select({ cnt: sql<number>`COUNT(DISTINCT ${pokemon.id})` })
+        .from(pokemonLearnsets)
+        .innerJoin(pokemon, eq(pokemon.id, pokemonLearnsets.pokemonId))
+        .where(baseWhere);
+      total = Number(countRows[0]?.cnt ?? 0);
+      if (total === 0) return { items: [], total: 0 };
+    }
+
     // 使用 Drizzle query builder + sql 片段处理 GROUP_CONCAT
-    const rows: any[] = await this.db
+    let query = this.db
       .select({
         id: pokemon.id,
         dexNumber: pokemon.dexNumber,
@@ -905,11 +922,17 @@ export class DrizzleStore implements IStore {
       .from(pokemonLearnsets)
       .innerJoin(pokemon, eq(pokemon.id, pokemonLearnsets.pokemonId))
       .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
-      .where(eq(pokemonLearnsets.moveId, moveId))
+      .where(baseWhere)
       .groupBy(pokemon.id)
       .orderBy(asc(pokemon.dexNumber));
 
-    if (rows.length === 0) return [];
+    if (usePagination) {
+      query = query.limit(Number(pagination!.limit)).offset(Number(pagination?.offset ?? 0));
+    }
+
+    const rows: any[] = await query;
+
+    if (rows.length === 0) return usePagination ? { items: [], total } : [];
 
     const formIds = rows.map((r: any) => Number(r.formId));
 
@@ -941,7 +964,7 @@ export class DrizzleStore implements IStore {
       imageMap.set(Number(r.formId), String(r.url));
     }
 
-    return rows.map((row: any) => {
+    const items = rows.map((row: any) => {
       const fid = Number(row.formId);
       const types = typeMap.get(fid) || [];
       return {
@@ -957,6 +980,8 @@ export class DrizzleStore implements IStore {
         image: imageMap.get(fid),
       };
     });
+
+    return usePagination ? { items, total } : items;
   }
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -1060,8 +1085,24 @@ export class DrizzleStore implements IStore {
   // Abilities: getPokemonByAbility
   // ────────────────────────────────────────────────────────────────────────────
 
-  async getPokemonByAbility(abilityId: number): Promise<any[]> {
-    const rows: any[] = await this.db
+  async getPokemonByAbility(abilityId: number, pagination?: { limit?: number; offset?: number }): Promise<any[] | { items: any[]; total: number }> {
+    const usePagination = pagination?.limit !== undefined;
+    const baseWhere = eq(pokemonFormAbilities.abilityId, abilityId);
+
+    // 如果需要分页，先查 total
+    let total = 0;
+    if (usePagination) {
+      const countRows: any[] = await this.db
+        .select({ cnt: sql<number>`COUNT(DISTINCT ${pokemon.id})` })
+        .from(pokemonFormAbilities)
+        .innerJoin(pokemonForms, and(eq(pokemonForms.id, pokemonFormAbilities.formId), eq(pokemonForms.isDefault, 1)))
+        .innerJoin(pokemon, eq(pokemon.id, pokemonForms.pokemonId))
+        .where(baseWhere);
+      total = Number(countRows[0]?.cnt ?? 0);
+      if (total === 0) return { items: [], total: 0 };
+    }
+
+    let query = this.db
       .selectDistinct({
         id: pokemon.id,
         dexNumber: pokemon.dexNumber,
@@ -1075,10 +1116,16 @@ export class DrizzleStore implements IStore {
       .from(pokemonFormAbilities)
       .innerJoin(pokemonForms, and(eq(pokemonForms.id, pokemonFormAbilities.formId), eq(pokemonForms.isDefault, 1)))
       .innerJoin(pokemon, eq(pokemon.id, pokemonForms.pokemonId))
-      .where(eq(pokemonFormAbilities.abilityId, abilityId))
+      .where(baseWhere)
       .orderBy(asc(pokemon.dexNumber));
 
-    if (rows.length === 0) return [];
+    if (usePagination) {
+      query = query.limit(Number(pagination!.limit)).offset(Number(pagination?.offset ?? 0));
+    }
+
+    const rows: any[] = await query;
+
+    if (rows.length === 0) return usePagination ? { items: [], total } : [];
 
     const formIds = rows.map((r: any) => Number(r.formId));
 
@@ -1110,7 +1157,7 @@ export class DrizzleStore implements IStore {
       imageMap.set(Number(r.formId), String(r.url));
     }
 
-    return rows.map((row: any) => {
+    const items = rows.map((row: any) => {
       const fid = Number(row.formId);
       const types = typeMap.get(fid) || [];
       return {
@@ -1126,6 +1173,8 @@ export class DrizzleStore implements IStore {
         image: imageMap.get(fid),
       };
     });
+
+    return usePagination ? { items, total } : items;
   }
 
   // ────────────────────────────────────────────────────────────────────────────

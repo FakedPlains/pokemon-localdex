@@ -139,6 +139,13 @@ export function registerApiRoutes<E extends object = object>(
   api.get("/moves/:id/pokemon", async (c) => {
     const id = Number(c.req.param("id"));
     if (isNaN(id)) return c.json({ data: [] });
+    const limit = numberQuery(c, "limit");
+    const offset = numberQuery(c, "offset") ?? 0;
+    if (limit !== undefined) {
+      const result = await getStore(c).getPokemonByMove(id, { limit, offset });
+      const { items, total } = result as { items: unknown[]; total: number };
+      return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
+    }
     const data = await getStore(c).getPokemonByMove(id);
     return c.json({ data });
   });
@@ -169,6 +176,13 @@ export function registerApiRoutes<E extends object = object>(
   api.get("/abilities/:id/pokemon", async (c) => {
     const id = Number(c.req.param("id"));
     if (isNaN(id)) return c.json({ data: [] });
+    const limit = numberQuery(c, "limit");
+    const offset = numberQuery(c, "offset") ?? 0;
+    if (limit !== undefined) {
+      const result = await getStore(c).getPokemonByAbility(id, { limit, offset });
+      const { items, total } = result as { items: unknown[]; total: number };
+      return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
+    }
     const data = await getStore(c).getPokemonByAbility(id);
     return c.json({ data });
   });

@@ -16,7 +16,7 @@ import StatCalculator from "../components/StatCalculator.jsx";
 import Loading from "../components/Loading.jsx";
 
 /* ─── Main Page ─── */
-export default function PokedexPage({ query = "", types = [], generation = "" }) {
+export default function PokedexPage({ query = "", types = [], generation = "", initialPokemonId = null, onInitialPokemonConsumed }) {
   const [selectedSlug, setSelectedSlug] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailGeneration, setDetailGeneration] = useState("");
@@ -25,6 +25,7 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
   const activeCardRef = useRef(null);
   const prevSlugRef = useRef(null);  // remember slug before closing detail
   const filterChangedWhileOpenRef = useRef(false); // track filter changes with detail open
+  const fromUrlNavRef = useRef(false); // true when selection comes from URL navigation (#/pokemon?id=X)
 
   // 构建分页请求路径
   const pokemonPath = useMemo(() => {
@@ -38,7 +39,7 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
 
   // Mark that filters changed while detail panel is open
   useEffect(() => {
-    if (selectedSlug) {
+    if (selectedSlug && !fromUrlNavRef.current) {
       filterChangedWhileOpenRef.current = true;
     }
   }, [query, types, generation]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -60,6 +61,19 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
       setDetail(null);
     }
   }, [list, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 从 URL 参数 (#/pokemon?id=X) 自动选中宝可梦
+  useEffect(() => {
+    if (!initialPokemonId) return;
+    fromUrlNavRef.current = true; // mark so scroll handler scrolls to top instead of scrollIntoView
+    setSelectedSlug(String(initialPokemonId));
+    if (onInitialPokemonConsumed) onInitialPokemonConsumed();
+    // 清理 URL hash，避免刷新后重复触发
+    const hash = window.location.hash || "";
+    if (hash.startsWith("#/pokemon")) {
+      window.history.replaceState(null, "", "#/pokedex");
+    }
+  }, [initialPokemonId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch detail when a card is selected
   useEffect(() => {
@@ -98,10 +112,17 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
     if (isOpen && !wasOpen) {
       // Entering split view from grid: scroll to the selected card after layout animation
       prevSlugRef.current = selectedSlug;
+      const isFromUrl = fromUrlNavRef.current;
+      fromUrlNavRef.current = false;
       scrollTimerRef.current = setTimeout(() => {
-        const card = document.querySelector(`[data-slug="${CSS.escape(selectedSlug)}"]`);
-        if (card) {
-          card.scrollIntoView({ block: "start", behavior: "instant" });
+        if (isFromUrl) {
+          // Navigated from another page (e.g. moves/abilities) — scroll to top so detail panel is visible
+          window.scrollTo({ top: 0, behavior: "instant" });
+        } else {
+          const card = document.querySelector(`[data-slug="${CSS.escape(selectedSlug)}"]`);
+          if (card) {
+            card.scrollIntoView({ block: "start", behavior: "instant" });
+          }
         }
       }, 380);
     } else if (isOpen && wasOpen) {

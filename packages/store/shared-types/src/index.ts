@@ -285,12 +285,12 @@ export interface IStore {
   // Moves
   listMoves(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams): Promise<MoveEntry[] | PaginatedResult<MoveEntry>>;
   getMove(idOrSlug: string): Promise<MoveEntry | undefined>;
-  getPokemonByMove(moveId: number): Promise<any[]>;
+  getPokemonByMove(moveId: number, pagination?: PaginationParams): Promise<any[] | PaginatedResult<any>>;
 
   // Abilities
   listAbilities(filters?: { query?: string; generation?: number } & PaginationParams): Promise<AbilityEntry[] | PaginatedResult<AbilityEntry>>;
   getAbility(idOrName: string): Promise<AbilityEntry | undefined>;
-  getPokemonByAbility(abilityId: number): Promise<any[]>;
+  getPokemonByAbility(abilityId: number, pagination?: PaginationParams): Promise<any[] | PaginatedResult<any>>;
 
   // Items
   listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;

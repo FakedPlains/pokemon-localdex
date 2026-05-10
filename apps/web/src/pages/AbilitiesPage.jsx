@@ -37,38 +37,116 @@ function typeIconSrc(typeName) {
   return `${import.meta.env.BASE_URL}assets/type-icons/type-${typeName}@sm.png`;
 }
 
-/* ── 宝可梦网格组件 ── */
-function PokemonGrid({ pokemon, emptyText = "暂无数据", labelFn }) {
-  if (!pokemon || pokemon.length === 0) {
+const POKEMON_PAGE_SIZE = 20;
+
+/* ── 宝可梦网格组件（后端分页） ── */
+function PokemonGrid({ abilityId, emptyText = "暂无数据", labelFn }) {
+  const [pokemon, setPokemon] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPage = useCallback((newOffset) => {
+    setLoading(true);
+    unifiedApi(`/abilities/${abilityId}/pokemon?limit=${POKEMON_PAGE_SIZE}&offset=${newOffset}`)
+      .then((r) => {
+        setPokemon(r.data || []);
+        setTotal(r.total ?? 0);
+        setOffset(newOffset);
+      })
+      .finally(() => setLoading(false));
+  }, [abilityId]);
+
+  useEffect(() => { fetchPage(0); }, [fetchPage]);
+
+  if (loading && pokemon.length === 0) {
+    return (
+      <div className="ab-detail-loading">
+        <div className="pulse-dot" />
+        <span>加载中…</span>
+      </div>
+    );
+  }
+
+  if (!loading && total === 0) {
     return <div className="ab-pokemon-empty">{emptyText}</div>;
   }
+
+  const totalPages = Math.ceil(total / POKEMON_PAGE_SIZE);
+  const page = Math.floor(offset / POKEMON_PAGE_SIZE);
+
   return (
-    <div className="ab-pokemon-grid">
-      {pokemon.map((p) => (
-        <a
-          key={p.id}
-          className="ab-pokemon-card"
-          href={`#/pokemon?id=${p.id}`}
-          style={{ background: TYPE_BG_COLORS[p.primaryType] || "rgba(200,200,200,0.12)" }}
-        >
-          {p.image && <img className="ab-pokemon-card-img" src={p.image} alt={p.nameZh} loading="lazy" />}
-          <span className="ab-pokemon-card-dex">#{String(p.dexNumber).padStart(4, "0")}</span>
-          <span className="ab-pokemon-card-name">{p.nameZh}</span>
-          <span className="ab-pokemon-card-types">
-            {p.primaryType && <img className="ab-pokemon-card-type-icon" src={typeIconSrc(p.primaryType)} alt={p.primaryType} title={p.primaryType} />}
-            {p.secondaryType && <img className="ab-pokemon-card-type-icon" src={typeIconSrc(p.secondaryType)} alt={p.secondaryType} title={p.secondaryType} />}
+    <>
+      {loading && (
+        <div className="ab-detail-loading" style={{ padding: "8px 0" }}>
+          <div className="pulse-dot" />
+          <span>加载中…</span>
+        </div>
+      )}
+      <div className="ab-pokemon-grid" style={{ opacity: loading ? 0.5 : 1 }}>
+        {pokemon.map((p) => (
+          <a
+            key={p.id}
+            className="ab-pokemon-card"
+            href={`#/pokemon?id=${p.id}`}
+            style={{ background: TYPE_BG_COLORS[p.primaryType] || "rgba(200,200,200,0.12)" }}
+          >
+            {p.image && (
+              <img
+                className="ab-pokemon-card-img"
+                src={p.image}
+                alt={p.nameZh}
+                referrerPolicy="no-referrer"
+                loading="lazy"
+                onError={(e) => { e.target.style.display = "none"; e.target.insertAdjacentHTML("afterend", '<span class="ab-pokemon-card-img-fallback">?</span>'); }}
+              />
+            )}
+            <span className="ab-pokemon-card-dex">#{String(p.dexNumber).padStart(4, "0")}</span>
+            <span className="ab-pokemon-card-name">{p.nameZh}</span>
+            <span className="ab-pokemon-card-types">
+              {p.primaryType && (
+                <span className={`ab-pokemon-card-type-icon type-${p.primaryType}`} title={p.primaryType}>
+                  <img src={typeIconSrc(p.primaryType)} alt={p.primaryType} />
+                </span>
+              )}
+              {p.secondaryType && (
+                <span className={`ab-pokemon-card-type-icon type-${p.secondaryType}`} title={p.secondaryType}>
+                  <img src={typeIconSrc(p.secondaryType)} alt={p.secondaryType} />
+                </span>
+              )}
+            </span>
+            {labelFn && <span className="ab-pokemon-card-label">{labelFn(p)}</span>}
+          </a>
+        ))}
+      </div>
+      {totalPages > 1 && (
+        <div className="ab-pokemon-pager">
+          <button
+            className="ab-pokemon-pager-btn"
+            disabled={page === 0 || loading}
+            onClick={() => fetchPage((page - 1) * POKEMON_PAGE_SIZE)}
+          >
+            ‹ 上一页
+          </button>
+          <span className="ab-pokemon-pager-info">
+            {offset + 1}–{Math.min(offset + POKEMON_PAGE_SIZE, total)} / {total}
           </span>
-          {labelFn && <span className="ab-pokemon-card-label">{labelFn(p)}</span>}
-        </a>
-      ))}
-    </div>
+          <button
+            className="ab-pokemon-pager-btn"
+            disabled={page >= totalPages - 1 || loading}
+            onClick={() => fetchPage((page + 1) * POKEMON_PAGE_SIZE)}
+          >
+            下一页 ›
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
 export default function AbilitiesPage({ query = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
   const [detailCache, setDetailCache] = useState({});
-  const [pokemonCache, setPokemonCache] = useState({});
   const pendingExpandRef = useRef(parseExpandParam());
 
   // 构建分页请求路径
@@ -104,11 +182,7 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
-      if (!pokemonCache[key]) {
-        unifiedApi(`/abilities/${key}/pokemon`).then((r) => {
-          setPokemonCache((prev) => ({ ...prev, [key]: r.data }));
-        });
-      }
+      // 不自动加载宝可梦数据，等用户点击"查看"按钮时再加载
       // Scroll to the ability row after DOM update
       requestAnimationFrame(() => {
         const el = document.querySelector(`[data-ability-id="${key}"]`);
@@ -134,6 +208,9 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
     }
   }, [abilities, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 宝可梦区域展开状态（独立于特性详情的展开）
+  const [pokemonExpanded, setPokemonExpanded] = useState({});
+
   const toggleExpand = useCallback((id) => {
     if (expanded === id) {
       setExpanded(null);
@@ -145,12 +222,12 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
         setDetailCache((prev) => ({ ...prev, [id]: r.data }));
       });
     }
-    if (!pokemonCache[id]) {
-      unifiedApi(`/abilities/${id}/pokemon`).then((r) => {
-        setPokemonCache((prev) => ({ ...prev, [id]: r.data }));
-      });
-    }
-  }, [expanded, detailCache, pokemonCache]);
+    // 不再自动加载宝可梦数据，等用户点击"查看"按钮时再加载
+  }, [expanded, detailCache]);
+
+  const togglePokemonSection = useCallback((id) => {
+    setPokemonExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
 
   if (loading && abilities.length === 0) return <Loading />;
 
@@ -251,18 +328,21 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
 
                         {/* 拥有该特性的宝可梦 */}
                         <div className="ab-pokemon-section">
-                          <div className="ab-pokemon-section-title">拥有该特性的宝可梦</div>
-                          {!pokemonCache[key] ? (
-                            <div className="ab-detail-loading">
-                              <div className="pulse-dot" />
-                              <span>加载中…</span>
+                          <button
+                            className={`ab-pokemon-toggle${pokemonExpanded[key] ? " ab-pokemon-toggle-open" : ""}`}
+                            onClick={() => togglePokemonSection(key)}
+                          >
+                            <span className="ab-pokemon-section-title">拥有该特性的宝可梦</span>
+                            <span className={`ab-pokemon-toggle-arrow${pokemonExpanded[key] ? " ab-pokemon-toggle-arrow-open" : ""}`}>▾</span>
+                          </button>
+                          {pokemonExpanded[key] && (
+                            <div className="ab-pokemon-content">
+                              <PokemonGrid
+                                abilityId={key}
+                                emptyText="暂无拥有该特性的宝可梦数据"
+                                labelFn={(p) => p.isHidden ? "隐藏特性" : null}
+                              />
                             </div>
-                          ) : (
-                            <PokemonGrid
-                              pokemon={pokemonCache[key]}
-                              emptyText="暂无拥有该特性的宝可梦数据"
-                              labelFn={(p) => p.isHidden ? "隐藏特性" : null}
-                            />
                           )}
                         </div>
 
