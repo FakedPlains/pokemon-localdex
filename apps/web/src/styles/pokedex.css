@@ -212,7 +212,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
   gap: 12px;
-  padding: 16px;
+  padding: 4px 16px 16px;
   transition: gap 0.35s cubic-bezier(0.22, 1, 0.36, 1),
               padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -774,4 +774,188 @@ display: block;
 }
 
 .drawer-tab-body { min-height: 120px; }
+
+/* ═══════════════════════════════════════════════════════
+   POKEDEX — View Toggle & Table View
+   ═══════════════════════════════════════════════════════ */
+
+.dex-view-toggle {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  padding: 0 16px;
+  margin-bottom: -4px;
+}
+
+/* ── Table View ── */
+.dex-table-view {
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+  margin: 2px 0;
+}
+
+.dex-table-header {
+  display: grid;
+  grid-template-columns: 52px 64px minmax(120px, 1.5fr) minmax(100px, 1fr) 24px minmax(120px, 1.2fr) repeat(6, 48px) 52px;
+  align-items: center;
+  padding: 8px 14px;
+  gap: 8px 6px;
+  background: var(--hover);
+  border-bottom: 1px solid var(--border);
+}
+
+.dex-table-hcol {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.dex-table-hcol-stats {
+  text-align: center;
+}
+
+.dex-table-row {
+  display: grid;
+  grid-template-columns: 52px 64px minmax(120px, 1.5fr) minmax(100px, 1fr) 24px minmax(120px, 1.2fr) repeat(6, 48px) 52px;
+  align-items: center;
+  padding: 6px 14px;
+  gap: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.dex-table-row:last-child {
+  border-bottom: none;
+}
+
+.dex-table-row:hover {
+  background: var(--hover);
+}
+
+/* 图片 */
+.dex-table-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.dex-table-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 编号 */
+.dex-table-dex {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 名称 */
+.dex-table-col-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.dex-table-name-zh {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dex-table-name-en {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 属性 */
+.dex-table-col-types {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* 种族值 */
+.dex-table-col-stat {
+  text-align: center;
+}
+
+.dex-table-stat-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.dex-table-stat-total {
+  font-weight: 700;
+}
+
+/* 特性列 */
+.dex-table-col-ability {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dex-table-ability {
+  font-size: 12px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dex-table-ability-hidden {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dex-table-hcol-ability {
+  text-align: left;
+}
+
+/* 响应式 */
+@media (max-width: 900px) {
+  .dex-table-header,
+  .dex-table-row {
+    grid-template-columns: 44px 52px minmax(80px, 1.2fr) minmax(80px, 0.8fr) 16px minmax(80px, 1fr) repeat(6, 38px) 44px;
+    gap: 4px 4px;
+    padding: 5px 10px;
+  }
+
+  .dex-table-thumb {
+    width: 36px;
+    height: 36px;
+  }
+
+  .dex-table-stat-val {
+    font-size: 11px;
+  }
+
+  .dex-table-name-zh {
+    font-size: 12px;
+  }
+}
 

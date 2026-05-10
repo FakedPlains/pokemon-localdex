@@ -37,7 +37,7 @@
   .dex-filter-chips { gap: 4px; }
   .dex-filter-type-icon { width: 14px; height: 14px; }
   .dex-header { padding: 18px 18px 16px; }
-  .dex-body { flex-direction: column; }
+  .dex-body { flex-direction: column; align-items: stretch; }
   .dex-list-panel-narrow { max-width: none; width: 100%; }
   .dex-detail-panel { position: relative; top: auto; max-height: none; order: -1; width: 100%; padding: 18px; }
   .dex-list { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
