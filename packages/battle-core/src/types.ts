@@ -30,28 +30,45 @@ export type PokemonCalcInput = {
   nature?: string;              // 性格中文名，默认 "认真"
   abilityId?: string | number;  // 特性数据库 ID（优先）
   ability?: string;             // 特性中文名（fallback）
+  abilityOn?: boolean;          // 特性是否激活（如威吓），默认 true
   itemId?: string | number;     // 道具数据库 ID（优先）
   item?: string;                // 道具中文名（fallback）
+  gender?: string;              // 性别: "M" | "F" | "N"
   evs?: Partial<StatsTable>;
   ivs?: Partial<StatsTable>;
   boosts?: Partial<StatsTable>;
-  status?: string;              // 状态: "burn" | "paralysis" | "poison" | "sleep" | ""
+  curHP?: number;               // 当前 HP（非满血计算用）
+  status?: string;              // 状态: "burn" | "paralysis" | "poison" | "sleep" | "freeze" | "tox" | ""
+  toxicCounter?: number;        // 剧毒回合计数（status 为 tox 时生效）
   teraType?: string;            // 太晶属性中文名
+  isDynamaxed?: boolean;        // 是否极巨化
+  alliesFainted?: number;       // 已倒下队友数（影响灵魂之心等）
+  boostedStat?: string;         // 古代活性/夸克充能强化的能力
+  overrides?: {                 // 手动覆盖种族值/属性
+    baseStats?: Partial<StatsTable>;
+    types?: [string, string?];  // [属性1, 属性2?]
+  };
 };
 
 export type SideInput = {
   isSR?: boolean;
   spikes?: number;
+  steelsurge?: boolean;         // 钢刺
   isReflect?: boolean;
   isLightScreen?: boolean;
   isAuroraVeil?: boolean;
   isProtected?: boolean;
-  isSeeded?: boolean;
-  isSaltCured?: boolean;
+  isSeeded?: boolean;           // 寄生种子
+  isSaltCured?: boolean;        // 盐腌
+  isForesight?: boolean;        // 识破
   isTailwind?: boolean;
   isHelpingHand?: boolean;
+  isFlowerGift?: boolean;       // 花之礼
   isPowerTrick?: boolean;
+  isSteelySpirit?: boolean;     // 钢之意志
   isFriendGuard?: boolean;
+  isBattery?: boolean;          // 蓄电池
+  isPowerSpot?: boolean;        // 能量点
   isSwitching?: "in" | "out";
 };
 
@@ -64,6 +81,16 @@ export type DamageCalcInput = {
     name?: string;          // 招式中文名（fallback）
     isCrit?: boolean;       // 是否暴击
     hits?: number;          // 连续攻击次数
+    timesUsed?: number;     // 招式已使用次数（影响怒火冲天等）
+    timesUsedWithMetronome?: number; // 节拍器连续使用次数
+    useZ?: boolean;         // 是否使用 Z 招式（Gen 7）
+    useMax?: boolean;       // 是否使用极巨招式（Gen 8）
+    isStellarFirstUse?: boolean; // 星晶属性首次使用
+    overrides?: {           // 手动覆盖招式属性
+      basePower?: number;
+      type?: string;
+      category?: string;
+    };
   };
   field?: {
     gameType?: "singles" | "doubles";
@@ -72,6 +99,10 @@ export type DamageCalcInput = {
     isGravity?: boolean;
     isMagicRoom?: boolean;
     isWonderRoom?: boolean;
+    isBeadsOfRuin?: boolean;   // 灾祸之珠
+    isTabletsOfRuin?: boolean; // 灾祸之碑
+    isSwordOfRuin?: boolean;   // 灾祸之剑
+    isVesselOfRuin?: boolean;  // 灾祸之鼎
     attackerSide?: SideInput;
     defenderSide?: SideInput;
   };
