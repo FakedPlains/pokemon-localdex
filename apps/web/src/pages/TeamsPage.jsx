@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { unifiedApi } from "../utils/api.js";
-import { STAT_KEYS, NATURE_OPTIONS } from "../utils/constants.js";
+import Modal from "../components/Modal.jsx";
+import ViewToggle from "../components/ViewToggle.jsx";
+import { STAT_KEYS } from "../utils/constants.js";
 import { createDraftMember, createDefaultStats, getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers.js";
 import {
   getBox, saveBoxConfig, deleteBoxConfig, duplicateBoxConfig,
@@ -14,42 +16,6 @@ import PokemonPickerList from "../components/PokemonPickerList.jsx";
 import { useToast } from "../components/Toast.jsx";
 import CustomSelect from "../components/CustomSelect.jsx";
 
-
-// ══════════════════════════════════════════════
-//  通用弹窗
-// ══════════════════════════════════════════════
-
-function Modal({ open, onClose, title, headerExtra, children }) {
-  const backdropRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    document.body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", handler); document.body.style.overflow = ""; };
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  return createPortal(
-    <div className="modal-backdrop" ref={backdropRef} onClick={(e) => { if (e.target === backdropRef.current) onClose(); }}>
-      <div className="modal-container">
-        <div className="modal-header">
-          <strong className="modal-title">{title}</strong>
-          {headerExtra && <div className="modal-header-extra">{headerExtra}</div>}
-          <button className="modal-close-btn" onClick={onClose} title="关闭">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4.11 3.05a.75.75 0 0 0-1.06 1.06L6.94 8l-3.89 3.89a.75.75 0 1 0 1.06 1.06L8 9.06l3.89 3.89a.75.75 0 1 0 1.06-1.06L9.06 8l3.89-3.89a.75.75 0 0 0-1.06-1.06L8 6.94 4.11 3.05z"/></svg>
-          </button>
-        </div>
-        <div className="modal-body">
-          {children}
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-}
 
 // ══════════════════════════════════════════════
 //  盒子卡片
@@ -619,22 +585,7 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                   </button>
                 )}
                 {boxConfigs.length > 0 && (
-                  <div className="box-view-toggle">
-                    <button
-                      className={`box-view-btn${boxViewMode === "card" ? " box-view-btn-active" : ""}`}
-                      onClick={() => setBoxViewMode("card")}
-                      title="卡片视图"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
-                    </button>
-                    <button
-                      className={`box-view-btn${boxViewMode === "list" ? " box-view-btn-active" : ""}`}
-                      onClick={() => setBoxViewMode("list")}
-                      title="列表视图"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2.5" rx="1"/><rect x="1" y="6.75" width="14" height="2.5" rx="1"/><rect x="1" y="11.5" width="14" height="2.5" rx="1"/></svg>
-                    </button>
-                  </div>
+                  <ViewToggle mode={boxViewMode} onChange={setBoxViewMode} />
                 )}
               </div>
 

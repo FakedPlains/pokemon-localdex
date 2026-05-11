@@ -1,0 +1,572 @@
+/* ══════════════════════════════════════════════════════════════
+   Shared Component Styles
+   统一的公共组件样式，替代 mv-/ab-/it- 前缀的重复定义
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Wiki Link ── */
+.shared-wiki-link,
+.mv-wiki-link,
+.ab-wiki-link,
+.it-wiki-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  color: var(--muted);
+  opacity: 0.6;
+  transition: opacity 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.shared-wiki-link:hover,
+.mv-wiki-link:hover,
+.ab-wiki-link:hover,
+.it-wiki-link:hover {
+  opacity: 1;
+  color: var(--accent, #d94f3d);
+}
+
+/* ── Name Tags ── */
+.shared-name-tag,
+.mv-name-tag,
+.ab-name-tag,
+.it-name-tag {
+  display: inline-flex;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.shared-name-ja,
+.mv-name-ja,
+.ab-name-ja,
+.it-name-ja {
+  background: rgba(217, 79, 61, 0.08);
+  color: var(--accent-strong);
+}
+
+.shared-name-en,
+.mv-name-en,
+.ab-name-en,
+.it-name-en {
+  background: rgba(59, 132, 197, 0.1);
+  color: #1a5276;
+}
+
+.shared-name-gen,
+.mv-name-gen,
+.ab-name-gen,
+.it-name-gen {
+  background: rgba(138, 166, 90, 0.12);
+  color: #3d5a1e;
+}
+
+/* ── Detail Loading ── */
+.shared-detail-loading,
+.mv-detail-loading,
+.ab-detail-loading,
+.it-detail-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  padding: 20px 0;
+  color: var(--muted);
+}
+
+/* ── Effect Detail ── */
+.shared-detail-effect,
+.mv-detail-effect,
+.ab-detail-effect,
+.it-detail-effect {
+  margin-top: 14px;
+}
+
+.shared-detail-effect-title,
+.mv-detail-effect-title,
+.ab-detail-effect-title,
+.it-detail-effect-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.shared-detail-effect-text,
+.mv-detail-effect-text,
+.ab-detail-effect-text,
+.it-detail-effect-text {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink);
+  white-space: pre-line;
+}
+
+/* ── Source Link ── */
+.shared-source,
+.mv-source,
+.ab-source,
+.it-source {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(31, 42, 31, 0.06);
+}
+
+.shared-source a,
+.mv-source a,
+.ab-source a,
+.it-source a {
+  font-size: 12px;
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.shared-source a:hover,
+.mv-source a:hover,
+.ab-source a:hover,
+.it-source a:hover {
+  text-decoration: underline;
+}
+
+/* ── Generation Changes (Timeline) ── */
+.shared-gen-section,
+.mv-gen-section,
+.ab-gen-section,
+.it-gen-section {
+  margin-top: 16px;
+}
+
+.shared-gen-title,
+.mv-gen-title,
+.ab-gen-title,
+.it-gen-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.shared-gen-timeline,
+.mv-gen-timeline,
+.ab-gen-timeline,
+.it-gen-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shared-gen-item,
+.mv-gen-item,
+.ab-gen-item,
+.it-gen-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 42, 31, 0.05);
+}
+
+.shared-gen-badges,
+.mv-gen-badges,
+.ab-gen-badges,
+.it-gen-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.shared-gen-badge,
+.mv-gen-badge,
+.ab-gen-badge,
+.it-gen-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, rgba(138, 166, 90, 0.18), rgba(138, 166, 90, 0.08));
+  color: #3d5a1e;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.shared-gen-version,
+.mv-gen-version,
+.ab-gen-version,
+.it-gen-version {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: linear-gradient(135deg, rgba(90, 130, 180, 0.16), rgba(90, 130, 180, 0.06));
+  color: #2a4a6e;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.shared-gen-text,
+.mv-gen-text,
+.ab-gen-text,
+.it-gen-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+/* Version Exclusive Tags */
+.shared-gen-exclusive-tag,
+.mv-gen-exclusive-tag,
+.ab-gen-exclusive-tag,
+.it-gen-exclusive-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, rgba(220, 120, 60, 0.18), rgba(220, 120, 60, 0.08));
+  color: #b05020;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.shared-gen-exclusive,
+.mv-gen-exclusive,
+.ab-gen-exclusive,
+.it-gen-exclusive {
+  opacity: 0.75;
+  border-left: 2px solid rgba(220, 120, 60, 0.4);
+  padding-left: 10px;
+}
+
+/* ── Pokemon Grid (shared) ── */
+.shared-pokemon-empty,
+.mv-pokemon-empty,
+.ab-pokemon-empty {
+  padding: 16px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.shared-pokemon-grid,
+.mv-pokemon-grid,
+.ab-pokemon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  padding: 2px;
+}
+
+.shared-pokemon-card,
+.mv-pokemon-card,
+.ab-pokemon-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px 6px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--ink);
+  border: 1px solid rgba(31, 42, 31, 0.06);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+  cursor: pointer;
+}
+
+.shared-pokemon-card:hover,
+.mv-pokemon-card:hover,
+.ab-pokemon-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.shared-pokemon-card-img,
+.mv-pokemon-card-img,
+.ab-pokemon-card-img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.shared-pokemon-card-img-fallback,
+.mv-pokemon-card-img-fallback,
+.ab-pokemon-card-img-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  font-size: 24px;
+  color: var(--muted);
+  opacity: 0.4;
+  background: rgba(31, 42, 31, 0.04);
+  border-radius: 8px;
+}
+
+.shared-pokemon-card-dex,
+.mv-pokemon-card-dex,
+.ab-pokemon-card-dex {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  font-family: "JetBrains Mono", "SF Mono", monospace;
+}
+
+.shared-pokemon-card-name,
+.mv-pokemon-card-name,
+.ab-pokemon-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+  word-break: keep-all;
+}
+
+.shared-pokemon-card-types,
+.mv-pokemon-card-types,
+.ab-pokemon-card-types {
+  display: flex;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.shared-pokemon-card-type-icon,
+.mv-pokemon-card-type-icon,
+.ab-pokemon-card-type-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  padding: 3px;
+}
+
+.shared-pokemon-card-type-icon img,
+.mv-pokemon-card-type-icon img,
+.ab-pokemon-card-type-icon img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+/* 宝可梦卡片属性图标底色 */
+.shared-pokemon-card-type-icon.type-一般,
+.mv-pokemon-card-type-icon.type-一般,
+.ab-pokemon-card-type-icon.type-一般 { background: #BBBBAA; }
+.shared-pokemon-card-type-icon.type-火,
+.mv-pokemon-card-type-icon.type-火,
+.ab-pokemon-card-type-icon.type-火 { background: #FF4422; }
+.shared-pokemon-card-type-icon.type-水,
+.mv-pokemon-card-type-icon.type-水,
+.ab-pokemon-card-type-icon.type-水 { background: #3399FF; }
+.shared-pokemon-card-type-icon.type-电,
+.mv-pokemon-card-type-icon.type-电,
+.ab-pokemon-card-type-icon.type-电 { background: #FFCC33; }
+.shared-pokemon-card-type-icon.type-草,
+.mv-pokemon-card-type-icon.type-草,
+.ab-pokemon-card-type-icon.type-草 { background: #77CC55; }
+.shared-pokemon-card-type-icon.type-冰,
+.mv-pokemon-card-type-icon.type-冰,
+.ab-pokemon-card-type-icon.type-冰 { background: #77DDFF; }
+.shared-pokemon-card-type-icon.type-格斗,
+.mv-pokemon-card-type-icon.type-格斗,
+.ab-pokemon-card-type-icon.type-格斗 { background: #BB5544; }
+.shared-pokemon-card-type-icon.type-毒,
+.mv-pokemon-card-type-icon.type-毒,
+.ab-pokemon-card-type-icon.type-毒 { background: #AA5599; }
+.shared-pokemon-card-type-icon.type-地面,
+.mv-pokemon-card-type-icon.type-地面,
+.ab-pokemon-card-type-icon.type-地面 { background: #DDBB55; }
+.shared-pokemon-card-type-icon.type-飞行,
+.mv-pokemon-card-type-icon.type-飞行,
+.ab-pokemon-card-type-icon.type-飞行 { background: #6699FF; }
+.shared-pokemon-card-type-icon.type-超能力,
+.mv-pokemon-card-type-icon.type-超能力,
+.ab-pokemon-card-type-icon.type-超能力 { background: #FF5599; }
+.shared-pokemon-card-type-icon.type-虫,
+.mv-pokemon-card-type-icon.type-虫,
+.ab-pokemon-card-type-icon.type-虫 { background: #AABB22; }
+.shared-pokemon-card-type-icon.type-岩石,
+.mv-pokemon-card-type-icon.type-岩石,
+.ab-pokemon-card-type-icon.type-岩石 { background: #BBAA66; }
+.shared-pokemon-card-type-icon.type-幽灵,
+.mv-pokemon-card-type-icon.type-幽灵,
+.ab-pokemon-card-type-icon.type-幽灵 { background: #6666BB; }
+.shared-pokemon-card-type-icon.type-龙,
+.mv-pokemon-card-type-icon.type-龙,
+.ab-pokemon-card-type-icon.type-龙 { background: #7766EE; }
+.shared-pokemon-card-type-icon.type-恶,
+.mv-pokemon-card-type-icon.type-恶,
+.ab-pokemon-card-type-icon.type-恶 { background: #775544; }
+.shared-pokemon-card-type-icon.type-钢,
+.mv-pokemon-card-type-icon.type-钢,
+.ab-pokemon-card-type-icon.type-钢 { background: #AAAABB; }
+.shared-pokemon-card-type-icon.type-妖精,
+.mv-pokemon-card-type-icon.type-妖精,
+.ab-pokemon-card-type-icon.type-妖精 { background: #FFAAFF; }
+
+.shared-pokemon-card-label,
+.mv-pokemon-card-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #1a5276;
+  background: rgba(59, 132, 197, 0.1);
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-top: 2px;
+}
+
+.ab-pokemon-card-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: rgba(217, 79, 61, 0.08);
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-top: 2px;
+}
+
+/* ── Pager ── */
+.shared-pokemon-pager,
+.mv-pokemon-pager,
+.ab-pokemon-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 6px 0;
+}
+
+.shared-pokemon-pager-btn,
+.mv-pokemon-pager-btn,
+.ab-pokemon-pager-btn {
+  padding: 5px 14px;
+  border: 1px solid rgba(31, 42, 31, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+
+.shared-pokemon-pager-btn:hover:not(:disabled),
+.mv-pokemon-pager-btn:hover:not(:disabled),
+.ab-pokemon-pager-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(90, 130, 180, 0.3);
+  transform: none;
+  box-shadow: none;
+}
+
+.shared-pokemon-pager-btn:disabled,
+.mv-pokemon-pager-btn:disabled,
+.ab-pokemon-pager-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.shared-pokemon-pager-info,
+.mv-pokemon-pager-info,
+.ab-pokemon-pager-info {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Pokemon Section Toggle ── */
+.shared-pokemon-section,
+.mv-pokemon-section,
+.ab-pokemon-section {
+  margin-top: 16px;
+}
+
+.shared-pokemon-toggle,
+.mv-pokemon-toggle,
+.ab-pokemon-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.shared-pokemon-toggle:hover,
+.mv-pokemon-toggle:hover,
+.ab-pokemon-toggle:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(90, 130, 180, 0.25);
+  transform: none;
+  box-shadow: none;
+}
+
+.shared-pokemon-toggle-open,
+.mv-pokemon-toggle-open,
+.ab-pokemon-toggle-open {
+  border-color: rgba(90, 130, 180, 0.25);
+  border-radius: 10px 10px 0 0;
+  border-bottom: 1px solid rgba(31, 42, 31, 0.06);
+}
+
+.shared-pokemon-section-title,
+.mv-pokemon-section-title,
+.ab-pokemon-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.shared-pokemon-toggle-arrow,
+.mv-pokemon-toggle-arrow,
+.ab-pokemon-toggle-arrow {
+  font-size: 12px;
+  color: var(--muted);
+  transition: transform 200ms ease;
+  margin-left: auto;
+}
+
+.shared-pokemon-toggle-arrow-open,
+.mv-pokemon-toggle-arrow-open,
+.ab-pokemon-toggle-arrow-open {
+  transform: rotate(180deg);
+}
+
+.shared-pokemon-content,
+.mv-pokemon-content,
+.ab-pokemon-content {
+  padding: 12px 14px 14px;
+  border: 1px solid rgba(31, 42, 31, 0.08);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  background: rgba(255, 255, 255, 0.3);
+}

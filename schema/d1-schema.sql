@@ -230,18 +230,6 @@ CREATE TABLE IF NOT EXISTS item_generation_records (
 );
 
 -- ============================================================
--- 对战队伍（D1 持久化，替代 Node.js 文件存储）
--- ============================================================
-CREATE TABLE IF NOT EXISTS battle_teams (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL DEFAULT '未命名队伍',
-  format TEXT NOT NULL DEFAULT 'singles',
-  members_json TEXT NOT NULL DEFAULT '[]',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
--- ============================================================
 -- 索引
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_pokemon_dex ON pokemon(dex_number);
@@ -270,7 +258,5 @@ CREATE INDEX IF NOT EXISTS idx_moves_number ON moves(number);
 CREATE INDEX IF NOT EXISTS idx_abilities_name ON abilities(name_zh);
 CREATE INDEX IF NOT EXISTS idx_abilities_number ON abilities(number);
 CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
-
-CREATE INDEX IF NOT EXISTS idx_battle_teams_updated ON battle_teams(updated_at DESC);
 
 PRAGMA foreign_keys = ON;

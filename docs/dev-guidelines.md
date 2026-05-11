@@ -69,7 +69,7 @@ pokemon（主表）
 
 **具体约束**：
 
-- `battle-core` 的查询函数签名统一为 `opts: { id?: string | number; nameZh?: string }` 格式，优先通过 `id` 查询，仅在 `id` 缺失时才降级到 `nameZh`
+- `battle-core` 通过 `NameLookup` 接口与 store 层解耦，查询函数签名统一为 `opts: { id?: string | number; nameZh?: string }` 格式，优先通过 `id` 查询，仅在 `id` 缺失时才降级到 `nameZh`
 - 宝可梦形态查询优先使用 `formId`（`pokemon_forms.id`）直接定位，`formKey`（如 "超级喷火龙x"）作为 fallback 保留，用于 formId 缺失时的降级查询
 - 前端在选择宝可梦/形态/招式/特性/道具时，必须同时保存数据库 ID 和中文名，API 请求中优先传递 ID
 - 中文名仅作为 fallback 和界面显示使用，不作为主要查询条件
@@ -98,32 +98,34 @@ attacker: {
 }
 ```
 
-**后端查询函数签名**：
+**后端查询接口**：
 
 ```typescript
-// sqlite-store 提供的 NameResolver（同步，node:sqlite）
-interface NameResolver {
-  queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): string | undefined;
-  queryMoveNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined;
-  queryAbilityNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined;
-  queryItemNameEn(opts: { id?: string | number; nameZh?: string }): string | undefined;
-}
+// battle-core 定义的 NameLookup 接口（由 DrizzleStore 统一实现）
+interface NameLookup {
+  pokemonNameEn(opts: {
+    pokemonId?: string | number;
+    formId?: string | number;
+    formKey?: string;
+    name?: string;
+  }): Promise<string | undefined>;
 
-// d1-store 提供的 DbAdapter（异步，D1Database）
-interface DbAdapter {
-  queryPokemonFormNameEn(opts: { pokemonId?: string | number; formId?: string | number; formKey?: string; nameZh?: string }): Promise<string | undefined>;
-  queryMoveNameEn(opts: { id?: string | number; nameZh?: string }): Promise<string | undefined>;
-  queryAbilityNameEn(opts: { id?: string | number; nameZh?: string }): Promise<string | undefined>;
-  queryItemNameEn(opts: { id?: string | number; nameZh?: string }): Promise<string | undefined>;
+  entityNameEn(
+    kind: "move" | "ability" | "item",
+    id?: string | number,
+    nameZh?: string,
+  ): Promise<string | undefined>;
 }
 ```
+
+`DrizzleStore` 同时实现 `IStore`（数据查询）和 `NameLookup`（名称解析）两个接口，本地模式和 Worker 模式共用同一套实现。
 
 **数据流转**：
 
 ```
 前端选择形态 → 保存 form.id 到 state（formId）
 前端发起计算 → 请求体携带 formId（优先）和 formKey（fallback）
-后端收到请求 → queryPokemonFormNameEn({ formId, formKey, pokemonId, nameZh })
+后端收到请求 → store.pokemonNameEn({ formId, formKey, pokemonId, name })
                    → formId 命中则直接返回
                    → 未命中则尝试 pokemonId + formKey 组合查询
                    → 再未命中则尝试 formKey 单独匹配
@@ -146,7 +148,7 @@ interface DbAdapter {
 
 ### 3.1 API 层（apps/api）
 
-本地开发使用 SQLite，生产环境使用 Cloudflare D1。切换逻辑在 `apps/api/src/app.ts` 顶部，动态 `import` 对应的 store 包。**不要在路由处理函数内部做数据源判断**，所有切换逻辑集中在模块导入处。
+本地开发使用 SQLite，生产环境使用 Cloudflare D1。`app.ts` 和 `worker.ts` 分别初始化各自的 store 实例，然后通过 `routes.ts` 的 `registerRoutes()` 函数统一注册路由。**不要在路由处理函数内部做数据源判断**，所有切换逻辑集中在 `getStore` 实现中。
 
 ### 3.2 Web 层（apps/web）
 
@@ -206,6 +208,8 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 
 ### 4.5 公共组件说明
 
+#### 4.5.1 业务组件
+
 **CustomSelect** — 自定义下拉选择框，支持选项分组和自定义渲染。用于 DamagePage 中的性格选择等场景。
 
 **SearchSelect** — 带异步搜索功能的下拉框，支持远程搜索和本地过滤。用于 DamagePage 中的宝可梦、招式、道具、特性搜索选择。
@@ -217,6 +221,79 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 **PokemonPickerList** — 宝可梦选择列表组件，用于从列表中选择宝可梦。
 
 **StatCalculator** — 能力值计算器，支持 EV/IV 输入和实际能力值计算，同时支持 Champions 赛制的 SP 模式。
+
+#### 4.5.2 跨页面共享组件
+
+以下组件从多个页面中提取而来，**新页面开发时必须优先使用这些共享组件，不要重复定义**。
+
+**WikiLink** (`components/WikiLink.jsx`) — Wiki 外链图标组件。接受 `url`、`title`（默认 `"Wiki"`）和可选 `className` 属性。当 `url` 为空时不渲染。已在 MovesPage、AbilitiesPage、ItemsPage、PokedexPage 中使用。
+
+```jsx
+import WikiLink from "../components/WikiLink.jsx";
+<WikiLink url={detail.source?.url} title="52Poké Wiki" />
+```
+
+**GenerationTimeline** (`components/GenerationTimeline.jsx`) — 世代变更时间线组件。接受 `generations` 数组（每项包含 `generation`、`description` 等字段）和可选 `title`（默认 `"世代变更"`）。当 `generations` 为空时不渲染。已在 MovesPage、AbilitiesPage、ItemsPage 中使用。
+
+```jsx
+import GenerationTimeline from "../components/GenerationTimeline.jsx";
+<GenerationTimeline generations={detail.generations} title="世代变更" />
+```
+
+**PokemonGrid** (`components/PokemonGrid.jsx`) — 可学习该招式/拥有该特性的宝可梦网格组件。接受 `apiPath`（API 请求路径，如 `/moves/123/pokemon`）和可选 `title`。已在 MovesPage、AbilitiesPage 中使用。
+
+```jsx
+import PokemonGrid from "../components/PokemonGrid.jsx";
+<PokemonGrid apiPath={`/moves/${moveId}/pokemon`} title="可学习的宝可梦" />
+```
+
+**Modal** (`components/Modal.jsx`) — 通用弹窗组件，基于 `createPortal` 渲染到 `document.body`。支持 Escape 键关闭、点击遮罩关闭、锁定 body 滚动。接受 `open`、`onClose`、`title`、`headerExtra` 和 `children` 属性。已在 TeamsPage 中使用。
+
+```jsx
+import Modal from "../components/Modal.jsx";
+<Modal open={showModal} onClose={() => setShowModal(false)} title="选择队伍">
+  {/* 弹窗内容 */}
+</Modal>
+```
+
+**ViewToggle** (`components/ViewToggle.jsx`) — 卡片/列表视图切换组件。接受 `mode`（`"card"` 或 `"list"`）和 `onChange` 回调。已在 PokedexPage、TeamsPage 中使用。
+
+```jsx
+import ViewToggle from "../components/ViewToggle.jsx";
+<ViewToggle mode={viewMode} onChange={setViewMode} />
+```
+
+#### 4.5.3 共享工具函数与常量
+
+**`parseExpandParam()`** (`utils/helpers.js`) — 从 URL hash 中解析 `expand` 参数，用于从其他页面跳转后自动展开指定条目。已在 MovesPage、AbilitiesPage、ItemsPage 中使用。
+
+```jsx
+import { parseExpandParam } from "../utils/helpers.js";
+const pendingExpandRef = useRef(parseExpandParam());
+```
+
+**`TYPE_BG_COLORS` / `TYPE_BG_COLORS_CARD`** (`utils/constants.js`) — 属性背景色映射。`TYPE_BG_COLORS` 使用 0.10 透明度（用于名称标签），`TYPE_BG_COLORS_CARD` 使用 0.18 透明度（用于卡片背景）。通过 `makeTypeBgColors(alpha)` 工厂函数生成，避免重复定义。
+
+```jsx
+import { TYPE_BG_COLORS, TYPE_BG_COLORS_CARD } from "../utils/constants.js";
+const bgColor = TYPE_BG_COLORS[typeName] || "rgba(0,0,0,0.06)";
+```
+
+**`typeIconSrc(type)` / `categoryIconSrc(category)`** (`utils/constants.js`) — 属性图标和分类图标的 URL 生成函数。
+
+```jsx
+import { typeIconSrc, categoryIconSrc } from "../utils/constants.js";
+<img src={typeIconSrc("fire")} alt="fire" />
+<img src={categoryIconSrc("physical")} alt="physical" />
+```
+
+#### 4.5.4 共享 CSS（`styles/shared.css`）
+
+`shared.css` 定义了跨页面复用的样式类，使用 `shared-` 前缀。为保持向后兼容，部分选择器同时包含旧前缀（`mv-`、`ab-`、`it-`）作为多选择器。
+
+主要共享类名：`shared-name-tag`、`shared-name-ja`、`shared-name-en`、`shared-name-gen`、`shared-detail-effect`、`shared-detail-effect-title`、`shared-detail-effect-text`、`shared-detail-loading`、`shared-gen-timeline`、`shared-gen-item`、`shared-pokemon-section`、`shared-pokemon-grid`、`shared-wiki-link`、`shared-source`。
+
+**开发规范**：新页面中使用 `shared-` 前缀的类名，不要再创建带页面前缀的重复样式。如需扩展共享样式，在 `shared.css` 中添加并使用 `shared-` 前缀。
 
 ### 4.6 ID 使用规范
 
@@ -265,6 +342,7 @@ DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 | 文件 | 职责 | 前缀/命名空间 |
 |------|------|--------------|
 | `base.css` | CSS 变量、reset、body 基础样式 | `--` 变量 |
+| `shared.css` | 跨页面共享样式（名称标签、世代时间线、Wiki 链接等） | `.shared-` |
 | `nav.css` | 顶部导航栏、搜索框、过滤面板 | `.nav-`、`.filter-` |
 | `pokedex.css` | 图鉴页 Master-Detail 布局 | `.pokedex-` |
 | `stat-calculator.css` | 能力值计算器 | `.stat-calc-` |
@@ -420,18 +498,20 @@ npx taro build --type weapp
 |----|------|---------|
 | `packages/battle-core` | 纯计算逻辑 | 不得有 I/O、不得包含 SQL、不得依赖 Node.js 特有 API |
 | `packages/store/shared-types` | 共享类型/常量/辅助函数 | 不得有 I/O、不得依赖运行时特定 API |
-| `packages/store/sqlite-store` | SQLite 查询 + NameResolver | 不得有业务逻辑，只做数据映射 |
-| `packages/store/d1-store` | D1 查询 + DbAdapter | 与 sqlite-store 保持接口一致 |
+| `packages/store/drizzle-schema` | Drizzle ORM 表定义 | 与 d1-schema.sql 保持一致 |
+| `packages/store/drizzle-queries` | 统一查询逻辑（DrizzleStore） | 实现 IStore + NameLookup，不得有业务逻辑 |
+| `packages/store/sqlite-store` | SQLite 薄封装 | 仅创建数据库连接，委托 drizzle-queries |
+| `packages/store/d1-store` | D1 薄封装 | 仅创建数据库连接，委托 drizzle-queries |
 | `packages/crawler_py` | 数据采集 | 不得直接被 API 层调用 |
 | `apps/api` | HTTP 路由 | 不得包含数据库查询逻辑（委托给 store 包） |
 | `apps/web` | UI 展示 | 不得直接操作数据库 |
 | `apps/miniprogram` | 小程序 UI | 不得引入 Node.js 专有模块 |
 
-### 8.2 store 包接口一致性
+### 8.2 store 包架构
 
-这是项目最重要的架构约束之一。sqlite-store 和 d1-store 两个包必须保持接口完全一致。每次修改任一 store 包的函数签名时，必须同步修改另一个包。
+存储层采用四层结构：shared-types 定义类型和常量，drizzle-schema 定义表结构，drizzle-queries 实现全部查询逻辑，sqlite-store 和 d1-store 作为薄封装层仅负责创建数据库连接。查询逻辑变更只需修改 drizzle-queries 一处，sqlite-store 和 d1-store 自动同步。
 
-sqlite-store 和 d1-store 的共享类型、常量和辅助函数统一定义在 `packages/store/shared-types`（`@pokemon-localdex/store-types`）中，不得在各自包内重复定义。
+共享类型、常量和辅助函数统一定义在 `packages/store/shared-types`（`@pokemon-localdex/store-types`）中，不得在各自包内重复定义。
 
 ### 8.3 常量管理
 

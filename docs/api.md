@@ -189,38 +189,6 @@ GET /api/pokemon/25/learnset/meta
 
 小程序端对应函数：`fetchItemDetail(idOrSlug)`。
 
-## 队伍
-
-### GET /teams
-
-获取所有已保存的队伍列表。队伍数据存储在 `data/teams.json` 文件中。
-
-### POST /teams
-
-创建或更新一支队伍。请求体为 JSON 格式：
-
-```json
-{
-  "id": "team_1714000000000",
-  "name": "我的队伍",
-  "format": "singles",
-  "members": [
-    {
-      "pokemonId": 25,
-      "nature": "胆小",
-      "level": 50,
-      "ability": "静电",
-      "item": "气势披带",
-      "moves": ["十万伏特", "冲浪", "草结", "伏特替换"]
-    }
-  ]
-}
-```
-
-如果请求体中包含已存在的 `id`，则更新该队伍；否则创建新队伍。`id` 字段可省略，服务端会自动生成。
-
-注意：队伍功能仅在 Web 端可用。小程序端暂不支持队伍管理。
-
 ## 伤害计算
 
 ### POST /battle/damage

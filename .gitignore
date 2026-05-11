@@ -38,11 +38,10 @@ yarn-error.log*
 project.private.config.json
 apps/miniprogram/dist/
 
-# Empty placeholder DB files
+# Local DB files (not the main data/sqlite/localdex.sqlite)
 /data/localdex.db
-/data/localdex.sqlite
+/data/pokemon.db
 /packages/crawler_py/localdex.db
-/packages/sqlite-store/pokemon.db
 
 # Generated type icon assets (duplicated in apps/web/public/)
 /data/type-icons/
@@ -50,13 +49,6 @@ apps/miniprogram/dist/
 # Generated 52Poke import/cache artifacts
 /data/raw/
 /packages/crawler_py/data/raw/
-/apps/web/public/assets/cache/
-!/apps/web/public/assets/cache/
-apps/web/public/assets/cache/*
-!/apps/web/public/assets/cache/pokemon/
-apps/web/public/assets/cache/pokemon/*
-!/apps/web/public/assets/cache/pokemon/*/
-apps/web/public/assets/cache/pokemon/*/*
-!/apps/web/public/assets/cache/pokemon/*/*超级*.webp
-!/apps/web/public/assets/cache/pokemon/*/*超极巨*.webp
+
+# Wrangler (Cloudflare Workers local state)
 .wrangler/

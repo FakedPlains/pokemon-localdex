@@ -1,12 +1,11 @@
 {
-  "name": "@pokemon-localdex/sqlite-store",
+  "name": "@pokemon-localdex/drizzle-queries",
   "private": true,
   "type": "module",
   "exports": "./src/index.ts",
   "dependencies": {
-    "@pokemon-localdex/battle-core": "*",
+    "@pokemon-localdex/drizzle-schema": "*",
     "@pokemon-localdex/store-types": "*",
-    "@pokemon-localdex/drizzle-queries": "*",
     "drizzle-orm": "*"
   }
 }

@@ -91,17 +91,19 @@ npm run check:damage   # 伤害计算验证
 ```
 pokemon-localdex/
 ├── apps/
-│   ├── api/                Hono API 服务（本地 SQLite / Worker D1）
+│   ├── api/                Hono API 服务（routes.ts 统一路由，本地 SQLite / Worker D1）
 │   ├── web/                React SPA 客户端（Vite 构建）
 │   └── miniprogram/        微信小程序客户端（Taro + React）
 ├── packages/
-│   ├── battle-core/        统一伤害计算引擎（同步 + 异步双入口）
-│   │   ├── src/index.ts    calculateDamage() / calculateDamageAsync()
-│   │   └── src/types.ts    计算相关类型定义（DamageCalcInput、NameResolver、DbAdapter 等）
+│   ├── battle-core/        伤害计算引擎（单一异步入口 calculateDamage）
+│   │   ├── src/index.ts    calculateDamage(input, lookup)
+│   │   └── src/types.ts    计算相关类型定义（DamageCalcInput、NameLookup 等）
 │   ├── store/              数据存储层
 │   │   ├── shared-types/   共享类型、常量和辅助函数（@pokemon-localdex/store-types）
-│   │   ├── sqlite-store/   SQLite 查询适配（node:sqlite 同步 API）
-│   │   └── d1-store/       D1 查询适配（Cloudflare D1 异步 API）
+│   │   ├── drizzle-schema/ Drizzle ORM 表定义（与 d1-schema.sql 对应）
+│   │   ├── drizzle-queries/ 统一查询逻辑（DrizzleStore 实现 IStore + NameLookup）
+│   │   ├── sqlite-store/   SQLite 薄封装（创建连接，委托 drizzle-queries）
+│   │   └── d1-store/       D1 薄封装（创建连接，委托 drizzle-queries）
 │   └── crawler_py/         Python 爬虫（52Poké 数据采集 → SQLite）
 ├── functions/              Cloudflare Pages Functions（Service Binding 代理）
 │   └── api/[[path]].ts     将 /api/* 请求代理到 Worker
@@ -118,9 +120,9 @@ pokemon-localdex/
 
 项目支持两种数据源，通过环境变量和部署模式切换，代码层面保持统一的接口。
 
-**SQLite 模式**（本地开发默认）：Python 爬虫采集数据写入 SQLite，Hono API 通过 `sqlite-store` 包读取数据库，前端通过 API 获取数据。完整链路为 `React SPA → Hono API → sqlite-store → SQLite`。
+**SQLite 模式**（本地开发默认）：Python 爬虫采集数据写入 SQLite，Hono API 通过 `sqlite-store` → `drizzle-queries` 读取数据库，前端通过 API 获取数据。完整链路为 `React SPA → Hono API → sqlite-store → drizzle-queries → SQLite`。
 
-**D1 模式**（Cloudflare Pages 生产部署）：数据存储在 Cloudflare D1（SQLite 兼容），Worker 通过 `packages/store/d1-store` 包读取数据库，前端通过 Pages Functions 的 Service Binding 代理请求到 Worker。链路为 `React SPA → Pages Functions → Service Binding → Worker → d1-store → D1`。
+**D1 模式**（Cloudflare Pages 生产部署）：数据存储在 Cloudflare D1（SQLite 兼容），Worker 通过 `d1-store` → `drizzle-queries` 读取数据库，前端通过 Pages Functions 的 Service Binding 代理请求到 Worker。链路为 `React SPA → Pages Functions → Service Binding → Worker → d1-store → drizzle-queries → D1`。
 
 **小程序模式**：小程序通过 `Taro.request` 调用后端 API（与 Web 端共用同一套 API），API 地址在编译时通过 `defineConstants` 注入。
 
@@ -266,6 +268,8 @@ Python 爬虫从 52Poké Wiki 采集全部 1025 只宝可梦、939 个招式、3
 - [数据库设计](docs/database.md) — SQLite/D1 表结构、索引和关系说明
 - [API 接口](docs/api.md) — RESTful API 端点、参数和响应格式
 - [爬虫指南](docs/crawler.md) — 爬虫命令、参数和运行流程
+- [项目概览](docs/project-overview.md) — 目录结构、包职责和数据流
+- [开发规范](docs/dev-guidelines.md) — 编码约束、分层职责和常见模式
 
 ## 数据来源
 

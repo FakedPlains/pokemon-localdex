@@ -23,9 +23,10 @@ pokemon-localdex/
 ├── apps/
 │   ├── api/                    Hono API 服务（本地 SQLite / Worker D1）
 │   │   ├── src/
-│   │   │   ├── app.ts          路由定义、数据源切换、Teams/Battle 接口
+│   │   │   ├── app.ts          本地模式入口（SQLite store 初始化）
+│   │   │   ├── worker.ts       Cloudflare Workers 入口（D1 store 初始化）
+│   │   │   ├── routes.ts       统一路由定义（app/worker 共享）
 │   │   │   ├── server.ts       HTTP 服务器入口（本地模式，监听 0.0.0.0:3030）
-│   │   │   ├── worker.ts       Cloudflare Workers 入口（生产模式）
 │   │   │   ├── static.ts       静态文件服务（dist/ → apps/web/public/）
 │   │   │   └── smoke.ts        启动自检脚本
 │   │   └── .env.example        API 环境变量模板
@@ -113,16 +114,16 @@ pokemon-localdex/
 │       └── project.config.json 微信开发者工具项目配置（AppID: wx6f183945e108152a）
 │
 ├── packages/
-│   ├── battle-core/            统一伤害计算引擎（同步 + 异步双入口）
-│   │   ├── src/index.ts        calculateDamage() / calculateDamageAsync()
-│   │   └── src/types.ts        类型定义（DamageCalcInput、NameResolver、DbAdapter 等）
+│   ├── battle-core/            统一伤害计算引擎（单一异步入口）
+│   │   ├── src/index.ts        calculateDamage(input, lookup)
+│   │   └── src/types.ts        类型定义（DamageCalcInput、NameLookup 等）
 │   ├── store/                  数据存储层
 │   │   ├── shared-types/       共享类型、常量和辅助函数（@pokemon-localdex/store-types）
-│   │   │   └── src/index.ts    StatBlock、PokemonEntry、GENERATIONS、TYPE_NAMES 等
-│   │   ├── sqlite-store/       SQLite 查询适配（node:sqlite 同步 API）
-│   │   │   └── src/index.ts    查询函数 + NameResolver 实现
-│   │   └── d1-store/           D1 查询适配（Cloudflare D1 异步 API）
-│   │       └── src/index.ts    查询函数 + DbAdapter 实现
+│   │   │   └── src/index.ts    StatBlock、PokemonEntry、IStore、GENERATIONS 等
+│   │   ├── drizzle-schema/     Drizzle ORM 表定义（共享 schema）
+│   │   ├── drizzle-queries/    Drizzle ORM 统一查询逻辑（DrizzleStore）
+│   │   ├── sqlite-store/       SQLite 薄封装（node:sqlite → drizzle-queries）
+│   │   └── d1-store/           D1 薄封装（Cloudflare D1 → drizzle-queries）
 │   ├── crawler_py/             Python 爬虫（52Poké → SQLite）
 │   │   └── localdex_crawler/   爬虫核心模块
 │
@@ -138,9 +139,8 @@ pokemon-localdex/
 │
 ├── data/
 │   ├── raw/                    爬虫页面缓存（gitignored）
-│   ├── sqlite/
-│   │   └── localdex.sqlite     本地主数据库
-│   └── teams.json              本地模式队伍数据（运行时生成）
+│   └── sqlite/
+│       └── localdex.sqlite     本地主数据库
 │
 ├── .github/
 │   └── workflows/
@@ -169,22 +169,17 @@ Python 爬虫，唯一数据源为 52Poké Wiki。核心职责：
 
 ### 3.2 存储层（packages/store/）
 
-存储层由三个包组成，其中 sqlite-store 和 d1-store 对外暴露**完全相同的函数签名**：
+存储层采用四层结构，通过 `IStore` 接口统一对外暴露查询能力，API 层无需关心底层数据源。
 
-```typescript
-listPokemonFromSqlite / listPokemonFromD1
-getPokemonFromSqlite  / getPokemonFromD1
-listMovesFromSqlite   / listMovesFromD1
-// ... 以此类推
-```
+**shared-types**（`packages/store/shared-types`，包名 `@pokemon-localdex/store-types`）集中定义了所有 store 包共用的类型（`StatBlock`、`PokemonEntry`、`MoveEntry`、`IStore` 接口等）、常量（`GENERATIONS`、`GAME_VERSIONS`、`TYPE_NAMES`、`TYPE_ALIASES` 等）和辅助函数（`normalizeTypeName`、`splitTypeNames`、`statBlockFromRow`、`sourceFromRow` 等）。
 
-API 层通过 `DATA_SOURCE` 环境变量动态 `import` 对应的包，切换对上层完全透明。
+**drizzle-schema**（`packages/store/drizzle-schema`）定义了所有数据库表的 Drizzle ORM schema，供 drizzle-queries 使用。表定义与 `schema/d1-schema.sql` 保持一致。
 
-**shared-types**（`packages/store/shared-types`，包名 `@pokemon-localdex/store-types`）集中定义了 sqlite-store 和 d1-store 共用的类型（`StatBlock`、`PokemonEntry`、`MoveEntry` 等）、常量（`GENERATIONS`、`GAME_VERSIONS`、`TYPE_NAMES`、`TYPE_ALIASES` 等）和辅助函数（`normalizeTypeName`、`splitTypeNames`、`statBlockFromRow`、`sourceFromRow` 等）。
+**drizzle-queries**（`packages/store/drizzle-queries`）是核心查询包，`DrizzleStore` 类实现了 `IStore` 和 `NameLookup` 两个接口，包含全部数据库查询逻辑。sqlite-store 和 d1-store 均通过 `createDrizzleStore(db)` 创建实例，共享同一套查询代码。
 
-**sqlite-store**（`packages/store/sqlite-store`）使用 Node.js 22 内置的 `node:sqlite`（`DatabaseSync`），无需额外依赖。同时提供 `NameResolver` 实现供 battle-core 同步入口使用。
+**sqlite-store**（`packages/store/sqlite-store`）是 SQLite 薄封装，使用 Node.js 22 内置的 `node:sqlite` 创建数据库连接，然后委托给 drizzle-queries 处理所有查询。无需额外依赖。
 
-**d1-store**（`packages/store/d1-store`）使用 Cloudflare D1 异步 API，在 Workers 运行时中通过 binding 访问数据库。同时提供 `DbAdapter` 实现供 battle-core 异步入口使用。D1 是 SQLite 兼容的边缘数据库，表结构与本地 SQLite 完全一致。
+**d1-store**（`packages/store/d1-store`）是 D1 薄封装，接收 Cloudflare D1 binding 创建数据库连接，然后委托给 drizzle-queries 处理所有查询。D1 是 SQLite 兼容的边缘数据库，表结构与本地 SQLite 完全一致。
 
 ### 3.3 API 层（apps/api）
 
@@ -192,9 +187,10 @@ API 层通过 `DATA_SOURCE` 环境变量动态 `import` 对应的包，切换对
 
 **本地模式**（`server.ts` 入口）：运行在 Node.js 22，默认监听 `0.0.0.0:3030`，使用 sqlite-store 查询数据。
 
-**Worker 模式**（`worker.ts` 入口）：运行在 Cloudflare Workers，使用 D1 binding 通过 d1-store 查询数据，通过 battle-core（异步入口）执行伤害计算。
+**Worker 模式**（`worker.ts` 入口）：运行在 Cloudflare Workers，使用 D1 binding 通过 d1-store 查询数据。
 
 关键设计：
+- 路由定义集中在 `routes.ts`，`app.ts` 和 `worker.ts` 只需传入各自的 `getStore` 实现即可共享全部路由
 - 所有路由**同时挂载在 `/` 和 `/api` 前缀**下，兼容 Vite dev proxy 和 Pages Functions 代理两种模式
 - 本地生产模式下同时托管 React SPA 静态资源
 - 全局启用 CORS，允许任意来源
@@ -230,7 +226,7 @@ Taro 4.2.0 + React 18，编译为微信小程序原生代码。
 
 ### 3.7 核心库
 
-**battle-core**：统一的伤害计算包，类型定义在 `src/types.ts`，计算逻辑在 `src/index.ts`。提供两个入口函数：`calculateDamage(resolver)` 接收同步 `NameResolver`（由 sqlite-store 提供），用于本地 API 模式；`calculateDamageAsync(adapter)` 接收异步 `DbAdapter`（由 d1-store 提供），用于 Workers 模式。基于 `@fakedplains/smogon-calc` 计算引擎，支持完整的伤害计算（含本系加成、属性克制、天气、急所、乱数范围、道具和特性影响）。SQL 查询逻辑已下沉到各自的 store 包中，battle-core 不包含任何 SQL。
+**battle-core**：统一的伤害计算包，类型定义在 `src/types.ts`，计算逻辑在 `src/index.ts`。提供唯一入口函数 `calculateDamage(input, lookup)`，接收 `DamageCalcInput` 和实现了 `NameLookup` 接口的 store 实例，内部自动完成名称解析和伤害计算。本地模式和 Worker 模式共用同一个入口。基于 `@fakedplains/smogon-calc` 计算引擎，支持完整的伤害计算（含本系加成、属性克制、天气、急所、乱数范围、道具和特性影响）。SQL 查询逻辑已下沉到 drizzle-queries 包中，battle-core 不包含任何 SQL。
 
 ---
 

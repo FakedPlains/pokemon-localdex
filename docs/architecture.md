@@ -73,13 +73,15 @@ pokemon-localdex/
 │       ├── project.config.json  微信开发者工具项目配置
 │       └── dist/             编译产物（微信开发者工具打开此目录）
 ├── packages/
-│   ├── battle-core/     统一伤害计算引擎（同步 + 异步双入口）
-│   │   ├── src/index.ts     calculateDamage() / calculateDamageAsync()
-│   │   └── src/types.ts     类型定义（DamageCalcInput、NameResolver、DbAdapter 等）
+│   ├── battle-core/     统一伤害计算引擎（单一异步入口）
+│   │   ├── src/index.ts     calculateDamage(input, lookup) — 名称解析 + 计算一步完成
+│   │   └── src/types.ts     类型定义（DamageCalcInput、NameLookup 等）
 │   ├── store/           数据存储层
 │   │   ├── shared-types/    共享类型、常量和辅助函数（@pokemon-localdex/store-types）
-│   │   ├── sqlite-store/    SQLite 查询适配（node:sqlite 同步 API）
-│   │   └── d1-store/        D1 查询适配（Cloudflare D1 异步 API）
+│   │   ├── drizzle-schema/  Drizzle ORM 表定义（共享 schema）
+│   │   ├── drizzle-queries/ Drizzle ORM 统一查询逻辑（DrizzleStore 实现 IStore + NameLookup）
+│   │   ├── sqlite-store/    SQLite 薄封装（node:sqlite → drizzle-queries）
+│   │   └── d1-store/        D1 薄封装（Cloudflare D1 → drizzle-queries）
 │   ├── crawler_py/      Python 爬虫（52Poké 数据采集 → SQLite）
 │   │   ├── crawl-52poke-db.py   爬虫入口脚本
 │   │   ├── fetch_type_icons.py  属性图标采集脚本
@@ -116,25 +118,27 @@ pokemon-localdex/
 
 ### 存储层
 
-存储层提供两个可互换的数据访问包，对外暴露相同的函数签名（`listPokemonFromXxx`、`getPokemonFromXxx` 等），API 层通过环境变量动态选择。
+存储层采用四层结构：shared-types 定义类型和常量，drizzle-schema 定义 Drizzle ORM 表结构，drizzle-queries 实现全部查询逻辑，sqlite-store 和 d1-store 作为薄封装层仅负责创建数据库连接。API 层通过 `IStore` 接口统一访问，无需关心底层数据源。
 
-**shared-types**（`packages/store/shared-types`）是共享类型包（`@pokemon-localdex/store-types`），集中定义了 sqlite-store 和 d1-store 共用的类型（`StatBlock`、`PokemonEntry`、`MoveEntry` 等）、常量（`GENERATIONS`、`GAME_VERSIONS`、`TYPE_NAMES`、`TYPE_ALIASES` 等）和辅助函数（`normalizeTypeName`、`splitTypeNames`、`statBlockFromRow`、`sourceFromRow` 等）。两个 store 包通过 `import` 和 `re-export` 使用这些共享定义。
+**shared-types**（`packages/store/shared-types`）是共享类型包（`@pokemon-localdex/store-types`），集中定义了所有 store 包共用的类型（`StatBlock`、`PokemonEntry`、`MoveEntry`、`IStore` 接口等）、常量（`GENERATIONS`、`GAME_VERSIONS`、`TYPE_NAMES`、`TYPE_ALIASES` 等）和辅助函数（`normalizeTypeName`、`splitTypeNames`、`statBlockFromRow`、`sourceFromRow` 等）。
 
-**sqlite-store**（`packages/store/sqlite-store`）是 SQLite 查询适配包，提供查询函数，支持按数字 ID、slug 和中文名多种方式查询；处理形态数据的聚合，将数据库中的扁平行组装为嵌套的形态结构（包含 `statVariants`、`typeVariants`、`abilityVariants`）。同时提供 `NameResolver` 实现供 battle-core 同步入口使用。项目使用 Node.js 22 的实验性 `node:sqlite` 模块，无需额外的 SQLite 绑定依赖。
+**drizzle-schema**（`packages/store/drizzle-schema`）定义了所有数据库表的 Drizzle ORM schema，供 drizzle-queries 使用。表定义与 `schema/d1-schema.sql` 保持一致。
 
-**d1-store**（`packages/store/d1-store`）与 sqlite-store 导出相同的类型和函数签名，底层使用 Cloudflare D1 的异步 API。同时提供 `DbAdapter` 实现供 battle-core 异步入口使用。D1 是 Cloudflare 提供的 SQLite 兼容边缘数据库，表结构与本地 SQLite 完全一致。Worker 在 Cloudflare 运行时中通过 D1 binding 访问数据库。
+**drizzle-queries**（`packages/store/drizzle-queries`）是核心查询包，`DrizzleStore` 类实现了 `IStore` 和 `NameLookup` 两个接口，包含全部数据库查询逻辑（宝可梦、招式、特性、道具的列表/详情/搜索，以及名称解析）。sqlite-store 和 d1-store 均通过 `createDrizzleStore(db)` 创建实例，共享同一套查询代码。
+
+**sqlite-store**（`packages/store/sqlite-store`）是 SQLite 薄封装，使用 Node.js 22 的实验性 `node:sqlite` 模块创建数据库连接，然后委托给 drizzle-queries 处理所有查询。无需额外的 SQLite 绑定依赖。
+
+**d1-store**（`packages/store/d1-store`）是 D1 薄封装，接收 Cloudflare D1 binding 创建数据库连接，然后委托给 drizzle-queries 处理所有查询。D1 是 Cloudflare 提供的 SQLite 兼容边缘数据库，表结构与本地 SQLite 完全一致。
 
 ### 伤害计算层
 
-伤害计算统一在 `packages/battle-core` 中，提供同步和异步两个入口：
+伤害计算统一在 `packages/battle-core` 中，提供单一异步入口：
 
-**battle-core** 是唯一的伤害计算包，类型定义集中在 `src/types.ts`（`DamageCalcInput`、`DamageCalcResult`、`NameResolver`、`DbAdapter`、`ResolvedNames` 等），计算逻辑和入口函数在 `src/index.ts`。包内包含常量映射（性格/天气/地形/属性/状态的中英文对照）和纯计算函数 `executeCalc()`。
+**battle-core** 是唯一的伤害计算包，类型定义集中在 `src/types.ts`（`DamageCalcInput`、`DamageCalcResult`、`NameLookup`、`ResolvedNames` 等），计算逻辑和入口函数在 `src/index.ts`。包内包含常量映射（性格/天气/地形/属性/状态的中英文对照）和纯计算函数 `executeCalc()`。
 
-**同步入口 `calculateDamage(resolver)`**：接收一个 `NameResolver` 对象（由 sqlite-store 提供的同步查询函数集合），在本地 API 模式下使用。
+**唯一入口 `calculateDamage(input, lookup)`**：接收 `DamageCalcInput` 和实现了 `NameLookup` 接口的 store 实例，内部自动完成名称解析（中文→英文）和伤害计算。`NameLookup` 接口定义了两个方法：`pokemonNameEn()` 和 `entityNameEn()`，由 `DrizzleStore` 统一实现。本地模式和 Worker 模式使用同一个入口函数，无需区分同步/异步。
 
-**异步入口 `calculateDamageAsync(adapter)`**：接收一个 `DbAdapter` 对象（由 d1-store 提供的异步查询函数集合），在 Cloudflare Workers 模式下使用。
-
-两个入口共享同一套 `executeCalc()` 纯计算逻辑，区别仅在于名称解析（中文→英文）的同步/异步方式。SQL 查询逻辑已下沉到各自的 store 包中，battle-core 不包含任何 SQL。
+SQL 查询逻辑已下沉到 drizzle-queries 包中，battle-core 不包含任何 SQL。
 
 ### API 层（apps/api）
 
@@ -142,9 +146,9 @@ API 层基于 Hono 框架，提供统一的 RESTful 查询入口。根据运行�
 
 **本地模式**（`server.ts` 入口）：启动时使用 sqlite-store，监听 `0.0.0.0:3030`。
 
-**Worker 模式**（`worker.ts` 入口）：在 Cloudflare Workers 运行时中执行，使用 D1 binding 通过 `d1-store` 查询数据，通过 `battle-core`（异步入口）执行伤害计算。Hono 的 `app.fetch()` 适配 Workers 的 `fetch` handler 接口。
+**Worker 模式**（`worker.ts` 入口）：在 Cloudflare Workers 运行时中执行，使用 D1 binding 通过 `d1-store` 查询数据。Hono 的 `app.fetch()` 适配 Workers 的 `fetch` handler 接口。
 
-核心职责包括：提供宝可梦、招式、特性、道具的查询接口（支持分页）；提供队伍保存和伤害计算接口；在本地生产模式下同时托管 React SPA 的静态资源。
+核心职责包括：提供宝可梦、招式、特性、道具的查询接口（支持分页）；提供伤害计算接口；在本地生产模式下同时托管 React SPA 的静态资源。路由定义集中在 `routes.ts` 中，`app.ts` 和 `worker.ts` 只需传入各自的 `getStore` 实现即可共享全部路由逻辑。
 
 API 同时挂载在根路径 `/` 和 `/api` 前缀下：Vite 开发模式下前端通过 proxy 把 `/api/xxx` 转发为 `/xxx`；Cloudflare Pages 生产模式下 Pages Functions 捕获 `/api/*` 并通过 Service Binding 转发到 Worker。
 
@@ -193,7 +197,7 @@ service = "pokemon-localdex-api"
 
 ### 核心库
 
-**battle-core**：统一的伤害计算包，类型定义在 `src/types.ts`，计算逻辑在 `src/index.ts`。提供两个入口函数：`calculateDamage(resolver)` 接收同步 `NameResolver`（由 sqlite-store 提供），用于本地 API 模式；`calculateDamageAsync(adapter)` 接收异步 `DbAdapter`（由 d1-store 提供），用于 Workers 模式。两者共享同一套 `executeCalc()` 纯计算逻辑，不依赖任何运行时特定 API。
+**battle-core**：统一的伤害计算包，类型定义在 `src/types.ts`，计算逻辑在 `src/index.ts`。提供唯一入口函数 `calculateDamage(input, lookup)`，接收 `DamageCalcInput` 和实现了 `NameLookup` 接口的 store 实例，内部自动完成名称解析和伤害计算。本地模式和 Worker 模式共用同一个入口，不依赖任何运行时特定 API。
 
 ## 数据流
 
@@ -310,5 +314,5 @@ Web 端使用 `@vitejs/plugin-react@5.2.0`（而非 v6.x），因为 v6.x 要求
 
 - **本地数据库**：`data/sqlite/localdex.sqlite`，存储所有宝可梦、招式、特性、道具数据
 - **生产数据库**：Cloudflare D1（`pokemon-localdex-d1`），SQLite 兼容，表结构与本地 SQLite 一致
-- **队伍数据**：浏览器 localStorage
+- **队伍数据**：完全存储在浏览器 localStorage 中，不涉及数据库
 - **页面缓存**：`data/raw/`，存储爬虫抓取的原始 HTML（gitignored）

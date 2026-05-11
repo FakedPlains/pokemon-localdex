@@ -1,15 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
+import { parseExpandParam } from "../utils/helpers.js";
 import Loading from "../components/Loading.jsx";
-
-function parseExpandParam() {
-  const hash = window.location.hash || "";
-  const qIdx = hash.indexOf("?");
-  if (qIdx < 0) return null;
-  const params = new URLSearchParams(hash.slice(qIdx));
-  return params.get("expand") || null;
-}
+import PokemonGrid from "../components/PokemonGrid.jsx";
+import GenerationTimeline from "../components/GenerationTimeline.jsx";
+import WikiLink from "../components/WikiLink.jsx";
 
 export default function AbilitiesPage({ query = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
@@ -32,16 +28,15 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
     const expandId = pendingExpandRef.current;
     if (!expandId || loading) return;
     if (abilities.length === 0 && !hasMore) {
-      // No abilities at all, give up
       pendingExpandRef.current = null;
       return;
     }
-    if (abilities.length === 0) return; // still loading first page
+    if (abilities.length === 0) return;
 
     const numId = Number(expandId);
     const target = abilities.find((a) => a.id === numId || String(a.id) === expandId);
     if (target) {
-      pendingExpandRef.current = null; // consume once found
+      pendingExpandRef.current = null;
       const key = target.id;
       setExpanded(key);
       if (!detailCache[key]) {
@@ -49,22 +44,18 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
-      // Scroll to the ability row after DOM update
       requestAnimationFrame(() => {
         const el = document.querySelector(`[data-ability-id="${key}"]`);
         if (el) el.scrollIntoView({ block: "center", behavior: "instant" });
       });
-      // Clean up the expand param from hash
       const hash = window.location.hash || "";
       const qIdx = hash.indexOf("?");
       if (qIdx >= 0) {
         window.history.replaceState(null, "", hash.slice(0, qIdx));
       }
     } else if (hasMore && !loadingMore) {
-      // Target not found yet, load more data
       loadMore();
     } else if (!hasMore) {
-      // All data loaded but target not found, give up
       pendingExpandRef.current = null;
       const hash = window.location.hash || "";
       const qIdx = hash.indexOf("?");
@@ -73,6 +64,9 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
       }
     }
   }, [abilities, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 宝可梦区域展开状态（独立于特性详情的展开）
+  const [pokemonExpanded, setPokemonExpanded] = useState({});
 
   const toggleExpand = useCallback((id) => {
     if (expanded === id) {
@@ -86,6 +80,10 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
       });
     }
   }, [expanded, detailCache]);
+
+  const togglePokemonSection = useCallback((id) => {
+    setPokemonExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
 
   if (loading && abilities.length === 0) return <Loading />;
 
@@ -128,7 +126,7 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
                 {isExpanded && (
                   <div className="ab-row-detail">
                     {!detail ? (
-                      <div className="ab-detail-loading">
+                      <div className="shared-detail-loading">
                         <div className="pulse-dot" />
                         <span>加载中…</span>
                       </div>
@@ -136,57 +134,48 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
                       <>
                         {/* 名称标签 */}
                         <div className="ab-detail-names">
-                          {detail.nameJa && <span className="ab-name-tag ab-name-ja">{detail.nameJa}</span>}
-                          {detail.nameEn && <span className="ab-name-tag ab-name-en">{detail.nameEn}</span>}
+                          {detail.nameJa && <span className="shared-name-tag shared-name-ja">{detail.nameJa}</span>}
+                          {detail.nameEn && <span className="shared-name-tag shared-name-en">{detail.nameEn}</span>}
                           {detail.introducedGeneration && (
-                            <span className="ab-name-tag ab-name-gen">第 {detail.introducedGeneration} 世代引入</span>
+                            <span className="shared-name-tag shared-name-gen">第 {detail.introducedGeneration} 世代引入</span>
                           )}
-                          {detail.source?.url && (
-                            <a href={detail.source.url} target="_blank" rel="noopener noreferrer" className="ab-wiki-link" title={detail.source.title || "Wiki"}>
-                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
-                                <path d="M9 2h5v5" /><path d="M14 2 7.5 8.5" />
-                              </svg>
-                            </a>
-                          )}
+                          <WikiLink url={detail.source?.url} title={detail.source?.title || "Wiki"} />
                         </div>
 
                         {/* 详细效果 */}
-                        <div className="ab-detail-effect">
-                          <div className="ab-detail-effect-title">特性效果</div>
-                          <div className="ab-detail-effect-text">
+                        <div className="shared-detail-effect">
+                          <div className="shared-detail-effect-title">特性效果</div>
+                          <div className="shared-detail-effect-text">
                             {detail.effectDetail || detail.description || "暂无详细说明"}
                           </div>
                         </div>
 
                         {/* 世代变更 */}
-                        {detail.generations?.length > 0 && (
-                          <div className="ab-gen-section">
-                            <div className="ab-gen-title">世代变更</div>
-                            <div className="ab-gen-timeline">
-                              {detail.generations.map((record, i) => (
-                                <div key={i} className={`ab-gen-item${record.versionExclusive ? ' ab-gen-exclusive' : ''}`}>
-                                  <div className="ab-gen-badges">
-                                    <div className="ab-gen-badge">
-                                      {record.generation === 99 ? "Champions" : `Gen ${record.generation}`}
-                                    </div>
-                                    {(record.gameVersionName || record.gameVersionCode) && (
-                                      <div className="ab-gen-version">{record.gameVersionName || record.gameVersionCode}</div>
-                                    )}
-                                    {record.versionExclusive && (
-                                      <div className="ab-gen-exclusive-tag">仅限</div>
-                                    )}
-                                  </div>
-                                  <div className="ab-gen-text">{record.description}</div>
-                                </div>
-                              ))}
+                        <GenerationTimeline generations={detail.generations} />
+
+                        {/* 拥有该特性的宝可梦 */}
+                        <div className="shared-pokemon-section">
+                          <button
+                            className={`shared-pokemon-toggle${pokemonExpanded[key] ? " shared-pokemon-toggle-open" : ""}`}
+                            onClick={() => togglePokemonSection(key)}
+                          >
+                            <span className="shared-pokemon-section-title">拥有该特性的宝可梦</span>
+                            <span className={`shared-pokemon-toggle-arrow${pokemonExpanded[key] ? " shared-pokemon-toggle-arrow-open" : ""}`}>▾</span>
+                          </button>
+                          {pokemonExpanded[key] && (
+                            <div className="shared-pokemon-content">
+                              <PokemonGrid
+                                apiPath={`/abilities/${key}/pokemon`}
+                                emptyText="暂无拥有该特性的宝可梦数据"
+                                labelFn={(p) => p.isHidden ? "隐藏特性" : null}
+                              />
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
 
                         {/* 来源 */}
                         {detail.source?.url && (
-                          <div className="ab-source">
+                          <div className="shared-source">
                             <a href={detail.source.url} target="_blank" rel="noopener noreferrer">
                               来源：{detail.source.title || "52Poké Wiki"}
                             </a>
