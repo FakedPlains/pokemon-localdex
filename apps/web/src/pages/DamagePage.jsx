@@ -426,7 +426,12 @@ function SimplePokemonList({ search, onSelect }) {
 //  子组件：宝可梦配置面板（攻击方/防守方通用）
 // ══════════════════════════════════════════════════════════════
 
-function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onClear, boosts, onBoostChange, level, onMovesSync, curHP, onCurHPChange }) {
+const TERA_TYPE_OPTIONS = [
+  { value: "none", label: "无" },
+  ...[ "一般","火","水","电","草","冰","格斗","毒","地面","飞行","超能力","虫","岩石","幽灵","龙","恶","钢","妖精","星晶"].map((t) => ({ value: t, label: t })),
+];
+
+function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onClear, boosts, onBoostChange, level, onMovesSync, curHP, onCurHPChange, teraType, setTeraType, generation }) {
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerTab, setPickerTab] = useState("search"); // "search" | "box" | "team"
   const [itemQuery, setItemQuery] = useState("");
@@ -768,6 +773,16 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
                   {(member.primaryType || detail?.primaryType) && <TypeChip type={member.primaryType || detail?.primaryType} size="xs" />}
                   {(member.secondaryType || detail?.secondaryType) && <TypeChip type={member.secondaryType || detail?.secondaryType} size="xs" />}
                 </span>
+                {Number(generation) >= 9 && (
+                  <div className="dc-tera-inline">
+                    <SearchSelect
+                      value={teraType || "none"}
+                      options={TERA_TYPE_OPTIONS}
+                      onChange={(val) => setTeraType(val)}
+                      placeholder="太晶"
+                    />
+                  </div>
+                )}
               </div>
               {/* 特性按钮紧跟属性后面 */}
               <div className="dc-ability-inline">
@@ -944,7 +959,12 @@ function StatusPanel({ label, side, status, setStatus, toxicCounter, setToxicCou
   stealthRock, setStealthRock, spikes, setSpikes, steelsurge, setSteelsurge,
   reflect, setReflect, lightScreen, setLightScreen, auroraVeil, setAuroraVeil,
   protect, setProtect, helpingHand, setHelpingHand, tailwind, setTailwind,
-  friendGuard, setFriendGuard, switchingOut, setSwitchingOut }) {
+  friendGuard, setFriendGuard, switchingOut, setSwitchingOut,
+  seeded, setSeeded, saltCured, setSaltCured, foresight, setForesight,
+  flowerGift, setFlowerGift, powerTrick, setPowerTrick, steelySpirit, setSteelySpirit,
+  battery, setBattery, powerSpot, setPowerSpot,
+  isDynamaxed, setIsDynamaxed, alliesFainted, setAlliesFainted,
+  generation }) {
   const STATUS_SELECT_OPTIONS = [
     { value: "none", label: "健康" },
     { value: "burn", label: "烧伤" },
@@ -1001,6 +1021,37 @@ function StatusPanel({ label, side, status, setStatus, toxicCounter, setToxicCou
           <button className={"dc-chip" + (switchingOut ? " dc-chip-on" : "")} onClick={() => setSwitchingOut(!switchingOut)}>换入中</button>
         </div>
       </div>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">异常</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (seeded ? " dc-chip-on" : "")} onClick={() => setSeeded(!seeded)}>寄生种子</button>
+          <button className={"dc-chip" + (saltCured ? " dc-chip-on" : "")} onClick={() => setSaltCured(!saltCured)}>盐腌</button>
+          <button className={"dc-chip" + (foresight ? " dc-chip-on" : "")} onClick={() => setForesight(!foresight)}>识破</button>
+        </div>
+      </div>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">队友</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (flowerGift ? " dc-chip-on" : "")} onClick={() => setFlowerGift(!flowerGift)}>花之礼</button>
+          <button className={"dc-chip" + (steelySpirit ? " dc-chip-on" : "")} onClick={() => setSteelySpirit(!steelySpirit)}>钢之意志</button>
+          <button className={"dc-chip" + (battery ? " dc-chip-on" : "")} onClick={() => setBattery(!battery)}>蓄电池</button>
+          <button className={"dc-chip" + (powerSpot ? " dc-chip-on" : "")} onClick={() => setPowerSpot(!powerSpot)}>能量点</button>
+          <button className={"dc-chip" + (powerTrick ? " dc-chip-on" : "")} onClick={() => setPowerTrick(!powerTrick)}>力量戏法</button>
+        </div>
+      </div>
+      {/* 极巨化/倒下队友 */}
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">特殊</span>
+        <div className="dc-sp-chips">
+          {Number(generation) === 8 && (
+            <button className={"dc-chip" + (isDynamaxed ? " dc-chip-on" : "")} onClick={() => setIsDynamaxed(!isDynamaxed)}>极巨化</button>
+          )}
+          <div className="dc-sp-inline-field">
+            <span className="dc-sp-inline-label">倒下队友</span>
+            <input type="number" className="dc-sp-mini-input" min={0} max={5} value={alliesFainted || 0} onChange={(e) => setAlliesFainted(Math.max(0, Math.min(5, Number(e.target.value) || 0)))} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1011,7 +1062,7 @@ function StatusPanel({ label, side, status, setStatus, toxicCounter, setToxicCou
 
 export default function DamagePage() {
   // ── 世代 ──
-  const [generation, setGeneration] = useState("9");
+  const [generation, setGeneration] = useState("0");
   const isChampions = Number(generation) === 0;
 
   // ── 攻守双方 ──
@@ -1029,15 +1080,29 @@ export default function DamagePage() {
   const [defMovesInfo, setDefMovesInfo] = useState({});
   const [defSelectedSlot, setDefSelectedSlot] = useState(null);
   const [selectedMove, setSelectedMove] = useState(null);
+  const [calcDirection, setCalcDirection] = useState("atk"); // "atk" = 攻击方→防守方, "def" = 防守方→攻击方
   const [critical, setCritical] = useState(false);
   const [moveHits, setMoveHits] = useState(0); // 0 = 默认（由招式决定）
+  const [defCritical, setDefCritical] = useState(false);
+  const [defMoveHits, setDefMoveHits] = useState(0);
+  // 招式额外参数
+  const [useZ, setUseZ] = useState(false);
+  const [useMax, setUseMax] = useState(false);
+  const [timesUsed, setTimesUsed] = useState(0);
+  const [timesUsedWithMetronome, setTimesUsedWithMetronome] = useState(0);
+  const [isStellarFirstUse, setIsStellarFirstUse] = useState(false);
+  const [defUseZ, setDefUseZ] = useState(false);
+  const [defUseMax, setDefUseMax] = useState(false);
+  const [defTimesUsed, setDefTimesUsed] = useState(0);
+  const [defTimesUsedWithMetronome, setDefTimesUsedWithMetronome] = useState(0);
+  const [defIsStellarFirstUse, setDefIsStellarFirstUse] = useState(false);
 
   // ── 当前 HP ──
   const [atkCurHP, setAtkCurHP] = useState(0);  // 0 = 满血
   const [defCurHP, setDefCurHP] = useState(0);  // 0 = 满血
 
   // ── 场地环境 ──
-  const [battleMode, setBattleMode] = useState("singles");
+  const [battleMode, setBattleMode] = useState("doubles");
   const [weather, setWeather] = useState("none");
   const [terrain, setTerrain] = useState("none");
   const [gravity, setGravity] = useState(false);
@@ -1049,6 +1114,16 @@ export default function DamagePage() {
   const [tabletsOfRuin, setTabletsOfRuin] = useState(false);
   const [swordOfRuin, setSwordOfRuin] = useState(false);
   const [vesselOfRuin, setVesselOfRuin] = useState(false);
+
+  // ── 攻击方额外属性 ──
+  const [atkTeraType, setAtkTeraType] = useState("none");
+  const [atkIsDynamaxed, setAtkIsDynamaxed] = useState(false);
+  const [atkAlliesFainted, setAtkAlliesFainted] = useState(0);
+
+  // ── 防守方额外属性 ──
+  const [defTeraType, setDefTeraType] = useState("none");
+  const [defIsDynamaxed, setDefIsDynamaxed] = useState(false);
+  const [defAlliesFainted, setDefAlliesFainted] = useState(0);
 
   // ── 攻击方状态 ──
   const [atkStatus, setAtkStatus] = useState("none");
@@ -1065,6 +1140,14 @@ export default function DamagePage() {
   const [atkFriendGuard, setAtkFriendGuard] = useState(false);
   const [atkBoost, setAtkBoost] = useState({ ...DEFAULT_BOOSTS });
   const [atkSwitchingOut, setAtkSwitchingOut] = useState(false);
+  const [atkSeeded, setAtkSeeded] = useState(false);
+  const [atkSaltCured, setAtkSaltCured] = useState(false);
+  const [atkForesight, setAtkForesight] = useState(false);
+  const [atkFlowerGift, setAtkFlowerGift] = useState(false);
+  const [atkPowerTrick, setAtkPowerTrick] = useState(false);
+  const [atkSteelySpirit, setAtkSteelySpirit] = useState(false);
+  const [atkBattery, setAtkBattery] = useState(false);
+  const [atkPowerSpot, setAtkPowerSpot] = useState(false);
 
   // ── 防守方状态 ──
   const [defStatus, setDefStatus] = useState("none");
@@ -1081,6 +1164,14 @@ export default function DamagePage() {
   const [defFriendGuard, setDefFriendGuard] = useState(false);
   const [defBoost, setDefBoost] = useState({ ...DEFAULT_BOOSTS });
   const [defSwitchingOut, setDefSwitchingOut] = useState(false);
+  const [defSeeded, setDefSeeded] = useState(false);
+  const [defSaltCured, setDefSaltCured] = useState(false);
+  const [defForesight, setDefForesight] = useState(false);
+  const [defFlowerGift, setDefFlowerGift] = useState(false);
+  const [defPowerTrick, setDefPowerTrick] = useState(false);
+  const [defSteelySpirit, setDefSteelySpirit] = useState(false);
+  const [defBattery, setDefBattery] = useState(false);
+  const [defPowerSpot, setDefPowerSpot] = useState(false);
 
   // ── 计算结果 ──
   const [result, setResult] = useState(null);
@@ -1121,13 +1212,14 @@ export default function DamagePage() {
   const handleAtkSelectSlot = useCallback((index) => {
     if (index === null) { setAtkSelectedSlot(null); setSelectedMove(null); return; }
     setAtkSelectedSlot(index);
+    setCalcDirection("atk");
+    setDefSelectedSlot(null); // 取消防守方选中
     const moveName = atkMoves[index];
     if (!moveName) return;
     const info = atkMovesInfo[moveName];
     if (info?._opt?._moveObj) {
       setSelectedMove(info._opt._moveObj);
     } else {
-      // 优先用 moveId 获取完整 move 对象
       const moveId = info?.moveId;
       const fetchMove = moveId
         ? unifiedApi(`/moves/${moveId}`)
@@ -1139,10 +1231,35 @@ export default function DamagePage() {
     }
   }, [atkMoves, atkMovesInfo]);
 
-  // 防守方设置招式槽位
+  // 防守方选中招式槽位（反向计算：防守方→攻击方）
+  const handleDefSelectSlot = useCallback((index) => {
+    if (index === null) { setDefSelectedSlot(null); setSelectedMove(null); return; }
+    setDefSelectedSlot(index);
+    setCalcDirection("def");
+    setAtkSelectedSlot(null); // 取消攻击方选中
+    const moveName = defMoves[index];
+    if (!moveName) return;
+    const info = defMovesInfo[moveName];
+    if (info?._opt?._moveObj) {
+      setSelectedMove(info._opt._moveObj);
+    } else {
+      const moveId = info?.moveId;
+      const fetchMove = moveId
+        ? unifiedApi(`/moves/${moveId}`)
+        : unifiedApi(`/moves?q=${encodeURIComponent(moveName)}&limit=5`);
+      fetchMove.then((r) => {
+        const found = moveId ? r.data : (r.data || []).find((m) => m.nameZh === moveName || m.slug === moveName);
+        if (found) setSelectedMove(found);
+      }).catch(() => {});
+    }
+  }, [defMoves, defMovesInfo]);
+
+  // 防守方设置招式槽位（设置后自动选中并触发反向计算）
   const handleDefSetMove = useCallback((index, opt) => {
     if (!opt) {
       setDefMoves((prev) => { const next = [...prev]; next[index] = ""; return next; });
+      setDefSelectedSlot(null);
+      setSelectedMove(null);
       return;
     }
     const name = opt.value || opt.label || "";
@@ -1152,6 +1269,18 @@ export default function DamagePage() {
       ...prev,
       [name]: { moveId, type: opt.moveType || "", power: opt.movePower ?? 0, category: opt.moveCategory || "", _opt: opt }
     }));
+    // 自动选中刚设置的招式，并设置为反向计算
+    setDefSelectedSlot(index);
+    setCalcDirection("def");
+    setAtkSelectedSlot(null);
+    // 获取完整 move 对象用于计算
+    const fetchMove = moveId
+      ? unifiedApi(`/moves/${moveId}`)
+      : unifiedApi(`/moves?q=${encodeURIComponent(name)}&limit=5`);
+    fetchMove.then((r) => {
+      const found = moveId ? r.data : (r.data || []).find((m) => m.nameZh === name || m.slug === name);
+      if (found) setSelectedMove(found);
+    }).catch(() => {});
   }, []);
 
   // 从盒子导入时同步招式到槽位（补全缺失的招式信息）
@@ -1262,9 +1391,73 @@ export default function DamagePage() {
     setDefender(convert);
   }, [isChampions]);
 
-  // ── 伤害计算 ──
+  // ── 伤害计算（支持双向：calcDirection 决定谁攻谁守） ──
   const handleCalculate = useCallback(async () => {
     if (!selectedMove || !attacker.pokemonId || !defender.pokemonId) return;
+
+    // 根据计算方向决定实际的攻击方和防守方
+    const isReverse = calcDirection === "def"; // 防守方→攻击方
+    const realAttacker = isReverse ? defender : attacker;
+    const realDefender = isReverse ? attacker : defender;
+    const realAtkDetail = isReverse ? defenderDetail : attackerDetail;
+    const realDefDetail = isReverse ? attackerDetail : defenderDetail;
+    const realAtkBoost = isReverse ? defBoost : atkBoost;
+    const realDefBoost = isReverse ? atkBoost : defBoost;
+    const realAtkCurHP = isReverse ? defCurHP : atkCurHP;
+    const realDefCurHP = isReverse ? atkCurHP : defCurHP;
+    const realAtkStatus = isReverse ? defStatus : atkStatus;
+    const realDefStatus = isReverse ? atkStatus : defStatus;
+    const realAtkToxicCounter = isReverse ? defToxicCounter : atkToxicCounter;
+    const realDefToxicCounter = isReverse ? atkToxicCounter : defToxicCounter;
+    const realCritical = isReverse ? defCritical : critical;
+    const realMoveHits = isReverse ? defMoveHits : moveHits;
+    const realUseZ = isReverse ? defUseZ : useZ;
+    const realUseMax = isReverse ? defUseMax : useMax;
+    const realTimesUsed = isReverse ? defTimesUsed : timesUsed;
+    const realTimesUsedWithMetronome = isReverse ? defTimesUsedWithMetronome : timesUsedWithMetronome;
+    const realIsStellarFirstUse = isReverse ? defIsStellarFirstUse : isStellarFirstUse;
+    const realAtkTeraType = isReverse ? defTeraType : atkTeraType;
+    const realDefTeraType = isReverse ? atkTeraType : defTeraType;
+    const realAtkIsDynamaxed = isReverse ? defIsDynamaxed : atkIsDynamaxed;
+    const realDefIsDynamaxed = isReverse ? atkIsDynamaxed : defIsDynamaxed;
+    const realAtkAlliesFainted = isReverse ? defAlliesFainted : atkAlliesFainted;
+    const realDefAlliesFainted = isReverse ? atkAlliesFainted : defAlliesFainted;
+
+    // 场地 side 也要交换
+    const realAtkSide = isReverse ? {
+      isSR: defStealthRock, spikes: defSpikes, steelsurge: defSteelsurge,
+      isReflect: defReflect, isLightScreen: defLightScreen, isAuroraVeil: defAuroraVeil,
+      isProtected: defProtect, isHelpingHand: defHelpingHand, isTailwind: defTailwind,
+      isFriendGuard: defFriendGuard, isSwitching: defSwitchingOut ? "out" : undefined,
+      isSeeded: defSeeded, isSaltCured: defSaltCured, isForesight: defForesight,
+      isFlowerGift: defFlowerGift, isPowerTrick: defPowerTrick, isSteelySpirit: defSteelySpirit,
+      isBattery: defBattery, isPowerSpot: defPowerSpot,
+    } : {
+      isSR: atkStealthRock, spikes: atkSpikes, steelsurge: atkSteelsurge,
+      isReflect: atkReflect, isLightScreen: atkLightScreen, isAuroraVeil: atkAuroraVeil,
+      isProtected: atkProtect, isHelpingHand: atkHelpingHand, isTailwind: atkTailwind,
+      isFriendGuard: atkFriendGuard, isSwitching: atkSwitchingOut ? "out" : undefined,
+      isSeeded: atkSeeded, isSaltCured: atkSaltCured, isForesight: atkForesight,
+      isFlowerGift: atkFlowerGift, isPowerTrick: atkPowerTrick, isSteelySpirit: atkSteelySpirit,
+      isBattery: atkBattery, isPowerSpot: atkPowerSpot,
+    };
+    const realDefSide = isReverse ? {
+      isSR: atkStealthRock, spikes: atkSpikes, steelsurge: atkSteelsurge,
+      isReflect: atkReflect, isLightScreen: atkLightScreen, isAuroraVeil: atkAuroraVeil,
+      isProtected: atkProtect, isHelpingHand: atkHelpingHand, isTailwind: atkTailwind,
+      isFriendGuard: atkFriendGuard, isSwitching: atkSwitchingOut ? "in" : undefined,
+      isSeeded: atkSeeded, isSaltCured: atkSaltCured, isForesight: atkForesight,
+      isFlowerGift: atkFlowerGift, isPowerTrick: atkPowerTrick, isSteelySpirit: atkSteelySpirit,
+      isBattery: atkBattery, isPowerSpot: atkPowerSpot,
+    } : {
+      isSR: defStealthRock, spikes: defSpikes, steelsurge: defSteelsurge,
+      isReflect: defReflect, isLightScreen: defLightScreen, isAuroraVeil: defAuroraVeil,
+      isProtected: defProtect, isHelpingHand: defHelpingHand, isTailwind: defTailwind,
+      isFriendGuard: defFriendGuard, isSwitching: defSwitchingOut ? "in" : undefined,
+      isSeeded: defSeeded, isSaltCured: defSaltCured, isForesight: defForesight,
+      isFlowerGift: defFlowerGift, isPowerTrick: defPowerTrick, isSteelySpirit: defSteelySpirit,
+      isBattery: defBattery, isPowerSpot: defPowerSpot,
+    };
 
     setCalculating(true);
     try {
@@ -1283,46 +1476,57 @@ export default function DamagePage() {
         body: JSON.stringify({
           generation: gen,
           attacker: {
-            pokemonId: attacker.pokemonId || "",
-            formId: attacker.formId || "",
-            formKey: attacker.formKey || "",
-            name: attacker.nameZh || (attackerDetail?.nameZh) || "",
+            pokemonId: realAttacker.pokemonId || "",
+            formId: realAttacker.formId || "",
+            formKey: realAttacker.formKey || "",
+            name: realAttacker.nameZh || (realAtkDetail?.nameZh) || "",
             level: Number(level || 50),
-            nature: attacker.nature || "认真",
-            abilityId: attacker.abilityId || "",
-            ability: attacker.abilityName || "",
-            itemId: attacker.itemId || "",
-            item: attacker.itemName || "",
-            evs: resolveEvs(attacker),
-            ivs: attacker.ivs || {},
-            boosts: Object.values(atkBoost).some((v) => v !== 0) ? atkBoost : undefined,
-            curHP: atkCurHP > 0 ? atkCurHP : undefined,
-            status: atkStatus !== "none" ? atkStatus : "",
-            toxicCounter: atkStatus === "tox" ? atkToxicCounter : undefined,
+            nature: realAttacker.nature || "认真",
+            abilityId: realAttacker.abilityId || "",
+            ability: realAttacker.abilityName || "",
+            itemId: realAttacker.itemId || "",
+            item: realAttacker.itemName || "",
+            evs: resolveEvs(realAttacker),
+            ivs: realAttacker.ivs || {},
+            boosts: Object.values(realAtkBoost).some((v) => v !== 0) ? realAtkBoost : undefined,
+            curHP: realAtkCurHP > 0 ? realAtkCurHP : undefined,
+            status: realAtkStatus !== "none" ? realAtkStatus : "",
+            toxicCounter: realAtkStatus === "tox" ? realAtkToxicCounter : undefined,
+            teraType: realAtkTeraType !== "none" ? realAtkTeraType : undefined,
+            isDynamaxed: realAtkIsDynamaxed || undefined,
+            alliesFainted: realAtkAlliesFainted > 0 ? realAtkAlliesFainted : undefined,
           },
           defender: {
-            pokemonId: defender.pokemonId || "",
-            formId: defender.formId || "",
-            formKey: defender.formKey || "",
-            name: defender.nameZh || (defenderDetail?.nameZh) || "",
+            pokemonId: realDefender.pokemonId || "",
+            formId: realDefender.formId || "",
+            formKey: realDefender.formKey || "",
+            name: realDefender.nameZh || (realDefDetail?.nameZh) || "",
             level: Number(level || 50),
-            nature: defender.nature || "认真",
-            abilityId: defender.abilityId || "",
-            ability: defender.abilityName || "",
-            itemId: defender.itemId || "",
-            item: defender.itemName || "",
-            evs: resolveEvs(defender),
-            ivs: defender.ivs || {},
-            boosts: Object.values(defBoost).some((v) => v !== 0) ? defBoost : undefined,
-            curHP: defCurHP > 0 ? defCurHP : undefined,
-            status: defStatus !== "none" ? defStatus : "",
-            toxicCounter: defStatus === "tox" ? defToxicCounter : undefined,
+            nature: realDefender.nature || "认真",
+            abilityId: realDefender.abilityId || "",
+            ability: realDefender.abilityName || "",
+            itemId: realDefender.itemId || "",
+            item: realDefender.itemName || "",
+            evs: resolveEvs(realDefender),
+            ivs: realDefender.ivs || {},
+            boosts: Object.values(realDefBoost).some((v) => v !== 0) ? realDefBoost : undefined,
+            curHP: realDefCurHP > 0 ? realDefCurHP : undefined,
+            status: realDefStatus !== "none" ? realDefStatus : "",
+            toxicCounter: realDefStatus === "tox" ? realDefToxicCounter : undefined,
+            teraType: realDefTeraType !== "none" ? realDefTeraType : undefined,
+            isDynamaxed: realDefIsDynamaxed || undefined,
+            alliesFainted: realDefAlliesFainted > 0 ? realDefAlliesFainted : undefined,
           },
           move: {
             id: selectedMove.id || "",
             name: selectedMove.nameZh || selectedMove.slug || "",
-            isCrit: critical,
-            hits: moveHits > 0 ? moveHits : undefined,
+            isCrit: realCritical,
+            hits: realMoveHits > 0 ? realMoveHits : undefined,
+            useZ: realUseZ || undefined,
+            useMax: realUseMax || undefined,
+            timesUsed: realTimesUsed > 0 ? realTimesUsed : undefined,
+            timesUsedWithMetronome: realTimesUsedWithMetronome > 0 ? realTimesUsedWithMetronome : undefined,
+            isStellarFirstUse: realIsStellarFirstUse || undefined,
           },
           field: {
             gameType: battleMode,
@@ -1335,32 +1539,8 @@ export default function DamagePage() {
             isTabletsOfRuin: tabletsOfRuin,
             isSwordOfRuin: swordOfRuin,
             isVesselOfRuin: vesselOfRuin,
-            attackerSide: {
-              isSR: atkStealthRock,
-              spikes: atkSpikes,
-              steelsurge: atkSteelsurge,
-              isReflect: atkReflect,
-              isLightScreen: atkLightScreen,
-              isAuroraVeil: atkAuroraVeil,
-              isProtected: atkProtect,
-              isHelpingHand: atkHelpingHand,
-              isTailwind: atkTailwind,
-              isFriendGuard: atkFriendGuard,
-              isSwitching: atkSwitchingOut ? "out" : undefined,
-            },
-            defenderSide: {
-              isSR: defStealthRock,
-              spikes: defSpikes,
-              steelsurge: defSteelsurge,
-              isReflect: defReflect,
-              isLightScreen: defLightScreen,
-              isAuroraVeil: defAuroraVeil,
-              isProtected: defProtect,
-              isHelpingHand: defHelpingHand,
-              isTailwind: defTailwind,
-              isFriendGuard: defFriendGuard,
-              isSwitching: defSwitchingOut ? "in" : undefined,
-            },
+            attackerSide: realAtkSide,
+            defenderSide: realDefSide,
           },
         })
       });
@@ -1379,25 +1559,33 @@ export default function DamagePage() {
         moveName: selectedMove.nameZh || selectedMove.slug || "",
         moveType: mType,
         category: cat,
-        attackerName: attacker.nameZh || "攻击方",
-        defenderName: defender.nameZh || "防守方",
+        attackerName: realAttacker.nameZh || (isReverse ? "防守方" : "攻击方"),
+        defenderName: realDefender.nameZh || (isReverse ? "攻击方" : "防守方"),
         defHp: data.defenderHp || 0,
         minPercent: data.minPercent || 0,
         maxPercent: data.maxPercent || 0,
+        direction: calcDirection,
       });
     } catch (err) {
       window.alert("计算失败: " + (err.message || "未知错误"));
     }
     setCalculating(false);
-  }, [selectedMove, attacker, attackerDetail, defender, defenderDetail, generation, isChampions, level,
-    critical, moveHits, battleMode, weather, terrain, gravity, magicRoom, wonderRoom,
+  }, [selectedMove, calcDirection, attacker, attackerDetail, defender, defenderDetail, generation, isChampions, level,
+    critical, moveHits, defCritical, defMoveHits,
+    useZ, useMax, timesUsed, timesUsedWithMetronome, isStellarFirstUse,
+    defUseZ, defUseMax, defTimesUsed, defTimesUsedWithMetronome, defIsStellarFirstUse,
+    battleMode, weather, terrain, gravity, magicRoom, wonderRoom,
     beadsOfRuin, tabletsOfRuin, swordOfRuin, vesselOfRuin,
+    atkTeraType, atkIsDynamaxed, atkAlliesFainted,
+    defTeraType, defIsDynamaxed, defAlliesFainted,
     atkCurHP, atkStatus, atkToxicCounter, atkStealthRock, atkSpikes, atkSteelsurge,
     atkReflect, atkLightScreen, atkAuroraVeil, atkProtect, atkHelpingHand, atkTailwind,
     atkFriendGuard, atkBoost, atkSwitchingOut,
+    atkSeeded, atkSaltCured, atkForesight, atkFlowerGift, atkPowerTrick, atkSteelySpirit, atkBattery, atkPowerSpot,
     defCurHP, defStatus, defToxicCounter, defStealthRock, defSpikes, defSteelsurge,
     defReflect, defLightScreen, defAuroraVeil, defProtect, defHelpingHand, defTailwind,
-    defFriendGuard, defBoost, defSwitchingOut]);
+    defFriendGuard, defBoost, defSwitchingOut,
+    defSeeded, defSaltCured, defForesight, defFlowerGift, defPowerTrick, defSteelySpirit, defBattery, defPowerSpot]);
 
   // 用 ref 保存最新的 handleCalculate，避免 useEffect 因引用变化过度触发
   const calcRef = useRef(handleCalculate);
@@ -1417,15 +1605,21 @@ export default function DamagePage() {
     attacker.evs, attacker.sps, attacker.ivs,
     defender.pokemonId, defender.formId, defender.nature, defender.abilityId, defender.itemId,
     defender.evs, defender.sps, defender.ivs,
-    level, generation, isChampions, critical, moveHits, battleMode, weather, terrain,
-    gravity, magicRoom, wonderRoom,
+    level, generation, isChampions, calcDirection, critical, moveHits, defCritical, defMoveHits,
+    useZ, useMax, timesUsed, timesUsedWithMetronome, isStellarFirstUse,
+    defUseZ, defUseMax, defTimesUsed, defTimesUsedWithMetronome, defIsStellarFirstUse,
+    battleMode, weather, terrain, gravity, magicRoom, wonderRoom,
     beadsOfRuin, tabletsOfRuin, swordOfRuin, vesselOfRuin,
+    atkTeraType, atkIsDynamaxed, atkAlliesFainted,
+    defTeraType, defIsDynamaxed, defAlliesFainted,
     atkCurHP, atkStatus, atkToxicCounter, atkBoost,
     atkStealthRock, atkSpikes, atkSteelsurge, atkReflect, atkLightScreen, atkAuroraVeil,
     atkProtect, atkHelpingHand, atkTailwind, atkFriendGuard, atkSwitchingOut,
+    atkSeeded, atkSaltCured, atkForesight, atkFlowerGift, atkPowerTrick, atkSteelySpirit, atkBattery, atkPowerSpot,
     defCurHP, defStatus, defToxicCounter, defBoost,
     defStealthRock, defSpikes, defSteelsurge, defReflect, defLightScreen, defAuroraVeil,
     defProtect, defHelpingHand, defTailwind, defFriendGuard, defSwitchingOut,
+    defSeeded, defSaltCured, defForesight, defFlowerGift, defPowerTrick, defSteelySpirit, defBattery, defPowerSpot,
   ]);
   useEffect(() => {
     if (!selectedMove || !attacker.pokemonId || !defender.pokemonId) return;
@@ -1444,6 +1638,15 @@ export default function DamagePage() {
     setDefMovesInfo({});
     setDefSelectedSlot(null);
     setSelectedMove(null);
+    setCalcDirection("atk");
+    setCritical(false);
+    setMoveHits(0);
+    setDefCritical(false);
+    setDefMoveHits(0);
+    setUseZ(false); setUseMax(false); setTimesUsed(0); setTimesUsedWithMetronome(0); setIsStellarFirstUse(false);
+    setDefUseZ(false); setDefUseMax(false); setDefTimesUsed(0); setDefTimesUsedWithMetronome(0); setDefIsStellarFirstUse(false);
+    setAtkTeraType("none"); setAtkIsDynamaxed(false); setAtkAlliesFainted(0);
+    setDefTeraType("none"); setDefIsDynamaxed(false); setDefAlliesFainted(0);
     setResult(null);
   }, [isChampions]);
 
@@ -1499,6 +1702,25 @@ export default function DamagePage() {
                   <span className="dc-move-extras-label">连击</span>
                   <input type="number" className="dc-hits-input" min={0} max={10} value={moveHits} onChange={(e) => setMoveHits(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
                   <span className="dc-hits-hint">{moveHits === 0 ? "默认" : `${moveHits}次`}</span>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">已用</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={timesUsed} onChange={(e) => setTimesUsed(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                </div>
+                <div className="dc-move-extras">
+                  {Number(generation) === 7 && (
+                    <button className={"dc-chip" + (useZ ? " dc-chip-on" : "")} onClick={() => setUseZ(!useZ)}>Z招式</button>
+                  )}
+                  {Number(generation) === 8 && (
+                    <button className={"dc-chip" + (useMax ? " dc-chip-on" : "")} onClick={() => setUseMax(!useMax)}>极巨招式</button>
+                  )}
+                  {atkTeraType === "星晶" && (
+                    <button className={"dc-chip" + (isStellarFirstUse ? " dc-chip-on" : "")} onClick={() => setIsStellarFirstUse(!isStellarFirstUse)}>星晶首次</button>
+                  )}
+                  {(attacker.itemName === "节拍器" || attacker.itemId === "item-节拍器") && (<>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">节拍器</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={timesUsedWithMetronome} onChange={(e) => setTimesUsedWithMetronome(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                  </>)}
                 </div>
               </div>
             )}
@@ -1515,6 +1737,9 @@ export default function DamagePage() {
               onMovesSync={(cfg) => syncMovesFromConfig(cfg, "atk")}
               curHP={atkCurHP}
               onCurHPChange={setAtkCurHP}
+              teraType={atkTeraType}
+              setTeraType={setAtkTeraType}
+              generation={generation}
             />
           </div>
 
@@ -1635,6 +1860,17 @@ export default function DamagePage() {
                 tailwind={atkTailwind} setTailwind={setAtkTailwind}
                 friendGuard={atkFriendGuard} setFriendGuard={setAtkFriendGuard}
                 switchingOut={atkSwitchingOut} setSwitchingOut={setAtkSwitchingOut}
+                seeded={atkSeeded} setSeeded={setAtkSeeded}
+                saltCured={atkSaltCured} setSaltCured={setAtkSaltCured}
+                foresight={atkForesight} setForesight={setAtkForesight}
+                flowerGift={atkFlowerGift} setFlowerGift={setAtkFlowerGift}
+                powerTrick={atkPowerTrick} setPowerTrick={setAtkPowerTrick}
+                steelySpirit={atkSteelySpirit} setSteelySpirit={setAtkSteelySpirit}
+                battery={atkBattery} setBattery={setAtkBattery}
+                powerSpot={atkPowerSpot} setPowerSpot={setAtkPowerSpot}
+                isDynamaxed={atkIsDynamaxed} setIsDynamaxed={setAtkIsDynamaxed}
+                alliesFainted={atkAlliesFainted} setAlliesFainted={setAtkAlliesFainted}
+                generation={generation}
               />
               <StatusPanel
                 label="防守方"
@@ -1652,6 +1888,17 @@ export default function DamagePage() {
                 tailwind={defTailwind} setTailwind={setDefTailwind}
                 friendGuard={defFriendGuard} setFriendGuard={setDefFriendGuard}
                 switchingOut={defSwitchingOut} setSwitchingOut={setDefSwitchingOut}
+                seeded={defSeeded} setSeeded={setDefSeeded}
+                saltCured={defSaltCured} setSaltCured={setDefSaltCured}
+                foresight={defForesight} setForesight={setDefForesight}
+                flowerGift={defFlowerGift} setFlowerGift={setDefFlowerGift}
+                powerTrick={defPowerTrick} setPowerTrick={setDefPowerTrick}
+                steelySpirit={defSteelySpirit} setSteelySpirit={setDefSteelySpirit}
+                battery={defBattery} setBattery={setDefBattery}
+                powerSpot={defPowerSpot} setPowerSpot={setDefPowerSpot}
+                isDynamaxed={defIsDynamaxed} setIsDynamaxed={setDefIsDynamaxed}
+                alliesFainted={defAlliesFainted} setAlliesFainted={setDefAlliesFainted}
+                generation={generation}
               />
             </div>
 
@@ -1667,11 +1914,37 @@ export default function DamagePage() {
                   moves={defMoves}
                   movesInfo={defMovesInfo}
                   selectedIndex={defSelectedSlot}
-                  onSelectSlot={(i) => setDefSelectedSlot(i)}
+                  onSelectSlot={handleDefSelectSlot}
                   pokemonId={defender.pokemonId}
                   generation={generation}
                   onSetMove={handleDefSetMove}
                 />
+                <div className="dc-move-extras">
+                  <button className={"dc-chip" + (defCritical ? " dc-chip-on" : "")} onClick={() => setDefCritical(!defCritical)}>暴击</button>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">连击</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={defMoveHits} onChange={(e) => setDefMoveHits(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                  <span className="dc-hits-hint">{defMoveHits === 0 ? "默认" : `${defMoveHits}次`}</span>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">已用</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={defTimesUsed} onChange={(e) => setDefTimesUsed(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                </div>
+                <div className="dc-move-extras">
+                  {Number(generation) === 7 && (
+                    <button className={"dc-chip" + (defUseZ ? " dc-chip-on" : "")} onClick={() => setDefUseZ(!defUseZ)}>Z招式</button>
+                  )}
+                  {Number(generation) === 8 && (
+                    <button className={"dc-chip" + (defUseMax ? " dc-chip-on" : "")} onClick={() => setDefUseMax(!defUseMax)}>极巨招式</button>
+                  )}
+                  {defTeraType === "星晶" && (
+                    <button className={"dc-chip" + (defIsStellarFirstUse ? " dc-chip-on" : "")} onClick={() => setDefIsStellarFirstUse(!defIsStellarFirstUse)}>星晶首次</button>
+                  )}
+                  {(defender.itemName === "节拍器" || defender.itemId === "item-节拍器") && (<>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">节拍器</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={defTimesUsedWithMetronome} onChange={(e) => setDefTimesUsedWithMetronome(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                  </>)}
+                </div>
               </div>
             )}
             <PokemonConfigPanel
@@ -1687,6 +1960,9 @@ export default function DamagePage() {
               onMovesSync={(cfg) => syncMovesFromConfig(cfg, "def")}
               curHP={defCurHP}
               onCurHPChange={setDefCurHP}
+              teraType={defTeraType}
+              setTeraType={setDefTeraType}
+              generation={generation}
             />
           </div>
 

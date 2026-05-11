@@ -508,10 +508,38 @@
   margin: 0;
 }
 
+.dc-tera-inline {
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.dc-tera-inline .ss-wrap {
+  min-width: 52px;
+}
+
+.dc-tera-inline .ss-trigger {
+  padding: 2px 6px;
+  font-size: 10px;
+  min-height: 0;
+  height: auto;
+  border-radius: 4px;
+  gap: 2px;
+}
+
+.dc-tera-inline .ss-val,
+.dc-tera-inline .ss-placeholder {
+  font-size: 10px;
+}
+
+.dc-tera-inline .ss-arrow {
+  width: 8px;
+  height: 8px;
+}
+
 .dc-ability-inline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
+display: flex;
+flex-wrap: wrap;
+gap: 3px;
 }
 
 .dc-ability-inline .dc-ability-btn {
@@ -1903,6 +1931,65 @@
   font-size: 11px;
   color: var(--muted);
   font-weight: 500;
+}
+
+/* ── StatusPanel 内联字段（太晶选择、倒下队友数等） ── */
+.dc-sp-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dc-sp-inline-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dc-sp-mini-select {
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.dc-sp-mini-select:focus {
+  outline: none;
+  border-color: rgba(217, 79, 61, 0.3);
+}
+
+.dc-sp-mini-input {
+  width: 40px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  color: var(--ink);
+  transition: border-color 0.15s;
+}
+
+.dc-sp-mini-input:focus {
+  outline: none;
+  border-color: rgba(217, 79, 61, 0.3);
+}
+
+.dc-sp-mini-input::-webkit-inner-spin-button,
+.dc-sp-mini-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.dc-sp-mini-input {
+  -moz-appearance: textfield;
 }
 
 /* ── 响应式 ── */
