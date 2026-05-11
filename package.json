@@ -31,7 +31,7 @@
     "crawl:items": "python3 packages/crawler_py/crawl-52poke-db.py items"
   },
   "dependencies": {
-    "@fakedplains/smogon-calc": "^0.11.0",
+    "@fakedplains/smogon-calc": "^0.11.1",
     "@hono/node-server": "^2.0.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.15"
