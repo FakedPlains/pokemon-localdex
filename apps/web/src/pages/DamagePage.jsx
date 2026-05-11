@@ -940,7 +940,7 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
 //  子组件：状态效果面板
 // ══════════════════════════════════════════════════════════════
 
-function StatusPanel({ label, status, setStatus, toxicCounter, setToxicCounter,
+function StatusPanel({ label, side, status, setStatus, toxicCounter, setToxicCounter,
   stealthRock, setStealthRock, spikes, setSpikes, steelsurge, setSteelsurge,
   reflect, setReflect, lightScreen, setLightScreen, auroraVeil, setAuroraVeil,
   protect, setProtect, helpingHand, setHelpingHand, tailwind, setTailwind,
@@ -955,36 +955,51 @@ function StatusPanel({ label, status, setStatus, toxicCounter, setToxicCounter,
     { value: "freeze", label: "冰冻" },
   ];
   return (
-    <div className="dc-status-panel">
-      <span className="dc-status-label">{label}状态</span>
-      <div className="dc-status-toggles">
-        <div className="dc-status-select-wrap">
-          <SearchSelect
-            value={status || "none"}
-            options={STATUS_SELECT_OPTIONS}
-            onChange={(val) => setStatus(val)}
-            placeholder="健康"
-          />
+    <div className={"dc-status-panel" + (side === "atk" ? " dc-status-panel-atk" : side === "def" ? " dc-status-panel-def" : "")}>
+      <div className="dc-sp-header">
+        <span className="dc-sp-title">{label}</span>
+        <div className="dc-sp-status-row">
+          <div className="dc-status-select-wrap">
+            <SearchSelect
+              value={status || "none"}
+              options={STATUS_SELECT_OPTIONS}
+              onChange={(val) => setStatus(val)}
+              placeholder="健康"
+            />
+          </div>
+          {status === "tox" && (
+            <span className="dc-toxic-counter">
+              <span>回合</span>
+              <input type="number" className="dc-toxic-input" min={0} max={15} value={toxicCounter || 0} onChange={(e) => setToxicCounter(Math.max(0, Math.min(15, Number(e.target.value) || 0)))} />
+            </span>
+          )}
         </div>
-        {status === "tox" && (
-          <span className="dc-toxic-counter">
-            <span>回合</span>
-            <input type="number" className="dc-toxic-input" min={0} max={15} value={toxicCounter || 0} onChange={(e) => setToxicCounter(Math.max(0, Math.min(15, Number(e.target.value) || 0)))} />
-          </span>
-        )}
       </div>
-      <div className="dc-status-toggles">
-        <button className={"dc-toggle" + (stealthRock ? " dc-toggle-on" : "")} onClick={() => setStealthRock(!stealthRock)}>隐石</button>
-        <button className={"dc-toggle" + (spikes > 0 ? " dc-toggle-on" : "")} onClick={() => setSpikes(spikes >= 3 ? 0 : spikes + 1)}>撒菱{spikes > 0 ? `×${spikes}` : ""}</button>
-        <button className={"dc-toggle" + (steelsurge ? " dc-toggle-on" : "")} onClick={() => setSteelsurge(!steelsurge)}>钢刺</button>
-        <button className={"dc-toggle" + (reflect ? " dc-toggle-on" : "")} onClick={() => setReflect(!reflect)}>反射壁</button>
-        <button className={"dc-toggle" + (lightScreen ? " dc-toggle-on" : "")} onClick={() => setLightScreen(!lightScreen)}>光墙</button>
-        <button className={"dc-toggle" + (auroraVeil ? " dc-toggle-on" : "")} onClick={() => setAuroraVeil(!auroraVeil)}>极光幕</button>
-        <button className={"dc-toggle" + (protect ? " dc-toggle-on" : "")} onClick={() => setProtect(!protect)}>守住</button>
-        <button className={"dc-toggle" + (helpingHand ? " dc-toggle-on" : "")} onClick={() => setHelpingHand(!helpingHand)}>帮助</button>
-        <button className={"dc-toggle" + (tailwind ? " dc-toggle-on" : "")} onClick={() => setTailwind(!tailwind)}>顺风</button>
-        <button className={"dc-toggle" + (friendGuard ? " dc-toggle-on" : "")} onClick={() => setFriendGuard(!friendGuard)}>友情防守</button>
-        <button className={"dc-toggle" + (switchingOut ? " dc-toggle-on" : "")} onClick={() => setSwitchingOut(!switchingOut)}>换入中</button>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">场地</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (stealthRock ? " dc-chip-on" : "")} onClick={() => setStealthRock(!stealthRock)}>隐石</button>
+          <button className={"dc-chip" + (spikes > 0 ? " dc-chip-on" : "")} onClick={() => setSpikes(spikes >= 3 ? 0 : spikes + 1)}>撒菱{spikes > 0 ? `×${spikes}` : ""}</button>
+          <button className={"dc-chip" + (steelsurge ? " dc-chip-on" : "")} onClick={() => setSteelsurge(!steelsurge)}>钢刺</button>
+        </div>
+      </div>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">屏障</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (reflect ? " dc-chip-on" : "")} onClick={() => setReflect(!reflect)}>反射壁</button>
+          <button className={"dc-chip" + (lightScreen ? " dc-chip-on" : "")} onClick={() => setLightScreen(!lightScreen)}>光墙</button>
+          <button className={"dc-chip" + (auroraVeil ? " dc-chip-on" : "")} onClick={() => setAuroraVeil(!auroraVeil)}>极光幕</button>
+        </div>
+      </div>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">辅助</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (protect ? " dc-chip-on" : "")} onClick={() => setProtect(!protect)}>守住</button>
+          <button className={"dc-chip" + (helpingHand ? " dc-chip-on" : "")} onClick={() => setHelpingHand(!helpingHand)}>帮助</button>
+          <button className={"dc-chip" + (tailwind ? " dc-chip-on" : "")} onClick={() => setTailwind(!tailwind)}>顺风</button>
+          <button className={"dc-chip" + (friendGuard ? " dc-chip-on" : "")} onClick={() => setFriendGuard(!friendGuard)}>友情防守</button>
+          <button className={"dc-chip" + (switchingOut ? " dc-chip-on" : "")} onClick={() => setSwitchingOut(!switchingOut)}>换入中</button>
+        </div>
       </div>
     </div>
   );
@@ -1478,6 +1493,13 @@ export default function DamagePage() {
                   generation={generation}
                   onSetMove={handleAtkSetMove}
                 />
+                <div className="dc-move-extras">
+                  <button className={"dc-chip" + (critical ? " dc-chip-on" : "")} onClick={() => setCritical(!critical)}>暴击</button>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">连击</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={moveHits} onChange={(e) => setMoveHits(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                  <span className="dc-hits-hint">{moveHits === 0 ? "默认" : `${moveHits}次`}</span>
+                </div>
               </div>
             )}
             <PokemonConfigPanel
@@ -1560,49 +1582,46 @@ export default function DamagePage() {
             {/* 场地环境 */}
             <div className="dc-field-section">
               <span className="dc-section-title">场地环境</span>
-              <div className="dc-field-group">
-                <div className="dc-seg-field">
-                  <span className="dc-seg-label">天气</span>
-                  <div className="dc-seg-switcher">
-                    {[{ v: "sun", l: "晴天" }, { v: "harshSunlight", l: "大日照" }, { v: "rain", l: "雨天" }, { v: "heavyRain", l: "大雨" }, { v: "sand", l: "沙暴" }, { v: "hail", l: "雪" }, { v: "strongWinds", l: "乱流" }].map((w) => (
-                      <button key={w.v} className={"dc-seg-btn" + (weather === w.v ? " dc-seg-btn-active" : "")} onClick={() => setWeather(weather === w.v ? "none" : w.v)}>{w.l}</button>
-                    ))}
-                  </div>
+              <div className="dc-sp-group">
+                <span className="dc-sp-group-label">天气</span>
+                <div className="dc-sp-chips">
+                  {[{ v: "sun", l: "晴天" }, { v: "harshSunlight", l: "大日照" }, { v: "rain", l: "雨天" }, { v: "heavyRain", l: "大雨" }, { v: "sand", l: "沙暴" }, { v: "hail", l: "雪" }, { v: "strongWinds", l: "乱流" }].map((w) => (
+                    <button key={w.v} className={"dc-chip" + (weather === w.v ? " dc-chip-on" : "")} onClick={() => setWeather(weather === w.v ? "none" : w.v)}>{w.l}</button>
+                  ))}
                 </div>
-                <div className="dc-seg-field">
-                  <span className="dc-seg-label">场地</span>
-                  <div className="dc-seg-switcher">
-                    {[{ v: "electric", l: "电气" }, { v: "grassy", l: "青草" }, { v: "misty", l: "薄雾" }, { v: "psychic", l: "精神" }].map((t) => (
-                      <button key={t.v} className={"dc-seg-btn" + (terrain === t.v ? " dc-seg-btn-active" : "")} onClick={() => setTerrain(terrain === t.v ? "none" : t.v)}>{t.l}</button>
-                    ))}
-                  </div>
+              </div>
+              <div className="dc-sp-group">
+                <span className="dc-sp-group-label">场地</span>
+                <div className="dc-sp-chips">
+                  {[{ v: "electric", l: "电气" }, { v: "grassy", l: "青草" }, { v: "misty", l: "薄雾" }, { v: "psychic", l: "精神" }].map((t) => (
+                    <button key={t.v} className={"dc-chip" + (terrain === t.v ? " dc-chip-on" : "")} onClick={() => setTerrain(terrain === t.v ? "none" : t.v)}>{t.l}</button>
+                  ))}
                 </div>
-                <div className="dc-field-row">
-                  <button className={"dc-toggle" + (gravity ? " dc-toggle-on" : "")} onClick={() => setGravity(!gravity)}>重力</button>
-                  <button className={"dc-toggle" + (magicRoom ? " dc-toggle-on" : "")} onClick={() => setMagicRoom(!magicRoom)}>魔法空间</button>
-                  <button className={"dc-toggle" + (wonderRoom ? " dc-toggle-on" : "")} onClick={() => setWonderRoom(!wonderRoom)}>奇妙空间</button>
-                  <button className={"dc-toggle" + (critical ? " dc-toggle-on" : "")} onClick={() => setCritical(!critical)}>暴击</button>
+              </div>
+              <div className="dc-sp-group">
+                <span className="dc-sp-group-label">效果</span>
+                <div className="dc-sp-chips">
+                  <button className={"dc-chip" + (gravity ? " dc-chip-on" : "")} onClick={() => setGravity(!gravity)}>重力</button>
+                  <button className={"dc-chip" + (magicRoom ? " dc-chip-on" : "")} onClick={() => setMagicRoom(!magicRoom)}>魔法空间</button>
+                  <button className={"dc-chip" + (wonderRoom ? " dc-chip-on" : "")} onClick={() => setWonderRoom(!wonderRoom)}>奇妙空间</button>
                 </div>
-                {/* 灾厄四宝 */}
-                <div className="dc-field-row">
-                  <button className={"dc-toggle" + (beadsOfRuin ? " dc-toggle-on" : "")} onClick={() => setBeadsOfRuin(!beadsOfRuin)}>灾祸之珠</button>
-                  <button className={"dc-toggle" + (tabletsOfRuin ? " dc-toggle-on" : "")} onClick={() => setTabletsOfRuin(!tabletsOfRuin)}>灾祸之碑</button>
-                  <button className={"dc-toggle" + (swordOfRuin ? " dc-toggle-on" : "")} onClick={() => setSwordOfRuin(!swordOfRuin)}>灾祸之剑</button>
-                  <button className={"dc-toggle" + (vesselOfRuin ? " dc-toggle-on" : "")} onClick={() => setVesselOfRuin(!vesselOfRuin)}>灾祸之鼎</button>
-                </div>
-                {/* 招式连击次数 */}
-                <div className="dc-field-row dc-hits-row">
-                  <span className="dc-seg-label">连击次数</span>
-                  <input type="number" className="dc-hits-input" min={0} max={10} value={moveHits} onChange={(e) => setMoveHits(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
-                  <span className="dc-hits-hint">{moveHits === 0 ? "默认" : `${moveHits}次`}</span>
+              </div>
+              <div className="dc-sp-group">
+                <span className="dc-sp-group-label">灾厄特性</span>
+                <div className="dc-sp-chips">
+                  <button className={"dc-chip" + (beadsOfRuin ? " dc-chip-on" : "")} onClick={() => setBeadsOfRuin(!beadsOfRuin)}>灾祸之珠</button>
+                  <button className={"dc-chip" + (tabletsOfRuin ? " dc-chip-on" : "")} onClick={() => setTabletsOfRuin(!tabletsOfRuin)}>灾祸之碑</button>
+                  <button className={"dc-chip" + (swordOfRuin ? " dc-chip-on" : "")} onClick={() => setSwordOfRuin(!swordOfRuin)}>灾祸之剑</button>
+                  <button className={"dc-chip" + (vesselOfRuin ? " dc-chip-on" : "")} onClick={() => setVesselOfRuin(!vesselOfRuin)}>灾祸之鼎</button>
                 </div>
               </div>
             </div>
 
-            {/* 攻守双方状态（场地环境下方） */}
+            {/* 攻守双方状态 */}
             <div className="dc-status-row">
               <StatusPanel
                 label="攻击方"
+                side="atk"
                 status={atkStatus} setStatus={setAtkStatus}
                 toxicCounter={atkToxicCounter} setToxicCounter={setAtkToxicCounter}
                 stealthRock={atkStealthRock} setStealthRock={setAtkStealthRock}
@@ -1619,6 +1638,7 @@ export default function DamagePage() {
               />
               <StatusPanel
                 label="防守方"
+                side="def"
                 status={defStatus} setStatus={setDefStatus}
                 toxicCounter={defToxicCounter} setToxicCounter={setDefToxicCounter}
                 stealthRock={defStealthRock} setStealthRock={setDefStealthRock}
@@ -1634,6 +1654,7 @@ export default function DamagePage() {
                 switchingOut={defSwitchingOut} setSwitchingOut={setDefSwitchingOut}
               />
             </div>
+
           </div>
 
           {/* ═══ 右栏：防守方招式 + 宝可梦 ═══ */}
@@ -1670,6 +1691,7 @@ export default function DamagePage() {
           </div>
 
         </div>
+
       </div>
     </section>
   );

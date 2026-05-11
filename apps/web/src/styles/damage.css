@@ -134,10 +134,10 @@
 }
 
 @media (min-width: 960px) {
-.dc-main-layout {
-grid-template-columns: 1.3fr minmax(280px, 340px) 1.3fr;
-gap: 20px;
-}
+  .dc-main-layout {
+    grid-template-columns: 1fr minmax(320px, 420px) 1fr;
+    gap: 16px;
+  }
 }
 
 .dc-side-col {
@@ -1020,51 +1020,124 @@ gap: 20px;
   color: var(--ink);
 }
 
-/* ── 状态面板 ── */
+/* ── 状态面板（分组 chip 风格） ── */
 .dc-status-panel {
-  padding: 12px 16px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.dc-status-label {
-  display: block;
+/* 头部：标题 + 状态下拉 */
+.dc-sp-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dc-sp-title {
   font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.3px;
+}
+
+.dc-sp-status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 分组 */
+.dc-sp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(31, 42, 31, 0.08);
+}
+
+.dc-sp-group-label {
+  font-size: 10px;
   font-weight: 600;
   color: var(--muted);
-  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.dc-status-toggles {
+.dc-sp-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
-/* ── Toggle 按钮 ── */
-.dc-toggle {
-  padding: 4px 9px;
+/* Chip 按钮 */
+.dc-chip {
+  padding: 3px 8px;
   font-size: 11px;
   font-weight: 500;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.6);
   color: var(--muted);
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
+  line-height: 1.4;
 }
 
-.dc-toggle:hover {
+.dc-chip:hover {
   border-color: rgba(217, 79, 61, 0.3);
   color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
 }
 
-.dc-toggle-on {
+.dc-chip-on {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
   font-weight: 600;
+}
+
+.dc-chip-on:hover {
+  background: var(--accent-strong, var(--accent));
+  border-color: var(--accent-strong, var(--accent));
+  color: #fff;
+}
+
+/* ── 攻击方状态面板：内容靠左 ── */
+.dc-status-panel-atk {
+  align-items: flex-start;
+}
+
+.dc-status-panel-atk .dc-sp-header,
+.dc-status-panel-atk .dc-sp-group {
+  align-items: flex-start;
+}
+
+.dc-status-panel-atk .dc-sp-chips {
+  justify-content: flex-start;
+}
+
+/* ── 防守方状态面板：内容靠右 ── */
+.dc-status-panel-def {
+  align-items: flex-end;
+}
+
+.dc-status-panel-def .dc-sp-header,
+.dc-status-panel-def .dc-sp-group {
+  align-items: flex-end;
+}
+
+.dc-status-panel-def .dc-sp-chips {
+  justify-content: flex-end;
+}
+
+.dc-status-panel-def .dc-sp-status-row {
+  justify-content: flex-end;
 }
 
 /* ── 中栏：等级 ── */
@@ -1113,80 +1186,39 @@ gap: 20px;
 
 /* ── 中栏：场地环境 ── */
 .dc-field-section {
-  padding: 14px 16px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.dc-field-section .dc-section-title {
+  text-align: center;
+}
+
+.dc-field-section .dc-sp-group {
+  align-items: center;
+  width: 100%;
+}
+
+.dc-field-section .dc-sp-group-label {
+  text-align: center;
+}
+
+.dc-field-section .dc-sp-chips {
+  justify-content: center;
 }
 
 .dc-section-title {
   display: block;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--ink);
-  margin-bottom: 10px;
-}
-
-.dc-field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.dc-field-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  justify-content: center;
-}
-
-/* ── 分段切换器（天气/场地） ── */
-.dc-seg-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.dc-seg-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.dc-seg-switcher {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  padding: 3px;
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 10px;
-}
-
-.dc-seg-btn {
-  flex: 1 1 0;
-  border: none;
-  background: transparent;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
-  padding: 4px 6px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-  text-align: center;
-  min-width: 0;
-}
-
-.dc-seg-btn:hover {
-  color: var(--ink);
-}
-
-.dc-seg-btn-active {
-  background: #fff;
-  color: var(--ink);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.3px;
 }
 
 /* ── 中栏：招式选择 ── */
@@ -1654,17 +1686,11 @@ gap: 20px;
   flex-shrink: 0;
 }
 
-/* ── 状态面板行（中栏内攻守并排） ── */
+/* ── 状态面板行（中栏内，左右对称） ── */
 .dc-status-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-@media (max-width: 1100px) {
-  .dc-status-row {
-    grid-template-columns: 1fr;
-  }
+  gap: 10px;
 }
 
 /* ── 当前HP ── */
@@ -1813,6 +1839,30 @@ gap: 20px;
 
 .dc-toxic-input {
   -moz-appearance: textfield;
+}
+
+/* ── 招式附加选项（暴击 + 连击） ── */
+.dc-move-extras {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(31, 42, 31, 0.08);
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.dc-move-extras-sep {
+  color: var(--line);
+  font-size: 12px;
+  user-select: none;
+}
+
+.dc-move-extras-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 /* ── 连击次数行 ── */
