@@ -858,7 +858,10 @@ export class DrizzleStore implements IStore {
       .select()
       .from(moves)
       .where(where)
-      .orderBy(asc(moves.number));
+      .orderBy(
+        sql`CASE WHEN ${moves.number} IS NULL OR ${moves.number} = 0 THEN 1 ELSE 0 END`,
+        asc(moves.number),
+      );
 
     if (usePagination) {
       query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));
