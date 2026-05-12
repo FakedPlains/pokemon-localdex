@@ -230,15 +230,56 @@ CREATE TABLE IF NOT EXISTS item_generation_records (
 );
 
 -- ============================================================
--- 对战队伍（D1 持久化，替代 Node.js 文件存储）
+-- Pokémon Champions 赛季 / 赛制 / 可用池
 -- ============================================================
-CREATE TABLE IF NOT EXISTS battle_teams (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL DEFAULT '未命名队伍',
-  format TEXT NOT NULL DEFAULT 'singles',
-  members_json TEXT NOT NULL DEFAULT '[]',
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS champions_regulations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  regulation_code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  start_at TEXT,
+  end_at TEXT,
+  period_text TEXT,
+  special_feature TEXT,
+  held_item_rule TEXT,
+  battle_time TEXT,
+  source_url TEXT,
+  source_title TEXT,
+  source_fetched_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS champions_seasons (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  season_code TEXT NOT NULL UNIQUE,
+  regulation_id INTEGER REFERENCES champions_regulations(id) ON DELETE SET NULL,
+  regulation_code TEXT NOT NULL,
+  start_at TEXT,
+  end_at TEXT,
+  period_text TEXT,
+  source_url TEXT,
+  source_title TEXT,
+  source_fetched_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS champions_regulation_pokemon (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  regulation_id INTEGER NOT NULL REFERENCES champions_regulations(id) ON DELETE CASCADE,
+  pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE SET NULL,
+  form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
+  dex_number INTEGER,
+  msp_code TEXT NOT NULL,
+  form_code TEXT,
+  name_zh TEXT NOT NULL,
+  form_key TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (regulation_id, msp_code, name_zh)
+);
+
+CREATE TABLE IF NOT EXISTS champions_regulation_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  regulation_id INTEGER NOT NULL REFERENCES champions_regulations(id) ON DELETE CASCADE,
+  item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (regulation_id, item_id)
 );
 
 -- ============================================================
@@ -271,6 +312,9 @@ CREATE INDEX IF NOT EXISTS idx_abilities_name ON abilities(name_zh);
 CREATE INDEX IF NOT EXISTS idx_abilities_number ON abilities(number);
 CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
 
-CREATE INDEX IF NOT EXISTS idx_battle_teams_updated ON battle_teams(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_champions_seasons_regulation ON champions_seasons(regulation_id);
+CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_regulation ON champions_regulation_pokemon(regulation_id);
+CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_pokemon ON champions_regulation_pokemon(pokemon_id);
+CREATE INDEX IF NOT EXISTS idx_champions_regulation_items_regulation ON champions_regulation_items(regulation_id);
 
 PRAGMA foreign_keys = ON;

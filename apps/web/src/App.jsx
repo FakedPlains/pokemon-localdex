@@ -49,11 +49,24 @@ const CATEGORY_FILTER_PAGES = new Set(["moves"]);
 function parseRoute() {
   const hash = window.location.hash || "#/pokedex";
   const key = hash.replace("#/", "").split(/[/?]/)[0];
+  // #/pokemon?id=X 也映射到 pokedex
+  if (key === "pokemon") return "pokedex";
   return NAV_ITEMS.find((n) => n.key === key)?.key || "pokedex";
+}
+
+function parsePokemonIdFromHash() {
+  const hash = window.location.hash || "";
+  if (!hash.startsWith("#/pokemon")) return null;
+  const qIdx = hash.indexOf("?");
+  if (qIdx < 0) return null;
+  const params = new URLSearchParams(hash.slice(qIdx));
+  return params.get("id") || null;
 }
 
 export default function App() {
   const [route, setRoute] = useState(parseRoute);
+  const [initialPokemonId, setInitialPokemonId] = useState(parsePokemonIdFromHash);
+  const initialPokemonIdRef = useRef(initialPokemonId);
 
   // Shared team draft state (lifted from TeamsPage so DamagePage can import from it)
   const [teamDraft, setTeamDraft] = useState({
@@ -76,7 +89,12 @@ export default function App() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
-    const onHashChange = () => setRoute(parseRoute());
+    const onHashChange = () => {
+      const newId = parsePokemonIdFromHash();
+      setRoute(parseRoute());
+      setInitialPokemonId(newId);
+      initialPokemonIdRef.current = newId;
+    };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
@@ -130,10 +148,17 @@ export default function App() {
   const showCategoryFilter = CATEGORY_FILTER_PAGES.has(route);
   const hasActiveFilters = types.length > 0 || generation !== "" || moveCategory !== "";
 
+  const consumeInitialPokemonId = useCallback(() => {
+    setInitialPokemonId(null);
+    initialPokemonIdRef.current = null;
+  }, []);
+
   const pageElement = useMemo(() => {
+    // Read initialPokemonId from ref so consuming it doesn't recreate the page component
+    const pokemonId = initialPokemonIdRef.current;
     switch (route) {
       case "pokedex":
-        return <PokedexPage query={query} types={types} generation={generation} />;
+        return <PokedexPage query={query} types={types} generation={generation} initialPokemonId={pokemonId} onInitialPokemonConsumed={consumeInitialPokemonId} />;
       case "items":
         return <ItemsPage query={query} />;
       case "moves":
@@ -147,9 +172,11 @@ export default function App() {
       case "typechart":
         return <TypeChartPage />;
       default:
-        return <PokedexPage query={query} types={types} generation={generation} />;
+        return <PokedexPage query={query} types={types} generation={generation} initialPokemonId={pokemonId} onInitialPokemonConsumed={consumeInitialPokemonId} />;
     }
-  }, [route, query, types, generation, moveCategory, teamDraft]);
+    // Note: initialPokemonId is intentionally read from ref, not listed as dependency.
+    // This prevents the page component from being recreated when the id is consumed.
+  }, [route, query, types, generation, moveCategory, teamDraft, consumeInitialPokemonId]);
 
   return (
     <ToastProvider>

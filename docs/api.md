@@ -57,6 +57,7 @@ API 启用了全局 CORS，允许任意来源访问。
 | q | string | 按名称模糊搜索（支持中文、英文、日文） |
 | type | string | 按属性筛选，支持逗号分隔多属性（如"火,飞行"） |
 | generation | number | 按初登场世代筛选 |
+| seasonId | number | 按 Champions 赛季数据库 ID 筛选可用池 |
 | limit | number | 分页：每页条数 |
 | offset | number | 分页：偏移量 |
 
@@ -64,6 +65,7 @@ API 启用了全局 CORS，允许任意来源访问。
 
 ```
 GET /api/pokemon?q=皮卡&type=电&generation=1
+GET /api/pokemon?seasonId=1
 GET /api/pokemon?limit=20&offset=0
 ```
 
@@ -74,11 +76,18 @@ GET /api/pokemon?limit=20&offset=0
 
 返回数据包含基础信息、所有形态（含每个形态的属性变体 `typeVariants`、种族值变体 `statVariants`、特性变体 `abilityVariants`、图片 `images`）、进化链、世代可用性等完整数据。
 
+查询参数：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| seasonId | number | 可选。传入 Champions 赛季数据库 ID 时，仅返回该赛季赛制中可用的宝可梦形态；`seasonCode` 只用于展示。 |
+
 示例：
 
 ```
 GET /api/pokemon/皮卡丘
 GET /api/pokemon/25
+GET /api/pokemon/2?seasonId=1
 ```
 
 小程序端对应函数：`fetchPokemonDetail(idOrSlug)`。小程序端使用 `query` + `limit:1` 而非 PostgREST 的 `single` 模式（后者在 0 或多条结果时返回 406 错误），并优先使用数字 ID 导航以避免中文 URL 编码问题。
@@ -117,6 +126,20 @@ GET /api/pokemon/25/learnset/meta
 ```
 
 小程序端对应函数：`fetchLearnsetMeta(pokemonId)`。
+
+## Champions
+
+### GET /champions/seasons
+
+获取 Pokémon Champions 赛季列表，用于构建赛季选择器。每个赛季包含赛季编号、关联赛制、赛制名称和期间文本。
+
+示例：
+
+```
+GET /api/champions/seasons
+```
+
+可将返回的 `id` 传给 `/pokemon?seasonId=...`，按该赛季关联赛制的可使用宝可梦池筛选图鉴列表。`seasonCode` 仅用于展示。
 
 ## 招式
 
@@ -188,38 +211,6 @@ GET /api/pokemon/25/learnset/meta
 获取单个道具的详情，包括分类和效果说明。`:id` 支持数字 ID、legacy_id 和中文名。
 
 小程序端对应函数：`fetchItemDetail(idOrSlug)`。
-
-## 队伍
-
-### GET /teams
-
-获取所有已保存的队伍列表。队伍数据存储在 `data/teams.json` 文件中。
-
-### POST /teams
-
-创建或更新一支队伍。请求体为 JSON 格式：
-
-```json
-{
-  "id": "team_1714000000000",
-  "name": "我的队伍",
-  "format": "singles",
-  "members": [
-    {
-      "pokemonId": 25,
-      "nature": "胆小",
-      "level": 50,
-      "ability": "静电",
-      "item": "气势披带",
-      "moves": ["十万伏特", "冲浪", "草结", "伏特替换"]
-    }
-  ]
-}
-```
-
-如果请求体中包含已存在的 `id`，则更新该队伍；否则创建新队伍。`id` 字段可省略，服务端会自动生成。
-
-注意：队伍功能仅在 Web 端可用。小程序端暂不支持队伍管理。
 
 ## 伤害计算
 

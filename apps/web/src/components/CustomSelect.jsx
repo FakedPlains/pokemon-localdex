@@ -4,9 +4,13 @@ import { useState, useEffect, useRef } from "react";
  * 自定义下拉选择器（替代原生 select）
  * 胶囊形触发按钮 + 浮层下拉列表
  */
-export default function CustomSelect({ value, options, placeholder, onChange, className }) {
+export default function CustomSelect({ id, value, options, placeholder, onChange, className, disabled = false }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
 
   useEffect(() => {
     if (!open) return;
@@ -21,16 +25,21 @@ export default function CustomSelect({ value, options, placeholder, onChange, cl
   return (
     <div className={`cs-wrap ${className || ""}`} ref={wrapRef}>
       <button
+        id={id}
         type="button"
         className={`cs-trigger${!selected ? " cs-placeholder" : ""}`}
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        disabled={disabled}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!disabled) setOpen(!open);
+        }}
       >
         <span className="cs-label">{displayLabel}</span>
         <svg className="cs-arrow" width="10" height="6" viewBox="0 0 10 6" fill="none">
           <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
-      {open && (
+      {open && !disabled && (
         <div className="cs-dropdown">
           {options.map((opt) => (
             <button

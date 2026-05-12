@@ -1,5 +1,18 @@
 import { ALL_TYPE_OPTIONS, TYPE_ALIASES, NATURE_EFFECTS, STAT_KEYS, LEARN_METHOD_LABELS } from "./constants.js";
 
+/**
+ * 从 hash 路由的 query string 中解析 expand 参数
+ * 用于 #/moves?expand=123、#/abilities?expand=456 等场景
+ * @returns {string|null}
+ */
+export function parseExpandParam() {
+  const hash = window.location.hash || "";
+  const qIdx = hash.indexOf("?");
+  if (qIdx < 0) return null;
+  const params = new URLSearchParams(hash.slice(qIdx));
+  return params.get("expand") || null;
+}
+
 export function normalizeTypeName(type) {
   return TYPE_ALIASES[String(type || "").trim()] || String(type || "").trim();
 }
@@ -76,6 +89,28 @@ export function calculateFinalStat(member, detail, statKey) {
 
   const raw = Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + 5;
   return Math.floor(raw * getNatureMultiplier(member.nature || "认真", statKey));
+}
+
+export function calculateClassicStatValue(base, statKey, {
+  iv = 31,
+  ev = 0,
+  level = 50,
+  nature = "认真",
+} = {}) {
+  if (base === undefined || base === null) return undefined;
+  if (statKey === "hp") {
+    return Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + level + 10;
+  }
+
+  const raw = Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + 5;
+  return Math.floor(raw * getNatureMultiplier(nature, statKey));
+}
+
+export function calculateSpeedLine(baseSpe, level = 50) {
+  return {
+    full: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "认真" }),
+    max: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "爽朗" }),
+  };
 }
 
 export function buildDerivedStats(member, detail) {

@@ -6,6 +6,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@fakedplains/smogon-calc": "^0.11.0"
+    "@fakedplains/smogon-calc": "^0.11.1"
   }
 }

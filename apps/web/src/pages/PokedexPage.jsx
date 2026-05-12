@@ -1,31 +1,69 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api, unifiedApi } from "../utils/api.js";
+import { unifiedApi } from "../utils/api.js";
+import { useApi } from "../hooks/useApi.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
-import { STAT_KEYS } from "../utils/constants.js";
+import { STAT_KEYS, LEARN_METHOD_LABELS } from "../utils/constants.js";
 import {
   getPokemonPreviewImage,
   resolvePokemonDisplayVariant,
-  describeLearnsetEntry
+  describeLearnsetEntry,
+  calculateSpeedLine,
 } from "../utils/helpers.js";
-import { LEARN_METHOD_LABELS } from "../utils/constants.js";
 import { saveBoxConfig, getTeams, saveTeam } from "../utils/teamStorage.js";
 import { useToast } from "../components/Toast.jsx";
 import TypeChip from "../components/TypeChip.jsx";
 import StatCalculator from "../components/StatCalculator.jsx";
 import Loading from "../components/Loading.jsx";
+import WikiLink from "../components/WikiLink.jsx";
+import ViewToggle from "../components/ViewToggle.jsx";
+import CustomSelect from "../components/CustomSelect.jsx";
+
+function formatSeasonLabel(season) {
+  if (!season) return "";
+  const parts = [season.seasonCode, season.regulationCode];
+  if (season.regulationName && season.regulationName !== season.regulationCode) {
+    parts.push(season.regulationName);
+  }
+  return parts.filter(Boolean).join(" · ");
+}
 
 /* ─── Main Page ─── */
-export default function PokedexPage({ query = "", types = [], generation = "" }) {
+export default function PokedexPage({ query = "", types = [], generation = "", initialPokemonId = null, onInitialPokemonConsumed }) {
   const [selectedSlug, setSelectedSlug] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailGeneration, setDetailGeneration] = useState("");
   const [dexViewMode, setDexViewMode] = useState("card"); // "card" | "list"
+  const [championsSeasonId, setChampionsSeasonId] = useState("");
+  const [speedSortOrder, setSpeedSortOrder] = useState("");
+  const [hasLoadedList, setHasLoadedList] = useState(false);
+  const [lastList, setLastList] = useState([]);
+  const [lastTotal, setLastTotal] = useState(0);
+
+  const { data: championsSeasonsData = [], loading: seasonsLoading } = useApi("/champions/seasons");
+  const championsSeasons = championsSeasonsData || [];
+  const selectedSeason = useMemo(
+    () => championsSeasons.find((season) => String(season.id) === championsSeasonId),
+    [championsSeasons, championsSeasonId],
+  );
+  const championsSeasonOptions = useMemo(() => {
+    const defaultLabel = seasonsLoading
+      ? "加载赛季…"
+      : championsSeasons.length === 0 ? "暂无赛季" : "全部赛季";
+    return [
+      { value: "", label: defaultLabel },
+      ...championsSeasons.map((season) => ({
+        value: String(season.id),
+        label: formatSeasonLabel(season),
+      })),
+    ];
+  }, [championsSeasons, seasonsLoading]);
 
   const detailRef = useRef(null);
   const activeCardRef = useRef(null);
   const prevSlugRef = useRef(null);  // remember slug before closing detail
   const filterChangedWhileOpenRef = useRef(false); // track filter changes with detail open
+  const fromUrlNavRef = useRef(false); // true when selection comes from URL navigation (#/pokemon?id=X)
 
   // 构建分页请求路径
   const pokemonPath = useMemo(() => {
@@ -33,18 +71,33 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
     if (query) params.set("q", query);
     if (types.length > 0) params.set("type", types.join(","));
     if (generation) params.set("generation", generation);
+    if (championsSeasonId) params.set("seasonId", championsSeasonId);
+    if (speedSortOrder) {
+      params.set("sort", "speed");
+      params.set("order", speedSortOrder);
+    }
     const qs = params.toString();
     return qs ? `/pokemon?${qs}` : "/pokemon";
-  }, [query, types, generation]);
+  }, [query, types, generation, championsSeasonId, speedSortOrder]);
 
   // Mark that filters changed while detail panel is open
   useEffect(() => {
-    if (selectedSlug) {
+    if (selectedSlug && !fromUrlNavRef.current) {
       filterChangedWhileOpenRef.current = true;
     }
-  }, [query, types, generation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, types, generation, championsSeasonId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: list, total, loading, hasMore, sentinelRef, loadingMore } = useInfiniteApi(pokemonPath, { pageSize: 60 });
+  const isRefreshingList = loading && hasLoadedList;
+  const displayList = isRefreshingList && list.length === 0 ? lastList : list;
+  const displayTotal = isRefreshingList && list.length === 0 ? lastTotal : total;
+
+  useEffect(() => {
+    if (loading) return;
+    setHasLoadedList(true);
+    setLastList(list);
+    setLastTotal(total);
+  }, [list, loading, total]);
 
   // After list reloads due to filter change while detail is open:
   // - has results → auto-select the first pokemon
@@ -62,19 +115,35 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
     }
   }, [list, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 从 URL 参数 (#/pokemon?id=X) 自动选中宝可梦
+  useEffect(() => {
+    if (!initialPokemonId) return;
+    fromUrlNavRef.current = true; // mark so scroll handler scrolls to top instead of scrollIntoView
+    setSelectedSlug(String(initialPokemonId));
+    if (onInitialPokemonConsumed) onInitialPokemonConsumed();
+    // 清理 URL hash，避免刷新后重复触发
+    const hash = window.location.hash || "";
+    if (hash.startsWith("#/pokemon")) {
+      window.history.replaceState(null, "", "#/pokedex");
+    }
+  }, [initialPokemonId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch detail when a card is selected
   useEffect(() => {
     if (!selectedSlug) { setDetail(null); return; }
     let cancelled = false;
     setDetail(null);
-    unifiedApi(`/pokemon/${selectedSlug}`).then((r) => {
+    const params = new URLSearchParams();
+    if (championsSeasonId) params.set("seasonId", championsSeasonId);
+    const qs = params.toString();
+    unifiedApi(`/pokemon/${selectedSlug}${qs ? `?${qs}` : ""}`).then((r) => {
       if (!cancelled) {
         setDetail(r.data);
         setDetailGeneration("");
       }
     });
     return () => { cancelled = true; };
-  }, [selectedSlug]);
+  }, [selectedSlug, championsSeasonId]);
 
   // Scroll detail panel to top when detail changes
   useEffect(() => {
@@ -99,10 +168,17 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
     if (isOpen && !wasOpen) {
       // Entering split view from grid: scroll to the selected card after layout animation
       prevSlugRef.current = selectedSlug;
+      const isFromUrl = fromUrlNavRef.current;
+      fromUrlNavRef.current = false;
       scrollTimerRef.current = setTimeout(() => {
-        const card = document.querySelector(`[data-slug="${CSS.escape(selectedSlug)}"]`);
-        if (card) {
-          card.scrollIntoView({ block: "start", behavior: "instant" });
+        if (isFromUrl) {
+          // Navigated from another page (e.g. moves/abilities) — scroll to top so detail panel is visible
+          window.scrollTo({ top: 0, behavior: "instant" });
+        } else {
+          const card = document.querySelector(`[data-slug="${CSS.escape(selectedSlug)}"]`);
+          if (card) {
+            card.scrollIntoView({ block: "start", behavior: "instant" });
+          }
         }
       }, 380);
     } else if (isOpen && wasOpen) {
@@ -130,7 +206,15 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
     setSelectedSlug(null);
   }, []);
 
-  if (loading && list.length === 0) return <Loading />;
+  const handleSpeedSortToggle = useCallback(() => {
+    setSpeedSortOrder((prev) => {
+      if (prev === "desc") return "asc";
+      if (prev === "asc") return "";
+      return "desc";
+    });
+  }, []);
+
+  if (loading && list.length === 0 && !hasLoadedList) return <Loading />;
 
   const hasSelection = selectedSlug !== null;
 
@@ -139,33 +223,42 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
 
   return (
     <div className="dex-page">
-      {/* 视图切换按钮（仅在未选中详情时显示） */}
-      {!hasSelection && list.length > 0 && (
-        <div className="dex-view-toggle">
-          <button
-            className={`box-view-btn${effectiveViewMode === "card" ? " box-view-btn-active" : ""}`}
-            onClick={() => setDexViewMode("card")}
-            title="卡片视图"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>
-          </button>
-          <button
-            className={`box-view-btn${effectiveViewMode === "list" ? " box-view-btn-active" : ""}`}
-            onClick={() => setDexViewMode("list")}
-            title="列表视图"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2.5" rx="1"/><rect x="1" y="6.75" width="14" height="2.5" rx="1"/><rect x="1" y="11.5" width="14" height="2.5" rx="1"/></svg>
-          </button>
+      <div className="dex-list-toolbar">
+        <div className="dex-season-control">
+          <label className="dex-season-label" htmlFor="dex-season-select">赛季</label>
+          <CustomSelect
+            id="dex-season-select"
+            className="dex-season-select"
+            value={championsSeasonId}
+            options={championsSeasonOptions}
+            onChange={setChampionsSeasonId}
+            disabled={seasonsLoading || championsSeasons.length === 0}
+          />
         </div>
-      )}
+
+        {selectedSeason && (
+          <div className="dex-season-note">
+            <strong>{selectedSeason.regulationName || selectedSeason.regulationCode}</strong>
+            {selectedSeason.periodText && <span>{selectedSeason.periodText}</span>}
+            <span>{isRefreshingList ? "正在更新可用名单…" : `${displayTotal} 只可用宝可梦`}</span>
+          </div>
+        )}
+
+        {/* 视图切换按钮（仅在未选中详情时显示） */}
+        {!hasSelection && displayList.length > 0 && (
+          <div className="dex-view-toggle">
+            <ViewToggle mode={effectiveViewMode} onChange={setDexViewMode} />
+          </div>
+        )}
+      </div>
 
       <div className={`dex-body${hasSelection ? " dex-body-split" : ""}`}>
         {/* Left: Pokemon list — scrolls naturally with the page */}
         <div className={`dex-list-panel${hasSelection ? " dex-list-panel-narrow" : ""}`}>
           {effectiveViewMode === "card" ? (
           <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
-            {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
-            {list.map((member) => {
+            {displayList.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
+            {displayList.map((member) => {
               const slug = String(member.id);
               const isActive = selectedSlug === slug;
               const image = getPokemonPreviewImage(member);
@@ -206,7 +299,7 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
           ) : (
           /* 列表视图 */
           <div className="dex-table-view">
-            {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
+            {displayList.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
             <div className="dex-table-header">
               <span className="dex-table-hcol dex-table-hcol-img"></span>
               <span className="dex-table-hcol dex-table-hcol-dex">编号</span>
@@ -219,14 +312,29 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
               <span className="dex-table-hcol dex-table-hcol-stats">防御</span>
               <span className="dex-table-hcol dex-table-hcol-stats">特攻</span>
               <span className="dex-table-hcol dex-table-hcol-stats">特防</span>
-              <span className="dex-table-hcol dex-table-hcol-stats">速度</span>
+              <button
+                type="button"
+                className={`dex-table-hcol dex-table-hcol-stats dex-table-sort-btn${speedSortOrder ? " dex-table-sort-btn-active" : ""}`}
+                onClick={handleSpeedSortToggle}
+                aria-label="按速度排序"
+                aria-sort={speedSortOrder === "asc" ? "ascending" : speedSortOrder === "desc" ? "descending" : "none"}
+                title="按速度排序"
+              >
+                <span>速度</span>
+                <span className="dex-table-sort-icon" aria-hidden="true">
+                  {speedSortOrder === "asc" ? "↑" : speedSortOrder === "desc" ? "↓" : "↕"}
+                </span>
+              </button>
+              <span className="dex-table-hcol dex-table-hcol-stats">满速</span>
+              <span className="dex-table-hcol dex-table-hcol-stats">极速</span>
               <span className="dex-table-hcol dex-table-hcol-stats">合计</span>
             </div>
-            {list.map((member) => {
+            {displayList.map((member) => {
               const slug = String(member.id);
               const image = getPokemonPreviewImage(member);
               const bs = member.baseStats || {};
               const total = STAT_KEYS.reduce((s, k) => s + (bs[k] || 0), 0);
+              const speedLine = calculateSpeedLine(bs.spe);
               return (
                 <div key={slug} className="dex-table-row" data-slug={slug} onClick={() => handleSelect(slug)}>
                   <div className="dex-table-col dex-table-col-img">
@@ -257,6 +365,12 @@ export default function PokedexPage({ query = "", types = [], generation = "" })
                       <span className="dex-table-stat-val">{bs[k] ?? "—"}</span>
                     </div>
                   ))}
+                  <div className="dex-table-col dex-table-col-stat">
+                    <span className="dex-table-stat-val">{speedLine.full ?? "—"}</span>
+                  </div>
+                  <div className="dex-table-col dex-table-col-stat">
+                    <span className="dex-table-stat-val">{speedLine.max ?? "—"}</span>
+                  </div>
                   <div className="dex-table-col dex-table-col-stat dex-table-col-total">
                     <span className="dex-table-stat-val dex-table-stat-total">{total || "—"}</span>
                   </div>
@@ -408,14 +522,7 @@ function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
             <span className="drawer-dex">#{String(detail.dexNumber).padStart(4, "0")}</span>
             <h3 className="drawer-name">{detail.nameZh}</h3>
             <span className="drawer-en">{detail.nameEn || ""}</span>
-            {detail.source?.url && (
-              <a href={detail.source.url} target="_blank" rel="noopener noreferrer" className="drawer-wiki-link" title={detail.source.title || "Wiki"}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
-                  <path d="M9 2h5v5" /><path d="M14 2 7.5 8.5" />
-                </svg>
-              </a>
-            )}
+            <WikiLink url={detail.source?.url} title={detail.source?.title || "Wiki"} className="drawer-wiki-link" />
           </div>
           <div className="drawer-types-row">
             <TypeChip type={display.primaryType} />

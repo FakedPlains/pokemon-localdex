@@ -426,7 +426,12 @@ function SimplePokemonList({ search, onSelect }) {
 //  子组件：宝可梦配置面板（攻击方/防守方通用）
 // ══════════════════════════════════════════════════════════════
 
-function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onClear, boosts, onBoostChange, level, onMovesSync }) {
+const TERA_TYPE_OPTIONS = [
+  { value: "none", label: "无" },
+  ...[ "一般","火","水","电","草","冰","格斗","毒","地面","飞行","超能力","虫","岩石","幽灵","龙","恶","钢","妖精","星晶"].map((t) => ({ value: t, label: t })),
+];
+
+function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onClear, boosts, onBoostChange, level, onMovesSync, curHP, onCurHPChange, teraType, setTeraType, generation }) {
   const [pickerSearch, setPickerSearch] = useState("");
   const [pickerTab, setPickerTab] = useState("search"); // "search" | "box" | "team"
   const [itemQuery, setItemQuery] = useState("");
@@ -768,6 +773,16 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
                   {(member.primaryType || detail?.primaryType) && <TypeChip type={member.primaryType || detail?.primaryType} size="xs" />}
                   {(member.secondaryType || detail?.secondaryType) && <TypeChip type={member.secondaryType || detail?.secondaryType} size="xs" />}
                 </span>
+                {Number(generation) >= 9 && (
+                  <div className="dc-tera-inline">
+                    <SearchSelect
+                      value={teraType || "none"}
+                      options={TERA_TYPE_OPTIONS}
+                      onChange={(val) => setTeraType(val)}
+                      placeholder="太晶"
+                    />
+                  </div>
+                )}
               </div>
               {/* 特性按钮紧跟属性后面 */}
               <div className="dc-ability-inline">
@@ -890,6 +905,46 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
             onBoostChange={onBoostChange}
             level={level}
           />
+
+          {/* 当前 HP */}
+          {detail && (() => {
+            const memberWithLevel = { ...member, level: level || member.level || 50 };
+            const maxHP = calculateFinalStat(memberWithLevel, detail, "hp") || 1;
+            const hpVal = curHP > 0 ? curHP : maxHP;
+            const pct = Math.round((hpVal / maxHP) * 100);
+            return (
+              <div className="dc-curhp-section">
+                <span className="dc-curhp-label">HP</span>
+                <input
+                  className="dc-curhp-num"
+                  type="number"
+                  min={0}
+                  max={maxHP}
+                  value={hpVal}
+                  onChange={(e) => {
+                    const v = Math.max(0, Math.min(maxHP, Number(e.target.value) || 0));
+                    onCurHPChange(v >= maxHP ? 0 : v);
+                  }}
+                />
+                <span className="dc-curhp-sep">/</span>
+                <span className="dc-curhp-max">{maxHP}</span>
+                <span className="dc-curhp-paren">(</span>
+                <input
+                  className="dc-curhp-pct"
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={pct}
+                  onChange={(e) => {
+                    const p = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                    const v = Math.round((p / 100) * maxHP);
+                    onCurHPChange(v >= maxHP ? 0 : v);
+                  }}
+                />
+                <span className="dc-curhp-paren">%)</span>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
@@ -900,24 +955,102 @@ function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onCl
 //  子组件：状态效果面板
 // ══════════════════════════════════════════════════════════════
 
-function StatusPanel({ label, status, setStatus, stealthRock, setStealthRock, spikes, setSpikes,
+function StatusPanel({ label, side, status, setStatus, toxicCounter, setToxicCounter,
+  stealthRock, setStealthRock, spikes, setSpikes, steelsurge, setSteelsurge,
   reflect, setReflect, lightScreen, setLightScreen, auroraVeil, setAuroraVeil,
   protect, setProtect, helpingHand, setHelpingHand, tailwind, setTailwind,
-  switchingOut, setSwitchingOut }) {
+  friendGuard, setFriendGuard, switchingOut, setSwitchingOut,
+  seeded, setSeeded, saltCured, setSaltCured, foresight, setForesight,
+  flowerGift, setFlowerGift, powerTrick, setPowerTrick, steelySpirit, setSteelySpirit,
+  battery, setBattery, powerSpot, setPowerSpot,
+  isDynamaxed, setIsDynamaxed, alliesFainted, setAlliesFainted,
+  generation }) {
+  const STATUS_SELECT_OPTIONS = [
+    { value: "none", label: "健康" },
+    { value: "burn", label: "烧伤" },
+    { value: "paralysis", label: "麻痹" },
+    { value: "poison", label: "中毒" },
+    { value: "tox", label: "剧毒" },
+    { value: "sleep", label: "睡眠" },
+    { value: "freeze", label: "冰冻" },
+  ];
   return (
-    <div className="dc-status-panel">
-      <span className="dc-status-label">{label}状态</span>
-      <div className="dc-status-toggles">
-        <button className={"dc-toggle" + (status === "burn" ? " dc-toggle-on" : "")} onClick={() => setStatus(status === "burn" ? "none" : "burn")}>烧伤</button>
-        <button className={"dc-toggle" + (stealthRock ? " dc-toggle-on" : "")} onClick={() => setStealthRock(!stealthRock)}>隐石</button>
-        <button className={"dc-toggle" + (spikes > 0 ? " dc-toggle-on" : "")} onClick={() => setSpikes(spikes >= 3 ? 0 : spikes + 1)}>撒菱{spikes > 0 ? `×${spikes}` : ""}</button>
-        <button className={"dc-toggle" + (reflect ? " dc-toggle-on" : "")} onClick={() => setReflect(!reflect)}>反射壁</button>
-        <button className={"dc-toggle" + (lightScreen ? " dc-toggle-on" : "")} onClick={() => setLightScreen(!lightScreen)}>光墙</button>
-        <button className={"dc-toggle" + (auroraVeil ? " dc-toggle-on" : "")} onClick={() => setAuroraVeil(!auroraVeil)}>极光幕</button>
-        <button className={"dc-toggle" + (protect ? " dc-toggle-on" : "")} onClick={() => setProtect(!protect)}>守住</button>
-        <button className={"dc-toggle" + (helpingHand ? " dc-toggle-on" : "")} onClick={() => setHelpingHand(!helpingHand)}>帮助</button>
-        <button className={"dc-toggle" + (tailwind ? " dc-toggle-on" : "")} onClick={() => setTailwind(!tailwind)}>顺风</button>
-        <button className={"dc-toggle" + (switchingOut ? " dc-toggle-on" : "")} onClick={() => setSwitchingOut(!switchingOut)}>换入中</button>
+    <div className={"dc-status-panel" + (side === "atk" ? " dc-status-panel-atk" : side === "def" ? " dc-status-panel-def" : "")}>
+      <div className="dc-sp-header">
+        <span className="dc-sp-title">{label}</span>
+        <div className="dc-sp-status-row">
+          <div className="dc-status-select-wrap">
+            <SearchSelect
+              value={status || "none"}
+              options={STATUS_SELECT_OPTIONS}
+              onChange={(val) => setStatus(val)}
+              placeholder="健康"
+            />
+          </div>
+          {status === "tox" && (
+            <span className="dc-toxic-counter">
+              <span>回合</span>
+              <input type="number" className="dc-toxic-input" min={0} max={15} value={toxicCounter || 0} onChange={(e) => setToxicCounter(Math.max(0, Math.min(15, Number(e.target.value) || 0)))} />
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">场地</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (stealthRock ? " dc-chip-on" : "")} onClick={() => setStealthRock(!stealthRock)}>隐石</button>
+          <button className={"dc-chip" + (spikes > 0 ? " dc-chip-on" : "")} onClick={() => setSpikes(spikes >= 3 ? 0 : spikes + 1)}>撒菱{spikes > 0 ? `×${spikes}` : ""}</button>
+          <button className={"dc-chip" + (steelsurge ? " dc-chip-on" : "")} onClick={() => setSteelsurge(!steelsurge)}>钢刺</button>
+        </div>
+      </div>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">屏障</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (reflect ? " dc-chip-on" : "")} onClick={() => setReflect(!reflect)}>反射壁</button>
+          <button className={"dc-chip" + (lightScreen ? " dc-chip-on" : "")} onClick={() => setLightScreen(!lightScreen)}>光墙</button>
+          <button className={"dc-chip" + (auroraVeil ? " dc-chip-on" : "")} onClick={() => setAuroraVeil(!auroraVeil)}>极光幕</button>
+        </div>
+      </div>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">辅助</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (protect ? " dc-chip-on" : "")} onClick={() => setProtect(!protect)}>守住</button>
+          <button className={"dc-chip" + (helpingHand ? " dc-chip-on" : "")} onClick={() => setHelpingHand(!helpingHand)}>帮助</button>
+          <button className={"dc-chip" + (tailwind ? " dc-chip-on" : "")} onClick={() => setTailwind(!tailwind)}>顺风</button>
+          <button className={"dc-chip" + (friendGuard ? " dc-chip-on" : "")} onClick={() => setFriendGuard(!friendGuard)}>友情防守</button>
+          <button className={"dc-chip" + (switchingOut ? " dc-chip-on" : "")} onClick={() => setSwitchingOut(!switchingOut)}>换入中</button>
+        </div>
+      </div>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">异常</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (seeded ? " dc-chip-on" : "")} onClick={() => setSeeded(!seeded)}>寄生种子</button>
+          <button className={"dc-chip" + (saltCured ? " dc-chip-on" : "")} onClick={() => setSaltCured(!saltCured)}>盐腌</button>
+          <button className={"dc-chip" + (foresight ? " dc-chip-on" : "")} onClick={() => setForesight(!foresight)}>识破</button>
+        </div>
+      </div>
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">队友</span>
+        <div className="dc-sp-chips">
+          <button className={"dc-chip" + (flowerGift ? " dc-chip-on" : "")} onClick={() => setFlowerGift(!flowerGift)}>花之礼</button>
+          <button className={"dc-chip" + (steelySpirit ? " dc-chip-on" : "")} onClick={() => setSteelySpirit(!steelySpirit)}>钢之意志</button>
+          <button className={"dc-chip" + (battery ? " dc-chip-on" : "")} onClick={() => setBattery(!battery)}>蓄电池</button>
+          <button className={"dc-chip" + (powerSpot ? " dc-chip-on" : "")} onClick={() => setPowerSpot(!powerSpot)}>能量点</button>
+          <button className={"dc-chip" + (powerTrick ? " dc-chip-on" : "")} onClick={() => setPowerTrick(!powerTrick)}>力量戏法</button>
+        </div>
+      </div>
+      {/* 极巨化/倒下队友 */}
+      <div className="dc-sp-group">
+        <span className="dc-sp-group-label">特殊</span>
+        <div className="dc-sp-chips">
+          {Number(generation) === 8 && (
+            <button className={"dc-chip" + (isDynamaxed ? " dc-chip-on" : "")} onClick={() => setIsDynamaxed(!isDynamaxed)}>极巨化</button>
+          )}
+          <div className="dc-sp-inline-field">
+            <span className="dc-sp-inline-label">倒下队友</span>
+            <input type="number" className="dc-sp-mini-input" min={0} max={5} value={alliesFainted || 0} onChange={(e) => setAlliesFainted(Math.max(0, Math.min(5, Number(e.target.value) || 0)))} />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -929,7 +1062,7 @@ function StatusPanel({ label, status, setStatus, stealthRock, setStealthRock, sp
 
 export default function DamagePage() {
   // ── 世代 ──
-  const [generation, setGeneration] = useState("9");
+  const [generation, setGeneration] = useState("0");
   const isChampions = Number(generation) === 0;
 
   // ── 攻守双方 ──
@@ -947,41 +1080,98 @@ export default function DamagePage() {
   const [defMovesInfo, setDefMovesInfo] = useState({});
   const [defSelectedSlot, setDefSelectedSlot] = useState(null);
   const [selectedMove, setSelectedMove] = useState(null);
+  const [calcDirection, setCalcDirection] = useState("atk"); // "atk" = 攻击方→防守方, "def" = 防守方→攻击方
   const [critical, setCritical] = useState(false);
+  const [moveHits, setMoveHits] = useState(0); // 0 = 默认（由招式决定）
+  const [defCritical, setDefCritical] = useState(false);
+  const [defMoveHits, setDefMoveHits] = useState(0);
+  // 招式额外参数
+  const [useZ, setUseZ] = useState(false);
+  const [useMax, setUseMax] = useState(false);
+  const [timesUsed, setTimesUsed] = useState(0);
+  const [timesUsedWithMetronome, setTimesUsedWithMetronome] = useState(0);
+  const [isStellarFirstUse, setIsStellarFirstUse] = useState(false);
+  const [defUseZ, setDefUseZ] = useState(false);
+  const [defUseMax, setDefUseMax] = useState(false);
+  const [defTimesUsed, setDefTimesUsed] = useState(0);
+  const [defTimesUsedWithMetronome, setDefTimesUsedWithMetronome] = useState(0);
+  const [defIsStellarFirstUse, setDefIsStellarFirstUse] = useState(false);
+
+  // ── 当前 HP ──
+  const [atkCurHP, setAtkCurHP] = useState(0);  // 0 = 满血
+  const [defCurHP, setDefCurHP] = useState(0);  // 0 = 满血
 
   // ── 场地环境 ──
-  const [battleMode, setBattleMode] = useState("singles");
+  const [battleMode, setBattleMode] = useState("doubles");
   const [weather, setWeather] = useState("none");
   const [terrain, setTerrain] = useState("none");
   const [gravity, setGravity] = useState(false);
   const [magicRoom, setMagicRoom] = useState(false);
   const [wonderRoom, setWonderRoom] = useState(false);
 
+  // ── 灾厄四宝 ──
+  const [beadsOfRuin, setBeadsOfRuin] = useState(false);
+  const [tabletsOfRuin, setTabletsOfRuin] = useState(false);
+  const [swordOfRuin, setSwordOfRuin] = useState(false);
+  const [vesselOfRuin, setVesselOfRuin] = useState(false);
+
+  // ── 攻击方额外属性 ──
+  const [atkTeraType, setAtkTeraType] = useState("none");
+  const [atkIsDynamaxed, setAtkIsDynamaxed] = useState(false);
+  const [atkAlliesFainted, setAtkAlliesFainted] = useState(0);
+
+  // ── 防守方额外属性 ──
+  const [defTeraType, setDefTeraType] = useState("none");
+  const [defIsDynamaxed, setDefIsDynamaxed] = useState(false);
+  const [defAlliesFainted, setDefAlliesFainted] = useState(0);
+
   // ── 攻击方状态 ──
   const [atkStatus, setAtkStatus] = useState("none");
+  const [atkToxicCounter, setAtkToxicCounter] = useState(0);
   const [atkStealthRock, setAtkStealthRock] = useState(false);
   const [atkSpikes, setAtkSpikes] = useState(0);
+  const [atkSteelsurge, setAtkSteelsurge] = useState(false);
   const [atkReflect, setAtkReflect] = useState(false);
   const [atkLightScreen, setAtkLightScreen] = useState(false);
   const [atkAuroraVeil, setAtkAuroraVeil] = useState(false);
   const [atkProtect, setAtkProtect] = useState(false);
   const [atkHelpingHand, setAtkHelpingHand] = useState(false);
   const [atkTailwind, setAtkTailwind] = useState(false);
+  const [atkFriendGuard, setAtkFriendGuard] = useState(false);
   const [atkBoost, setAtkBoost] = useState({ ...DEFAULT_BOOSTS });
   const [atkSwitchingOut, setAtkSwitchingOut] = useState(false);
+  const [atkSeeded, setAtkSeeded] = useState(false);
+  const [atkSaltCured, setAtkSaltCured] = useState(false);
+  const [atkForesight, setAtkForesight] = useState(false);
+  const [atkFlowerGift, setAtkFlowerGift] = useState(false);
+  const [atkPowerTrick, setAtkPowerTrick] = useState(false);
+  const [atkSteelySpirit, setAtkSteelySpirit] = useState(false);
+  const [atkBattery, setAtkBattery] = useState(false);
+  const [atkPowerSpot, setAtkPowerSpot] = useState(false);
 
   // ── 防守方状态 ──
   const [defStatus, setDefStatus] = useState("none");
+  const [defToxicCounter, setDefToxicCounter] = useState(0);
   const [defStealthRock, setDefStealthRock] = useState(false);
   const [defSpikes, setDefSpikes] = useState(0);
+  const [defSteelsurge, setDefSteelsurge] = useState(false);
   const [defReflect, setDefReflect] = useState(false);
   const [defLightScreen, setDefLightScreen] = useState(false);
   const [defAuroraVeil, setDefAuroraVeil] = useState(false);
   const [defProtect, setDefProtect] = useState(false);
   const [defHelpingHand, setDefHelpingHand] = useState(false);
   const [defTailwind, setDefTailwind] = useState(false);
+  const [defFriendGuard, setDefFriendGuard] = useState(false);
   const [defBoost, setDefBoost] = useState({ ...DEFAULT_BOOSTS });
   const [defSwitchingOut, setDefSwitchingOut] = useState(false);
+  const [defSeeded, setDefSeeded] = useState(false);
+  const [defSaltCured, setDefSaltCured] = useState(false);
+  const [defForesight, setDefForesight] = useState(false);
+  const [defFlowerGift, setDefFlowerGift] = useState(false);
+  const [defPowerTrick, setDefPowerTrick] = useState(false);
+  const [defSteelySpirit, setDefSteelySpirit] = useState(false);
+  const [defBattery, setDefBattery] = useState(false);
+  const [defPowerSpot, setDefPowerSpot] = useState(false);
 
   // ── 计算结果 ──
   const [result, setResult] = useState(null);
@@ -1022,13 +1212,14 @@ export default function DamagePage() {
   const handleAtkSelectSlot = useCallback((index) => {
     if (index === null) { setAtkSelectedSlot(null); setSelectedMove(null); return; }
     setAtkSelectedSlot(index);
+    setCalcDirection("atk");
+    setDefSelectedSlot(null); // 取消防守方选中
     const moveName = atkMoves[index];
     if (!moveName) return;
     const info = atkMovesInfo[moveName];
     if (info?._opt?._moveObj) {
       setSelectedMove(info._opt._moveObj);
     } else {
-      // 优先用 moveId 获取完整 move 对象
       const moveId = info?.moveId;
       const fetchMove = moveId
         ? unifiedApi(`/moves/${moveId}`)
@@ -1040,10 +1231,35 @@ export default function DamagePage() {
     }
   }, [atkMoves, atkMovesInfo]);
 
-  // 防守方设置招式槽位
+  // 防守方选中招式槽位（反向计算：防守方→攻击方）
+  const handleDefSelectSlot = useCallback((index) => {
+    if (index === null) { setDefSelectedSlot(null); setSelectedMove(null); return; }
+    setDefSelectedSlot(index);
+    setCalcDirection("def");
+    setAtkSelectedSlot(null); // 取消攻击方选中
+    const moveName = defMoves[index];
+    if (!moveName) return;
+    const info = defMovesInfo[moveName];
+    if (info?._opt?._moveObj) {
+      setSelectedMove(info._opt._moveObj);
+    } else {
+      const moveId = info?.moveId;
+      const fetchMove = moveId
+        ? unifiedApi(`/moves/${moveId}`)
+        : unifiedApi(`/moves?q=${encodeURIComponent(moveName)}&limit=5`);
+      fetchMove.then((r) => {
+        const found = moveId ? r.data : (r.data || []).find((m) => m.nameZh === moveName || m.slug === moveName);
+        if (found) setSelectedMove(found);
+      }).catch(() => {});
+    }
+  }, [defMoves, defMovesInfo]);
+
+  // 防守方设置招式槽位（设置后自动选中并触发反向计算）
   const handleDefSetMove = useCallback((index, opt) => {
     if (!opt) {
       setDefMoves((prev) => { const next = [...prev]; next[index] = ""; return next; });
+      setDefSelectedSlot(null);
+      setSelectedMove(null);
       return;
     }
     const name = opt.value || opt.label || "";
@@ -1053,6 +1269,18 @@ export default function DamagePage() {
       ...prev,
       [name]: { moveId, type: opt.moveType || "", power: opt.movePower ?? 0, category: opt.moveCategory || "", _opt: opt }
     }));
+    // 自动选中刚设置的招式，并设置为反向计算
+    setDefSelectedSlot(index);
+    setCalcDirection("def");
+    setAtkSelectedSlot(null);
+    // 获取完整 move 对象用于计算
+    const fetchMove = moveId
+      ? unifiedApi(`/moves/${moveId}`)
+      : unifiedApi(`/moves?q=${encodeURIComponent(name)}&limit=5`);
+    fetchMove.then((r) => {
+      const found = moveId ? r.data : (r.data || []).find((m) => m.nameZh === name || m.slug === name);
+      if (found) setSelectedMove(found);
+    }).catch(() => {});
   }, []);
 
   // 从盒子导入时同步招式到槽位（补全缺失的招式信息）
@@ -1163,9 +1391,73 @@ export default function DamagePage() {
     setDefender(convert);
   }, [isChampions]);
 
-  // ── 伤害计算 ──
+  // ── 伤害计算（支持双向：calcDirection 决定谁攻谁守） ──
   const handleCalculate = useCallback(async () => {
     if (!selectedMove || !attacker.pokemonId || !defender.pokemonId) return;
+
+    // 根据计算方向决定实际的攻击方和防守方
+    const isReverse = calcDirection === "def"; // 防守方→攻击方
+    const realAttacker = isReverse ? defender : attacker;
+    const realDefender = isReverse ? attacker : defender;
+    const realAtkDetail = isReverse ? defenderDetail : attackerDetail;
+    const realDefDetail = isReverse ? attackerDetail : defenderDetail;
+    const realAtkBoost = isReverse ? defBoost : atkBoost;
+    const realDefBoost = isReverse ? atkBoost : defBoost;
+    const realAtkCurHP = isReverse ? defCurHP : atkCurHP;
+    const realDefCurHP = isReverse ? atkCurHP : defCurHP;
+    const realAtkStatus = isReverse ? defStatus : atkStatus;
+    const realDefStatus = isReverse ? atkStatus : defStatus;
+    const realAtkToxicCounter = isReverse ? defToxicCounter : atkToxicCounter;
+    const realDefToxicCounter = isReverse ? atkToxicCounter : defToxicCounter;
+    const realCritical = isReverse ? defCritical : critical;
+    const realMoveHits = isReverse ? defMoveHits : moveHits;
+    const realUseZ = isReverse ? defUseZ : useZ;
+    const realUseMax = isReverse ? defUseMax : useMax;
+    const realTimesUsed = isReverse ? defTimesUsed : timesUsed;
+    const realTimesUsedWithMetronome = isReverse ? defTimesUsedWithMetronome : timesUsedWithMetronome;
+    const realIsStellarFirstUse = isReverse ? defIsStellarFirstUse : isStellarFirstUse;
+    const realAtkTeraType = isReverse ? defTeraType : atkTeraType;
+    const realDefTeraType = isReverse ? atkTeraType : defTeraType;
+    const realAtkIsDynamaxed = isReverse ? defIsDynamaxed : atkIsDynamaxed;
+    const realDefIsDynamaxed = isReverse ? atkIsDynamaxed : defIsDynamaxed;
+    const realAtkAlliesFainted = isReverse ? defAlliesFainted : atkAlliesFainted;
+    const realDefAlliesFainted = isReverse ? atkAlliesFainted : defAlliesFainted;
+
+    // 场地 side 也要交换
+    const realAtkSide = isReverse ? {
+      isSR: defStealthRock, spikes: defSpikes, steelsurge: defSteelsurge,
+      isReflect: defReflect, isLightScreen: defLightScreen, isAuroraVeil: defAuroraVeil,
+      isProtected: defProtect, isHelpingHand: defHelpingHand, isTailwind: defTailwind,
+      isFriendGuard: defFriendGuard, isSwitching: defSwitchingOut ? "out" : undefined,
+      isSeeded: defSeeded, isSaltCured: defSaltCured, isForesight: defForesight,
+      isFlowerGift: defFlowerGift, isPowerTrick: defPowerTrick, isSteelySpirit: defSteelySpirit,
+      isBattery: defBattery, isPowerSpot: defPowerSpot,
+    } : {
+      isSR: atkStealthRock, spikes: atkSpikes, steelsurge: atkSteelsurge,
+      isReflect: atkReflect, isLightScreen: atkLightScreen, isAuroraVeil: atkAuroraVeil,
+      isProtected: atkProtect, isHelpingHand: atkHelpingHand, isTailwind: atkTailwind,
+      isFriendGuard: atkFriendGuard, isSwitching: atkSwitchingOut ? "out" : undefined,
+      isSeeded: atkSeeded, isSaltCured: atkSaltCured, isForesight: atkForesight,
+      isFlowerGift: atkFlowerGift, isPowerTrick: atkPowerTrick, isSteelySpirit: atkSteelySpirit,
+      isBattery: atkBattery, isPowerSpot: atkPowerSpot,
+    };
+    const realDefSide = isReverse ? {
+      isSR: atkStealthRock, spikes: atkSpikes, steelsurge: atkSteelsurge,
+      isReflect: atkReflect, isLightScreen: atkLightScreen, isAuroraVeil: atkAuroraVeil,
+      isProtected: atkProtect, isHelpingHand: atkHelpingHand, isTailwind: atkTailwind,
+      isFriendGuard: atkFriendGuard, isSwitching: atkSwitchingOut ? "in" : undefined,
+      isSeeded: atkSeeded, isSaltCured: atkSaltCured, isForesight: atkForesight,
+      isFlowerGift: atkFlowerGift, isPowerTrick: atkPowerTrick, isSteelySpirit: atkSteelySpirit,
+      isBattery: atkBattery, isPowerSpot: atkPowerSpot,
+    } : {
+      isSR: defStealthRock, spikes: defSpikes, steelsurge: defSteelsurge,
+      isReflect: defReflect, isLightScreen: defLightScreen, isAuroraVeil: defAuroraVeil,
+      isProtected: defProtect, isHelpingHand: defHelpingHand, isTailwind: defTailwind,
+      isFriendGuard: defFriendGuard, isSwitching: defSwitchingOut ? "in" : undefined,
+      isSeeded: defSeeded, isSaltCured: defSaltCured, isForesight: defForesight,
+      isFlowerGift: defFlowerGift, isPowerTrick: defPowerTrick, isSteelySpirit: defSteelySpirit,
+      isBattery: defBattery, isPowerSpot: defPowerSpot,
+    };
 
     setCalculating(true);
     try {
@@ -1183,41 +1475,58 @@ export default function DamagePage() {
         method: "POST",
         body: JSON.stringify({
           generation: gen,
-attacker: {
-pokemonId: attacker.pokemonId || "",
-formId: attacker.formId || "",
-formKey: attacker.formKey || "",
-name: attacker.nameZh || (attackerDetail?.nameZh) || "",
+          attacker: {
+            pokemonId: realAttacker.pokemonId || "",
+            formId: realAttacker.formId || "",
+            formKey: realAttacker.formKey || "",
+            name: realAttacker.nameZh || (realAtkDetail?.nameZh) || "",
             level: Number(level || 50),
-            nature: attacker.nature || "认真",
-            abilityId: attacker.abilityId || "",
-            ability: attacker.abilityName || "",
-            itemId: attacker.itemId || "",
-            item: attacker.itemName || "",
-            evs: resolveEvs(attacker),
-            ivs: attacker.ivs || {},
-            boosts: Object.values(atkBoost).some((v) => v !== 0) ? atkBoost : undefined,
-            status: atkStatus !== "none" ? atkStatus : "",
+            nature: realAttacker.nature || "认真",
+            abilityId: realAttacker.abilityId || "",
+            ability: realAttacker.abilityName || "",
+            itemId: realAttacker.itemId || "",
+            item: realAttacker.itemName || "",
+            evs: resolveEvs(realAttacker),
+            ivs: realAttacker.ivs || {},
+            boosts: Object.values(realAtkBoost).some((v) => v !== 0) ? realAtkBoost : undefined,
+            curHP: realAtkCurHP > 0 ? realAtkCurHP : undefined,
+            status: realAtkStatus !== "none" ? realAtkStatus : "",
+            toxicCounter: realAtkStatus === "tox" ? realAtkToxicCounter : undefined,
+            teraType: realAtkTeraType !== "none" ? realAtkTeraType : undefined,
+            isDynamaxed: realAtkIsDynamaxed || undefined,
+            alliesFainted: realAtkAlliesFainted > 0 ? realAtkAlliesFainted : undefined,
           },
-defender: {
-pokemonId: defender.pokemonId || "",
-formId: defender.formId || "",
-formKey: defender.formKey || "",
-name: defender.nameZh || (defenderDetail?.nameZh) || "",
+          defender: {
+            pokemonId: realDefender.pokemonId || "",
+            formId: realDefender.formId || "",
+            formKey: realDefender.formKey || "",
+            name: realDefender.nameZh || (realDefDetail?.nameZh) || "",
             level: Number(level || 50),
-            nature: defender.nature || "认真",
-            abilityId: defender.abilityId || "",
-            ability: defender.abilityName || "",
-            itemId: defender.itemId || "",
-            item: defender.itemName || "",
-            evs: resolveEvs(defender),
-            ivs: defender.ivs || {},
-            boosts: Object.values(defBoost).some((v) => v !== 0) ? defBoost : undefined,
+            nature: realDefender.nature || "认真",
+            abilityId: realDefender.abilityId || "",
+            ability: realDefender.abilityName || "",
+            itemId: realDefender.itemId || "",
+            item: realDefender.itemName || "",
+            evs: resolveEvs(realDefender),
+            ivs: realDefender.ivs || {},
+            boosts: Object.values(realDefBoost).some((v) => v !== 0) ? realDefBoost : undefined,
+            curHP: realDefCurHP > 0 ? realDefCurHP : undefined,
+            status: realDefStatus !== "none" ? realDefStatus : "",
+            toxicCounter: realDefStatus === "tox" ? realDefToxicCounter : undefined,
+            teraType: realDefTeraType !== "none" ? realDefTeraType : undefined,
+            isDynamaxed: realDefIsDynamaxed || undefined,
+            alliesFainted: realDefAlliesFainted > 0 ? realDefAlliesFainted : undefined,
           },
           move: {
             id: selectedMove.id || "",
             name: selectedMove.nameZh || selectedMove.slug || "",
-            isCrit: critical,
+            isCrit: realCritical,
+            hits: realMoveHits > 0 ? realMoveHits : undefined,
+            useZ: realUseZ || undefined,
+            useMax: realUseMax || undefined,
+            timesUsed: realTimesUsed > 0 ? realTimesUsed : undefined,
+            timesUsedWithMetronome: realTimesUsedWithMetronome > 0 ? realTimesUsedWithMetronome : undefined,
+            isStellarFirstUse: realIsStellarFirstUse || undefined,
           },
           field: {
             gameType: battleMode,
@@ -1226,28 +1535,12 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
             isGravity: gravity,
             isMagicRoom: magicRoom,
             isWonderRoom: wonderRoom,
-            attackerSide: {
-              isSR: atkStealthRock,
-              spikes: atkSpikes,
-              isReflect: atkReflect,
-              isLightScreen: atkLightScreen,
-              isAuroraVeil: atkAuroraVeil,
-              isProtected: atkProtect,
-              isHelpingHand: atkHelpingHand,
-              isTailwind: atkTailwind,
-              isSwitching: atkSwitchingOut ? "out" : undefined,
-            },
-            defenderSide: {
-              isSR: defStealthRock,
-              spikes: defSpikes,
-              isReflect: defReflect,
-              isLightScreen: defLightScreen,
-              isAuroraVeil: defAuroraVeil,
-              isProtected: defProtect,
-              isHelpingHand: defHelpingHand,
-              isTailwind: defTailwind,
-              isSwitching: defSwitchingOut ? "in" : undefined,
-            },
+            isBeadsOfRuin: beadsOfRuin,
+            isTabletsOfRuin: tabletsOfRuin,
+            isSwordOfRuin: swordOfRuin,
+            isVesselOfRuin: vesselOfRuin,
+            attackerSide: realAtkSide,
+            defenderSide: realDefSide,
           },
         })
       });
@@ -1266,22 +1559,33 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
         moveName: selectedMove.nameZh || selectedMove.slug || "",
         moveType: mType,
         category: cat,
-        attackerName: attacker.nameZh || "攻击方",
-        defenderName: defender.nameZh || "防守方",
+        attackerName: realAttacker.nameZh || (isReverse ? "防守方" : "攻击方"),
+        defenderName: realDefender.nameZh || (isReverse ? "攻击方" : "防守方"),
         defHp: data.defenderHp || 0,
         minPercent: data.minPercent || 0,
         maxPercent: data.maxPercent || 0,
+        direction: calcDirection,
       });
     } catch (err) {
       window.alert("计算失败: " + (err.message || "未知错误"));
     }
     setCalculating(false);
-  }, [selectedMove, attacker, attackerDetail, defender, defenderDetail, generation, isChampions, level,
-    critical, battleMode, weather, terrain, gravity, magicRoom, wonderRoom,
-    atkStatus, atkStealthRock, atkSpikes, atkReflect, atkLightScreen, atkAuroraVeil,
-    atkProtect, atkHelpingHand, atkTailwind, atkBoost, atkSwitchingOut,
-    defStealthRock, defSpikes, defReflect, defLightScreen, defAuroraVeil,
-    defProtect, defHelpingHand, defTailwind, defBoost, defSwitchingOut]);
+  }, [selectedMove, calcDirection, attacker, attackerDetail, defender, defenderDetail, generation, isChampions, level,
+    critical, moveHits, defCritical, defMoveHits,
+    useZ, useMax, timesUsed, timesUsedWithMetronome, isStellarFirstUse,
+    defUseZ, defUseMax, defTimesUsed, defTimesUsedWithMetronome, defIsStellarFirstUse,
+    battleMode, weather, terrain, gravity, magicRoom, wonderRoom,
+    beadsOfRuin, tabletsOfRuin, swordOfRuin, vesselOfRuin,
+    atkTeraType, atkIsDynamaxed, atkAlliesFainted,
+    defTeraType, defIsDynamaxed, defAlliesFainted,
+    atkCurHP, atkStatus, atkToxicCounter, atkStealthRock, atkSpikes, atkSteelsurge,
+    atkReflect, atkLightScreen, atkAuroraVeil, atkProtect, atkHelpingHand, atkTailwind,
+    atkFriendGuard, atkBoost, atkSwitchingOut,
+    atkSeeded, atkSaltCured, atkForesight, atkFlowerGift, atkPowerTrick, atkSteelySpirit, atkBattery, atkPowerSpot,
+    defCurHP, defStatus, defToxicCounter, defStealthRock, defSpikes, defSteelsurge,
+    defReflect, defLightScreen, defAuroraVeil, defProtect, defHelpingHand, defTailwind,
+    defFriendGuard, defBoost, defSwitchingOut,
+    defSeeded, defSaltCured, defForesight, defFlowerGift, defPowerTrick, defSteelySpirit, defBattery, defPowerSpot]);
 
   // 用 ref 保存最新的 handleCalculate，避免 useEffect 因引用变化过度触发
   const calcRef = useRef(handleCalculate);
@@ -1301,13 +1605,21 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
     attacker.evs, attacker.sps, attacker.ivs,
     defender.pokemonId, defender.formId, defender.nature, defender.abilityId, defender.itemId,
     defender.evs, defender.sps, defender.ivs,
-    level, generation, isChampions, critical, battleMode, weather, terrain,
-    gravity, magicRoom, wonderRoom, atkStatus,
-    atkBoost, defBoost,
-    atkStealthRock, atkSpikes, atkReflect, atkLightScreen, atkAuroraVeil,
-    atkProtect, atkHelpingHand, atkTailwind, atkSwitchingOut,
-    defStealthRock, defSpikes, defReflect, defLightScreen, defAuroraVeil,
-    defProtect, defHelpingHand, defTailwind, defSwitchingOut,
+    level, generation, isChampions, calcDirection, critical, moveHits, defCritical, defMoveHits,
+    useZ, useMax, timesUsed, timesUsedWithMetronome, isStellarFirstUse,
+    defUseZ, defUseMax, defTimesUsed, defTimesUsedWithMetronome, defIsStellarFirstUse,
+    battleMode, weather, terrain, gravity, magicRoom, wonderRoom,
+    beadsOfRuin, tabletsOfRuin, swordOfRuin, vesselOfRuin,
+    atkTeraType, atkIsDynamaxed, atkAlliesFainted,
+    defTeraType, defIsDynamaxed, defAlliesFainted,
+    atkCurHP, atkStatus, atkToxicCounter, atkBoost,
+    atkStealthRock, atkSpikes, atkSteelsurge, atkReflect, atkLightScreen, atkAuroraVeil,
+    atkProtect, atkHelpingHand, atkTailwind, atkFriendGuard, atkSwitchingOut,
+    atkSeeded, atkSaltCured, atkForesight, atkFlowerGift, atkPowerTrick, atkSteelySpirit, atkBattery, atkPowerSpot,
+    defCurHP, defStatus, defToxicCounter, defBoost,
+    defStealthRock, defSpikes, defSteelsurge, defReflect, defLightScreen, defAuroraVeil,
+    defProtect, defHelpingHand, defTailwind, defFriendGuard, defSwitchingOut,
+    defSeeded, defSaltCured, defForesight, defFlowerGift, defPowerTrick, defSteelySpirit, defBattery, defPowerSpot,
   ]);
   useEffect(() => {
     if (!selectedMove || !attacker.pokemonId || !defender.pokemonId) return;
@@ -1326,6 +1638,15 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
     setDefMovesInfo({});
     setDefSelectedSlot(null);
     setSelectedMove(null);
+    setCalcDirection("atk");
+    setCritical(false);
+    setMoveHits(0);
+    setDefCritical(false);
+    setDefMoveHits(0);
+    setUseZ(false); setUseMax(false); setTimesUsed(0); setTimesUsedWithMetronome(0); setIsStellarFirstUse(false);
+    setDefUseZ(false); setDefUseMax(false); setDefTimesUsed(0); setDefTimesUsedWithMetronome(0); setDefIsStellarFirstUse(false);
+    setAtkTeraType("none"); setAtkIsDynamaxed(false); setAtkAlliesFainted(0);
+    setDefTeraType("none"); setDefIsDynamaxed(false); setDefAlliesFainted(0);
     setResult(null);
   }, [isChampions]);
 
@@ -1344,6 +1665,19 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
               {GENERATION_OPTIONS.map((g) => <option key={g} value={g}>{g}世代</option>)}
               <option value="0">Champions</option>
             </select>
+            {!isChampions && (
+              <div className="dc-level-inline">
+                <span className="dc-level-inline-label">Lv.</span>
+                <input
+                  className="dc-level-inline-input"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={level}
+                  onChange={(e) => setLevel(Math.max(1, Math.min(100, Number(e.target.value) || 50)))}
+                />
+              </div>
+            )}
             <div className="dc-battle-mode-toggle">
               <button className={"dc-mode-btn" + (battleMode === "singles" ? " dc-mode-btn-active" : "")} onClick={() => setBattleMode("singles")}>单打</button>
               <button className={"dc-mode-btn" + (battleMode === "doubles" ? " dc-mode-btn-active" : "")} onClick={() => setBattleMode("doubles")}>双打</button>
@@ -1375,6 +1709,32 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
                   generation={generation}
                   onSetMove={handleAtkSetMove}
                 />
+                <div className="dc-move-extras">
+                  <button className={"dc-chip" + (critical ? " dc-chip-on" : "")} onClick={() => setCritical(!critical)}>暴击</button>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">连击</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={moveHits} onChange={(e) => setMoveHits(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                  <span className="dc-hits-hint">{moveHits === 0 ? "默认" : `${moveHits}次`}</span>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">已用</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={timesUsed} onChange={(e) => setTimesUsed(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                </div>
+                <div className="dc-move-extras">
+                  {Number(generation) === 7 && (
+                    <button className={"dc-chip" + (useZ ? " dc-chip-on" : "")} onClick={() => setUseZ(!useZ)}>Z招式</button>
+                  )}
+                  {Number(generation) === 8 && (
+                    <button className={"dc-chip" + (useMax ? " dc-chip-on" : "")} onClick={() => setUseMax(!useMax)}>极巨招式</button>
+                  )}
+                  {atkTeraType === "星晶" && (
+                    <button className={"dc-chip" + (isStellarFirstUse ? " dc-chip-on" : "")} onClick={() => setIsStellarFirstUse(!isStellarFirstUse)}>星晶首次</button>
+                  )}
+                  {(attacker.itemName === "节拍器" || attacker.itemId === "item-节拍器") && (<>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">节拍器</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={timesUsedWithMetronome} onChange={(e) => setTimesUsedWithMetronome(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                  </>)}
+                </div>
               </div>
             )}
             <PokemonConfigPanel
@@ -1388,6 +1748,11 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
               onBoostChange={(key, val) => setAtkBoost((prev) => ({ ...prev, [key]: Math.max(-6, Math.min(6, val)) }))}
               level={level}
               onMovesSync={(cfg) => syncMovesFromConfig(cfg, "atk")}
+              curHP={atkCurHP}
+              onCurHPChange={setAtkCurHP}
+              teraType={atkTeraType}
+              setTeraType={setAtkTeraType}
+              generation={generation}
             />
           </div>
 
@@ -1439,77 +1804,105 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
               )}
             </div>
 
-            {/* 等级 */}
-            <div className="dc-level-section">
-              <span className="dc-section-title">等级</span>
-              <input
-                className="dc-level-input"
-                type="number"
-                min={1}
-                max={100}
-                value={level}
-                onChange={(e) => setLevel(Math.max(1, Math.min(100, Number(e.target.value) || 50)))}
-              />
-            </div>
 
             {/* 场地环境 */}
             <div className="dc-field-section">
               <span className="dc-section-title">场地环境</span>
-              <div className="dc-field-group">
-                <div className="dc-seg-field">
-                  <span className="dc-seg-label">天气</span>
-                  <div className="dc-seg-switcher">
-                    {[{ v: "sun", l: "晴天" }, { v: "harshSunlight", l: "大日照" }, { v: "rain", l: "雨天" }, { v: "heavyRain", l: "大雨" }, { v: "sand", l: "沙暴" }, { v: "hail", l: "雪" }, { v: "strongWinds", l: "乱流" }].map((w) => (
-                      <button key={w.v} className={"dc-seg-btn" + (weather === w.v ? " dc-seg-btn-active" : "")} onClick={() => setWeather(weather === w.v ? "none" : w.v)}>{w.l}</button>
-                    ))}
-                  </div>
+              <div className="dc-sp-group">
+                <span className="dc-sp-group-label">天气</span>
+                <div className="dc-sp-chips">
+                  {[{ v: "sun", l: "晴天" }, { v: "harshSunlight", l: "大日照" }, { v: "rain", l: "雨天" }, { v: "heavyRain", l: "大雨" }, { v: "sand", l: "沙暴" }, { v: "hail", l: "雪" }, { v: "strongWinds", l: "乱流" }].map((w) => (
+                    <button key={w.v} className={"dc-chip" + (weather === w.v ? " dc-chip-on" : "")} onClick={() => setWeather(weather === w.v ? "none" : w.v)}>{w.l}</button>
+                  ))}
                 </div>
-                <div className="dc-seg-field">
-                  <span className="dc-seg-label">场地</span>
-                  <div className="dc-seg-switcher">
-                    {[{ v: "electric", l: "电气" }, { v: "grassy", l: "青草" }, { v: "misty", l: "薄雾" }, { v: "psychic", l: "精神" }].map((t) => (
-                      <button key={t.v} className={"dc-seg-btn" + (terrain === t.v ? " dc-seg-btn-active" : "")} onClick={() => setTerrain(terrain === t.v ? "none" : t.v)}>{t.l}</button>
-                    ))}
-                  </div>
+              </div>
+              <div className="dc-sp-group">
+                <span className="dc-sp-group-label">场地</span>
+                <div className="dc-sp-chips">
+                  {[{ v: "electric", l: "电气" }, { v: "grassy", l: "青草" }, { v: "misty", l: "薄雾" }, { v: "psychic", l: "精神" }].map((t) => (
+                    <button key={t.v} className={"dc-chip" + (terrain === t.v ? " dc-chip-on" : "")} onClick={() => setTerrain(terrain === t.v ? "none" : t.v)}>{t.l}</button>
+                  ))}
                 </div>
-                <div className="dc-field-row">
-                  <button className={"dc-toggle" + (gravity ? " dc-toggle-on" : "")} onClick={() => setGravity(!gravity)}>重力</button>
-                  <button className={"dc-toggle" + (magicRoom ? " dc-toggle-on" : "")} onClick={() => setMagicRoom(!magicRoom)}>魔法空间</button>
-                  <button className={"dc-toggle" + (wonderRoom ? " dc-toggle-on" : "")} onClick={() => setWonderRoom(!wonderRoom)}>奇妙空间</button>
-                  <button className={"dc-toggle" + (critical ? " dc-toggle-on" : "")} onClick={() => setCritical(!critical)}>暴击</button>
+              </div>
+              <div className="dc-sp-group">
+                <span className="dc-sp-group-label">效果</span>
+                <div className="dc-sp-chips">
+                  <button className={"dc-chip" + (gravity ? " dc-chip-on" : "")} onClick={() => setGravity(!gravity)}>重力</button>
+                  <button className={"dc-chip" + (magicRoom ? " dc-chip-on" : "")} onClick={() => setMagicRoom(!magicRoom)}>魔法空间</button>
+                  <button className={"dc-chip" + (wonderRoom ? " dc-chip-on" : "")} onClick={() => setWonderRoom(!wonderRoom)}>奇妙空间</button>
+                </div>
+              </div>
+              <div className="dc-sp-group">
+                <span className="dc-sp-group-label">灾厄特性</span>
+                <div className="dc-sp-chips">
+                  <button className={"dc-chip" + (beadsOfRuin ? " dc-chip-on" : "")} onClick={() => setBeadsOfRuin(!beadsOfRuin)}>灾祸之珠</button>
+                  <button className={"dc-chip" + (tabletsOfRuin ? " dc-chip-on" : "")} onClick={() => setTabletsOfRuin(!tabletsOfRuin)}>灾祸之碑</button>
+                  <button className={"dc-chip" + (swordOfRuin ? " dc-chip-on" : "")} onClick={() => setSwordOfRuin(!swordOfRuin)}>灾祸之剑</button>
+                  <button className={"dc-chip" + (vesselOfRuin ? " dc-chip-on" : "")} onClick={() => setVesselOfRuin(!vesselOfRuin)}>灾祸之鼎</button>
                 </div>
               </div>
             </div>
 
-            {/* 攻守双方状态（场地环境下方） */}
+            {/* 攻守双方状态 */}
             <div className="dc-status-row">
               <StatusPanel
                 label="攻击方"
+                side="atk"
                 status={atkStatus} setStatus={setAtkStatus}
+                toxicCounter={atkToxicCounter} setToxicCounter={setAtkToxicCounter}
                 stealthRock={atkStealthRock} setStealthRock={setAtkStealthRock}
                 spikes={atkSpikes} setSpikes={setAtkSpikes}
+                steelsurge={atkSteelsurge} setSteelsurge={setAtkSteelsurge}
                 reflect={atkReflect} setReflect={setAtkReflect}
                 lightScreen={atkLightScreen} setLightScreen={setAtkLightScreen}
                 auroraVeil={atkAuroraVeil} setAuroraVeil={setAtkAuroraVeil}
                 protect={atkProtect} setProtect={setAtkProtect}
                 helpingHand={atkHelpingHand} setHelpingHand={setAtkHelpingHand}
                 tailwind={atkTailwind} setTailwind={setAtkTailwind}
+                friendGuard={atkFriendGuard} setFriendGuard={setAtkFriendGuard}
                 switchingOut={atkSwitchingOut} setSwitchingOut={setAtkSwitchingOut}
+                seeded={atkSeeded} setSeeded={setAtkSeeded}
+                saltCured={atkSaltCured} setSaltCured={setAtkSaltCured}
+                foresight={atkForesight} setForesight={setAtkForesight}
+                flowerGift={atkFlowerGift} setFlowerGift={setAtkFlowerGift}
+                powerTrick={atkPowerTrick} setPowerTrick={setAtkPowerTrick}
+                steelySpirit={atkSteelySpirit} setSteelySpirit={setAtkSteelySpirit}
+                battery={atkBattery} setBattery={setAtkBattery}
+                powerSpot={atkPowerSpot} setPowerSpot={setAtkPowerSpot}
+                isDynamaxed={atkIsDynamaxed} setIsDynamaxed={setAtkIsDynamaxed}
+                alliesFainted={atkAlliesFainted} setAlliesFainted={setAtkAlliesFainted}
+                generation={generation}
               />
               <StatusPanel
                 label="防守方"
+                side="def"
                 status={defStatus} setStatus={setDefStatus}
+                toxicCounter={defToxicCounter} setToxicCounter={setDefToxicCounter}
                 stealthRock={defStealthRock} setStealthRock={setDefStealthRock}
                 spikes={defSpikes} setSpikes={setDefSpikes}
+                steelsurge={defSteelsurge} setSteelsurge={setDefSteelsurge}
                 reflect={defReflect} setReflect={setDefReflect}
                 lightScreen={defLightScreen} setLightScreen={setDefLightScreen}
                 auroraVeil={defAuroraVeil} setAuroraVeil={setDefAuroraVeil}
                 protect={defProtect} setProtect={setDefProtect}
                 helpingHand={defHelpingHand} setHelpingHand={setDefHelpingHand}
                 tailwind={defTailwind} setTailwind={setDefTailwind}
+                friendGuard={defFriendGuard} setFriendGuard={setDefFriendGuard}
                 switchingOut={defSwitchingOut} setSwitchingOut={setDefSwitchingOut}
+                seeded={defSeeded} setSeeded={setDefSeeded}
+                saltCured={defSaltCured} setSaltCured={setDefSaltCured}
+                foresight={defForesight} setForesight={setDefForesight}
+                flowerGift={defFlowerGift} setFlowerGift={setDefFlowerGift}
+                powerTrick={defPowerTrick} setPowerTrick={setDefPowerTrick}
+                steelySpirit={defSteelySpirit} setSteelySpirit={setDefSteelySpirit}
+                battery={defBattery} setBattery={setDefBattery}
+                powerSpot={defPowerSpot} setPowerSpot={setDefPowerSpot}
+                isDynamaxed={defIsDynamaxed} setIsDynamaxed={setDefIsDynamaxed}
+                alliesFainted={defAlliesFainted} setAlliesFainted={setDefAlliesFainted}
+                generation={generation}
               />
             </div>
+
           </div>
 
           {/* ═══ 右栏：防守方招式 + 宝可梦 ═══ */}
@@ -1522,11 +1915,37 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
                   moves={defMoves}
                   movesInfo={defMovesInfo}
                   selectedIndex={defSelectedSlot}
-                  onSelectSlot={(i) => setDefSelectedSlot(i)}
+                  onSelectSlot={handleDefSelectSlot}
                   pokemonId={defender.pokemonId}
                   generation={generation}
                   onSetMove={handleDefSetMove}
                 />
+                <div className="dc-move-extras">
+                  <button className={"dc-chip" + (defCritical ? " dc-chip-on" : "")} onClick={() => setDefCritical(!defCritical)}>暴击</button>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">连击</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={defMoveHits} onChange={(e) => setDefMoveHits(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                  <span className="dc-hits-hint">{defMoveHits === 0 ? "默认" : `${defMoveHits}次`}</span>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">已用</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={defTimesUsed} onChange={(e) => setDefTimesUsed(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                </div>
+                <div className="dc-move-extras">
+                  {Number(generation) === 7 && (
+                    <button className={"dc-chip" + (defUseZ ? " dc-chip-on" : "")} onClick={() => setDefUseZ(!defUseZ)}>Z招式</button>
+                  )}
+                  {Number(generation) === 8 && (
+                    <button className={"dc-chip" + (defUseMax ? " dc-chip-on" : "")} onClick={() => setDefUseMax(!defUseMax)}>极巨招式</button>
+                  )}
+                  {defTeraType === "星晶" && (
+                    <button className={"dc-chip" + (defIsStellarFirstUse ? " dc-chip-on" : "")} onClick={() => setDefIsStellarFirstUse(!defIsStellarFirstUse)}>星晶首次</button>
+                  )}
+                  {(defender.itemName === "节拍器" || defender.itemId === "item-节拍器") && (<>
+                  <span className="dc-move-extras-sep">|</span>
+                  <span className="dc-move-extras-label">节拍器</span>
+                  <input type="number" className="dc-hits-input" min={0} max={10} value={defTimesUsedWithMetronome} onChange={(e) => setDefTimesUsedWithMetronome(Math.max(0, Math.min(10, Number(e.target.value) || 0)))} />
+                  </>)}
+                </div>
               </div>
             )}
             <PokemonConfigPanel
@@ -1540,10 +1959,16 @@ name: defender.nameZh || (defenderDetail?.nameZh) || "",
               onBoostChange={(key, val) => setDefBoost((prev) => ({ ...prev, [key]: Math.max(-6, Math.min(6, val)) }))}
               level={level}
               onMovesSync={(cfg) => syncMovesFromConfig(cfg, "def")}
+              curHP={defCurHP}
+              onCurHPChange={setDefCurHP}
+              teraType={defTeraType}
+              setTeraType={setDefTeraType}
+              generation={generation}
             />
           </div>
 
         </div>
+
       </div>
     </section>
   );

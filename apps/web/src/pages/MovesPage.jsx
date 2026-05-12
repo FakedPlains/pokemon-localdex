@@ -1,43 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
+import { TYPE_BG_COLORS, CATEGORY_COLORS, typeIconSrc, categoryIconSrc } from "../utils/constants.js";
+import { parseExpandParam } from "../utils/helpers.js";
 import Loading from "../components/Loading.jsx";
-
-/* ── 属性颜色映射（用于行底色） ── */
-const TYPE_BG_COLORS = {
-  一般: "rgba(187,187,170,0.10)",
-  火:   "rgba(255,68,34,0.10)",
-  水:   "rgba(51,153,255,0.10)",
-  电:   "rgba(255,204,51,0.10)",
-  草:   "rgba(119,204,85,0.10)",
-  冰:   "rgba(119,221,255,0.10)",
-  格斗: "rgba(187,85,68,0.10)",
-  毒:   "rgba(170,85,153,0.10)",
-  地面: "rgba(221,187,85,0.10)",
-  飞行: "rgba(102,153,255,0.10)",
-  超能力:"rgba(255,85,153,0.10)",
-  虫:   "rgba(170,187,34,0.10)",
-  岩石: "rgba(187,170,102,0.10)",
-  幽灵: "rgba(102,102,187,0.10)",
-  龙:   "rgba(119,102,238,0.10)",
-  恶:   "rgba(119,85,68,0.10)",
-  钢:   "rgba(170,170,187,0.10)",
-  妖精: "rgba(255,170,255,0.10)",
-};
-
-/* ── 分类颜色映射（参考 52Poké Wiki 配色） ── */
-const CATEGORY_COLORS = {
-  物理: { bg: "#FF4400", text: "#FFCC00" },
-  特殊: { bg: "#2266CC", text: "#BBEEFF" },
-  变化: { bg: "#999999", text: "#EEEEEE" },
-};
-
-/* ── 图标路径工具 ── */
-function typeIconSrc(typeName) {
-  return `${import.meta.env.BASE_URL}assets/type-icons/type-${typeName}@sm.png`;
-}
-function categoryIconSrc(category) {
-  return `${import.meta.env.BASE_URL}assets/type-icons/category-${category}@sm.png`;
-}
+import PokemonGrid from "../components/PokemonGrid.jsx";
+import GenerationTimeline from "../components/GenerationTimeline.jsx";
+import WikiLink from "../components/WikiLink.jsx";
 
 /* ── 属性 Chip（图标 + 文字合并） ── */
 function TypeIconChip({ type }) {
@@ -62,12 +30,21 @@ function CategoryChip({ category }) {
   );
 }
 
-function parseExpandParam() {
-  const hash = window.location.hash || "";
-  const qIdx = hash.indexOf("?");
-  if (qIdx < 0) return null;
-  const params = new URLSearchParams(hash.slice(qIdx));
-  return params.get("expand") || null;
+/* ── 学习方式翻译 ── */
+const LEARN_METHOD_NAMES = {
+  "升级": "升级",
+  "招式机": "招式机",
+  "遗传": "遗传",
+  "教学": "教学",
+  "level-up": "升级",
+  "machine": "招式机",
+  "egg": "遗传",
+  "tutor": "教学",
+};
+
+function formatLearnMethods(methods) {
+  if (!methods || methods.length === 0) return null;
+  return methods.map((m) => LEARN_METHOD_NAMES[m] || m).join("/");
 }
 
 export default function MovesPage({ query = "", type = "", category = "", generation = "" }) {
@@ -125,8 +102,15 @@ export default function MovesPage({ query = "", type = "", category = "", genera
     }
   }, [moves, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 宝可梦区域展开状态（独立于招式详情的展开）
+  const [pokemonExpanded, setPokemonExpanded] = useState({});
+
   const toggleExpand = useCallback((id) => {
     setExpanded((prev) => (prev === id ? null : id));
+  }, []);
+
+  const togglePokemonSection = useCallback((id) => {
+    setPokemonExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
   if (loading && moves.length === 0) return <Loading />;
@@ -201,19 +185,12 @@ export default function MovesPage({ query = "", type = "", category = "", genera
                   <div className="mv-row-detail">
                     {/* 名称标签 */}
                     <div className="mv-detail-names">
-                      {move.nameJa && <span className="mv-name-tag mv-name-ja">{move.nameJa}</span>}
-                      {move.nameEn && <span className="mv-name-tag mv-name-en">{move.nameEn}</span>}
+                      {move.nameJa && <span className="shared-name-tag shared-name-ja">{move.nameJa}</span>}
+                      {move.nameEn && <span className="shared-name-tag shared-name-en">{move.nameEn}</span>}
                       {move.introducedGeneration && (
-                        <span className="mv-name-tag mv-name-gen">第 {move.introducedGeneration} 世代引入</span>
+                        <span className="shared-name-tag shared-name-gen">第 {move.introducedGeneration} 世代引入</span>
                       )}
-                      {move.source?.url && (
-                        <a href={move.source.url} target="_blank" rel="noopener noreferrer" className="mv-wiki-link" title={move.source.title || "Wiki"}>
-                          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10" />
-                            <path d="M9 2h5v5" /><path d="M14 2 7.5 8.5" />
-                          </svg>
-                        </a>
-                      )}
+                      <WikiLink url={move.source?.url} title={move.source?.title || "Wiki"} />
                     </div>
 
                     {/* 基础数据 */}
@@ -245,41 +222,39 @@ export default function MovesPage({ query = "", type = "", category = "", genera
                     </div>
 
                     {/* 效果说明 */}
-                    <div className="mv-detail-effect">
-                      <div className="mv-detail-effect-title">招式效果</div>
-                      <div className="mv-detail-effect-text">
+                    <div className="shared-detail-effect">
+                      <div className="shared-detail-effect-title">招式效果</div>
+                      <div className="shared-detail-effect-text">
                         {move.effectDetail || move.description || "暂无详细说明"}
                       </div>
                     </div>
 
                     {/* 世代变更 */}
-                    {move.generations?.length > 0 && (
-                      <div className="mv-gen-section">
-                        <div className="mv-gen-title">世代变更</div>
-                        <div className="mv-gen-timeline">
-                          {move.generations.map((record, i) => (
-                            <div key={i} className={`mv-gen-item${record.versionExclusive ? ' mv-gen-exclusive' : ''}`}>
-                              <div className="mv-gen-badges">
-                                <div className="mv-gen-badge">
-                                  {record.generation === 99 ? "Champions" : `Gen ${record.generation}`}
-                                </div>
-                                {(record.gameVersionName || record.gameVersionCode) && (
-                                  <div className="mv-gen-version">{record.gameVersionName || record.gameVersionCode}</div>
-                                )}
-                                {record.versionExclusive && (
-                                  <div className="mv-gen-exclusive-tag">仅限</div>
-                                )}
-                              </div>
-                              <div className="mv-gen-text">{record.description}</div>
-                            </div>
-                          ))}
+                    <GenerationTimeline generations={move.generations} />
+
+                    {/* 能学习该招式的宝可梦 */}
+                    <div className="shared-pokemon-section">
+                      <button
+                        className={`shared-pokemon-toggle${pokemonExpanded[move.id] ? " shared-pokemon-toggle-open" : ""}`}
+                        onClick={() => togglePokemonSection(move.id)}
+                      >
+                        <span className="shared-pokemon-section-title">能学习该招式的宝可梦</span>
+                        <span className={`shared-pokemon-toggle-arrow${pokemonExpanded[move.id] ? " shared-pokemon-toggle-arrow-open" : ""}`}>▾</span>
+                      </button>
+                      {pokemonExpanded[move.id] && (
+                        <div className="shared-pokemon-content">
+                          <PokemonGrid
+                            apiPath={`/moves/${move.id}/pokemon`}
+                            emptyText="暂无能学习该招式的宝可梦数据"
+                            labelFn={(p) => formatLearnMethods(p.learnMethods)}
+                          />
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     {/* 来源 */}
                     {move.source?.url && (
-                      <div className="mv-source">
+                      <div className="shared-source">
                         <a href={move.source.url} target="_blank" rel="noopener noreferrer">
                           来源：{move.source.title || "52Poké Wiki"}
                         </a>

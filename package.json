@@ -25,14 +25,16 @@
     "crawl": "python3 packages/crawler_py/crawl-52poke-db.py",
     "crawl:all": "python3 packages/crawler_py/crawl-52poke-db.py all",
     "crawl:pokemon": "python3 packages/crawler_py/crawl-52poke-db.py pokemon",
+    "crawl:champions": "python3 packages/crawler_py/crawl-52poke-db.py champions",
     "crawl:catalog": "python3 packages/crawler_py/crawl-52poke-db.py catalog",
     "crawl:abilities": "python3 packages/crawler_py/crawl-52poke-db.py abilities",
     "crawl:moves": "python3 packages/crawler_py/crawl-52poke-db.py moves",
     "crawl:items": "python3 packages/crawler_py/crawl-52poke-db.py items"
   },
   "dependencies": {
-    "@fakedplains/smogon-calc": "^0.11.0",
+    "@fakedplains/smogon-calc": "^0.11.1",
     "@hono/node-server": "^2.0.0",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.12.15"
   },
   "devDependencies": {
