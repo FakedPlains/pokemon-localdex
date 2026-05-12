@@ -4,6 +4,107 @@
 
 .dex-page { display: flex; flex-direction: column; gap: 18px; }
 
+.dex-list-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+.dex-season-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dex-season-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.dex-season-select {
+  width: min(300px, 72vw);
+}
+
+.dex-season-select .cs-trigger {
+  width: 100%;
+  height: 38px;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dex-season-select .cs-trigger:hover,
+.dex-season-select .cs-trigger:focus {
+  border-color: rgba(217, 79, 61, 0.35);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+}
+
+.dex-season-select .cs-label {
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.dex-season-select .cs-dropdown {
+  left: 0;
+  min-width: 100%;
+  max-width: min(360px, 86vw);
+  transform: none;
+  animation: dex-season-select-fade-in 0.12s ease-out;
+}
+
+.dex-season-select .cs-option {
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.dex-season-select .cs-trigger:disabled:hover {
+  border-color: rgba(31, 42, 31, 0.12);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: none;
+}
+
+@keyframes dex-season-select-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dex-season-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(460px, 100%);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.dex-season-note strong {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dex-season-note span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dex-view-toggle {
+  margin-left: auto;
+}
+
 /* ── Header ── */
 .dex-header { padding: 22px 24px 20px; }
 .dex-header-top {
@@ -783,8 +884,7 @@ display: block;
   display: flex;
   gap: 4px;
   justify-content: flex-end;
-  padding: 0 16px;
-  margin-bottom: -4px;
+  margin-left: auto;
 }
 
 /* ── Table View ── */
@@ -938,6 +1038,27 @@ display: block;
 
 /* 响应式 */
 @media (max-width: 900px) {
+  .dex-list-toolbar {
+    align-items: stretch;
+  }
+
+  .dex-season-control,
+  .dex-season-note {
+    width: 100%;
+  }
+
+  .dex-season-select {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .dex-view-toggle {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
   .dex-table-header,
   .dex-table-row {
     grid-template-columns: 44px 52px minmax(80px, 1.2fr) minmax(80px, 0.8fr) 16px minmax(80px, 1fr) repeat(6, 38px) 44px;
@@ -958,4 +1079,3 @@ display: block;
     font-size: 12px;
   }
 }
-

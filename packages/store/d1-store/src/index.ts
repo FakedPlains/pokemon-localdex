@@ -27,6 +27,7 @@ export type {
   EvolutionStep,
   PokemonSummary,
   PokemonEntry,
+  ChampionsSeasonSummary,
   MoveGenerationRecord,
   MoveEntry,
   AbilityGenerationRecord,
@@ -90,4 +91,3 @@ export function createD1Store(db: D1Database): D1Store {
   const drizzleDb = drizzle(db as any);
   return createDrizzleStore(drizzleDb);
 }
-

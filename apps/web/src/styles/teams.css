@@ -522,6 +522,17 @@ gap: 6px;
   background: rgba(255, 248, 236, 0.95);
 }
 
+.cs-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  box-shadow: none;
+}
+
+.cs-trigger:disabled:hover {
+  border-color: rgba(31, 42, 31, 0.12);
+  background: rgba(255, 248, 236, 0.7);
+}
+
 .cs-trigger.cs-placeholder .cs-label {
   color: var(--muted);
 }

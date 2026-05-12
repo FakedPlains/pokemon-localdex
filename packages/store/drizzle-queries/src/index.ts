@@ -7,7 +7,7 @@
  * 所有方法均为 async（Drizzle 的 node:sqlite driver 也支持 async API）。
  */
 
-import { eq, like, and, or, sql, inArray, isNull, asc } from "drizzle-orm";
+import { eq, like, and, or, sql, inArray, isNull, asc, desc } from "drizzle-orm";
 import type { SQL, SQLiteColumn } from "drizzle-orm";
 import type { SQLiteSelectQueryBuilder } from "drizzle-orm/sqlite-core";
 
@@ -27,6 +27,9 @@ import {
   abilityGenerationRecords,
   items,
   itemGenerationRecords,
+  championsRegulations,
+  championsRegulationPokemon,
+  championsSeasons,
 } from "@pokemon-localdex/drizzle-schema";
 
 import type {
@@ -36,6 +39,7 @@ import type {
   EvolutionStep,
   PokemonSummary,
   PokemonEntry,
+  ChampionsSeasonSummary,
   MoveEntry,
   MoveGenerationRecord,
   AbilityEntry,
@@ -88,6 +92,33 @@ function hydrateGenRecord(r: Record<string, unknown>) {
   };
 }
 
+function normalizeChampionFormName(value: string | undefined, speciesName?: string): string {
+  const normalizeBasic = (input: string | undefined) =>
+    (input || "")
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/[（）()・·･\s　\-_]/g, "");
+
+  let normalized = normalizeBasic(value);
+  const species = normalizeBasic(speciesName);
+  if (species) normalized = normalized.replaceAll(species, "");
+  return normalized.replaceAll("的样子", "").replaceAll("样子", "");
+}
+
+function championFormNameMatches(form: any, championName: string, speciesName?: string): boolean {
+  const target = normalizeChampionFormName(championName, speciesName);
+  if (!target) return false;
+
+  const candidates = [
+    normalizeChampionFormName(form.nameZh, speciesName),
+    normalizeChampionFormName(form.formKey, speciesName),
+  ].filter(Boolean);
+
+  return candidates.some((candidate) =>
+    candidate === target || candidate.includes(target) || target.includes(candidate),
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // DrizzleStore — 实现 IStore 接口
 // ══════════════════════════════════════════════════════════════════════════════
@@ -107,7 +138,7 @@ export class DrizzleStore implements IStore {
   // ────────────────────────────────────────────────────────────────────────────
 
   async listPokemon(
-    filters?: { query?: string; type?: string | string[]; generation?: number } & PaginationParams,
+    filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number } & PaginationParams,
   ): Promise<PaginatedResult<PokemonSummary & { _chainId?: number }> | Array<PokemonSummary & { _chainId?: number }>> {
     const conditions: SQL[] = [];
 
@@ -142,6 +173,21 @@ export class DrizzleStore implements IStore {
     if (filters?.generation) {
       conditions.push(
         sql`EXISTS (SELECT 1 FROM pokemon_generation_regions pgr WHERE pgr.pokemon_id = ${pokemon.id} AND pgr.generation = ${filters.generation})`,
+      );
+    }
+
+    if (filters?.championsSeasonId !== undefined) {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1
+          FROM champions_seasons cs
+          INNER JOIN champions_regulation_pokemon crp ON crp.regulation_id = cs.regulation_id
+          WHERE cs.id = ${filters.championsSeasonId}
+            AND (
+              crp.pokemon_id = ${pokemon.id}
+              OR (crp.pokemon_id IS NULL AND crp.dex_number = ${pokemon.dexNumber})
+            )
+        )`,
       );
     }
 
@@ -305,10 +351,43 @@ export class DrizzleStore implements IStore {
   }
 
   // ────────────────────────────────────────────────────────────────────────────
+  // Champions: listChampionsSeasons
+  // ────────────────────────────────────────────────────────────────────────────
+
+  async listChampionsSeasons(): Promise<ChampionsSeasonSummary[]> {
+    const rows = await this.db
+      .select({
+        id: championsSeasons.id,
+        seasonCode: championsSeasons.seasonCode,
+        regulationCode: championsSeasons.regulationCode,
+        regulationName: championsRegulations.name,
+        startAt: championsSeasons.startAt,
+        endAt: championsSeasons.endAt,
+        periodText: championsSeasons.periodText,
+      })
+      .from(championsSeasons)
+      .leftJoin(championsRegulations, eq(championsRegulations.id, championsSeasons.regulationId))
+      .orderBy(desc(championsSeasons.startAt), desc(championsSeasons.id));
+
+    return rows.map((row: any) => ({
+      id: Number(row.id),
+      seasonCode: String(row.seasonCode),
+      regulationCode: String(row.regulationCode),
+      regulationName: row.regulationName ? String(row.regulationName) : undefined,
+      startAt: row.startAt ? String(row.startAt) : undefined,
+      endAt: row.endAt ? String(row.endAt) : undefined,
+      periodText: row.periodText ? String(row.periodText) : undefined,
+    }));
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
   // Pokemon: getPokemon
   // ────────────────────────────────────────────────────────────────────────────
 
-  async getPokemon(idOrSlug: string): Promise<PokemonEntry | undefined> {
+  async getPokemon(
+    idOrSlug: string,
+    filters?: { championsSeasonId?: number },
+  ): Promise<PokemonEntry | undefined> {
     const rows = await this.db
       .select()
       .from(pokemon)
@@ -326,9 +405,37 @@ export class DrizzleStore implements IStore {
     if (!row) return undefined;
 
     const pokemonId = Number(row.id);
+    const dexNumber = Number(row.dexNumber);
+
+    let championRows: Array<{ formId?: number; nameZh: string }> | undefined;
+    if (filters?.championsSeasonId !== undefined) {
+      const rows = await this.db
+        .select({
+          formId: championsRegulationPokemon.formId,
+          nameZh: championsRegulationPokemon.nameZh,
+        })
+        .from(championsSeasons)
+        .innerJoin(championsRegulationPokemon, eq(championsRegulationPokemon.regulationId, championsSeasons.regulationId))
+        .where(and(
+          eq(championsSeasons.id, filters.championsSeasonId),
+          or(
+            eq(championsRegulationPokemon.pokemonId, pokemonId),
+            and(
+              isNull(championsRegulationPokemon.pokemonId),
+              eq(championsRegulationPokemon.dexNumber, dexNumber),
+            )!,
+          )!,
+        ));
+
+      if (rows.length === 0) return undefined;
+      championRows = rows.map((item: any) => ({
+        formId: item.formId != null ? Number(item.formId) : undefined,
+        nameZh: String(item.nameZh),
+      }));
+    }
 
     // 查询所有形态（含绑定道具）
-    const formRows: any[] = await this.db
+    let formRows: any[] = await this.db
       .select({
         id: pokemonForms.id,
         pokemonId: pokemonForms.pokemonId,
@@ -347,6 +454,29 @@ export class DrizzleStore implements IStore {
       .leftJoin(items, eq(items.id, pokemonForms.requiredItemId))
       .where(eq(pokemonForms.pokemonId, pokemonId))
       .orderBy(asc(pokemonForms.sortOrder));
+
+    if (championRows) {
+      const allowedFormIds = new Set<number>();
+      const defaultFormId = Number(formRows.find((form: any) => Number(form.isDefault) === 1)?.id ?? formRows[0]?.id);
+
+      for (const champion of championRows) {
+        if (champion.formId != null) {
+          allowedFormIds.add(champion.formId);
+          continue;
+        }
+
+        const matchedForms = formRows.filter((form: any) =>
+          championFormNameMatches(form, champion.nameZh, String(row.nameZh)),
+        );
+        if (matchedForms.length > 0) {
+          for (const form of matchedForms) allowedFormIds.add(Number(form.id));
+        } else if (Number.isFinite(defaultFormId)) {
+          allowedFormIds.add(defaultFormId);
+        }
+      }
+
+      formRows = formRows.filter((form: any) => allowedFormIds.has(Number(form.id)));
+    }
 
     const formIds = formRows.map((f: any) => Number(f.id));
 

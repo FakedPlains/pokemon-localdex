@@ -25,6 +25,7 @@
     "crawl": "python3 packages/crawler_py/crawl-52poke-db.py",
     "crawl:all": "python3 packages/crawler_py/crawl-52poke-db.py all",
     "crawl:pokemon": "python3 packages/crawler_py/crawl-52poke-db.py pokemon",
+    "crawl:champions": "python3 packages/crawler_py/crawl-52poke-db.py champions",
     "crawl:catalog": "python3 packages/crawler_py/crawl-52poke-db.py catalog",
     "crawl:abilities": "python3 packages/crawler_py/crawl-52poke-db.py abilities",
     "crawl:moves": "python3 packages/crawler_py/crawl-52poke-db.py moves",
