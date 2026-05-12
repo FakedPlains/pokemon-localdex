@@ -7,7 +7,7 @@
  * 所有方法均为 async（Drizzle 的 node:sqlite driver 也支持 async API）。
  */
 
-import { eq, like, and, or, sql, inArray, isNull, asc } from "drizzle-orm";
+import { eq, like, and, or, sql, inArray, isNull, asc, desc } from "drizzle-orm";
 import type { SQL, SQLiteColumn } from "drizzle-orm";
 import type { SQLiteSelectQueryBuilder } from "drizzle-orm/sqlite-core";
 
@@ -27,6 +27,8 @@ import {
   abilityGenerationRecords,
   items,
   itemGenerationRecords,
+  championsRegulations,
+  championsSeasons,
 } from "@pokemon-localdex/drizzle-schema";
 
 import type {
@@ -36,6 +38,7 @@ import type {
   EvolutionStep,
   PokemonSummary,
   PokemonEntry,
+  ChampionsSeasonSummary,
   MoveEntry,
   MoveGenerationRecord,
   AbilityEntry,
@@ -107,7 +110,7 @@ export class DrizzleStore implements IStore {
   // ────────────────────────────────────────────────────────────────────────────
 
   async listPokemon(
-    filters?: { query?: string; type?: string | string[]; generation?: number } & PaginationParams,
+    filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number } & PaginationParams,
   ): Promise<PaginatedResult<PokemonSummary & { _chainId?: number }> | Array<PokemonSummary & { _chainId?: number }>> {
     const conditions: SQL[] = [];
 
@@ -142,6 +145,21 @@ export class DrizzleStore implements IStore {
     if (filters?.generation) {
       conditions.push(
         sql`EXISTS (SELECT 1 FROM pokemon_generation_regions pgr WHERE pgr.pokemon_id = ${pokemon.id} AND pgr.generation = ${filters.generation})`,
+      );
+    }
+
+    if (filters?.championsSeasonId !== undefined) {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1
+          FROM champions_seasons cs
+          INNER JOIN champions_regulation_pokemon crp ON crp.regulation_id = cs.regulation_id
+          WHERE cs.id = ${filters.championsSeasonId}
+            AND (
+              crp.pokemon_id = ${pokemon.id}
+              OR (crp.pokemon_id IS NULL AND crp.dex_number = ${pokemon.dexNumber})
+            )
+        )`,
       );
     }
 
@@ -302,6 +320,36 @@ export class DrizzleStore implements IStore {
     });
 
     return usePagination ? { items: resultItems, total } : resultItems;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Champions: listChampionsSeasons
+  // ────────────────────────────────────────────────────────────────────────────
+
+  async listChampionsSeasons(): Promise<ChampionsSeasonSummary[]> {
+    const rows = await this.db
+      .select({
+        id: championsSeasons.id,
+        seasonCode: championsSeasons.seasonCode,
+        regulationCode: championsSeasons.regulationCode,
+        regulationName: championsRegulations.name,
+        startAt: championsSeasons.startAt,
+        endAt: championsSeasons.endAt,
+        periodText: championsSeasons.periodText,
+      })
+      .from(championsSeasons)
+      .leftJoin(championsRegulations, eq(championsRegulations.id, championsSeasons.regulationId))
+      .orderBy(desc(championsSeasons.startAt), desc(championsSeasons.id));
+
+    return rows.map((row: any) => ({
+      id: Number(row.id),
+      seasonCode: String(row.seasonCode),
+      regulationCode: String(row.regulationCode),
+      regulationName: row.regulationName ? String(row.regulationName) : undefined,
+      startAt: row.startAt ? String(row.startAt) : undefined,
+      endAt: row.endAt ? String(row.endAt) : undefined,
+      periodText: row.periodText ? String(row.periodText) : undefined,
+    }));
   }
 
   // ────────────────────────────────────────────────────────────────────────────

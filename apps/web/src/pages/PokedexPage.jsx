@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { unifiedApi } from "../utils/api.js";
+import { useApi } from "../hooks/useApi.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import { STAT_KEYS, LEARN_METHOD_LABELS } from "../utils/constants.js";
 import {
@@ -15,6 +16,16 @@ import StatCalculator from "../components/StatCalculator.jsx";
 import Loading from "../components/Loading.jsx";
 import WikiLink from "../components/WikiLink.jsx";
 import ViewToggle from "../components/ViewToggle.jsx";
+import CustomSelect from "../components/CustomSelect.jsx";
+
+function formatSeasonLabel(season) {
+  if (!season) return "";
+  const parts = [season.seasonCode, season.regulationCode];
+  if (season.regulationName && season.regulationName !== season.regulationCode) {
+    parts.push(season.regulationName);
+  }
+  return parts.filter(Boolean).join(" · ");
+}
 
 /* ─── Main Page ─── */
 export default function PokedexPage({ query = "", types = [], generation = "", initialPokemonId = null, onInitialPokemonConsumed }) {
@@ -22,6 +33,29 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
   const [detail, setDetail] = useState(null);
   const [detailGeneration, setDetailGeneration] = useState("");
   const [dexViewMode, setDexViewMode] = useState("card"); // "card" | "list"
+  const [championsSeasonId, setChampionsSeasonId] = useState("");
+  const [hasLoadedList, setHasLoadedList] = useState(false);
+  const [lastList, setLastList] = useState([]);
+  const [lastTotal, setLastTotal] = useState(0);
+
+  const { data: championsSeasonsData = [], loading: seasonsLoading } = useApi("/champions/seasons");
+  const championsSeasons = championsSeasonsData || [];
+  const selectedSeason = useMemo(
+    () => championsSeasons.find((season) => String(season.id) === championsSeasonId),
+    [championsSeasons, championsSeasonId],
+  );
+  const championsSeasonOptions = useMemo(() => {
+    const defaultLabel = seasonsLoading
+      ? "加载赛季…"
+      : championsSeasons.length === 0 ? "暂无赛季" : "全部赛季";
+    return [
+      { value: "", label: defaultLabel },
+      ...championsSeasons.map((season) => ({
+        value: String(season.id),
+        label: formatSeasonLabel(season),
+      })),
+    ];
+  }, [championsSeasons, seasonsLoading]);
 
   const detailRef = useRef(null);
   const activeCardRef = useRef(null);
@@ -35,18 +69,29 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     if (query) params.set("q", query);
     if (types.length > 0) params.set("type", types.join(","));
     if (generation) params.set("generation", generation);
+    if (championsSeasonId) params.set("seasonId", championsSeasonId);
     const qs = params.toString();
     return qs ? `/pokemon?${qs}` : "/pokemon";
-  }, [query, types, generation]);
+  }, [query, types, generation, championsSeasonId]);
 
   // Mark that filters changed while detail panel is open
   useEffect(() => {
     if (selectedSlug && !fromUrlNavRef.current) {
       filterChangedWhileOpenRef.current = true;
     }
-  }, [query, types, generation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, types, generation, championsSeasonId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: list, total, loading, hasMore, sentinelRef, loadingMore } = useInfiniteApi(pokemonPath, { pageSize: 60 });
+  const isRefreshingList = loading && hasLoadedList;
+  const displayList = isRefreshingList && list.length === 0 ? lastList : list;
+  const displayTotal = isRefreshingList && list.length === 0 ? lastTotal : total;
+
+  useEffect(() => {
+    if (loading) return;
+    setHasLoadedList(true);
+    setLastList(list);
+    setLastTotal(total);
+  }, [list, loading, total]);
 
   // After list reloads due to filter change while detail is open:
   // - has results → auto-select the first pokemon
@@ -152,7 +197,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     setSelectedSlug(null);
   }, []);
 
-  if (loading && list.length === 0) return <Loading />;
+  if (loading && list.length === 0 && !hasLoadedList) return <Loading />;
 
   const hasSelection = selectedSlug !== null;
 
@@ -161,20 +206,42 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
 
   return (
     <div className="dex-page">
-      {/* 视图切换按钮（仅在未选中详情时显示） */}
-      {!hasSelection && list.length > 0 && (
-        <div className="dex-view-toggle">
-          <ViewToggle mode={effectiveViewMode} onChange={setDexViewMode} />
+      <div className="dex-list-toolbar">
+        <div className="dex-season-control">
+          <label className="dex-season-label" htmlFor="dex-season-select">赛季</label>
+          <CustomSelect
+            id="dex-season-select"
+            className="dex-season-select"
+            value={championsSeasonId}
+            options={championsSeasonOptions}
+            onChange={setChampionsSeasonId}
+            disabled={seasonsLoading || championsSeasons.length === 0}
+          />
         </div>
-      )}
+
+        {selectedSeason && (
+          <div className="dex-season-note">
+            <strong>{selectedSeason.regulationName || selectedSeason.regulationCode}</strong>
+            {selectedSeason.periodText && <span>{selectedSeason.periodText}</span>}
+            <span>{isRefreshingList ? "正在更新可用名单…" : `${displayTotal} 只可用宝可梦`}</span>
+          </div>
+        )}
+
+        {/* 视图切换按钮（仅在未选中详情时显示） */}
+        {!hasSelection && displayList.length > 0 && (
+          <div className="dex-view-toggle">
+            <ViewToggle mode={effectiveViewMode} onChange={setDexViewMode} />
+          </div>
+        )}
+      </div>
 
       <div className={`dex-body${hasSelection ? " dex-body-split" : ""}`}>
         {/* Left: Pokemon list — scrolls naturally with the page */}
         <div className={`dex-list-panel${hasSelection ? " dex-list-panel-narrow" : ""}`}>
           {effectiveViewMode === "card" ? (
           <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
-            {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
-            {list.map((member) => {
+            {displayList.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
+            {displayList.map((member) => {
               const slug = String(member.id);
               const isActive = selectedSlug === slug;
               const image = getPokemonPreviewImage(member);
@@ -215,7 +282,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
           ) : (
           /* 列表视图 */
           <div className="dex-table-view">
-            {list.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
+            {displayList.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
             <div className="dex-table-header">
               <span className="dex-table-hcol dex-table-hcol-img"></span>
               <span className="dex-table-hcol dex-table-hcol-dex">编号</span>
@@ -231,7 +298,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
               <span className="dex-table-hcol dex-table-hcol-stats">速度</span>
               <span className="dex-table-hcol dex-table-hcol-stats">合计</span>
             </div>
-            {list.map((member) => {
+            {displayList.map((member) => {
               const slug = String(member.id);
               const image = getPokemonPreviewImage(member);
               const bs = member.baseStats || {};

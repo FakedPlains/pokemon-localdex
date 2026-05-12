@@ -27,6 +27,7 @@ export type {
   EvolutionStep,
   PokemonSummary,
   PokemonEntry,
+  ChampionsSeasonSummary,
   MoveGenerationRecord,
   MoveEntry,
   AbilityGenerationRecord,

@@ -45,15 +45,16 @@ export function registerApiRoutes<E extends object = object>(
       ? typeRaw.includes(",") ? typeRaw.split(",") : typeRaw
       : undefined;
     const generation = numberQuery(c, "generation");
+    const championsSeasonId = numberQuery(c, "seasonId");
     const limit = numberQuery(c, "limit");
     const offset = numberQuery(c, "offset") ?? 0;
 
     if (limit !== undefined) {
-      const result = await s.listPokemon({ query, type, generation, limit, offset });
+      const result = await s.listPokemon({ query, type, generation, championsSeasonId, limit, offset });
       const { items, total } = result as { items: unknown[]; total: number };
       return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
     }
-    const data = await s.listPokemon({ query, type, generation });
+    const data = await s.listPokemon({ query, type, generation, championsSeasonId });
     return c.json({ data });
   });
 
@@ -85,6 +86,13 @@ export function registerApiRoutes<E extends object = object>(
     if (!entry) return c.json({ error: "Pokemon not found" }, 404);
     const meta = await s.getLearnsetMeta(entry.id);
     return c.json({ data: meta, pokemonId: entry.id });
+  });
+
+  // ── Champions ──
+
+  api.get("/champions/seasons", async (c) => {
+    const data = await getStore(c).listChampionsSeasons();
+    return c.json({ data });
   });
 
   // ── Items ──

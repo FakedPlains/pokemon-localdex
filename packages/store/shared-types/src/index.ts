@@ -125,6 +125,20 @@ export type PokemonEntry = PokemonSummary & {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Champions 赛季 / 赛制
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type ChampionsSeasonSummary = {
+  id: number;
+  seasonCode: string;
+  regulationCode: string;
+  regulationName?: string;
+  startAt?: string;
+  endAt?: string;
+  periodText?: string;
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // 招式
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -250,10 +264,13 @@ export type PaginatedResult<T> = { items: T[]; total: number };
  */
 export interface IStore {
   // Pokemon
-  listPokemon(filters?: { query?: string; type?: string | string[]; generation?: number } & PaginationParams): Promise<PokemonSummary[] | PaginatedResult<PokemonSummary>>;
+  listPokemon(filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number } & PaginationParams): Promise<PokemonSummary[] | PaginatedResult<PokemonSummary>>;
   getPokemon(idOrSlug: string): Promise<PokemonEntry | undefined>;
   getLearnsetMeta(pokemonId: number): Promise<any>;
   getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string }>;
+
+  // Champions
+  listChampionsSeasons(): Promise<ChampionsSeasonSummary[]>;
 
   // Moves
   listMoves(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams): Promise<MoveEntry[] | PaginatedResult<MoveEntry>>;
