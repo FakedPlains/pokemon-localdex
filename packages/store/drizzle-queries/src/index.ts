@@ -28,6 +28,7 @@ import {
   items,
   itemGenerationRecords,
   championsRegulations,
+  championsRegulationPokemon,
   championsSeasons,
 } from "@pokemon-localdex/drizzle-schema";
 
@@ -89,6 +90,33 @@ function hydrateGenRecord(r: Record<string, unknown>) {
     description: r.description ? String(r.description) : "",
     notes: r.notes ? String(r.notes) : undefined,
   };
+}
+
+function normalizeChampionFormName(value: string | undefined, speciesName?: string): string {
+  const normalizeBasic = (input: string | undefined) =>
+    (input || "")
+      .normalize("NFKC")
+      .toLowerCase()
+      .replace(/[（）()・·･\s　\-_]/g, "");
+
+  let normalized = normalizeBasic(value);
+  const species = normalizeBasic(speciesName);
+  if (species) normalized = normalized.replaceAll(species, "");
+  return normalized.replaceAll("的样子", "").replaceAll("样子", "");
+}
+
+function championFormNameMatches(form: any, championName: string, speciesName?: string): boolean {
+  const target = normalizeChampionFormName(championName, speciesName);
+  if (!target) return false;
+
+  const candidates = [
+    normalizeChampionFormName(form.nameZh, speciesName),
+    normalizeChampionFormName(form.formKey, speciesName),
+  ].filter(Boolean);
+
+  return candidates.some((candidate) =>
+    candidate === target || candidate.includes(target) || target.includes(candidate),
+  );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -356,7 +384,10 @@ export class DrizzleStore implements IStore {
   // Pokemon: getPokemon
   // ────────────────────────────────────────────────────────────────────────────
 
-  async getPokemon(idOrSlug: string): Promise<PokemonEntry | undefined> {
+  async getPokemon(
+    idOrSlug: string,
+    filters?: { championsSeasonId?: number },
+  ): Promise<PokemonEntry | undefined> {
     const rows = await this.db
       .select()
       .from(pokemon)
@@ -374,9 +405,37 @@ export class DrizzleStore implements IStore {
     if (!row) return undefined;
 
     const pokemonId = Number(row.id);
+    const dexNumber = Number(row.dexNumber);
+
+    let championRows: Array<{ formId?: number; nameZh: string }> | undefined;
+    if (filters?.championsSeasonId !== undefined) {
+      const rows = await this.db
+        .select({
+          formId: championsRegulationPokemon.formId,
+          nameZh: championsRegulationPokemon.nameZh,
+        })
+        .from(championsSeasons)
+        .innerJoin(championsRegulationPokemon, eq(championsRegulationPokemon.regulationId, championsSeasons.regulationId))
+        .where(and(
+          eq(championsSeasons.id, filters.championsSeasonId),
+          or(
+            eq(championsRegulationPokemon.pokemonId, pokemonId),
+            and(
+              isNull(championsRegulationPokemon.pokemonId),
+              eq(championsRegulationPokemon.dexNumber, dexNumber),
+            )!,
+          )!,
+        ));
+
+      if (rows.length === 0) return undefined;
+      championRows = rows.map((item: any) => ({
+        formId: item.formId != null ? Number(item.formId) : undefined,
+        nameZh: String(item.nameZh),
+      }));
+    }
 
     // 查询所有形态（含绑定道具）
-    const formRows: any[] = await this.db
+    let formRows: any[] = await this.db
       .select({
         id: pokemonForms.id,
         pokemonId: pokemonForms.pokemonId,
@@ -395,6 +454,29 @@ export class DrizzleStore implements IStore {
       .leftJoin(items, eq(items.id, pokemonForms.requiredItemId))
       .where(eq(pokemonForms.pokemonId, pokemonId))
       .orderBy(asc(pokemonForms.sortOrder));
+
+    if (championRows) {
+      const allowedFormIds = new Set<number>();
+      const defaultFormId = Number(formRows.find((form: any) => Number(form.isDefault) === 1)?.id ?? formRows[0]?.id);
+
+      for (const champion of championRows) {
+        if (champion.formId != null) {
+          allowedFormIds.add(champion.formId);
+          continue;
+        }
+
+        const matchedForms = formRows.filter((form: any) =>
+          championFormNameMatches(form, champion.nameZh, String(row.nameZh)),
+        );
+        if (matchedForms.length > 0) {
+          for (const form of matchedForms) allowedFormIds.add(Number(form.id));
+        } else if (Number.isFinite(defaultFormId)) {
+          allowedFormIds.add(defaultFormId);
+        }
+      }
+
+      formRows = formRows.filter((form: any) => allowedFormIds.has(Number(form.id)));
+    }
 
     const formIds = formRows.map((f: any) => Number(f.id));
 

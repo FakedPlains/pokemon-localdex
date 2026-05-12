@@ -76,11 +76,18 @@ GET /api/pokemon?limit=20&offset=0
 
 返回数据包含基础信息、所有形态（含每个形态的属性变体 `typeVariants`、种族值变体 `statVariants`、特性变体 `abilityVariants`、图片 `images`）、进化链、世代可用性等完整数据。
 
+查询参数：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| seasonId | number | 可选。传入 Champions 赛季数据库 ID 时，仅返回该赛季赛制中可用的宝可梦形态；`seasonCode` 只用于展示。 |
+
 示例：
 
 ```
 GET /api/pokemon/皮卡丘
 GET /api/pokemon/25
+GET /api/pokemon/2?seasonId=1
 ```
 
 小程序端对应函数：`fetchPokemonDetail(idOrSlug)`。小程序端使用 `query` + `limit:1` 而非 PostgREST 的 `single` 模式（后者在 0 或多条结果时返回 406 错误），并优先使用数字 ID 导航以避免中文 URL 编码问题。

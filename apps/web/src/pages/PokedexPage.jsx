@@ -127,14 +127,17 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     if (!selectedSlug) { setDetail(null); return; }
     let cancelled = false;
     setDetail(null);
-    unifiedApi(`/pokemon/${selectedSlug}`).then((r) => {
+    const params = new URLSearchParams();
+    if (championsSeasonId) params.set("seasonId", championsSeasonId);
+    const qs = params.toString();
+    unifiedApi(`/pokemon/${selectedSlug}${qs ? `?${qs}` : ""}`).then((r) => {
       if (!cancelled) {
         setDetail(r.data);
         setDetailGeneration("");
       }
     });
     return () => { cancelled = true; };
-  }, [selectedSlug]);
+  }, [selectedSlug, championsSeasonId]);
 
   // Scroll detail panel to top when detail changes
   useEffect(() => {

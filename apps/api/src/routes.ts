@@ -59,7 +59,8 @@ export function registerApiRoutes<E extends object = object>(
   });
 
   api.get("/pokemon/:id", async (c) => {
-    const entry = await getStore(c).getPokemon(c.req.param("id"));
+    const championsSeasonId = numberQuery(c, "seasonId");
+    const entry = await getStore(c).getPokemon(c.req.param("id"), { championsSeasonId });
     return entry ? c.json({ data: entry }) : c.json({ error: "Pokemon not found" }, 404);
   });
 
