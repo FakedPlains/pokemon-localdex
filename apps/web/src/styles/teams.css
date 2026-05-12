@@ -170,6 +170,80 @@ display: flex;
 align-items: center;
 gap: 12px;
 margin-top: 14px;
+flex-wrap: wrap;
+}
+
+.box-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 2 1 420px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.box-search-wrap {
+  flex: 1 1 240px;
+  max-width: 360px;
+  min-width: 180px;
+}
+
+.box-sort-select .cs-trigger {
+  min-width: 92px;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.box-sort-select .cs-dropdown {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.box-result-meta {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.box-filter-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 36px 0;
+  text-align: center;
+}
+
+.box-filter-empty p {
+  margin: 0;
+}
+
+.box-filter-clear {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 42, 31, 0.12);
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.box-filter-clear:hover {
+  border-color: var(--accent);
+  background: rgba(217, 79, 61, 0.06);
+  color: var(--accent-strong);
+}
+
+@keyframes cs-fade-in-right {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.box-sort-select .cs-dropdown {
+  animation-name: cs-fade-in-right;
 }
 
 /* 新建配置按钮 */
@@ -1030,3 +1104,27 @@ white-space: nowrap;
   color: #c0392b !important;
 }
 
+@media (max-width: 900px) {
+  .box-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .box-tools {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .box-search-wrap {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .box-sort-select {
+    flex: 1 1 120px;
+  }
+
+  .box-sort-select .cs-trigger {
+    width: 100%;
+  }
+}

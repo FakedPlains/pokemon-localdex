@@ -17,6 +17,56 @@ import { useToast } from "../components/Toast.jsx";
 import CustomSelect from "../components/CustomSelect.jsx";
 
 
+const BOX_SORT_OPTIONS = [
+  { value: "current", label: "当前顺序" },
+  { value: "number", label: "按编号" },
+];
+
+function normalizeBoxSearch(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function boxSearchText(config) {
+  return [
+    config.configName,
+    config.nameZh,
+    config.formName,
+    config.pokemonId,
+  ].map(normalizeBoxSearch).join(" ");
+}
+
+function pokemonNumber(config) {
+  const number = Number(config.pokemonId);
+  return Number.isFinite(number) ? number : Number.POSITIVE_INFINITY;
+}
+
+function isDefaultForm(config) {
+  const formKey = normalizeBoxSearch(config.formKey);
+  const formName = normalizeBoxSearch(config.formName);
+  const nameZh = normalizeBoxSearch(config.nameZh);
+  return !formKey || formKey === "default" || !formName || formName === nameZh;
+}
+
+function pokemonFormNumber(config) {
+  const number = Number(config.formId);
+  return Number.isFinite(number) ? number : Number.POSITIVE_INFINITY;
+}
+
+function pokemonFormLabel(config) {
+  return normalizeBoxSearch(config.formKey || config.formName || "");
+}
+
+function comparePokemonForm(a, b) {
+  const byDefault = Number(isDefaultForm(a)) - Number(isDefaultForm(b));
+  if (byDefault !== 0) return -byDefault;
+
+  const formIdA = pokemonFormNumber(a);
+  const formIdB = pokemonFormNumber(b);
+  if (formIdA !== formIdB) return formIdA - formIdB;
+
+  return pokemonFormLabel(a).localeCompare(pokemonFormLabel(b), "zh-Hans", { numeric: true });
+}
+
 // ══════════════════════════════════════════════
 //  盒子卡片
 // ══════════════════════════════════════════════
@@ -297,9 +347,9 @@ function TeamCard({ team, onEdit, onDelete }) {
 
 export default function TeamsPage() {
   const toast = useToast();
-const [boxConfigs, setBoxConfigs] = useState([]);
-const [editingConfig, setEditingConfig] = useState(null);
-const [isNewConfig, setIsNewConfig] = useState(false);
+  const [boxConfigs, setBoxConfigs] = useState([]);
+  const [editingConfig, setEditingConfig] = useState(null);
+  const [isNewConfig, setIsNewConfig] = useState(false);
 
   const [teams, setTeams] = useState([]);
   const [editingTeam, setEditingTeam] = useState(null);
@@ -312,6 +362,8 @@ const [isNewConfig, setIsNewConfig] = useState(false);
 
   const [activeTab, setActiveTab] = useState("box");
   const [boxViewMode, setBoxViewMode] = useState("card"); // "card" | "list"
+  const [boxSearch, setBoxSearch] = useState("");
+  const [boxSortMode, setBoxSortMode] = useState("current");
   const [pickerSearch, setPickerSearch] = useState("");
 
   const editorRef = useRef(null);
@@ -354,6 +406,25 @@ const [isNewConfig, setIsNewConfig] = useState(false);
 
   const refreshBox = useCallback(() => setBoxConfigs(getBox()), []);
   const refreshTeams = useCallback(() => setTeams(getTeams()), []);
+
+  const displayedBoxConfigs = useMemo(() => {
+    const query = normalizeBoxSearch(boxSearch);
+    const indexed = boxConfigs.map((config, index) => ({ config, index }));
+    const filtered = query
+      ? indexed.filter(({ config }) => boxSearchText(config).includes(query))
+      : indexed;
+
+    if (boxSortMode === "number") {
+      return [...filtered]
+        .sort((a, b) => {
+          const byNumber = pokemonNumber(a.config) - pokemonNumber(b.config);
+          return byNumber || comparePokemonForm(a.config, b.config) || a.index - b.index;
+        })
+        .map(({ config }) => config);
+    }
+
+    return filtered.map(({ config }) => config);
+  }, [boxConfigs, boxSearch, boxSortMode]);
 
   // ── 盒子操作 ──
   const handleNewConfig = useCallback(() => { setEditingConfig(createDraftMember()); setIsNewConfig(true); }, []);
@@ -585,15 +656,49 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                   </button>
                 )}
                 {boxConfigs.length > 0 && (
-                  <ViewToggle mode={boxViewMode} onChange={setBoxViewMode} />
+                  <div className="box-tools">
+                    <div className="box-search-wrap search-input-wrap search-input-sm">
+                      <svg className="search-input-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4 4" />
+                      </svg>
+                      <input
+                        className="search-input"
+                        value={boxSearch}
+                        onChange={(e) => setBoxSearch(e.target.value)}
+                        placeholder="搜索宝可梦或配置名称…"
+                      />
+                      {boxSearch && (
+                        <button className="search-input-clear" onClick={() => setBoxSearch("")}>✕</button>
+                      )}
+                    </div>
+                    <CustomSelect
+                      className="box-sort-select"
+                      value={boxSortMode}
+                      options={BOX_SORT_OPTIONS}
+                      onChange={setBoxSortMode}
+                    />
+                    <ViewToggle mode={boxViewMode} onChange={setBoxViewMode} />
+                  </div>
                 )}
               </div>
 
               {boxConfigs.length > 0 ? (
                 <>
-                  {boxViewMode === "card" ? (
+                  {displayedBoxConfigs.length > 0 && (
+                    <div className="box-result-meta">
+                      {displayedBoxConfigs.length === boxConfigs.length
+                        ? `共 ${boxConfigs.length} 个配置`
+                        : `显示 ${displayedBoxConfigs.length} / ${boxConfigs.length} 个配置`}
+                    </div>
+                  )}
+                  {displayedBoxConfigs.length === 0 ? (
+                    <div className="detail-empty box-filter-empty">
+                      <p>没有匹配的宝可梦配置。</p>
+                      <button className="box-filter-clear" onClick={() => setBoxSearch("")}>清空搜索</button>
+                    </div>
+                  ) : boxViewMode === "card" ? (
                     <div className="te-card-grid">
-                      {boxConfigs.map((config) => (
+                      {displayedBoxConfigs.map((config) => (
                         <BoxCard
                           key={config.configId}
                           config={config}
@@ -619,7 +724,7 @@ const [isNewConfig, setIsNewConfig] = useState(false);
                         <span className="box-list-hcol box-list-hcol-combined" title="种族值 / 能力值">速度</span>
                         <span className="box-list-hcol box-list-hcol-actions"></span>
                       </div>
-                      {boxConfigs.map((config) => (
+                      {displayedBoxConfigs.map((config) => (
                         <BoxListRow
                           key={config.configId}
                           config={config}
