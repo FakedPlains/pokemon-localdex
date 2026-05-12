@@ -250,6 +250,8 @@ export type LearnsetRecord = {
 // 分页
 // ══════════════════════════════════════════════════════════════════════════════
 
+export type SortOrder = "asc" | "desc";
+export type PokemonListSortKey = "speed";
 export type PaginationParams = { offset?: number; limit?: number };
 export type PaginatedResult<T> = { items: T[]; total: number };
 
@@ -264,7 +266,14 @@ export type PaginatedResult<T> = { items: T[]; total: number };
  */
 export interface IStore {
   // Pokemon
-  listPokemon(filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number } & PaginationParams): Promise<PokemonSummary[] | PaginatedResult<PokemonSummary>>;
+  listPokemon(filters?: {
+    query?: string;
+    type?: string | string[];
+    generation?: number;
+    championsSeasonId?: number;
+    sort?: PokemonListSortKey;
+    order?: SortOrder;
+  } & PaginationParams): Promise<PokemonSummary[] | PaginatedResult<PokemonSummary>>;
   getPokemon(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<PokemonEntry | undefined>;
   getLearnsetMeta(pokemonId: number): Promise<any>;
   getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string }>;

@@ -7,7 +7,8 @@ import { STAT_KEYS, LEARN_METHOD_LABELS } from "../utils/constants.js";
 import {
   getPokemonPreviewImage,
   resolvePokemonDisplayVariant,
-  describeLearnsetEntry
+  describeLearnsetEntry,
+  calculateSpeedLine,
 } from "../utils/helpers.js";
 import { saveBoxConfig, getTeams, saveTeam } from "../utils/teamStorage.js";
 import { useToast } from "../components/Toast.jsx";
@@ -34,6 +35,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
   const [detailGeneration, setDetailGeneration] = useState("");
   const [dexViewMode, setDexViewMode] = useState("card"); // "card" | "list"
   const [championsSeasonId, setChampionsSeasonId] = useState("");
+  const [speedSortOrder, setSpeedSortOrder] = useState("");
   const [hasLoadedList, setHasLoadedList] = useState(false);
   const [lastList, setLastList] = useState([]);
   const [lastTotal, setLastTotal] = useState(0);
@@ -70,9 +72,13 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     if (types.length > 0) params.set("type", types.join(","));
     if (generation) params.set("generation", generation);
     if (championsSeasonId) params.set("seasonId", championsSeasonId);
+    if (speedSortOrder) {
+      params.set("sort", "speed");
+      params.set("order", speedSortOrder);
+    }
     const qs = params.toString();
     return qs ? `/pokemon?${qs}` : "/pokemon";
-  }, [query, types, generation, championsSeasonId]);
+  }, [query, types, generation, championsSeasonId, speedSortOrder]);
 
   // Mark that filters changed while detail panel is open
   useEffect(() => {
@@ -200,6 +206,14 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     setSelectedSlug(null);
   }, []);
 
+  const handleSpeedSortToggle = useCallback(() => {
+    setSpeedSortOrder((prev) => {
+      if (prev === "desc") return "asc";
+      if (prev === "asc") return "";
+      return "desc";
+    });
+  }, []);
+
   if (loading && list.length === 0 && !hasLoadedList) return <Loading />;
 
   const hasSelection = selectedSlug !== null;
@@ -298,7 +312,21 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
               <span className="dex-table-hcol dex-table-hcol-stats">防御</span>
               <span className="dex-table-hcol dex-table-hcol-stats">特攻</span>
               <span className="dex-table-hcol dex-table-hcol-stats">特防</span>
-              <span className="dex-table-hcol dex-table-hcol-stats">速度</span>
+              <button
+                type="button"
+                className={`dex-table-hcol dex-table-hcol-stats dex-table-sort-btn${speedSortOrder ? " dex-table-sort-btn-active" : ""}`}
+                onClick={handleSpeedSortToggle}
+                aria-label="按速度排序"
+                aria-sort={speedSortOrder === "asc" ? "ascending" : speedSortOrder === "desc" ? "descending" : "none"}
+                title="按速度排序"
+              >
+                <span>速度</span>
+                <span className="dex-table-sort-icon" aria-hidden="true">
+                  {speedSortOrder === "asc" ? "↑" : speedSortOrder === "desc" ? "↓" : "↕"}
+                </span>
+              </button>
+              <span className="dex-table-hcol dex-table-hcol-stats">满速</span>
+              <span className="dex-table-hcol dex-table-hcol-stats">极速</span>
               <span className="dex-table-hcol dex-table-hcol-stats">合计</span>
             </div>
             {displayList.map((member) => {
@@ -306,6 +334,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
               const image = getPokemonPreviewImage(member);
               const bs = member.baseStats || {};
               const total = STAT_KEYS.reduce((s, k) => s + (bs[k] || 0), 0);
+              const speedLine = calculateSpeedLine(bs.spe);
               return (
                 <div key={slug} className="dex-table-row" data-slug={slug} onClick={() => handleSelect(slug)}>
                   <div className="dex-table-col dex-table-col-img">
@@ -336,6 +365,12 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
                       <span className="dex-table-stat-val">{bs[k] ?? "—"}</span>
                     </div>
                   ))}
+                  <div className="dex-table-col dex-table-col-stat">
+                    <span className="dex-table-stat-val">{speedLine.full ?? "—"}</span>
+                  </div>
+                  <div className="dex-table-col dex-table-col-stat">
+                    <span className="dex-table-stat-val">{speedLine.max ?? "—"}</span>
+                  </div>
                   <div className="dex-table-col dex-table-col-stat dex-table-col-total">
                     <span className="dex-table-stat-val dex-table-stat-total">{total || "—"}</span>
                   </div>

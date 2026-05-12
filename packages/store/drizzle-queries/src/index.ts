@@ -37,6 +37,7 @@ import type {
   ImageAsset,
   PokemonFormEntry,
   EvolutionStep,
+  PokemonListSortKey,
   PokemonSummary,
   PokemonEntry,
   ChampionsSeasonSummary,
@@ -49,6 +50,7 @@ import type {
   LearnsetRecord,
   PaginationParams,
   PaginatedResult,
+  SortOrder,
   IStore,
 } from "@pokemon-localdex/store-types";
 
@@ -138,7 +140,14 @@ export class DrizzleStore implements IStore {
   // ────────────────────────────────────────────────────────────────────────────
 
   async listPokemon(
-    filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number } & PaginationParams,
+    filters?: {
+      query?: string;
+      type?: string | string[];
+      generation?: number;
+      championsSeasonId?: number;
+      sort?: PokemonListSortKey;
+      order?: SortOrder;
+    } & PaginationParams,
   ): Promise<PaginatedResult<PokemonSummary & { _chainId?: number }> | Array<PokemonSummary & { _chainId?: number }>> {
     const conditions: SQL[] = [];
 
@@ -204,6 +213,14 @@ export class DrizzleStore implements IStore {
       total = Number(countRows[0]?.cnt ?? 0);
     }
 
+    const orderByClauses: SQL[] = filters?.sort === "speed"
+      ? [
+          sql`${pokemonFormStats.spe} IS NULL`,
+          filters.order === "asc" ? asc(pokemonFormStats.spe) : desc(pokemonFormStats.spe),
+          asc(pokemon.dexNumber),
+        ]
+      : [asc(pokemon.dexNumber)];
+
     let query = this.db
       .select({
         id: pokemon.id,
@@ -224,7 +241,7 @@ export class DrizzleStore implements IStore {
       .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
       .leftJoin(pokemonFormStats, and(eq(pokemonFormStats.formId, pokemonForms.id), isNull(pokemonFormStats.generationEnd)))
       .where(where)
-      .orderBy(asc(pokemon.dexNumber));
+      .orderBy(...orderByClauses);
 
     if (usePagination) {
       query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));

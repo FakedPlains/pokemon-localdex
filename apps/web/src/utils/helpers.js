@@ -91,6 +91,28 @@ export function calculateFinalStat(member, detail, statKey) {
   return Math.floor(raw * getNatureMultiplier(member.nature || "认真", statKey));
 }
 
+export function calculateClassicStatValue(base, statKey, {
+  iv = 31,
+  ev = 0,
+  level = 50,
+  nature = "认真",
+} = {}) {
+  if (base === undefined || base === null) return undefined;
+  if (statKey === "hp") {
+    return Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + level + 10;
+  }
+
+  const raw = Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + 5;
+  return Math.floor(raw * getNatureMultiplier(nature, statKey));
+}
+
+export function calculateSpeedLine(baseSpe, level = 50) {
+  return {
+    full: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "认真" }),
+    max: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "爽朗" }),
+  };
+}
+
 export function buildDerivedStats(member, detail) {
   if (!detail?.baseStats) return undefined;
   return Object.fromEntries(
