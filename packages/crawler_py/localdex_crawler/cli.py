@@ -12,6 +12,12 @@ from .catalog import (
     normalize_item_detail_page,
     normalize_move_detail_page,
 )
+from .champions import (
+    CHAMPIONS_ITEMS_URL,
+    CHAMPIONS_REGULATIONS_URL,
+    CHAMPIONS_SEASONS_URL,
+    normalize_champions_pages,
+)
 from .config import CrawlerPaths
 from .fetcher import PageFetcher, PageNotFoundError
 from .html_tools import parse_pokemon_abilities
@@ -28,6 +34,7 @@ from .sqlite_upsert import (
     cache_key,
     clear_abilities,
     clear_all,
+    clear_champions,
     clear_items,
     clear_moves,
     clear_pokemon,
@@ -35,6 +42,7 @@ from .sqlite_upsert import (
     pokemon_source_url,
     select_pokemon,
     upsert_ability_detail,
+    upsert_champions_data,
     upsert_item_detail,
     upsert_move_detail,
     upsert_pokemon_abilities,
@@ -75,12 +83,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     catalog.add_argument("--item-limit", type=int)
     catalog.add_argument("--name", action="append", default=[], help="Catalog Chinese name filter.")
 
-    all_parser = subparsers.add_parser("all", help="Crawl catalog, Pokemon details, and learnsets.")
+    champions = subparsers.add_parser("champions", help="Crawl Pokemon Champions seasons, regulations, Pokemon, and items.")
+    add_runtime_flags(champions)
+
+    all_parser = subparsers.add_parser("all", help="Crawl catalog, Pokemon details, learnsets, and Champions data.")
     add_runtime_flags(all_parser)
     add_pokemon_filters(all_parser)
     all_parser.add_argument("--moves", action=argparse.BooleanOptionalAction, default=True)
     all_parser.add_argument("--abilities", action=argparse.BooleanOptionalAction, default=True)
     all_parser.add_argument("--items", action=argparse.BooleanOptionalAction, default=True)
+    all_parser.add_argument("--champions", action=argparse.BooleanOptionalAction, default=True)
     all_parser.add_argument("--move-limit", type=int)
     all_parser.add_argument("--ability-limit", type=int)
     all_parser.add_argument("--item-limit", type=int)
@@ -123,6 +135,8 @@ def main(argv: list[str] | None = None) -> int:
         return crawl_pokemon_abilities(conn, fetcher, args)
     if command == "learnsets":
         return crawl_learnsets(conn, fetcher, args)
+    if command == "champions":
+        return crawl_champions(conn, fetcher, args)
     if command == "all":
         clean = getattr(args, "clean", False)
         if clean and not args.dry_run:
@@ -133,7 +147,8 @@ def main(argv: list[str] | None = None) -> int:
         catalog_result = crawl_catalog(conn, fetcher, args)
         pokemon_result = crawl_pokemon(conn, fetcher, args)
         learnset_result = crawl_learnsets(conn, fetcher, args)
-        return catalog_result or pokemon_result or learnset_result
+        champions_result = crawl_champions(conn, fetcher, args) if getattr(args, "champions", True) else 0
+        return catalog_result or pokemon_result or learnset_result or champions_result
     raise ValueError(f"Unsupported command: {command}")
 
 
@@ -340,6 +355,51 @@ def crawl_learnsets(conn, fetcher: PageFetcher, args) -> int:
     if not args.dry_run:
         _backfill_incomplete_moves(conn, fetcher)
 
+    return 0
+
+
+def crawl_champions(conn, fetcher: PageFetcher, args) -> int:
+    clean = getattr(args, "clean", False)
+    if clean and not args.dry_run:
+        n = clear_champions(conn)
+        print(f"[clean] Deleted {n} Champions rows.")
+
+    seasons_page = fetcher.load_or_fetch("champions-seasons", CHAMPIONS_SEASONS_URL)
+    regulations_page = fetcher.load_or_fetch("champions-regulations", CHAMPIONS_REGULATIONS_URL)
+    items_page = fetcher.load_or_fetch("champions-items", CHAMPIONS_ITEMS_URL)
+    payload = normalize_champions_pages(seasons_page, regulations_page, items_page)
+
+    seasons = payload.get("seasons") or []
+    regulations = payload.get("regulations") or []
+    items = payload.get("items") or []
+    pokemon_count = sum(len(regulation.pokemon) for regulation in regulations)
+    battle_item_count = sum(1 for item in items if item.is_battle_item)
+    linked_item_count = None
+
+    if args.dry_run:
+        for season in seasons:
+            print(
+                f"[dry-run] champions season {season.season_code}: "
+                f"regulation={season.regulation_code} period={season.period_text or '-'}"
+            )
+        for regulation in regulations:
+            print(
+                f"[dry-run] champions regulation {regulation.regulation_code}: "
+                f"pokemon={len(regulation.pokemon)} items={battle_item_count} "
+                f"period={regulation.period_text or '-'}"
+            )
+    else:
+        summary = upsert_champions_data(conn, payload)
+        linked_item_count = summary.get("linkedItems")
+        print(f"[updated] champions: {summary}")
+
+    linked_info = f"linkedItems={linked_item_count} " if linked_item_count is not None else ""
+    print(
+        "Champions finished. "
+        f"seasons={len(seasons)} regulations={len(regulations)} "
+        f"pokemon={pokemon_count} items={len(items)} battleItems={battle_item_count} "
+        f"{linked_info}dryRun={args.dry_run}"
+    )
     return 0
 
 

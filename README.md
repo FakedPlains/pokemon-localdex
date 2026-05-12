@@ -38,6 +38,7 @@ npm run crawl:pokemon
 npm run crawl:abilities
 npm run crawl:moves
 npm run crawl:items
+npm run crawl:champions
 ```
 
 ### 本地开发（SQLite 模式）

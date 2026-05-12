@@ -56,6 +56,14 @@ python3 scripts/crawl-52poke-db.py pokemon-abilities
 python3 scripts/crawl-52poke-db.py learnsets
 ```
 
+**champions** — 采集 Pokémon Champions 的赛季、赛制、赛制可用宝可梦和可用道具。赛季页提供赛季到赛制的映射，赛制页提供可用宝可梦和持有物规则，道具页用于定位 Champions 道具池；写库时只把主 `items` 表中已存在的对战道具关联到赛制。
+
+```bash
+npm run crawl:champions
+# 或
+python3 scripts/crawl-52poke-db.py champions
+```
+
 **catalog** — 采集招式、特性和道具的详情页。从各自的列表页获取条目，然后逐一抓取详情页解析完整数据。
 
 ```bash
@@ -64,7 +72,7 @@ npm run crawl:catalog
 python3 scripts/crawl-52poke-db.py catalog
 ```
 
-**all** — 依次执行 catalog、pokemon、learnsets 三个子命令，完成全量采集。
+**all** — 依次执行 catalog、pokemon、learnsets、champions 四个子命令，完成全量采集。
 
 ## 通用参数
 
@@ -115,6 +123,7 @@ python3 scripts/crawl-52poke-db.py pokemon --limit 5 --dry-run
 | `--moves / --no-moves` | 是否采集招式（默认开启） |
 | `--abilities / --no-abilities` | 是否采集特性（默认开启） |
 | `--items / --no-items` | 是否采集道具（默认开启） |
+| `--champions / --no-champions` | `all` 子命令中是否采集 Champions 数据（默认开启） |
 | `--move-limit N` | 最多采集 N 个招式 |
 | `--ability-limit N` | 最多采集 N 个特性 |
 | `--item-limit N` | 最多采集 N 个道具 |
@@ -175,7 +184,7 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 
 爬虫唯一的数据源是 [52Poké Wiki](https://wiki.52poke.com/)（神奇宝贝百科）。所有数据均从该站点的 HTML 页面中解析获取，不使用任何第三方 API 或其他数据源。
 
-采集入口页面共四个：
+采集入口页面包括：
 
 | 数据类型 | 入口页面 | 说明 |
 |---------|---------|------|
@@ -183,6 +192,9 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 | 招式 | 招式列表 | 按世代分组的招式表格 |
 | 特性 | 特性列表 | 按世代分组的特性表格 |
 | 道具 | 道具列表 | 按分类分组的道具表格 |
+| Champions 赛季 | 赛季（Champions） | 赛季、举办日期、赛制映射 |
+| Champions 赛制 | 赛制（Champions） | 赛制期间、特殊要素、持有物规则、可用宝可梦 |
+| Champions 道具 | 道具列表（Champions） | Champions 中的树果、对战影响道具、属性增强道具、超级石和票券 |
 
 每个条目的详情数据通过列表页中的超链接跳转到对应的详情页获取。详情页 URL 的构造规则为 `https://wiki.52poke.com/wiki/{名称}（{类型后缀}）`，其中类型后缀为"招式"、"特性"或"道具"。宝可梦详情页直接使用中文名作为路径，不带后缀。
 
@@ -217,6 +229,9 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 | 特性详情 | `ability-{slugify(name_zh)}` | `ability-静电.json` |
 | 道具详情 | `item-{slugify(name_zh)}` | `item-光之石.json` |
 | 招式学习表 | `pokemon-{dex_number:04d}-learnset-gen{N}` | `pokemon-0025-learnset-gen9.json` |
+| Champions 赛季 | `champions-seasons` | `champions-seasons.json` |
+| Champions 赛制 | `champions-regulations` | `champions-regulations.json` |
+| Champions 道具 | `champions-items` | `champions-items.json` |
 
 `slugify()` 函数将文本进行 NFKC 标准化后，用连字符替换非字母数字和非中文字符，并转为小写。
 
@@ -301,6 +316,19 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 | `level` | 正整数或 NULL | 仅 `level-up` 方式有值，"进化"/"—" 转为 NULL |
 | `game_version_code` | 版本代码或 NULL | 如 `SV`、`BDSP`、`SWSH` 等，从页面 h4 标题推断 |
 | `tm_number` | 字符串或 NULL | 招式学习器编号，如 `TM001`、`TR01` |
+
+#### Champions 字段
+
+| 字段 | 格式要求 | 说明 |
+|------|---------|------|
+| `season_code` | 字符串 | 赛季编号，如 `M-1` |
+| `regulation_code` | 字符串 | 赛制编号，如 `M-A` |
+| `period_text` | 简体中文原文 | Wiki 页面中的举办期间原文 |
+| `start_at` / `end_at` | `YYYY-MM-DD` 或 `YYYY-MM-DDTHH:mm` | 从期间文本解析出的起止时间；无时间时只存日期 |
+| `msp_code` | 字符串 | 52Poké `data-msp` 中的形态代码，如 `0006MX` |
+| `dex_number` | 整数或 NULL | 从 `msp_code` 前四位解析出的全国图鉴编号 |
+| `form_key` | 字符串 | 可用形态名称的 `slugify()` 结果 |
+| `item_id` | 整数 | `champions_regulation_items` 直接关联主 `items.id`；Champions 专用道具或票券不写入 |
 
 #### 世代变更记录字段
 

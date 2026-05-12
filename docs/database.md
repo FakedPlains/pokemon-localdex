@@ -8,7 +8,7 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 
 ## 表结构总览
 
-数据库包含 14 张表，按功能可分为四组：主实体表、形态相关表、世代记录表和关联表。
+数据库包含主实体表、形态相关表、世代记录表、关联表和 Champions 专用表。
 
 ### 主实体表
 
@@ -205,6 +205,54 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 | region | TEXT | 地区名称 |
 | regional_dex_number | TEXT | 地区图鉴编号 |
 
+### Champions 专用表
+
+Champions 数据来自 52Poké 的 `赛季（Champions）`、`赛制（Champions）` 和 `道具列表（Champions）`。赛季通过 `regulation_id` 关联到赛制；赛制下挂可使用的宝可梦，并通过主 `items` 表关联可用的对战道具。道具列表页中只用于定位 Champions 道具池，不单独落 Champions 专用道具表。
+
+**champions_regulations** — Champions 赛制表。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| regulation_code | TEXT UNIQUE | 赛制编号，如 `M-A` |
+| name | TEXT | 赛制名称 |
+| start_at / end_at | TEXT | 解析后的期间起止日期/时间 |
+| period_text | TEXT | Wiki 原始期间文本 |
+| special_feature | TEXT | 特别要素 |
+| held_item_rule | TEXT | 持有物规则 |
+| battle_time | TEXT | 对战时间规则 |
+
+**champions_seasons** — Champions 赛季表。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| season_code | TEXT UNIQUE | 赛季编号，如 `M-1` |
+| regulation_id | INTEGER FK | 关联 champions_regulations.id |
+| regulation_code | TEXT | 冗余赛制编号，便于排查源数据 |
+| start_at / end_at | TEXT | 解析后的赛季起止日期/时间 |
+| period_text | TEXT | Wiki 原始日期文本 |
+
+**champions_regulation_pokemon** — 每个赛制可使用的宝可梦/形态。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| regulation_id | INTEGER FK | 关联 champions_regulations.id |
+| pokemon_id | INTEGER FK | 可选关联 pokemon.id |
+| form_id | INTEGER FK | 可选关联 pokemon_forms.id |
+| dex_number | INTEGER | 全国图鉴编号 |
+| msp_code | TEXT | 52Poké `data-msp` 形态代码 |
+| form_code | TEXT | `msp_code` 的形态后缀 |
+| name_zh | TEXT | Champions 可用形态显示名 |
+| form_key | TEXT | 形态显示名 slug |
+| sort_order | INTEGER | 源页面顺序 |
+
+**champions_regulation_items** — 每个赛制可使用的主系列道具池。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| regulation_id | INTEGER FK | 关联 champions_regulations.id |
+| item_id | INTEGER FK | 关联主 items.id；Champions 道具页中找不到主表记录的条目不写入 |
+| sort_order | INTEGER | Champions 道具源页面顺序 |
+
 ## ER 关系
 
 ```mermaid
@@ -221,6 +269,12 @@ erDiagram
     moves ||--o{ pokemon_learnsets : "learned by"
     abilities ||--o{ ability_generation_records : "changes across"
     abilities ||--o{ pokemon_form_abilities : "possessed by"
+    champions_regulations ||--o{ champions_seasons : "used by"
+    champions_regulations ||--o{ champions_regulation_pokemon : "allows"
+    champions_regulations ||--o{ champions_regulation_items : "allows"
+    items ||--o{ champions_regulation_items : "available in"
+    pokemon ||--o{ champions_regulation_pokemon : "matched by dex"
+    pokemon_forms ||--o{ champions_regulation_pokemon : "matched by form"
 ```
 
 ## 设计要点
