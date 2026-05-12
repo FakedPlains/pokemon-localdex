@@ -284,3 +284,63 @@ export const itemGenerationRecords = sqliteTable("item_generation_records", {
   uniqueIndex("uq_item_gen").on(table.itemId, table.generation),
 ]);
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Pokémon Champions 赛季 / 赛制 / 可用池
+// ══════════════════════════════════════════════════════════════════════════════
+
+export const championsRegulations = sqliteTable("champions_regulations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  regulationCode: text("regulation_code").notNull().unique(),
+  name: text("name").notNull(),
+  startAt: text("start_at"),
+  endAt: text("end_at"),
+  periodText: text("period_text"),
+  specialFeature: text("special_feature"),
+  heldItemRule: text("held_item_rule"),
+  battleTime: text("battle_time"),
+  sourceUrl: text("source_url"),
+  sourceTitle: text("source_title"),
+  sourceFetchedAt: text("source_fetched_at"),
+});
+
+export const championsSeasons = sqliteTable("champions_seasons", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  seasonCode: text("season_code").notNull().unique(),
+  regulationId: integer("regulation_id").references(() => championsRegulations.id, { onDelete: "set null" }),
+  regulationCode: text("regulation_code").notNull(),
+  startAt: text("start_at"),
+  endAt: text("end_at"),
+  periodText: text("period_text"),
+  sourceUrl: text("source_url"),
+  sourceTitle: text("source_title"),
+  sourceFetchedAt: text("source_fetched_at"),
+}, (table) => [
+  index("idx_champions_seasons_regulation").on(table.regulationId),
+]);
+
+export const championsRegulationPokemon = sqliteTable("champions_regulation_pokemon", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  regulationId: integer("regulation_id").notNull().references(() => championsRegulations.id, { onDelete: "cascade" }),
+  pokemonId: integer("pokemon_id").references(() => pokemon.id, { onDelete: "set null" }),
+  formId: integer("form_id").references(() => pokemonForms.id, { onDelete: "set null" }),
+  dexNumber: integer("dex_number"),
+  mspCode: text("msp_code").notNull(),
+  formCode: text("form_code"),
+  nameZh: text("name_zh").notNull(),
+  formKey: text("form_key"),
+  sortOrder: integer("sort_order").notNull().default(0),
+}, (table) => [
+  uniqueIndex("uq_champions_regulation_pokemon").on(table.regulationId, table.mspCode, table.nameZh),
+  index("idx_champions_regulation_pokemon_regulation").on(table.regulationId),
+  index("idx_champions_regulation_pokemon_pokemon").on(table.pokemonId),
+]);
+
+export const championsRegulationItems = sqliteTable("champions_regulation_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  regulationId: integer("regulation_id").notNull().references(() => championsRegulations.id, { onDelete: "cascade" }),
+  itemId: integer("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+}, (table) => [
+  uniqueIndex("uq_champions_regulation_items").on(table.regulationId, table.itemId),
+  index("idx_champions_regulation_items_regulation").on(table.regulationId),
+]);

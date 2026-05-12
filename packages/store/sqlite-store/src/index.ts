@@ -27,6 +27,7 @@ export type {
   EvolutionStep,
   PokemonSummary,
   PokemonEntry,
+  ChampionsSeasonSummary,
   MoveGenerationRecord,
   MoveEntry,
   AbilityGenerationRecord,
@@ -347,6 +348,22 @@ export function ensureSchema() {
     db.exec(`DROP TABLE IF EXISTS image_assets; DROP TABLE IF EXISTS _image_assets_backup;`);
   } catch { /* table doesn't exist */ }
 
+  // ── 迁移: Champions 道具关联直接指向 items，移除旧 champions_items 表 ──
+  try {
+    const championItemCols = db.prepare("PRAGMA table_info(champions_regulation_items)").all() as Record<string, unknown>[];
+    const colNames = championItemCols.map((c) => String(c.name));
+    if (colNames.includes("champions_item_id")) {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        DROP TABLE IF EXISTS champions_regulation_items;
+        DROP TABLE IF EXISTS champions_items;
+        PRAGMA foreign_keys = ON;
+      `);
+    } else {
+      db.exec(`DROP TABLE IF EXISTS champions_items;`);
+    }
+  } catch { /* tables don't exist yet */ }
+
   db.exec(`
     PRAGMA foreign_keys = OFF;
 
@@ -542,6 +559,56 @@ export function ensureSchema() {
       UNIQUE (item_id, generation)
     );
 
+    CREATE TABLE IF NOT EXISTS champions_regulations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      regulation_code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      start_at TEXT,
+      end_at TEXT,
+      period_text TEXT,
+      special_feature TEXT,
+      held_item_rule TEXT,
+      battle_time TEXT,
+      source_url TEXT,
+      source_title TEXT,
+      source_fetched_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS champions_seasons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      season_code TEXT NOT NULL UNIQUE,
+      regulation_id INTEGER REFERENCES champions_regulations(id) ON DELETE SET NULL,
+      regulation_code TEXT NOT NULL,
+      start_at TEXT,
+      end_at TEXT,
+      period_text TEXT,
+      source_url TEXT,
+      source_title TEXT,
+      source_fetched_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS champions_regulation_pokemon (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      regulation_id INTEGER NOT NULL REFERENCES champions_regulations(id) ON DELETE CASCADE,
+      pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE SET NULL,
+      form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
+      dex_number INTEGER,
+      msp_code TEXT NOT NULL,
+      form_code TEXT,
+      name_zh TEXT NOT NULL,
+      form_key TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (regulation_id, msp_code, name_zh)
+    );
+
+    CREATE TABLE IF NOT EXISTS champions_regulation_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      regulation_id INTEGER NOT NULL REFERENCES champions_regulations(id) ON DELETE CASCADE,
+      item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (regulation_id, item_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pokemon_dex ON pokemon(dex_number);
     CREATE INDEX IF NOT EXISTS idx_pokemon_name ON pokemon(name_zh);
     CREATE INDEX IF NOT EXISTS idx_pokemon_slug ON pokemon(slug);
@@ -568,6 +635,11 @@ export function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_abilities_name ON abilities(name_zh);
     CREATE INDEX IF NOT EXISTS idx_abilities_number ON abilities(number);
     CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
+
+    CREATE INDEX IF NOT EXISTS idx_champions_seasons_regulation ON champions_seasons(regulation_id);
+    CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_regulation ON champions_regulation_pokemon(regulation_id);
+    CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_pokemon ON champions_regulation_pokemon(pokemon_id);
+    CREATE INDEX IF NOT EXISTS idx_champions_regulation_items_regulation ON champions_regulation_items(regulation_id);
 
     PRAGMA foreign_keys = ON;
   `);
@@ -596,6 +668,11 @@ export function migrateSchema() {
     DROP TABLE IF EXISTS pokemon_base_stats;
     DROP TABLE IF EXISTS evolution_chains;
     DROP TABLE IF EXISTS pokemon_learnsets;
+    DROP TABLE IF EXISTS champions_regulation_items;
+    DROP TABLE IF EXISTS champions_regulation_pokemon;
+    DROP TABLE IF EXISTS champions_seasons;
+    DROP TABLE IF EXISTS champions_regulations;
+    DROP TABLE IF EXISTS champions_items;
     DROP TABLE IF EXISTS pokemon_form_images;
     DROP TABLE IF EXISTS pokemon;
     PRAGMA foreign_keys = ON;
@@ -609,6 +686,11 @@ export function resetSchema() {
   db.exec(`
     PRAGMA foreign_keys = OFF;
     DROP TABLE IF EXISTS pokemon_learnsets;
+    DROP TABLE IF EXISTS champions_regulation_items;
+    DROP TABLE IF EXISTS champions_regulation_pokemon;
+    DROP TABLE IF EXISTS champions_seasons;
+    DROP TABLE IF EXISTS champions_regulations;
+    DROP TABLE IF EXISTS champions_items;
     DROP TABLE IF EXISTS evolution_chains;
     DROP TABLE IF EXISTS pokemon_form_images;
     DROP TABLE IF EXISTS pokemon_form_abilities;
@@ -716,4 +798,3 @@ export function createSqliteStore(): IStore {
   const { db } = createDrizzleDb();
   return createDrizzleStore(db);
 }
-

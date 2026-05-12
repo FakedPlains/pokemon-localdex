@@ -1665,6 +1665,19 @@ export default function DamagePage() {
               {GENERATION_OPTIONS.map((g) => <option key={g} value={g}>{g}世代</option>)}
               <option value="0">Champions</option>
             </select>
+            {!isChampions && (
+              <div className="dc-level-inline">
+                <span className="dc-level-inline-label">Lv.</span>
+                <input
+                  className="dc-level-inline-input"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={level}
+                  onChange={(e) => setLevel(Math.max(1, Math.min(100, Number(e.target.value) || 50)))}
+                />
+              </div>
+            )}
             <div className="dc-battle-mode-toggle">
               <button className={"dc-mode-btn" + (battleMode === "singles" ? " dc-mode-btn-active" : "")} onClick={() => setBattleMode("singles")}>单打</button>
               <button className={"dc-mode-btn" + (battleMode === "doubles" ? " dc-mode-btn-active" : "")} onClick={() => setBattleMode("doubles")}>双打</button>
@@ -1791,18 +1804,6 @@ export default function DamagePage() {
               )}
             </div>
 
-            {/* 等级 */}
-            <div className="dc-level-section">
-              <span className="dc-section-title">等级</span>
-              <input
-                className="dc-level-input"
-                type="number"
-                min={1}
-                max={100}
-                value={level}
-                onChange={(e) => setLevel(Math.max(1, Math.min(100, Number(e.target.value) || 50)))}
-              />
-            </div>
 
             {/* 场地环境 */}
             <div className="dc-field-section">
