@@ -18,6 +18,16 @@ function numberQuery(c: any, key: string): number | undefined {
   return v ? Number(v) : undefined;
 }
 
+function pokemonSortQuery(c: any): { sort?: "speed"; order?: "asc" | "desc" } {
+  const sortRaw = c.req.query("sort");
+  const sort = sortRaw === "speed" || sortRaw === "spe" ? "speed" : undefined;
+  if (!sort) return {};
+  return {
+    sort,
+    order: c.req.query("order") === "asc" ? "asc" : "desc",
+  };
+}
+
 // ── 路由注册 ──
 
 export interface RegisterRoutesOptions<E extends object = object> {
@@ -46,15 +56,16 @@ export function registerApiRoutes<E extends object = object>(
       : undefined;
     const generation = numberQuery(c, "generation");
     const championsSeasonId = numberQuery(c, "seasonId");
+    const sortOptions = pokemonSortQuery(c);
     const limit = numberQuery(c, "limit");
     const offset = numberQuery(c, "offset") ?? 0;
 
     if (limit !== undefined) {
-      const result = await s.listPokemon({ query, type, generation, championsSeasonId, limit, offset });
+      const result = await s.listPokemon({ query, type, generation, championsSeasonId, ...sortOptions, limit, offset });
       const { items, total } = result as { items: unknown[]; total: number };
       return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
     }
-    const data = await s.listPokemon({ query, type, generation, championsSeasonId });
+    const data = await s.listPokemon({ query, type, generation, championsSeasonId, ...sortOptions });
     return c.json({ data });
   });
 

@@ -890,14 +890,15 @@ display: block;
 /* ── Table View ── */
 .dex-table-view {
   border-radius: 14px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   background: var(--surface);
   margin: 2px 0;
 }
 
 .dex-table-header {
   display: grid;
-  grid-template-columns: 52px 64px minmax(120px, 1.5fr) minmax(100px, 1fr) 24px minmax(120px, 1.2fr) repeat(6, 48px) 52px;
+  grid-template-columns: 52px 64px minmax(120px, 1.5fr) minmax(100px, 1fr) 24px minmax(120px, 1.2fr) repeat(6, 48px) repeat(2, 54px) 52px;
   align-items: center;
   padding: 8px 14px;
   gap: 8px 6px;
@@ -916,9 +917,37 @@ display: block;
   text-align: center;
 }
 
+.dex-table-sort-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 2px;
+  border-radius: 6px;
+  font: inherit;
+  letter-spacing: 0;
+}
+
+.dex-table-sort-btn:hover,
+.dex-table-sort-btn-active {
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.dex-table-sort-icon {
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
 .dex-table-row {
   display: grid;
-  grid-template-columns: 52px 64px minmax(120px, 1.5fr) minmax(100px, 1fr) 24px minmax(120px, 1.2fr) repeat(6, 48px) 52px;
+  grid-template-columns: 52px 64px minmax(120px, 1.5fr) minmax(100px, 1fr) 24px minmax(120px, 1.2fr) repeat(6, 48px) repeat(2, 54px) 52px;
   align-items: center;
   padding: 6px 14px;
   gap: 8px 6px;
@@ -1061,7 +1090,7 @@ display: block;
 
   .dex-table-header,
   .dex-table-row {
-    grid-template-columns: 44px 52px minmax(80px, 1.2fr) minmax(80px, 0.8fr) 16px minmax(80px, 1fr) repeat(6, 38px) 44px;
+    grid-template-columns: 44px 52px minmax(80px, 1.2fr) minmax(80px, 0.8fr) 16px minmax(80px, 1fr) repeat(6, 38px) repeat(2, 46px) 44px;
     gap: 4px 4px;
     padding: 5px 10px;
   }
