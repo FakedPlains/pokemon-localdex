@@ -108,6 +108,7 @@ export function calculateClassicStatValue(base, statKey, {
 
 export function calculateSpeedLine(baseSpe, level = 50) {
   return {
+    noInvestment: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 0, level, nature: "认真" }),
     full: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "认真" }),
     max: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "爽朗" }),
   };

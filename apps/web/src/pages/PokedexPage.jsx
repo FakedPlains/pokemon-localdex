@@ -36,6 +36,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
   const [dexViewMode, setDexViewMode] = useState("card"); // "card" | "list"
   const [championsSeasonId, setChampionsSeasonId] = useState("");
   const [speedSortOrder, setSpeedSortOrder] = useState("");
+  const [showSpeedLine, setShowSpeedLine] = useState(false);
   const [hasLoadedList, setHasLoadedList] = useState(false);
   const [lastList, setLastList] = useState([]);
   const [lastTotal, setLastTotal] = useState(0);
@@ -215,6 +216,11 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     });
   }, []);
 
+  const handleSpeedLineToggle = useCallback(() => {
+    if (!showSpeedLine) setDexViewMode("list");
+    setShowSpeedLine((prev) => !prev);
+  }, [showSpeedLine]);
+
   if (loading && list.length === 0 && !hasLoadedList) return <Loading />;
 
   const hasSelection = selectedSlug !== null;
@@ -248,6 +254,19 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
         {/* 视图切换按钮（仅在未选中详情时显示） */}
         {!hasSelection && displayList.length > 0 && (
           <div className="dex-view-toggle">
+            <button
+              type="button"
+              className={`dex-speed-line-toggle${showSpeedLine ? " dex-speed-line-toggle-active" : ""}`}
+              onClick={handleSpeedLineToggle}
+              aria-pressed={showSpeedLine}
+              title={showSpeedLine ? "显示完整种族值" : "查看速度线"}
+            >
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 12h10" />
+                <path d="M4 10l3-3 2 2 3-5" />
+              </svg>
+              <span>{showSpeedLine ? "完整种族值" : "查看速度线"}</span>
+            </button>
             <ViewToggle mode={effectiveViewMode} onChange={setDexViewMode} />
           </div>
         )}
@@ -301,34 +320,55 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
           /* 列表视图 */
           <div className="dex-table-view">
             {displayList.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
-            <div className="dex-table-header">
+            <div className={`dex-table-header${showSpeedLine ? " dex-table-header-speed-line" : ""}`}>
               <span className="dex-table-hcol dex-table-hcol-img"></span>
               <span className="dex-table-hcol dex-table-hcol-dex">编号</span>
               <span className="dex-table-hcol dex-table-hcol-name">名称</span>
               <span className="dex-table-hcol dex-table-hcol-types">属性</span>
               <span className="dex-table-hcol-spacer" />
               <span className="dex-table-hcol dex-table-hcol-ability">特性</span>
-              <span className="dex-table-hcol dex-table-hcol-stats">HP</span>
-              <span className="dex-table-hcol dex-table-hcol-stats">攻击</span>
-              <span className="dex-table-hcol dex-table-hcol-stats">防御</span>
-              <span className="dex-table-hcol dex-table-hcol-stats">特攻</span>
-              <span className="dex-table-hcol dex-table-hcol-stats">特防</span>
-              <button
-                type="button"
-                className={`dex-table-hcol dex-table-hcol-stats dex-table-sort-btn${speedSortOrder ? " dex-table-sort-btn-active" : ""}`}
-                onClick={handleSpeedSortToggle}
-                aria-label="按速度排序"
-                aria-sort={speedSortOrder === "asc" ? "ascending" : speedSortOrder === "desc" ? "descending" : "none"}
-                title="按速度排序"
-              >
-                <span>速度</span>
-                <span className="dex-table-sort-icon" aria-hidden="true">
-                  {speedSortOrder === "asc" ? "↑" : speedSortOrder === "desc" ? "↓" : "↕"}
-                </span>
-              </button>
-              <span className="dex-table-hcol dex-table-hcol-stats">满速</span>
-              <span className="dex-table-hcol dex-table-hcol-stats">极速</span>
-              <span className="dex-table-hcol dex-table-hcol-stats">合计</span>
+              {showSpeedLine ? (
+                <>
+                  <button
+                    type="button"
+                    className={`dex-table-hcol dex-table-hcol-stats dex-table-sort-btn${speedSortOrder ? " dex-table-sort-btn-active" : ""}`}
+                    onClick={handleSpeedSortToggle}
+                    aria-label="按速度种族值排序"
+                    aria-sort={speedSortOrder === "asc" ? "ascending" : speedSortOrder === "desc" ? "descending" : "none"}
+                    title="按速度种族值排序"
+                  >
+                    <span>种族值</span>
+                    <span className="dex-table-sort-icon" aria-hidden="true">
+                      {speedSortOrder === "asc" ? "↑" : speedSortOrder === "desc" ? "↓" : "↕"}
+                    </span>
+                  </button>
+                  <span className="dex-table-hcol dex-table-hcol-stats">无加点</span>
+                  <span className="dex-table-hcol dex-table-hcol-stats">满速</span>
+                  <span className="dex-table-hcol dex-table-hcol-stats">极速</span>
+                </>
+              ) : (
+                <>
+                  <span className="dex-table-hcol dex-table-hcol-stats">HP</span>
+                  <span className="dex-table-hcol dex-table-hcol-stats">攻击</span>
+                  <span className="dex-table-hcol dex-table-hcol-stats">防御</span>
+                  <span className="dex-table-hcol dex-table-hcol-stats">特攻</span>
+                  <span className="dex-table-hcol dex-table-hcol-stats">特防</span>
+                  <button
+                    type="button"
+                    className={`dex-table-hcol dex-table-hcol-stats dex-table-sort-btn${speedSortOrder ? " dex-table-sort-btn-active" : ""}`}
+                    onClick={handleSpeedSortToggle}
+                    aria-label="按速度排序"
+                    aria-sort={speedSortOrder === "asc" ? "ascending" : speedSortOrder === "desc" ? "descending" : "none"}
+                    title="按速度排序"
+                  >
+                    <span>速度</span>
+                    <span className="dex-table-sort-icon" aria-hidden="true">
+                      {speedSortOrder === "asc" ? "↑" : speedSortOrder === "desc" ? "↓" : "↕"}
+                    </span>
+                  </button>
+                  <span className="dex-table-hcol dex-table-hcol-stats">合计</span>
+                </>
+              )}
             </div>
             {displayList.map((member) => {
               const slug = String(member.id);
@@ -337,7 +377,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
               const total = STAT_KEYS.reduce((s, k) => s + (bs[k] || 0), 0);
               const speedLine = calculateSpeedLine(bs.spe);
               return (
-                <div key={slug} className="dex-table-row" data-slug={slug} onClick={() => handleSelect(slug)}>
+                <div key={slug} className={`dex-table-row${showSpeedLine ? " dex-table-row-speed-line" : ""}`} data-slug={slug} onClick={() => handleSelect(slug)}>
                   <div className="dex-table-col dex-table-col-img">
                     <div className="dex-table-thumb">
                       {image?.url
@@ -361,20 +401,33 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
                     <span className="dex-table-ability">{(member.abilities || []).join(" / ") || "—"}</span>
                     {member.hiddenAbility && <span className="dex-table-ability-hidden">{member.hiddenAbility}</span>}
                   </div>
-                  {STAT_KEYS.map((k) => (
-                    <div key={k} className="dex-table-col dex-table-col-stat">
-                      <span className="dex-table-stat-val">{bs[k] ?? "—"}</span>
-                    </div>
-                  ))}
-                  <div className="dex-table-col dex-table-col-stat">
-                    <span className="dex-table-stat-val">{speedLine.full ?? "—"}</span>
-                  </div>
-                  <div className="dex-table-col dex-table-col-stat">
-                    <span className="dex-table-stat-val">{speedLine.max ?? "—"}</span>
-                  </div>
-                  <div className="dex-table-col dex-table-col-stat dex-table-col-total">
-                    <span className="dex-table-stat-val dex-table-stat-total">{total || "—"}</span>
-                  </div>
+                  {showSpeedLine ? (
+                    <>
+                      <div className="dex-table-col dex-table-col-stat">
+                        <span className="dex-table-stat-val">{bs.spe ?? "—"}</span>
+                      </div>
+                      <div className="dex-table-col dex-table-col-stat">
+                        <span className="dex-table-stat-val">{speedLine.noInvestment ?? "—"}</span>
+                      </div>
+                      <div className="dex-table-col dex-table-col-stat">
+                        <span className="dex-table-stat-val">{speedLine.full ?? "—"}</span>
+                      </div>
+                      <div className="dex-table-col dex-table-col-stat">
+                        <span className="dex-table-stat-val">{speedLine.max ?? "—"}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {STAT_KEYS.map((k) => (
+                        <div key={k} className="dex-table-col dex-table-col-stat">
+                          <span className="dex-table-stat-val">{bs[k] ?? "—"}</span>
+                        </div>
+                      ))}
+                      <div className="dex-table-col dex-table-col-stat dex-table-col-total">
+                        <span className="dex-table-stat-val dex-table-stat-total">{total || "—"}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
