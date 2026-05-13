@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ALL_TYPE_OPTIONS, TYPE_CHART } from "../utils/constants.js";
+import { ALL_TYPE_OPTIONS, TYPE_CHART } from "@pokemon-localdex/store-types/constants";
 
 const EFFECTIVENESS_LABELS = {
   0: "无效",

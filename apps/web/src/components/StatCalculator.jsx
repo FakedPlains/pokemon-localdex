@@ -1,14 +1,14 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { STAT_KEYS, NATURE_OPTIONS, NATURE_EFFECTS } from "../utils/constants.js";
+import {
+  STAT_KEYS,
+  STAT_COLORS,
+  STAT_LABELS,
+  STAT_LABELS_COMPACT as STAT_LABELS_SHORT,
+  NATURE_OPTIONS,
+  NATURE_EFFECTS,
+} from "@pokemon-localdex/store-types/constants";
 import { getNatureMultiplier } from "../utils/helpers.js";
 import SearchSelect from "./SearchSelect.jsx";
-
-const STAT_LABELS = { hp: "HP", atk: "攻击", def: "防御", spa: "特攻", spd: "特防", spe: "速度" };
-const STAT_LABELS_SHORT = { hp: "HP", atk: "攻", def: "防", spa: "特攻", spd: "特防", spe: "速" };
-const STAT_COLORS = {
-  hp: "#8AC654", atk: "#F8CB3C", def: "#D98837",
-  spa: "#59C3D0", spd: "#5890CD", spe: "#A456D0"
-};
 
 const NATURE_SELECT_OPTIONS = NATURE_OPTIONS.map((n) => {
   const eff = NATURE_EFFECTS[n];

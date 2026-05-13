@@ -3,16 +3,8 @@ import { useState, useCallback } from 'react'
 import Taro from '@tarojs/taro'
 import { fetchPokemonList, fetchMovesList } from '../../utils/api'
 import { apiBaseUrl } from '../../utils/config'
-import { NATURE_OPTIONS, NATURE_EFFECTS, STAT_KEYS, STAT_LABELS } from '../../utils/constants'
+import { NATURE_OPTIONS, NATURE_EFFECTS, STAT_KEYS, STAT_LABELS, TYPE_COLORS } from '@pokemon-localdex/store-types/constants'
 import './index.less'
-
-const TYPE_COLORS = {
-  '一般': '#a8a878', '火': '#f08030', '水': '#6890f0', '电': '#f8d030',
-  '草': '#78c850', '冰': '#98d8d8', '格斗': '#c03028', '毒': '#a040a0',
-  '地面': '#e0c068', '飞行': '#a890f0', '超能力': '#f85888', '虫': '#a8b820',
-  '岩石': '#b8a038', '幽灵': '#705898', '龙': '#7038f8', '恶': '#705848',
-  '钢': '#b8b8d0', '妖精': '#ee99ac'
-}
 
 const WEATHER_OPTIONS = ['无', '大晴天', '下雨', '沙暴', '冰雹', '大雪']
 const TERRAIN_OPTIONS = ['无', '电气场地', '青草场地', '精神场地', '薄雾场地']

@@ -1,15 +1,7 @@
 import { View, Text, ScrollView } from '@tarojs/components'
 import { useState } from 'react'
-import { TYPE_CHART, ALL_TYPE_OPTIONS } from '../../utils/constants'
+import { TYPE_CHART, ALL_TYPE_OPTIONS, TYPE_COLORS } from '@pokemon-localdex/store-types/constants'
 import './index.less'
-
-const TYPE_COLORS = {
-  '一般': '#a8a878', '火': '#f08030', '水': '#6890f0', '电': '#f8d030',
-  '草': '#78c850', '冰': '#98d8d8', '格斗': '#c03028', '毒': '#a040a0',
-  '地面': '#e0c068', '飞行': '#a890f0', '超能力': '#f85888', '虫': '#a8b820',
-  '岩石': '#b8a038', '幽灵': '#705898', '龙': '#7038f8', '恶': '#705848',
-  '钢': '#b8b8d0', '妖精': '#ee99ac'
-}
 
 function getEffLabel(val) {
   if (val === 2) return '2'

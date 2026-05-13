@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { unifiedApi } from "../utils/api.js";
 import Modal from "../components/Modal.jsx";
 import ViewToggle from "../components/ViewToggle.jsx";
-import { STAT_KEYS } from "../utils/constants.js";
+import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import { createDraftMember, createDefaultStats, getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers.js";
 import {
   getBox, saveBoxConfig, deleteBoxConfig, duplicateBoxConfig,

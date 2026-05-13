@@ -1,5 +1,5 @@
 import { View, Text } from '@tarojs/components'
-import { STAT_KEYS, STAT_LABELS_SHORT, STAT_COLORS } from '../../utils/constants'
+import { STAT_KEYS, STAT_LABELS_SHORT, STAT_COLORS } from '@pokemon-localdex/store-types/constants'
 import './index.less'
 
 export default function StatBar({ stats = {} }) {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { unifiedApi } from "../utils/api.js";
-import { TYPE_BG_COLORS_CARD, typeIconSrc } from "../utils/constants.js";
+import { TYPE_BG_COLORS_CARD } from "@pokemon-localdex/store-types/constants";
+import { typeIconSrc } from "../utils/iconPaths.js";
 
 const POKEMON_PAGE_SIZE = 20;
 

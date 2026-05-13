@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createDraftMember } from "./utils/helpers.js";
-import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "./utils/constants.js";
+import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import { ToastProvider } from "./components/Toast.jsx";
 import PokedexPage from "./pages/PokedexPage.jsx";
 import ItemsPage from "./pages/ItemsPage.jsx";

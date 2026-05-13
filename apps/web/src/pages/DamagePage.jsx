@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { api, unifiedApi } from "../utils/api.js";
-import { STAT_KEYS, NATURE_OPTIONS, NATURE_EFFECTS, GENERATION_OPTIONS } from "../utils/constants.js";
+import { STAT_KEYS, STAT_LABELS, NATURE_OPTIONS, NATURE_EFFECTS, GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import {
   createDraftMember, createDefaultStats, buildDerivedStats,
   resolveMoveGenerationRecord, getPokemonPreviewImage, evToSp,
@@ -12,7 +12,6 @@ import SearchSelect from "../components/SearchSelect.jsx";
 import { getBox, getTeams, resolveTeamMembers } from "../utils/teamStorage.js";
 
 // ── 常量 ──
-const STAT_LABELS = { hp: "HP", atk: "攻击", def: "防御", spa: "特攻", spd: "特防", spe: "速度" };
 const BOOST_STATS = ["atk", "def", "spa", "spd", "spe"]; // HP 不参与增减修正
 const DEFAULT_BOOSTS = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const SP_MAX = 32;

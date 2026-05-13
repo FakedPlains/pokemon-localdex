@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
 import { fetchAbilitiesList, fetchAbilityDetail } from '../../utils/api'
 import { PAGE_SIZE } from '../../utils/config'
-import { GENERATION_OPTIONS } from '../../utils/constants'
+import { GENERATION_OPTIONS } from '@pokemon-localdex/store-types/constants'
 import Loading from '../../components/loading'
 import './index.less'
 

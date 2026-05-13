@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
 import { fetchMoveDetail, fetchMovesList } from '../../utils/api'
-import { ALL_TYPE_OPTIONS, CATEGORY_COLORS, GENERATION_OPTIONS } from '../../utils/constants'
+import { ALL_TYPE_OPTIONS, CATEGORY_BG_COLORS, GENERATION_OPTIONS } from '@pokemon-localdex/store-types/constants'
 import { PAGE_SIZE } from '../../utils/config'
 import TypeChip from '../../components/type-chip'
 import Loading from '../../components/loading'
@@ -171,7 +171,7 @@ export default function MovesPage() {
                     {move.category && (
                       <View
                         className='category-badge'
-                        style={{ background: CATEGORY_COLORS[move.category] || '#999' }}
+                        style={{ background: CATEGORY_BG_COLORS[move.category] || '#999' }}
                       >
                         <Text className='category-text'>{move.category}</Text>
                       </View>

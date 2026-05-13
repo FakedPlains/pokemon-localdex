@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { unifiedApi } from "../utils/api.js";
 import { useApi } from "../hooks/useApi.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
-import { STAT_KEYS, LEARN_METHOD_LABELS } from "../utils/constants.js";
+import { STAT_KEYS, STAT_COLORS, STAT_LABELS_SHORT, LEARN_METHOD_LABELS } from "@pokemon-localdex/store-types/constants";
 import {
   getPokemonPreviewImage,
   resolvePokemonDisplayVariant,
@@ -962,12 +962,6 @@ function StatsTab({ detail, display, detailGeneration, onDetailGenerationChange 
 }
 
 /* ─── Base Stat Bars (visual only) ─── */
-const STAT_COLORS = {
-  hp: "#8AC654", atk: "#F8CB3C", def: "#D98837",
-  spa: "#59C3D0", spd: "#5890CD", spe: "#A456D0"
-};
-const STAT_LABELS_SHORT = { hp: "HP", atk: "ATK", def: "DEF", spa: "SPA", spd: "SPD", spe: "SPE" };
-
 function BaseStatBars({ stats, diff }) {
   const total = STAT_KEYS.reduce((s, k) => s + (stats[k] || 0), 0);
   const totalDiff = diff ? STAT_KEYS.reduce((s, k) => s + (diff[k] || 0), 0) : 0;

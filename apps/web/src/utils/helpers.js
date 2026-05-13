@@ -1,4 +1,4 @@
-import { ALL_TYPE_OPTIONS, TYPE_ALIASES, NATURE_EFFECTS, STAT_KEYS, LEARN_METHOD_LABELS } from "./constants.js";
+import { ALL_TYPE_OPTIONS, TYPE_ALIASES, NATURE_EFFECTS, STAT_KEYS, LEARN_METHOD_LABELS } from "@pokemon-localdex/store-types/constants";
 
 /**
  * 从 hash 路由的 query string 中解析 expand 参数

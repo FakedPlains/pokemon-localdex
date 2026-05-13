@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
-import { TYPE_BG_COLORS, CATEGORY_COLORS, typeIconSrc, categoryIconSrc } from "../utils/constants.js";
+import { TYPE_BG_COLORS, CATEGORY_COLORS } from "@pokemon-localdex/store-types/constants";
+import { typeIconSrc, categoryIconSrc } from "../utils/iconPaths.js";
 import { parseExpandParam } from "../utils/helpers.js";
 import Loading from "../components/Loading.jsx";
 import PokemonGrid from "../components/PokemonGrid.jsx";

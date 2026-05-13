@@ -11,6 +11,7 @@
 
 import { calculate, Pokemon, Move, Field } from "@fakedplains/smogon-calc";
 import type { GenerationNum } from "@fakedplains/smogon-calc/dist/data/interface";
+import { NATURE_ZH_TO_EN, TYPE_ZH_TO_EN } from "@pokemon-localdex/store-types/constants";
 
 import type {
   DamageCalcInput,
@@ -30,37 +31,11 @@ export type {
   NameLookup,
 } from "./types.ts";
 
+export { NATURE_ZH_TO_EN, TYPE_ZH_TO_EN } from "@pokemon-localdex/store-types/constants";
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 常量映射
 // ══════════════════════════════════════════════════════════════════════════════
-
-export const NATURE_ZH_TO_EN: Record<string, string> = {
-  勤奋: "Hardy",
-  怕寂寞: "Lonely",
-  固执: "Adamant",
-  顽皮: "Naughty",
-  勇敢: "Brave",
-  大胆: "Bold",
-  坦率: "Docile",
-  淘气: "Impish",
-  乐天: "Lax",
-  悠闲: "Relaxed",
-  胆小: "Timid",
-  急躁: "Hasty",
-  认真: "Serious",
-  爽朗: "Jolly",
-  天真: "Naive",
-  内敛: "Modest",
-  慢吞吞: "Mild",
-  害羞: "Bashful",
-  马虎: "Rash",
-  冷静: "Quiet",
-  温和: "Calm",
-  温顺: "Gentle",
-  慎重: "Careful",
-  浮躁: "Quirky",
-  自大: "Sassy",
-};
 
 export const WEATHER_MAP: Record<string, string | undefined> = {
   none: undefined,
@@ -77,27 +52,6 @@ export const TERRAIN_MAP: Record<string, string | undefined> = {
   grassy: "Grassy",
   misty: "Misty",
   psychic: "Psychic",
-};
-
-export const TYPE_ZH_TO_EN: Record<string, string> = {
-  一般: "Normal",
-  火: "Fire",
-  水: "Water",
-  电: "Electric",
-  草: "Grass",
-  冰: "Ice",
-  格斗: "Fighting",
-  毒: "Poison",
-  地面: "Ground",
-  飞行: "Flying",
-  超能力: "Psychic",
-  虫: "Bug",
-  岩石: "Rock",
-  幽灵: "Ghost",
-  龙: "Dragon",
-  恶: "Dark",
-  钢: "Steel",
-  妖精: "Fairy",
 };
 
 export const STATUS_MAP: Record<string, string> = {

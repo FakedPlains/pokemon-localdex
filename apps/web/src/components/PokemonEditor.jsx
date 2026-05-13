@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { unifiedApi } from "../utils/api.js";
-import { STAT_KEYS } from "../utils/constants.js";
+import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import { createDefaultStats, getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers.js";
 import StatCalculator from "./StatCalculator.jsx";
 
