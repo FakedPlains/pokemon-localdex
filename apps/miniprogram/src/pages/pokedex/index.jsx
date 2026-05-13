@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
 import Taro, { useReachBottom, usePullDownRefresh } from '@tarojs/taro'
-import { fetchPokemonList } from '../../utils/api'
+import { fetchPokemonCards } from '../../utils/api'
 import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from '../../utils/constants'
 import { PAGE_SIZE } from '../../utils/config'
 import TypeChip from '../../components/type-chip'
@@ -29,7 +29,7 @@ export default function PokedexPage() {
     else setLoadingMore(true)
 
     try {
-      const result = await fetchPokemonList({
+      const result = await fetchPokemonCards({
         q: q || undefined,
         type: type || undefined,
         generation: gen || undefined,
@@ -48,7 +48,7 @@ export default function PokedexPage() {
       setHasMore(result.hasMore ?? false)
       offsetRef.current = offset + newItems.length
     } catch (err) {
-      console.error('fetchPokemonList error:', err)
+      console.error('fetchPokemonCards error:', err)
     } finally {
       if (id === fetchIdRef.current) {
         setLoading(false)

@@ -28,6 +28,20 @@ function pokemonSortQuery(c: any): { sort?: "speed"; order?: "asc" | "desc" } {
   };
 }
 
+function pokemonListQuery(c: any) {
+  const query = c.req.query("q") || undefined;
+  const typeRaw = c.req.query("type") || undefined;
+  const type = typeRaw
+    ? typeRaw.includes(",") ? typeRaw.split(",") : typeRaw
+    : undefined;
+  const generation = numberQuery(c, "generation");
+  const championsSeasonId = numberQuery(c, "seasonId");
+  const sortOptions = pokemonSortQuery(c);
+  const limit = numberQuery(c, "limit");
+  const offset = numberQuery(c, "offset") ?? 0;
+  return { query, type, generation, championsSeasonId, sortOptions, limit, offset };
+}
+
 // ── 路由注册 ──
 
 export interface RegisterRoutesOptions<E extends object = object> {
@@ -49,16 +63,7 @@ export function registerApiRoutes<E extends object = object>(
 
   api.get("/pokemon", async (c) => {
     const s = getStore(c);
-    const query = c.req.query("q") || undefined;
-    const typeRaw = c.req.query("type") || undefined;
-    const type = typeRaw
-      ? typeRaw.includes(",") ? typeRaw.split(",") : typeRaw
-      : undefined;
-    const generation = numberQuery(c, "generation");
-    const championsSeasonId = numberQuery(c, "seasonId");
-    const sortOptions = pokemonSortQuery(c);
-    const limit = numberQuery(c, "limit");
-    const offset = numberQuery(c, "offset") ?? 0;
+    const { query, type, generation, championsSeasonId, sortOptions, limit, offset } = pokemonListQuery(c);
 
     if (limit !== undefined) {
       const result = await s.listPokemon({ query, type, generation, championsSeasonId, ...sortOptions, limit, offset });
@@ -66,6 +71,32 @@ export function registerApiRoutes<E extends object = object>(
       return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
     }
     const data = await s.listPokemon({ query, type, generation, championsSeasonId, ...sortOptions });
+    return c.json({ data });
+  });
+
+  api.get("/pokemon/cards", async (c) => {
+    const s = getStore(c);
+    const { query, type, generation, championsSeasonId, sortOptions, limit, offset } = pokemonListQuery(c);
+
+    if (limit !== undefined) {
+      const result = await s.listPokemonCards({ query, type, generation, championsSeasonId, ...sortOptions, limit, offset });
+      const { items, total } = result as { items: unknown[]; total: number };
+      return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
+    }
+    const data = await s.listPokemonCards({ query, type, generation, championsSeasonId, ...sortOptions });
+    return c.json({ data });
+  });
+
+  api.get("/pokemon/table", async (c) => {
+    const s = getStore(c);
+    const { query, type, generation, championsSeasonId, sortOptions, limit, offset } = pokemonListQuery(c);
+
+    if (limit !== undefined) {
+      const result = await s.listPokemonTable({ query, type, generation, championsSeasonId, ...sortOptions, limit, offset });
+      const { items, total } = result as { items: unknown[]; total: number };
+      return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
+    }
+    const data = await s.listPokemonTable({ query, type, generation, championsSeasonId, ...sortOptions });
     return c.json({ data });
   });
 
@@ -77,7 +108,7 @@ export function registerApiRoutes<E extends object = object>(
 
   api.get("/pokemon/:id/learnset", async (c) => {
     const s = getStore(c);
-    const entry = await s.getPokemon(c.req.param("id"));
+    const entry = await s.getPokemonIdentity(c.req.param("id"));
     if (!entry) return c.json({ error: "Pokemon not found" }, 404);
     const generation = numberQuery(c, "generation") ?? 9;
     const formKey = c.req.query("form") || "default";
@@ -94,7 +125,7 @@ export function registerApiRoutes<E extends object = object>(
 
   api.get("/pokemon/:id/learnset/meta", async (c) => {
     const s = getStore(c);
-    const entry = await s.getPokemon(c.req.param("id"));
+    const entry = await s.getPokemonIdentity(c.req.param("id"));
     if (!entry) return c.json({ error: "Pokemon not found" }, 404);
     const meta = await s.getLearnsetMeta(entry.id);
     return c.json({ data: meta, pokemonId: entry.id });

@@ -115,6 +115,23 @@ export type PokemonSummary = {
   generations: number[];
 };
 
+export type PokemonCardSummary = {
+  id: number;
+  dexNumber: number;
+  slug: string;
+  nameZh: string;
+  nameEn?: string;
+  primaryType?: string;
+  secondaryType?: string;
+  image?: ImageAsset;
+};
+
+export type PokemonTableSummary = PokemonCardSummary & {
+  abilities: string[];
+  hiddenAbility?: string;
+  baseStats?: StatBlock;
+};
+
 export type PokemonEntry = PokemonSummary & {
   category?: string;
   heightM?: number;
@@ -122,6 +139,13 @@ export type PokemonEntry = PokemonSummary & {
   forms: PokemonFormEntry[];
   evolutionChain: EvolutionStep[];
   source?: SourceMeta;
+};
+
+export type PokemonIdentity = {
+  id: number;
+  dexNumber: number;
+  slug: string;
+  nameZh: string;
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -274,7 +298,24 @@ export interface IStore {
     sort?: PokemonListSortKey;
     order?: SortOrder;
   } & PaginationParams): Promise<PokemonSummary[] | PaginatedResult<PokemonSummary>>;
+  listPokemonCards(filters?: {
+    query?: string;
+    type?: string | string[];
+    generation?: number;
+    championsSeasonId?: number;
+    sort?: PokemonListSortKey;
+    order?: SortOrder;
+  } & PaginationParams): Promise<PokemonCardSummary[] | PaginatedResult<PokemonCardSummary>>;
+  listPokemonTable(filters?: {
+    query?: string;
+    type?: string | string[];
+    generation?: number;
+    championsSeasonId?: number;
+    sort?: PokemonListSortKey;
+    order?: SortOrder;
+  } & PaginationParams): Promise<PokemonTableSummary[] | PaginatedResult<PokemonTableSummary>>;
   getPokemon(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<PokemonEntry | undefined>;
+  getPokemonIdentity(idOrSlug: string): Promise<PokemonIdentity | undefined>;
   getLearnsetMeta(pokemonId: number): Promise<any>;
   getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string }>;
 

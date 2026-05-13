@@ -14,6 +14,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 宝可梦主表
@@ -36,6 +37,7 @@ export const pokemon = sqliteTable("pokemon", {
 }, (table) => [
   index("idx_pokemon_dex").on(table.dexNumber),
   index("idx_pokemon_name").on(table.nameZh),
+  index("idx_pokemon_introduced_generation").on(table.introducedGeneration),
 ]);
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -84,6 +86,7 @@ export const pokemonFormTypes = sqliteTable("pokemon_form_types", {
 }, (table) => [
   uniqueIndex("uq_form_types").on(table.formId, table.slot, table.generationStart),
   index("idx_form_types_form").on(table.formId),
+  index("idx_form_types_current").on(table.formId, table.generationEnd, table.slot),
 ]);
 
 export const pokemonFormAbilities = sqliteTable("pokemon_form_abilities", {
@@ -98,6 +101,7 @@ export const pokemonFormAbilities = sqliteTable("pokemon_form_abilities", {
 }, (table) => [
   uniqueIndex("uq_form_abilities").on(table.formId, table.slot, table.generationStart),
   index("idx_form_abilities_form").on(table.formId),
+  index("idx_form_abilities_ability").on(table.abilityId, table.formId),
 ]);
 
 export const pokemonFormImages = sqliteTable("pokemon_form_images", {
@@ -109,6 +113,7 @@ export const pokemonFormImages = sqliteTable("pokemon_form_images", {
 }, (table) => [
   uniqueIndex("uq_form_images").on(table.formId, table.imageKind),
   index("idx_form_images_form").on(table.formId),
+  index("idx_form_images_kind").on(table.formId, table.imageKind),
 ]);
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -173,6 +178,14 @@ export const pokemonLearnsets = sqliteTable("pokemon_learnsets", {
   ),
   index("idx_learnsets_pokemon").on(table.pokemonId, table.formKey),
   index("idx_learnsets_pokemon_gen").on(table.pokemonId, table.generation),
+  index("idx_learnsets_lookup").on(
+    table.pokemonId,
+    table.generation,
+    table.formKey,
+    table.gameVersionCode,
+    table.learnMethod,
+    table.sortOrder,
+  ),
   index("idx_learnsets_move").on(table.moveId),
 ]);
 
@@ -202,6 +215,7 @@ export const moves = sqliteTable("moves", {
   index("idx_moves_name_zh").on(table.nameZh),
   index("idx_moves_type").on(table.typeName),
   index("idx_moves_number").on(table.number),
+  index("idx_moves_sort").on(sql`CASE WHEN ${table.number} IS NULL OR ${table.number} = 0 THEN 1 ELSE 0 END`, table.number),
 ]);
 
 export const moveGenerationRecords = sqliteTable("move_generation_records", {
@@ -270,6 +284,7 @@ export const items = sqliteTable("items", {
   sourceFetchedAt: text("source_fetched_at"),
 }, (table) => [
   index("idx_items_name_zh").on(table.nameZh),
+  index("idx_items_category").on(table.category),
 ]);
 
 export const itemGenerationRecords = sqliteTable("item_generation_records", {

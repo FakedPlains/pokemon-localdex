@@ -29,11 +29,70 @@ export interface Env {
 let cachedStore: D1Store | null = null;
 let cachedDb: D1Database | null = null;
 
+const API_GET_CACHE_CONTROL = "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400";
+const CACHEABLE_API_PREFIXES = [
+  "/api/pokemon",
+  "/api/moves",
+  "/api/abilities",
+  "/api/items",
+  "/api/champions",
+  "/pokemon",
+  "/moves",
+  "/abilities",
+  "/items",
+  "/champions",
+];
+
 function getOrCreateStore(db: D1Database): D1Store {
   if (cachedStore && cachedDb === db) return cachedStore;
   cachedStore = createD1Store(db);
   cachedDb = db;
   return cachedStore;
+}
+
+function isCacheableApiGet(request: Request, url: URL): boolean {
+  if (request.method !== "GET") return false;
+  return CACHEABLE_API_PREFIXES.some((prefix) =>
+    url.pathname === prefix || url.pathname.startsWith(`${prefix}/`),
+  );
+}
+
+async function withApiCache(
+  request: Request,
+  ctx: ExecutionContext,
+  handler: () => Promise<Response>,
+): Promise<Response> {
+  const runtimeCaches = (globalThis as any).caches;
+  if (!runtimeCaches?.default) {
+    const response = await handler();
+    if (!response.ok) return response;
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", API_GET_CACHE_CONTROL);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  const cache = runtimeCaches.default;
+  const cacheKey = new Request(request.url, { method: "GET" });
+  const cached = await cache.match(cacheKey);
+  if (cached) return cached;
+
+  const response = await handler();
+  if (!response.ok) return response;
+
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", API_GET_CACHE_CONTROL);
+  headers.set("Vary", "Accept-Encoding");
+  const cacheableResponse = new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+  ctx.waitUntil(cache.put(cacheKey, cacheableResponse.clone()));
+  return cacheableResponse;
 }
 
 // ── Hono app（Workers 专用） ──
@@ -78,6 +137,11 @@ export default {
       }
     }
 
-    return app.fetch(request, env, ctx);
+    const handleApi = () => app.fetch(request, env, ctx);
+    if (isCacheableApiGet(request, url)) {
+      return withApiCache(request, ctx, handleApi);
+    }
+
+    return handleApi();
   },
 };
