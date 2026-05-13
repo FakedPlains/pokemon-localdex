@@ -1,6 +1,14 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { api, unifiedApi } from "../utils/api.js";
-import { STAT_KEYS, STAT_LABELS, NATURE_OPTIONS, NATURE_EFFECTS, GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
+import {
+  STAT_KEYS,
+  STAT_LABELS,
+  STAT_LABELS_BY_ID,
+  NATURES,
+  NATURE_EFFECTS_BY_ID,
+  GENERATION_OPTIONS,
+  TYPE_OPTIONS,
+} from "@pokemon-localdex/store-types/constants";
 import {
   createDraftMember, createDefaultStats, buildDerivedStats,
   resolveMoveGenerationRecord, getPokemonPreviewImage, evToSp,
@@ -25,12 +33,13 @@ function spToEv(sp) {
   if (sp <= 0) return 0;
   return Math.min(252, 4 + (sp - 1) * 8);
 }
-const NATURE_SELECT_OPTIONS = NATURE_OPTIONS.map((n) => {
-  const eff = NATURE_EFFECTS[n];
+const NATURE_SELECT_OPTIONS = NATURES.map((nature) => {
+  const eff = NATURE_EFFECTS_BY_ID[nature.id];
   return {
-    value: n,
-    label: n,
-    sublabel: eff ? `+${STAT_LABELS[eff.up]} -${STAT_LABELS[eff.down]}` : "无修正",
+    id: nature.id,
+    value: nature.nameZh,
+    label: nature.nameZh,
+    sublabel: eff ? `+${STAT_LABELS_BY_ID[eff.up]} -${STAT_LABELS_BY_ID[eff.down]}` : "无修正",
   };
 });
 
@@ -427,7 +436,8 @@ function SimplePokemonList({ search, onSelect }) {
 
 const TERA_TYPE_OPTIONS = [
   { value: "none", label: "无" },
-  ...[ "一般","火","水","电","草","冰","格斗","毒","地面","飞行","超能力","虫","岩石","幽灵","龙","恶","钢","妖精","星晶"].map((t) => ({ value: t, label: t })),
+  ...TYPE_OPTIONS.map((type) => ({ id: type.id, value: type.nameZh, label: type.nameZh })),
+  { id: 99, value: "星晶", label: "星晶" },
 ];
 
 function PokemonConfigPanel({ title, member, detail, isChampions, onChange, onClear, boosts, onBoostChange, level, onMovesSync, curHP, onCurHPChange, teraType, setTeraType, generation }) {

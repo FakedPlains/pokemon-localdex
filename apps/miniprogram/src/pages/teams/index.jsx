@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Taro from '@tarojs/taro'
 import { fetchPokemonList } from '../../utils/api'
 import { getTeams, createTeam, deleteTeam, updateTeam, addMember, removeMember } from '../../utils/teamStorage'
-import { ALL_TYPE_OPTIONS, TYPE_COLORS } from '@pokemon-localdex/store-types/constants'
+import { TYPE_COLORS } from '@pokemon-localdex/store-types/constants'
 import './index.less'
 
 export default function TeamsPage() {

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ALL_TYPE_OPTIONS, TYPE_CHART } from "@pokemon-localdex/store-types/constants";
+import { TYPE_OPTIONS, TYPE_CHART_BY_ID } from "@pokemon-localdex/store-types/constants";
 
 const EFFECTIVENESS_LABELS = {
   0: "无效",
@@ -15,9 +15,9 @@ export default function TypeChartPage() {
   const hasHover = highlightAtk !== null || highlightDef !== null;
 
   const chartData = useMemo(() => {
-    return ALL_TYPE_OPTIONS.map((atkType) => ({
-      type: atkType,
-      row: TYPE_CHART[atkType],
+    return TYPE_OPTIONS.map((type) => ({
+      type,
+      row: TYPE_CHART_BY_ID[type.id],
     }));
   }, []);
 
@@ -50,14 +50,14 @@ export default function TypeChartPage() {
                     <span className="tc-corner-atk">攻↓</span>
                     <span className="tc-corner-def">防→</span>
                   </th>
-                  {ALL_TYPE_OPTIONS.map((defType) => (
+                  {TYPE_OPTIONS.map((defType) => (
                     <th
-                      key={defType}
-                      className={`tc-header-col${highlightDef === defType ? " tc-header-highlight" : ""}`}
+                      key={defType.id}
+                      className={`tc-header-col${highlightDef === defType.id ? " tc-header-highlight" : ""}`}
                     >
-                      <span className={`tc-type-label type-bg-solid-${defType}`}>
-                        <img className="tc-type-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${defType}@sm.png`} alt="" />
-                        <span className="tc-type-text">{defType}</span>
+                      <span className={`tc-type-label type-bg-solid-${defType.nameZh}`}>
+                        <img className="tc-type-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${defType.nameZh}@sm.png`} alt="" />
+                        <span className="tc-type-text">{defType.nameZh}</span>
                       </span>
                     </th>
                   ))}
@@ -66,24 +66,24 @@ export default function TypeChartPage() {
               <tbody>
                 {chartData.map(({ type: atkType, row }) => (
                   <tr
-                    key={atkType}
-                    onMouseEnter={() => setHighlightAtk(atkType)}
+                    key={atkType.id}
+                    onMouseEnter={() => setHighlightAtk(atkType.id)}
                   >
-                    <th className={`tc-header-row${highlightAtk === atkType ? " tc-header-highlight" : ""}`}>
-                      <span className={`tc-type-label type-bg-solid-${atkType}`}>
-                        <img className="tc-type-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${atkType}@sm.png`} alt="" />
-                        <span className="tc-type-text">{atkType}</span>
+                    <th className={`tc-header-row${highlightAtk === atkType.id ? " tc-header-highlight" : ""}`}>
+                      <span className={`tc-type-label type-bg-solid-${atkType.nameZh}`}>
+                        <img className="tc-type-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${atkType.nameZh}@sm.png`} alt="" />
+                        <span className="tc-type-text">{atkType.nameZh}</span>
                       </span>
                     </th>
                     {row.map((value, i) => {
-                      const defType = ALL_TYPE_OPTIONS[i];
-                      const isHighlighted = highlightAtk === atkType || highlightDef === defType;
+                      const defType = TYPE_OPTIONS[i];
+                      const isHighlighted = highlightAtk === atkType.id || highlightDef === defType.id;
                       return (
                         <td
-                          key={defType}
+                          key={defType.id}
                           className={`${getCellClass(value)}${isHighlighted ? " tc-cell-highlight" : ""}`}
-                          title={`${atkType} → ${defType}: ${value === 0 ? "无效" : value === 0.5 ? "效果不好" : value === 2 ? "效果拔群" : "普通"}`}
-                          onMouseEnter={() => setHighlightDef(defType)}
+                          title={`${atkType.nameZh} → ${defType.nameZh}: ${value === 0 ? "无效" : value === 0.5 ? "效果不好" : value === 2 ? "效果拔群" : "普通"}`}
+                          onMouseEnter={() => setHighlightDef(defType.id)}
                         >
                           {EFFECTIVENESS_LABELS[value]}
                         </td>

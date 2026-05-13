@@ -1,4 +1,12 @@
-import { ALL_TYPE_OPTIONS, TYPE_ALIASES, NATURE_EFFECTS, STAT_KEYS, LEARN_METHOD_LABELS } from "@pokemon-localdex/store-types/constants";
+import {
+  TYPE_OPTIONS,
+  TYPE_ALIASES,
+  NATURE_EFFECTS,
+  STAT_KEYS,
+  LEARN_METHOD_LABELS,
+  typeNameToId,
+  typeIdToName,
+} from "@pokemon-localdex/store-types/constants";
 
 /**
  * 从 hash 路由的 query string 中解析 expand 参数
@@ -14,17 +22,18 @@ export function parseExpandParam() {
 }
 
 export function normalizeTypeName(type) {
-  return TYPE_ALIASES[String(type || "").trim()] || String(type || "").trim();
+  const id = typeNameToId(type);
+  return id ? typeIdToName(id) : String(type || "").trim();
 }
 
 export function splitTypeNames(type) {
   const normalized = normalizeTypeName(type);
   if (!normalized) return [];
-  if (ALL_TYPE_OPTIONS.includes(normalized)) return [normalized];
+  if (typeNameToId(normalized)) return [normalized];
 
   const result = [];
   let remaining = normalized;
-  const candidates = [...ALL_TYPE_OPTIONS, ...Object.keys(TYPE_ALIASES)]
+  const candidates = [...TYPE_OPTIONS.map((typeOption) => typeOption.nameZh), ...Object.keys(TYPE_ALIASES)]
     .sort((a, b) => b.length - a.length);
 
   while (remaining) {

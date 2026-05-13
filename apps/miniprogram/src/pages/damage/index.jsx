@@ -3,11 +3,25 @@ import { useState, useCallback } from 'react'
 import Taro from '@tarojs/taro'
 import { fetchPokemonList, fetchMovesList } from '../../utils/api'
 import { apiBaseUrl } from '../../utils/config'
-import { NATURE_OPTIONS, NATURE_EFFECTS, STAT_KEYS, STAT_LABELS, TYPE_COLORS } from '@pokemon-localdex/store-types/constants'
+import {
+  NATURES,
+  NATURE_EFFECTS_BY_ID,
+  STAT_KEYS,
+  STAT_LABELS,
+  STAT_LABELS_BY_ID,
+  TYPE_COLORS,
+  natureNameToId,
+} from '@pokemon-localdex/store-types/constants'
 import './index.less'
 
 const WEATHER_OPTIONS = ['无', '大晴天', '下雨', '沙暴', '冰雹', '大雪']
 const TERRAIN_OPTIONS = ['无', '电气场地', '青草场地', '精神场地', '薄雾场地']
+const NATURE_OPTIONS = NATURES.map(nature => nature.nameZh)
+
+function formatNatureEffect(natureName) {
+  const effect = NATURE_EFFECTS_BY_ID[natureNameToId(natureName)]
+  return effect ? ` (+${STAT_LABELS_BY_ID[effect.up]} -${STAT_LABELS_BY_ID[effect.down]})` : ''
+}
 
 function createDefaultMember() {
   return {
@@ -163,7 +177,7 @@ export default function DamagePage() {
 
   // 性格修改
   const handleNatureChange = (side, e) => {
-    const nature = NATURE_OPTIONS[e.detail.value]
+    const nature = NATURES[e.detail.value]?.nameZh || '认真'
     if (side === 'attacker') {
       setAttacker(prev => ({ ...prev, nature }))
     } else {
@@ -283,7 +297,7 @@ export default function DamagePage() {
               <Text className='form-label'>性格</Text>
               <Picker mode='selector' range={NATURE_OPTIONS} onChange={(e) => handleNatureChange('attacker', e)}>
                 <View className='form-picker'>
-                  <Text>{attacker.nature}{NATURE_EFFECTS[attacker.nature] ? ` (+${STAT_LABELS[NATURE_EFFECTS[attacker.nature].up]} -${STAT_LABELS[NATURE_EFFECTS[attacker.nature].down]})` : ''}</Text>
+                  <Text>{attacker.nature}{formatNatureEffect(attacker.nature)}</Text>
                 </View>
               </Picker>
             </View>
@@ -326,7 +340,7 @@ export default function DamagePage() {
               <Text className='form-label'>性格</Text>
               <Picker mode='selector' range={NATURE_OPTIONS} onChange={(e) => handleNatureChange('defender', e)}>
                 <View className='form-picker'>
-                  <Text>{defender.nature}{NATURE_EFFECTS[defender.nature] ? ` (+${STAT_LABELS[NATURE_EFFECTS[defender.nature].up]} -${STAT_LABELS[NATURE_EFFECTS[defender.nature].down]})` : ''}</Text>
+                  <Text>{defender.nature}{formatNatureEffect(defender.nature)}</Text>
                 </View>
               </Picker>
             </View>

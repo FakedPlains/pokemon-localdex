@@ -3,19 +3,21 @@ import {
   STAT_KEYS,
   STAT_COLORS,
   STAT_LABELS,
+  STAT_LABELS_BY_ID,
   STAT_LABELS_COMPACT as STAT_LABELS_SHORT,
-  NATURE_OPTIONS,
-  NATURE_EFFECTS,
+  NATURES,
+  NATURE_EFFECTS_BY_ID,
 } from "@pokemon-localdex/store-types/constants";
 import { getNatureMultiplier } from "../utils/helpers.js";
 import SearchSelect from "./SearchSelect.jsx";
 
-const NATURE_SELECT_OPTIONS = NATURE_OPTIONS.map((n) => {
-  const eff = NATURE_EFFECTS[n];
+const NATURE_SELECT_OPTIONS = NATURES.map((nature) => {
+  const eff = NATURE_EFFECTS_BY_ID[nature.id];
   return {
-    value: n,
-    label: n,
-    sublabel: eff ? `+${STAT_LABELS[eff.up]} -${STAT_LABELS[eff.down]}` : "无修正",
+    id: nature.id,
+    value: nature.nameZh,
+    label: nature.nameZh,
+    sublabel: eff ? `+${STAT_LABELS_BY_ID[eff.up]} -${STAT_LABELS_BY_ID[eff.down]}` : "无修正",
   };
 });
 

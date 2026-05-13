@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
 import Taro, { useReachBottom, usePullDownRefresh } from '@tarojs/taro'
 import { fetchPokemonCards } from '../../utils/api'
-import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from '@pokemon-localdex/store-types/constants'
+import { TYPE_OPTIONS, GENERATION_OPTIONS } from '@pokemon-localdex/store-types/constants'
 import { PAGE_SIZE } from '../../utils/config'
 import TypeChip from '../../components/type-chip'
 import Loading from '../../components/loading'
@@ -139,13 +139,13 @@ export default function PokedexPage() {
           </View>
           <Text className='filter-title'>属性（可多选）</Text>
           <View className='filter-types'>
-            {ALL_TYPE_OPTIONS.map(type => (
+            {TYPE_OPTIONS.map(type => (
               <View
-                key={type}
-                className={`type-chip type-${type} ${selectedTypes.includes(type) ? 'type-chip-selected' : 'type-chip-dim'}`}
-                onClick={() => handleTypeFilter(type)}
+                key={type.id}
+                className={`type-chip type-${type.nameZh} ${selectedTypes.includes(type.nameZh) ? 'type-chip-selected' : 'type-chip-dim'}`}
+                onClick={() => handleTypeFilter(type.nameZh)}
               >
-                <Text>{type}</Text>
+                <Text>{type.nameZh}</Text>
               </View>
             ))}
           </View>

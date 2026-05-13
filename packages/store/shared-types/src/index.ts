@@ -5,7 +5,7 @@
  * 两个 store 包均从此处导入并重新导出，保证类型一致。
  */
 
-import { TYPE_ALIASES, TYPE_NAMES } from "./constants.js";
+import { TYPE_ALIASES, TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 基础类型
@@ -394,7 +394,8 @@ export * from "./constants.js";
 // ══════════════════════════════════════════════════════════════════════════════
 
 export function normalizeTypeName(type: string | undefined): string {
-  return type ? (TYPE_ALIASES[type] || type).trim() : "";
+  const id = typeNameToId(type);
+  return id ? typeIdToName(id) : type ? type.trim() : "";
 }
 
 export function typeLegacyId(type: string | undefined): string | undefined {
@@ -405,11 +406,11 @@ export function typeLegacyId(type: string | undefined): string | undefined {
 export function splitTypeNames(type: string | undefined): string[] {
   const normalized = normalizeTypeName(type);
   if (!normalized) return [];
-  if (TYPE_NAMES.includes(normalized)) return [normalized];
+  if (typeNameToId(normalized)) return [normalized];
   const compact = normalized.replace(/\s+/g, "");
   const result: string[] = [];
   let rest = compact;
-  const candidates = [...TYPE_NAMES, ...Object.keys(TYPE_ALIASES)].sort((a, b) => b.length - a.length);
+  const candidates = [...TYPE_OPTIONS.map((typeOption) => typeOption.nameZh), ...Object.keys(TYPE_ALIASES)].sort((a, b) => b.length - a.length);
   while (rest) {
     const match = candidates.find((c) => rest.startsWith(c));
     if (!match) break;

@@ -1,6 +1,6 @@
 import { View, Text, ScrollView } from '@tarojs/components'
 import { useState } from 'react'
-import { TYPE_CHART, ALL_TYPE_OPTIONS, TYPE_COLORS } from '@pokemon-localdex/store-types/constants'
+import { TYPE_OPTIONS, TYPE_CHART_BY_ID, TYPE_COLORS_BY_ID } from '@pokemon-localdex/store-types/constants'
 import './index.less'
 
 function getEffLabel(val) {
@@ -35,27 +35,27 @@ export default function TypeChartPage() {
             <View className='corner-cell' style={{ width: '40px', minWidth: '40px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #eee' }}>
               <Text style={{ fontSize: '9px', color: '#999' }}>攻↓防→</Text>
             </View>
-            {ALL_TYPE_OPTIONS.map((type, ci) => (
+            {TYPE_OPTIONS.map((type, ci) => (
               <View
-                key={type}
+                key={type.id}
                 className='header-cell'
                 style={{
                   width: '32px', minWidth: '32px', height: '32px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: TYPE_COLORS[type],
+                  background: TYPE_COLORS_BY_ID[type.id],
                   border: '1px solid #eee',
                   opacity: highlightCol >= 0 && highlightCol !== ci ? 0.4 : 1
                 }}
               >
-                <Text>{type.slice(0, 1)}</Text>
+                <Text>{type.nameZh.slice(0, 1)}</Text>
               </View>
             ))}
           </View>
 
           {/* 每一行：攻击方属性 */}
-          {ALL_TYPE_OPTIONS.map((atkType, ri) => (
+          {TYPE_OPTIONS.map((atkType, ri) => (
             <View
-              key={atkType}
+              key={atkType.id}
               style={{ display: 'flex', opacity: highlightRow >= 0 && highlightRow !== ri ? 0.4 : 1 }}
             >
               <View
@@ -63,13 +63,13 @@ export default function TypeChartPage() {
                 style={{
                   width: '40px', minWidth: '40px', height: '32px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: TYPE_COLORS[atkType],
+                  background: TYPE_COLORS_BY_ID[atkType.id],
                   border: '1px solid #eee'
                 }}
               >
-                <Text>{atkType.length > 2 ? atkType.slice(0, 2) : atkType}</Text>
+                <Text>{atkType.nameZh.length > 2 ? atkType.nameZh.slice(0, 2) : atkType.nameZh}</Text>
               </View>
-              {TYPE_CHART[atkType].map((val, ci) => (
+              {TYPE_CHART_BY_ID[atkType.id].map((val, ci) => (
                 <View
                   key={ci}
                   className={`eff-cell ${getEffClass(val)}`}

@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
 import { fetchMoveDetail, fetchMovesList } from '../../utils/api'
-import { ALL_TYPE_OPTIONS, CATEGORY_BG_COLORS, GENERATION_OPTIONS } from '@pokemon-localdex/store-types/constants'
+import { TYPE_OPTIONS, CATEGORY_OPTIONS, CATEGORY_BG_COLORS, GENERATION_OPTIONS } from '@pokemon-localdex/store-types/constants'
 import { PAGE_SIZE } from '../../utils/config'
 import TypeChip from '../../components/type-chip'
 import Loading from '../../components/loading'
 import './index.less'
-
-const CATEGORY_OPTIONS = ['物理', '特殊', '变化']
 
 export default function MovesPage() {
   const [list, setList] = useState([])
@@ -103,13 +101,13 @@ export default function MovesPage() {
         <ScrollView scrollX className='filter-scroll'>
           <View className='filter-row'>
             {/* 分类筛选 */}
-            {CATEGORY_OPTIONS.map(cat => (
+            {CATEGORY_OPTIONS.map(category => (
               <View
-                key={cat}
-                className={`filter-chip ${categoryFilter === cat ? 'filter-chip-active' : ''}`}
-                onClick={() => setCategoryFilter(prev => prev === cat ? '' : cat)}
+                key={category.id}
+                className={`filter-chip ${categoryFilter === category.nameZh ? 'filter-chip-active' : ''}`}
+                onClick={() => setCategoryFilter(prev => prev === category.nameZh ? '' : category.nameZh)}
               >
-                <Text>{cat}</Text>
+                <Text>{category.nameZh}</Text>
               </View>
             ))}
             <View className='filter-divider' />
@@ -125,13 +123,13 @@ export default function MovesPage() {
             ))}
             <View className='filter-divider' />
             {/* 属性筛选 */}
-            {ALL_TYPE_OPTIONS.map(t => (
+            {TYPE_OPTIONS.map(type => (
               <View
-                key={t}
-                className={`filter-chip ${typeFilter === t ? 'filter-chip-active' : ''}`}
-                onClick={() => setTypeFilter(prev => prev === t ? '' : t)}
+                key={type.id}
+                className={`filter-chip ${typeFilter === type.nameZh ? 'filter-chip-active' : ''}`}
+                onClick={() => setTypeFilter(prev => prev === type.nameZh ? '' : type.nameZh)}
               >
-                <Text>{t}</Text>
+                <Text>{type.nameZh}</Text>
               </View>
             ))}
           </View>
