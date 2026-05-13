@@ -6,6 +6,9 @@ main = "apps/api/src/worker.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+[placement]
+mode = "smart"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "pokemon-localdex-d1"
@@ -17,6 +20,9 @@ DATA_SOURCE = "d1"
 [env.production]
 name = "pokemon-localdex-api"
 vars = { DATA_SOURCE = "d1" }
+
+[env.production.placement]
+mode = "smart"
 
 [[env.production.d1_databases]]
 binding = "DB"
