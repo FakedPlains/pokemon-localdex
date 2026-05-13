@@ -50,15 +50,25 @@ async function request(path, options = {}) {
 
 // ── Pokemon 列表 ──
 
-export async function fetchPokemonList({ q, type, generation, limit, offset } = {}) {
+function buildPokemonListParams({ q, type, generation, limit, offset } = {}) {
   const params = {}
   if (q) params.q = q
   if (type) params.type = type
   if (generation) params.generation = generation
   if (limit !== undefined) params.limit = limit
   if (offset !== undefined) params.offset = offset
+  return params
+}
 
+export async function fetchPokemonList({ q, type, generation, limit, offset } = {}) {
+  const params = buildPokemonListParams({ q, type, generation, limit, offset })
   const res = await request('/pokemon', { params })
+  return res
+}
+
+export async function fetchPokemonCards({ q, type, generation, limit, offset } = {}) {
+  const params = buildPokemonListParams({ q, type, generation, limit, offset })
+  const res = await request('/pokemon/cards', { params })
   return res
 }
 

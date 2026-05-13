@@ -69,6 +69,27 @@ GET /api/pokemon?seasonId=1
 GET /api/pokemon?limit=20&offset=0
 ```
 
+### GET /pokemon/cards
+
+获取图鉴卡片视图的轻量列表。只返回卡片展示需要的字段：数字 ID、图鉴编号、名称、当前默认形态属性和官方图。筛选参数与 `/pokemon` 相同。`generation` 使用 `pokemon.introduced_generation` 按初登场世代筛选，不连接 `pokemon_generation_regions`。
+
+示例：
+
+```
+GET /api/pokemon/cards?limit=60&offset=0
+GET /api/pokemon/cards?generation=1&type=电
+```
+
+### GET /pokemon/table
+
+获取 Web 图鉴表格视图的轻量列表。返回表格需要的字段：卡片字段、当前默认形态特性和当前种族值；不返回世代可用性、进化链、闪光图或详情字段。支持 `sort=speed&order=asc|desc`。
+
+示例：
+
+```
+GET /api/pokemon/table?limit=60&offset=0
+GET /api/pokemon/table?sort=speed&order=desc
+```
 
 ### GET /pokemon/:id
 

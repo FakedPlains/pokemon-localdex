@@ -39,7 +39,10 @@ import type {
   EvolutionStep,
   PokemonListSortKey,
   PokemonSummary,
+  PokemonCardSummary,
+  PokemonTableSummary,
   PokemonEntry,
+  PokemonIdentity,
   ChampionsSeasonSummary,
   MoveEntry,
   MoveGenerationRecord,
@@ -59,6 +62,15 @@ import {
   statBlockFromRow,
   sourceFromRow,
 } from "@pokemon-localdex/store-types";
+
+type PokemonListFilters = {
+  query?: string;
+  type?: string | string[];
+  generation?: number;
+  championsSeasonId?: number;
+  sort?: PokemonListSortKey;
+  order?: SortOrder;
+} & PaginationParams;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 辅助函数
@@ -135,9 +147,277 @@ export class DrizzleStore implements IStore {
     this.db = db;
   }
 
+  private pokemonListWhere(filters?: PokemonListFilters): SQL | undefined {
+    const conditions: SQL[] = [];
+
+    if (filters?.query) {
+      const v = `%${filters.query}%`;
+      conditions.push(
+        or(
+          like(pokemon.nameZh, v),
+          like(pokemon.nameJa, v),
+          like(pokemon.nameEn, v),
+          like(pokemon.slug, v),
+          like(sql`CAST(${pokemon.dexNumber} AS TEXT)`, v),
+        )!,
+      );
+    }
+
+    if (filters?.type) {
+      const types = Array.isArray(filters.type) ? filters.type : [filters.type];
+      if (types.length === 1) {
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM pokemon_form_types pft2 WHERE pft2.form_id = ${pokemonForms.id} AND pft2.type_name = ${types[0]})`,
+        );
+      } else if (types.length > 1) {
+        const placeholders = types.map((t) => sql`${t}`);
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM pokemon_form_types pft2 WHERE pft2.form_id = ${pokemonForms.id} AND pft2.type_name IN (${sql.join(placeholders, sql`, `)}))`,
+        );
+      }
+    }
+
+    if (filters?.generation) {
+      conditions.push(eq(pokemon.introducedGeneration, filters.generation));
+    }
+
+    if (filters?.championsSeasonId !== undefined) {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1
+          FROM champions_seasons cs
+          INNER JOIN champions_regulation_pokemon crp ON crp.regulation_id = cs.regulation_id
+          WHERE cs.id = ${filters.championsSeasonId}
+            AND (
+              crp.pokemon_id = ${pokemon.id}
+              OR (crp.pokemon_id IS NULL AND crp.dex_number = ${pokemon.dexNumber})
+            )
+        )`,
+      );
+    }
+
+    return conditions.length ? and(...conditions) : undefined;
+  }
+
+  private pokemonListOrderBy(filters?: PokemonListFilters): SQL[] {
+    return filters?.sort === "speed"
+      ? [
+          sql`${pokemonFormStats.spe} IS NULL`,
+          filters.order === "asc" ? asc(pokemonFormStats.spe) : desc(pokemonFormStats.spe),
+          asc(pokemon.dexNumber),
+        ]
+      : [asc(pokemon.dexNumber)];
+  }
+
+  private async countDefaultPokemonRows(where: SQL | undefined): Promise<number> {
+    const countRows = await this.db
+      .select({ cnt: sql<number>`COUNT(*)` })
+      .from(pokemon)
+      .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
+      .where(where);
+    return Number(countRows[0]?.cnt ?? 0);
+  }
+
+  private async listPokemonCardRows(filters?: PokemonListFilters): Promise<PaginatedResult<PokemonCardSummary> | PokemonCardSummary[]> {
+    const where = this.pokemonListWhere(filters);
+    const usePagination = filters?.limit !== undefined;
+    const needsSpeedJoin = filters?.sort === "speed";
+
+    const total = usePagination ? await this.countDefaultPokemonRows(where) : 0;
+
+    let query = this.db
+      .select({
+        id: pokemon.id,
+        dexNumber: pokemon.dexNumber,
+        slug: pokemon.slug,
+        nameZh: pokemon.nameZh,
+        nameEn: pokemon.nameEn,
+        formId: pokemonForms.id,
+        spe: needsSpeedJoin ? pokemonFormStats.spe : sql<number>`NULL`,
+      })
+      .from(pokemon)
+      .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)));
+
+    if (needsSpeedJoin) {
+      query = query.leftJoin(pokemonFormStats, and(eq(pokemonFormStats.formId, pokemonForms.id), isNull(pokemonFormStats.generationEnd)));
+    }
+
+    query = query.where(where).orderBy(...this.pokemonListOrderBy(filters));
+
+    if (usePagination) {
+      query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));
+    }
+
+    const rows: any[] = await query;
+    if (rows.length === 0) return usePagination ? { items: [], total } : [];
+
+    const formIds = rows.map((r: any) => Number(r.formId));
+    const [typeRows, imageRows] = await Promise.all([
+      this.db.select({
+        formId: pokemonFormTypes.formId,
+        typeName: pokemonFormTypes.typeName,
+        slot: pokemonFormTypes.slot,
+      }).from(pokemonFormTypes)
+        .where(and(inArray(pokemonFormTypes.formId, formIds), isNull(pokemonFormTypes.generationEnd)))
+        .orderBy(asc(pokemonFormTypes.formId), asc(pokemonFormTypes.slot)),
+
+      this.db.select({
+        formId: pokemonFormImages.formId,
+        url: pokemonFormImages.url,
+        alt: pokemonFormImages.alt,
+      }).from(pokemonFormImages)
+        .where(and(inArray(pokemonFormImages.formId, formIds), eq(pokemonFormImages.imageKind, "official"))),
+    ]);
+
+    const typeMap = new Map<number, string[]>();
+    for (const r of typeRows) {
+      const fid = Number(r.formId);
+      if (!typeMap.has(fid)) typeMap.set(fid, []);
+      typeMap.get(fid)!.push(String(r.typeName));
+    }
+
+    const imageMap = new Map<number, ImageAsset>();
+    for (const r of imageRows) {
+      imageMap.set(Number(r.formId), {
+        url: String(r.url),
+        alt: r.alt ? String(r.alt) : undefined,
+      });
+    }
+
+    const items = rows.map((row: any) => {
+      const fid = Number(row.formId);
+      const types = typeMap.get(fid) || [];
+      return {
+        id: Number(row.id),
+        dexNumber: Number(row.dexNumber),
+        slug: String(row.slug),
+        nameZh: String(row.nameZh),
+        nameEn: row.nameEn ? String(row.nameEn) : undefined,
+        primaryType: types[0],
+        secondaryType: types[1],
+        image: imageMap.get(fid),
+      } as PokemonCardSummary;
+    });
+
+    return usePagination ? { items, total } : items;
+  }
+
+  private async listPokemonTableRows(filters?: PokemonListFilters): Promise<PaginatedResult<PokemonTableSummary> | PokemonTableSummary[]> {
+    const where = this.pokemonListWhere(filters);
+    const usePagination = filters?.limit !== undefined;
+    const total = usePagination ? await this.countDefaultPokemonRows(where) : 0;
+
+    let query = this.db
+      .select({
+        id: pokemon.id,
+        dexNumber: pokemon.dexNumber,
+        slug: pokemon.slug,
+        nameZh: pokemon.nameZh,
+        nameEn: pokemon.nameEn,
+        formId: pokemonForms.id,
+        hp: pokemonFormStats.hp,
+        atk: pokemonFormStats.atk,
+        def: pokemonFormStats.def,
+        spa: pokemonFormStats.spa,
+        spd: pokemonFormStats.spd,
+        spe: pokemonFormStats.spe,
+      })
+      .from(pokemon)
+      .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
+      .leftJoin(pokemonFormStats, and(eq(pokemonFormStats.formId, pokemonForms.id), isNull(pokemonFormStats.generationEnd)))
+      .where(where)
+      .orderBy(...this.pokemonListOrderBy(filters));
+
+    if (usePagination) {
+      query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));
+    }
+
+    const rows: any[] = await query;
+    if (rows.length === 0) return usePagination ? { items: [], total } : [];
+
+    const formIds = rows.map((r: any) => Number(r.formId));
+    const [typeRows, abilityRows, imageRows] = await Promise.all([
+      this.db.select({
+        formId: pokemonFormTypes.formId,
+        typeName: pokemonFormTypes.typeName,
+        slot: pokemonFormTypes.slot,
+      }).from(pokemonFormTypes)
+        .where(and(inArray(pokemonFormTypes.formId, formIds), isNull(pokemonFormTypes.generationEnd)))
+        .orderBy(asc(pokemonFormTypes.formId), asc(pokemonFormTypes.slot)),
+
+      this.db.select({
+        formId: pokemonFormAbilities.formId,
+        abilityNameZh: pokemonFormAbilities.abilityNameZh,
+        isHidden: pokemonFormAbilities.isHidden,
+      }).from(pokemonFormAbilities)
+        .where(and(inArray(pokemonFormAbilities.formId, formIds), isNull(pokemonFormAbilities.generationEnd)))
+        .orderBy(asc(pokemonFormAbilities.formId), asc(pokemonFormAbilities.slot)),
+
+      this.db.select({
+        formId: pokemonFormImages.formId,
+        url: pokemonFormImages.url,
+        alt: pokemonFormImages.alt,
+      }).from(pokemonFormImages)
+        .where(and(inArray(pokemonFormImages.formId, formIds), eq(pokemonFormImages.imageKind, "official"))),
+    ]);
+
+    const typeMap = new Map<number, string[]>();
+    for (const r of typeRows) {
+      const fid = Number(r.formId);
+      if (!typeMap.has(fid)) typeMap.set(fid, []);
+      typeMap.get(fid)!.push(String(r.typeName));
+    }
+
+    const abilityMap = new Map<number, { abilities: string[]; hidden?: string }>();
+    for (const r of abilityRows) {
+      const fid = Number(r.formId);
+      if (!abilityMap.has(fid)) abilityMap.set(fid, { abilities: [] });
+      const entry = abilityMap.get(fid)!;
+      if (Number(r.isHidden)) entry.hidden = String(r.abilityNameZh);
+      else entry.abilities.push(String(r.abilityNameZh));
+    }
+
+    const imageMap = new Map<number, ImageAsset>();
+    for (const r of imageRows) {
+      imageMap.set(Number(r.formId), {
+        url: String(r.url),
+        alt: r.alt ? String(r.alt) : undefined,
+      });
+    }
+
+    const items = rows.map((row: any) => {
+      const fid = Number(row.formId);
+      const types = typeMap.get(fid) || [];
+      const ab = abilityMap.get(fid) || { abilities: [] };
+      return {
+        id: Number(row.id),
+        dexNumber: Number(row.dexNumber),
+        slug: String(row.slug),
+        nameZh: String(row.nameZh),
+        nameEn: row.nameEn ? String(row.nameEn) : undefined,
+        primaryType: types[0],
+        secondaryType: types[1],
+        abilities: ab.abilities,
+        hiddenAbility: ab.hidden,
+        baseStats: buildStatBlock(row),
+        image: imageMap.get(fid),
+      } as PokemonTableSummary;
+    });
+
+    return usePagination ? { items, total } : items;
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // Pokemon: listPokemon
   // ────────────────────────────────────────────────────────────────────────────
+
+  async listPokemonCards(filters?: PokemonListFilters): Promise<PaginatedResult<PokemonCardSummary> | PokemonCardSummary[]> {
+    return this.listPokemonCardRows(filters);
+  }
+
+  async listPokemonTable(filters?: PokemonListFilters): Promise<PaginatedResult<PokemonTableSummary> | PokemonTableSummary[]> {
+    return this.listPokemonTableRows(filters);
+  }
 
   async listPokemon(
     filters?: {
@@ -148,7 +428,7 @@ export class DrizzleStore implements IStore {
       sort?: PokemonListSortKey;
       order?: SortOrder;
     } & PaginationParams,
-  ): Promise<PaginatedResult<PokemonSummary & { _chainId?: number }> | Array<PokemonSummary & { _chainId?: number }>> {
+  ): Promise<PaginatedResult<PokemonSummary> | PokemonSummary[]> {
     const conditions: SQL[] = [];
 
     if (filters?.query) {
@@ -180,9 +460,7 @@ export class DrizzleStore implements IStore {
     }
 
     if (filters?.generation) {
-      conditions.push(
-        sql`EXISTS (SELECT 1 FROM pokemon_generation_regions pgr WHERE pgr.pokemon_id = ${pokemon.id} AND pgr.generation = ${filters.generation})`,
-      );
+      conditions.push(eq(pokemon.introducedGeneration, filters.generation));
     }
 
     if (filters?.championsSeasonId !== undefined) {
@@ -254,10 +532,9 @@ export class DrizzleStore implements IStore {
     }
 
     const formIds = rows.map((r: any) => Number(r.formId));
-    const pokemonIds = rows.map((r: any) => Number(r.id));
 
-    // 批量查询：属性、特性、图片、世代、进化链
-    const [typeRows, abilityRows, imageRows, genRows, evoRows] = await Promise.all([
+    // 批量查询：属性、特性、图片
+    const [typeRows, abilityRows, imageRows] = await Promise.all([
       this.db.select({
         formId: pokemonFormTypes.formId,
         typeName: pokemonFormTypes.typeName,
@@ -282,18 +559,6 @@ export class DrizzleStore implements IStore {
       }).from(pokemonFormImages)
         .where(inArray(pokemonFormImages.formId, formIds)),
 
-      this.db.select({
-        pokemonId: pokemonGenerationRegions.pokemonId,
-        generation: pokemonGenerationRegions.generation,
-      }).from(pokemonGenerationRegions)
-        .where(inArray(pokemonGenerationRegions.pokemonId, pokemonIds))
-        .orderBy(asc(pokemonGenerationRegions.pokemonId), asc(pokemonGenerationRegions.generation)),
-
-      this.db.select({
-        chainId: evolutionChains.chainId,
-        toPokemonId: evolutionChains.toPokemonId,
-      }).from(evolutionChains)
-        .where(inArray(evolutionChains.toPokemonId, pokemonIds)),
     ]);
 
     // 构建 Map
@@ -326,19 +591,6 @@ export class DrizzleStore implements IStore {
       };
     }
 
-    const genMap = new Map<number, number[]>();
-    for (const r of genRows) {
-      const pid = Number(r.pokemonId);
-      if (!genMap.has(pid)) genMap.set(pid, []);
-      const num = Number(r.generation);
-      if (!genMap.get(pid)!.includes(num)) genMap.get(pid)!.push(num);
-    }
-
-    const chainMap = new Map<number, number>();
-    for (const r of evoRows) {
-      chainMap.set(Number(r.toPokemonId), Number(r.chainId));
-    }
-
     const resultItems = rows.map((row: any) => {
       const fid = Number(row.formId);
       const pid = Number(row.id);
@@ -359,9 +611,8 @@ export class DrizzleStore implements IStore {
         baseStats: buildStatBlock(row),
         image: imgs.official,
         shinyImage: imgs.shiny,
-        generations: genMap.get(pid) || [],
-        _chainId: chainMap.get(pid),
-      } as PokemonSummary & { _chainId?: number };
+        generations: [],
+      } as PokemonSummary;
     });
 
     return usePagination ? { items: resultItems, total } : resultItems;
@@ -400,6 +651,36 @@ export class DrizzleStore implements IStore {
   // ────────────────────────────────────────────────────────────────────────────
   // Pokemon: getPokemon
   // ────────────────────────────────────────────────────────────────────────────
+
+  async getPokemonIdentity(idOrSlug: string): Promise<PokemonIdentity | undefined> {
+    const rows = await this.db
+      .select({
+        id: pokemon.id,
+        dexNumber: pokemon.dexNumber,
+        slug: pokemon.slug,
+        nameZh: pokemon.nameZh,
+      })
+      .from(pokemon)
+      .where(
+        or(
+          eq(pokemon.id, Number(idOrSlug) || 0),
+          eq(pokemon.slug, idOrSlug),
+          eq(pokemon.nameZh, idOrSlug),
+          eq(sql`CAST(${pokemon.dexNumber} AS TEXT)`, idOrSlug),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    return row
+      ? {
+          id: Number(row.id),
+          dexNumber: Number(row.dexNumber),
+          slug: String(row.slug),
+          nameZh: String(row.nameZh),
+        }
+      : undefined;
+  }
 
   async getPokemon(
     idOrSlug: string,
@@ -957,6 +1238,23 @@ export class DrizzleStore implements IStore {
     };
   }
 
+  private hydrateMoveSummary(row: any): MoveEntry {
+    return {
+      id: String(row.id),
+      number: row.number != null ? Number(row.number) : undefined,
+      nameZh: String(row.nameZh),
+      nameJa: row.nameJa ? String(row.nameJa) : undefined,
+      nameEn: row.nameEn ? String(row.nameEn) : undefined,
+      type: row.typeName ? String(row.typeName) : undefined,
+      category: row.category ? String(row.category) : undefined,
+      power: row.power != null ? Number(row.power) : undefined,
+      accuracy: row.accuracy != null ? Number(row.accuracy) : undefined,
+      pp: row.pp != null ? Number(row.pp) : undefined,
+      description: row.description ? String(row.description) : undefined,
+      generations: [],
+    };
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // Moves: listMoves
   // ────────────────────────────────────────────────────────────────────────────
@@ -1015,7 +1313,7 @@ export class DrizzleStore implements IStore {
     }
 
     const rows: any[] = await query;
-    const items = await Promise.all(rows.map((r: any) => this.hydrateMoveRow(r)));
+    const items = rows.map((r: any) => this.hydrateMoveSummary(r));
     return usePagination ? { items, total } : items;
   }
 
@@ -1163,6 +1461,18 @@ export class DrizzleStore implements IStore {
     };
   }
 
+  private hydrateAbilitySummary(row: any): AbilityEntry {
+    return {
+      id: String(row.id),
+      number: row.number != null ? Number(row.number) : undefined,
+      nameZh: String(row.nameZh),
+      nameJa: row.nameJa ? String(row.nameJa) : undefined,
+      nameEn: row.nameEn ? String(row.nameEn) : undefined,
+      description: row.description ? String(row.description) : undefined,
+      generations: [],
+    };
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // Abilities: listAbilities
   // ────────────────────────────────────────────────────────────────────────────
@@ -1211,7 +1521,7 @@ export class DrizzleStore implements IStore {
     }
 
     const rows: any[] = await query;
-    const items = await Promise.all(rows.map((r: any) => this.hydrateAbilityRow(r)));
+    const items = rows.map((r: any) => this.hydrateAbilitySummary(r));
     return usePagination ? { items, total } : items;
   }
 
@@ -1358,6 +1668,20 @@ export class DrizzleStore implements IStore {
     };
   }
 
+  private hydrateItemSummary(row: any): ItemEntry {
+    return {
+      id: String(row.id),
+      slug: String(row.slug),
+      nameZh: String(row.nameZh),
+      nameJa: row.nameJa ? String(row.nameJa) : undefined,
+      nameEn: row.nameEn ? String(row.nameEn) : undefined,
+      category: row.category ? String(row.category) : undefined,
+      effectSummary: row.effectSummary ? String(row.effectSummary) : undefined,
+      imageUrl: row.imageUrl ? String(row.imageUrl) : undefined,
+      generations: [],
+    };
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // Items: listItems
   // ────────────────────────────────────────────────────────────────────────────
@@ -1406,7 +1730,7 @@ export class DrizzleStore implements IStore {
     }
 
     const rows: any[] = await query;
-    const resultItems = await Promise.all(rows.map((r: any) => this.hydrateItemRow(r)));
+    const resultItems = rows.map((r: any) => this.hydrateItemSummary(r));
     return usePagination ? { items: resultItems, total } : resultItems;
   }
 

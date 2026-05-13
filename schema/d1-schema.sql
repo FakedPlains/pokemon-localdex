@@ -288,19 +288,24 @@ CREATE TABLE IF NOT EXISTS champions_regulation_items (
 CREATE INDEX IF NOT EXISTS idx_pokemon_dex ON pokemon(dex_number);
 CREATE INDEX IF NOT EXISTS idx_pokemon_name ON pokemon(name_zh);
 CREATE INDEX IF NOT EXISTS idx_pokemon_slug ON pokemon(slug);
+CREATE INDEX IF NOT EXISTS idx_pokemon_introduced_generation ON pokemon(introduced_generation);
 
 CREATE INDEX IF NOT EXISTS idx_forms_pokemon ON pokemon_forms(pokemon_id);
 CREATE INDEX IF NOT EXISTS idx_forms_default ON pokemon_forms(pokemon_id, is_default);
 CREATE INDEX IF NOT EXISTS idx_form_types_form ON pokemon_form_types(form_id);
+CREATE INDEX IF NOT EXISTS idx_form_types_current ON pokemon_form_types(form_id, generation_end, slot);
 CREATE INDEX IF NOT EXISTS idx_form_abilities_form ON pokemon_form_abilities(form_id);
+CREATE INDEX IF NOT EXISTS idx_form_abilities_ability ON pokemon_form_abilities(ability_id, form_id);
 CREATE INDEX IF NOT EXISTS idx_form_stats_form ON pokemon_form_stats(form_id);
 CREATE INDEX IF NOT EXISTS idx_form_images_form ON pokemon_form_images(form_id);
+CREATE INDEX IF NOT EXISTS idx_form_images_kind ON pokemon_form_images(form_id, image_kind);
 
 CREATE INDEX IF NOT EXISTS idx_evo_chain ON evolution_chains(chain_id);
 CREATE INDEX IF NOT EXISTS idx_evo_to ON evolution_chains(to_pokemon_id);
 
 CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon ON pokemon_learnsets(pokemon_id, form_key);
 CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon_gen ON pokemon_learnsets(pokemon_id, generation);
+CREATE INDEX IF NOT EXISTS idx_learnsets_lookup ON pokemon_learnsets(pokemon_id, generation, form_key, game_version_code, learn_method, sort_order);
 CREATE INDEX IF NOT EXISTS idx_learnsets_move ON pokemon_learnsets(move_id);
 
 CREATE INDEX IF NOT EXISTS idx_regions_pokemon ON pokemon_generation_regions(pokemon_id);
@@ -308,9 +313,11 @@ CREATE INDEX IF NOT EXISTS idx_regions_pokemon ON pokemon_generation_regions(pok
 CREATE INDEX IF NOT EXISTS idx_moves_name_zh ON moves(name_zh);
 CREATE INDEX IF NOT EXISTS idx_moves_type ON moves(type_name);
 CREATE INDEX IF NOT EXISTS idx_moves_number ON moves(number);
+CREATE INDEX IF NOT EXISTS idx_moves_sort ON moves(CASE WHEN number IS NULL OR number = 0 THEN 1 ELSE 0 END, number);
 CREATE INDEX IF NOT EXISTS idx_abilities_name ON abilities(name_zh);
 CREATE INDEX IF NOT EXISTS idx_abilities_number ON abilities(number);
 CREATE INDEX IF NOT EXISTS idx_items_name_zh ON items(name_zh);
+CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
 
 CREATE INDEX IF NOT EXISTS idx_champions_seasons_regulation ON champions_seasons(regulation_id);
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_regulation ON champions_regulation_pokemon(regulation_id);

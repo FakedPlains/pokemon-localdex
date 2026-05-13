@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
-import { fetchAbilitiesList } from '../../utils/api'
+import { fetchAbilitiesList, fetchAbilityDetail } from '../../utils/api'
 import { PAGE_SIZE } from '../../utils/config'
 import { GENERATION_OPTIONS } from '../../utils/constants'
 import Loading from '../../components/loading'
@@ -15,6 +15,7 @@ export default function AbilitiesPage() {
   const [keyword, setKeyword] = useState('')
   const [genFilter, setGenFilter] = useState('')
   const [expandedId, setExpandedId] = useState(null)
+  const [detailCache, setDetailCache] = useState({})
 
   const offsetRef = useRef(0)
 
@@ -30,6 +31,7 @@ export default function AbilitiesPage() {
     try {
       const res = await fetchAbilitiesList({
         q: keyword || undefined,
+        generation: genFilter || undefined,
         limit: PAGE_SIZE,
         offset: offsetRef.current
       })
@@ -60,9 +62,22 @@ export default function AbilitiesPage() {
     if (!loadingMore && hasMore) loadData(false)
   }, [loadingMore, hasMore, loadData])
 
+  const loadDetail = useCallback((id) => {
+    if (detailCache[id]) return
+    fetchAbilityDetail(id).then(res => {
+      setDetailCache(prev => ({ ...prev, [id]: res.data }))
+    }).catch(e => {
+      console.error('fetchAbilityDetail error', e)
+    })
+  }, [detailCache])
+
   const toggleExpand = useCallback((id) => {
-    setExpandedId(prev => prev === id ? null : id)
-  }, [])
+    setExpandedId(prev => {
+      if (prev === id) return null
+      loadDetail(id)
+      return id
+    })
+  }, [loadDetail])
 
   return (
     <View className='abilities-page'>
@@ -112,55 +127,66 @@ export default function AbilitiesPage() {
           onScrollToLower={onScrollToLower}
           lowerThreshold={200}
         >
-          {list.map(ability => (
-            <View key={ability.id} className='ability-card' onClick={() => toggleExpand(ability.id)}>
-              <View className='ability-card-header'>
-                <View className='ability-card-left'>
-                  {ability.number && (
-                    <Text className='ability-number'>#{String(ability.number).padStart(3, '0')}</Text>
-                  )}
-                  <Text className='ability-name'>{ability.nameZh}</Text>
+          {list.map(ability => {
+            const detail = detailCache[ability.id]
+            return (
+              <View key={ability.id} className='ability-card' onClick={() => toggleExpand(ability.id)}>
+                <View className='ability-card-header'>
+                  <View className='ability-card-left'>
+                    {ability.number && (
+                      <Text className='ability-number'>#{String(ability.number).padStart(3, '0')}</Text>
+                    )}
+                    <Text className='ability-name'>{ability.nameZh}</Text>
+                  </View>
+                  <View className='ability-card-right'>
+                    {ability.nameEn && <Text className='ability-name-en'>{ability.nameEn}</Text>}
+                  </View>
                 </View>
-                <View className='ability-card-right'>
-                  {ability.nameEn && <Text className='ability-name-en'>{ability.nameEn}</Text>}
+
+                {ability.description && (
+                  <View className='ability-desc'>
+                    <Text className='ability-desc-text'>{ability.description}</Text>
+                  </View>
+                )}
+
+                {/* 展开详情 */}
+                {expandedId === ability.id && (
+                  <View className='ability-detail'>
+                    {!detail ? (
+                      <View className='detail-section'>
+                        <Text className='detail-text'>加载中…</Text>
+                      </View>
+                    ) : (
+                      <>
+                        {detail.nameJa && (
+                          <View className='detail-section'>
+                            <Text className='detail-label'>日文名</Text>
+                            <Text className='detail-text'>{detail.nameJa}</Text>
+                          </View>
+                        )}
+                        {detail.effectDetail && (
+                          <View className='detail-section'>
+                            <Text className='detail-label'>详细效果</Text>
+                            <Text className='detail-text'>{detail.effectDetail}</Text>
+                          </View>
+                        )}
+                        {detail.introducedGeneration && (
+                          <View className='detail-section'>
+                            <Text className='detail-label'>初登场</Text>
+                            <Text className='detail-text'>第 {detail.introducedGeneration} 世代</Text>
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
+
+                <View className='expand-indicator'>
+                  <Text className='expand-arrow'>{expandedId === ability.id ? '▲' : '▼'}</Text>
                 </View>
               </View>
-
-              {ability.description && (
-                <View className='ability-desc'>
-                  <Text className='ability-desc-text'>{ability.description}</Text>
-                </View>
-              )}
-
-              {/* 展开详情 */}
-              {expandedId === ability.id && (
-                <View className='ability-detail'>
-                  {ability.nameJa && (
-                    <View className='detail-section'>
-                      <Text className='detail-label'>日文名</Text>
-                      <Text className='detail-text'>{ability.nameJa}</Text>
-                    </View>
-                  )}
-                  {ability.effectDetail && (
-                    <View className='detail-section'>
-                      <Text className='detail-label'>详细效果</Text>
-                      <Text className='detail-text'>{ability.effectDetail}</Text>
-                    </View>
-                  )}
-                  {ability.introducedGeneration && (
-                    <View className='detail-section'>
-                      <Text className='detail-label'>初登场</Text>
-                      <Text className='detail-text'>第 {ability.introducedGeneration} 世代</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              <View className='expand-indicator'>
-                <Text className='expand-arrow'>{expandedId === ability.id ? '▲' : '▼'}</Text>
-              </View>
-            </View>
-          ))}
+            )
+          })}
 
           {loadingMore && <Loading text='加载更多…' />}
           {!hasMore && list.length > 0 && (

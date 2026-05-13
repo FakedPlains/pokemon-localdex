@@ -72,13 +72,14 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     if (types.length > 0) params.set("type", types.join(","));
     if (generation) params.set("generation", generation);
     if (championsSeasonId) params.set("seasonId", championsSeasonId);
-    if (speedSortOrder) {
+    if (dexViewMode === "list" && speedSortOrder) {
       params.set("sort", "speed");
       params.set("order", speedSortOrder);
     }
     const qs = params.toString();
-    return qs ? `/pokemon?${qs}` : "/pokemon";
-  }, [query, types, generation, championsSeasonId, speedSortOrder]);
+    const endpoint = dexViewMode === "list" ? "/pokemon/table" : "/pokemon/cards";
+    return qs ? `${endpoint}?${qs}` : endpoint;
+  }, [query, types, generation, championsSeasonId, speedSortOrder, dexViewMode]);
 
   // Mark that filters changed while detail panel is open
   useEffect(() => {

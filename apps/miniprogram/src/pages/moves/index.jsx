@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
-import { fetchMovesList } from '../../utils/api'
+import { fetchMoveDetail, fetchMovesList } from '../../utils/api'
 import { ALL_TYPE_OPTIONS, CATEGORY_COLORS, GENERATION_OPTIONS } from '../../utils/constants'
 import { PAGE_SIZE } from '../../utils/config'
 import TypeChip from '../../components/type-chip'
@@ -20,6 +20,7 @@ export default function MovesPage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [genFilter, setGenFilter] = useState('')
   const [expandedId, setExpandedId] = useState(null)
+  const [detailCache, setDetailCache] = useState({})
 
   const offsetRef = useRef(0)
 
@@ -37,6 +38,7 @@ export default function MovesPage() {
         q: keyword || undefined,
         type: typeFilter || undefined,
         category: categoryFilter || undefined,
+        generation: genFilter || undefined,
         limit: PAGE_SIZE,
         offset: offsetRef.current
       })
@@ -67,9 +69,22 @@ export default function MovesPage() {
     if (!loadingMore && hasMore) loadData(false)
   }, [loadingMore, hasMore, loadData])
 
+  const loadDetail = useCallback((id) => {
+    if (detailCache[id]) return
+    fetchMoveDetail(id).then(res => {
+      setDetailCache(prev => ({ ...prev, [id]: res.data }))
+    }).catch(e => {
+      console.error('fetchMoveDetail error', e)
+    })
+  }, [detailCache])
+
   const toggleExpand = useCallback((id) => {
-    setExpandedId(prev => prev === id ? null : id)
-  }, [])
+    setExpandedId(prev => {
+      if (prev === id) return null
+      loadDetail(id)
+      return id
+    })
+  }, [loadDetail])
 
   return (
     <View className='moves-page'>
@@ -142,66 +157,77 @@ export default function MovesPage() {
           onScrollToLower={onScrollToLower}
           lowerThreshold={200}
         >
-          {list.map(move => (
-            <View key={move.id} className='move-card' onClick={() => toggleExpand(move.id)}>
-              <View className='move-card-header'>
-                <View className='move-card-left'>
-                  <Text className='move-name'>{move.nameZh}</Text>
-                  {move.nameEn && <Text className='move-name-en'>{move.nameEn}</Text>}
+          {list.map(move => {
+            const detail = detailCache[move.id]
+            return (
+              <View key={move.id} className='move-card' onClick={() => toggleExpand(move.id)}>
+                <View className='move-card-header'>
+                  <View className='move-card-left'>
+                    <Text className='move-name'>{move.nameZh}</Text>
+                    {move.nameEn && <Text className='move-name-en'>{move.nameEn}</Text>}
+                  </View>
+                  <View className='move-card-right'>
+                    <TypeChip type={move.type} />
+                    {move.category && (
+                      <View
+                        className='category-badge'
+                        style={{ background: CATEGORY_COLORS[move.category] || '#999' }}
+                      >
+                        <Text className='category-text'>{move.category}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-                <View className='move-card-right'>
-                  <TypeChip type={move.type} />
-                  {move.category && (
-                    <View
-                      className='category-badge'
-                      style={{ background: CATEGORY_COLORS[move.category] || '#999' }}
-                    >
-                      <Text className='category-text'>{move.category}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
 
-              <View className='move-card-stats'>
-                <View className='stat-item'>
-                  <Text className='stat-label'>威力</Text>
-                  <Text className='stat-value'>{move.power ?? '—'}</Text>
+                <View className='move-card-stats'>
+                  <View className='stat-item'>
+                    <Text className='stat-label'>威力</Text>
+                    <Text className='stat-value'>{move.power ?? '—'}</Text>
+                  </View>
+                  <View className='stat-item'>
+                    <Text className='stat-label'>命中</Text>
+                    <Text className='stat-value'>{move.accuracy ?? '—'}</Text>
+                  </View>
+                  <View className='stat-item'>
+                    <Text className='stat-label'>PP</Text>
+                    <Text className='stat-value'>{move.pp ?? '—'}</Text>
+                  </View>
                 </View>
-                <View className='stat-item'>
-                  <Text className='stat-label'>命中</Text>
-                  <Text className='stat-value'>{move.accuracy ?? '—'}</Text>
-                </View>
-                <View className='stat-item'>
-                  <Text className='stat-label'>PP</Text>
-                  <Text className='stat-value'>{move.pp ?? '—'}</Text>
-                </View>
-              </View>
 
-              {/* 展开详情 */}
-              {expandedId === move.id && (
-                <View className='move-card-detail'>
-                  {move.description && (
-                    <View className='detail-section'>
-                      <Text className='detail-label'>效果</Text>
-                      <Text className='detail-text'>{move.description}</Text>
-                    </View>
-                  )}
-                  {move.effectDetail && (
-                    <View className='detail-section'>
-                      <Text className='detail-label'>详细说明</Text>
-                      <Text className='detail-text'>{move.effectDetail}</Text>
-                    </View>
-                  )}
-                  {move.introducedGeneration && (
-                    <View className='detail-section'>
-                      <Text className='detail-label'>初登场</Text>
-                      <Text className='detail-text'>第 {move.introducedGeneration} 世代</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-          ))}
+                {/* 展开详情 */}
+                {expandedId === move.id && (
+                  <View className='move-card-detail'>
+                    {!detail ? (
+                      <View className='detail-section'>
+                        <Text className='detail-text'>加载中…</Text>
+                      </View>
+                    ) : (
+                      <>
+                        {(detail.description || move.description) && (
+                          <View className='detail-section'>
+                            <Text className='detail-label'>效果</Text>
+                            <Text className='detail-text'>{detail.description || move.description}</Text>
+                          </View>
+                        )}
+                        {detail.effectDetail && (
+                          <View className='detail-section'>
+                            <Text className='detail-label'>详细说明</Text>
+                            <Text className='detail-text'>{detail.effectDetail}</Text>
+                          </View>
+                        )}
+                        {detail.introducedGeneration && (
+                          <View className='detail-section'>
+                            <Text className='detail-label'>初登场</Text>
+                            <Text className='detail-text'>第 {detail.introducedGeneration} 世代</Text>
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
+              </View>
+            )
+          })}
 
           {loadingMore && <Loading text='加载更多…' />}
           {!hasMore && list.length > 0 && (

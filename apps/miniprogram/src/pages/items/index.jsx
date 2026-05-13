@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
-import { fetchItemsList } from '../../utils/api'
+import { fetchItemsList, fetchItemDetail } from '../../utils/api'
 import { PAGE_SIZE } from '../../utils/config'
 import Loading from '../../components/loading'
 import SafeImage from '../../components/safe-image'
@@ -16,6 +16,7 @@ export default function ItemsPage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [categories, setCategories] = useState([])
   const [expandedId, setExpandedId] = useState(null)
+  const [detailCache, setDetailCache] = useState({})
 
   const offsetRef = useRef(0)
 
@@ -67,9 +68,22 @@ export default function ItemsPage() {
     if (!loadingMore && hasMore) loadData(false)
   }, [loadingMore, hasMore, loadData])
 
+  const loadDetail = useCallback((id) => {
+    if (detailCache[id]) return
+    fetchItemDetail(id).then(res => {
+      setDetailCache(prev => ({ ...prev, [id]: res.data }))
+    }).catch(e => {
+      console.error('fetchItemDetail error', e)
+    })
+  }, [detailCache])
+
   const toggleExpand = useCallback((id) => {
-    setExpandedId(prev => prev === id ? null : id)
-  }, [])
+    setExpandedId(prev => {
+      if (prev === id) return null
+      loadDetail(id)
+      return id
+    })
+  }, [loadDetail])
 
   return (
     <View className='items-page'>
@@ -127,52 +141,63 @@ export default function ItemsPage() {
           onScrollToLower={onScrollToLower}
           lowerThreshold={200}
         >
-          {list.map(item => (
-            <View key={item.id} className='item-card' onClick={() => toggleExpand(item.id)}>
-              <View className='item-card-header'>
-                <View className='item-card-left'>
-                  <SafeImage className='item-icon' src={item.imageUrl} mode='aspectFit' />
-                  <View className='item-card-info'>
-                    <Text className='item-name'>{item.nameZh}</Text>
-                    {item.nameEn && <Text className='item-name-en'>{item.nameEn}</Text>}
+          {list.map(item => {
+            const detail = detailCache[item.id]
+            return (
+              <View key={item.id} className='item-card' onClick={() => toggleExpand(item.id)}>
+                <View className='item-card-header'>
+                  <View className='item-card-left'>
+                    <SafeImage className='item-icon' src={item.imageUrl} mode='aspectFit' />
+                    <View className='item-card-info'>
+                      <Text className='item-name'>{item.nameZh}</Text>
+                      {item.nameEn && <Text className='item-name-en'>{item.nameEn}</Text>}
+                    </View>
                   </View>
+                  {item.category && (
+                    <View className='item-category'>
+                      <Text className='item-category-text'>{item.category}</Text>
+                    </View>
+                  )}
                 </View>
-                {item.category && (
-                  <View className='item-category'>
-                    <Text className='item-category-text'>{item.category}</Text>
+
+                {item.effectSummary && (
+                  <View className='item-summary'>
+                    <Text className='item-summary-text'>{item.effectSummary}</Text>
                   </View>
                 )}
-              </View>
 
-              {item.effectSummary && (
-                <View className='item-summary'>
-                  <Text className='item-summary-text'>{item.effectSummary}</Text>
+                {/* 展开详情 */}
+                {expandedId === item.id && (
+                  <View className='item-detail'>
+                    {!detail ? (
+                      <View className='detail-section'>
+                        <Text className='detail-text'>加载中…</Text>
+                      </View>
+                    ) : (
+                      <>
+                        {detail.nameJa && (
+                          <View className='detail-section'>
+                            <Text className='detail-label'>日文名</Text>
+                            <Text className='detail-text'>{detail.nameJa}</Text>
+                          </View>
+                        )}
+                        {detail.introducedGeneration && (
+                          <View className='detail-section'>
+                            <Text className='detail-label'>初登场</Text>
+                            <Text className='detail-text'>第 {detail.introducedGeneration} 世代</Text>
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
+
+                <View className='expand-indicator'>
+                  <Text className='expand-arrow'>{expandedId === item.id ? '▲' : '▼'}</Text>
                 </View>
-              )}
-
-              {/* 展开详情 */}
-              {expandedId === item.id && (
-                <View className='item-detail'>
-                  {item.nameJa && (
-                    <View className='detail-section'>
-                      <Text className='detail-label'>日文名</Text>
-                      <Text className='detail-text'>{item.nameJa}</Text>
-                    </View>
-                  )}
-                  {item.introducedGeneration && (
-                    <View className='detail-section'>
-                      <Text className='detail-label'>初登场</Text>
-                      <Text className='detail-text'>第 {item.introducedGeneration} 世代</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              <View className='expand-indicator'>
-                <Text className='expand-arrow'>{expandedId === item.id ? '▲' : '▼'}</Text>
               </View>
-            </View>
-          ))}
+            )
+          })}
 
           {loadingMore && <Loading text='加载更多…' />}
           {!hasMore && list.length > 0 && (

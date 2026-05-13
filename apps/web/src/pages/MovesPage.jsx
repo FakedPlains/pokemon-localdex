@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import { TYPE_BG_COLORS, CATEGORY_COLORS, typeIconSrc, categoryIconSrc } from "../utils/constants.js";
 import { parseExpandParam } from "../utils/helpers.js";
@@ -49,7 +50,9 @@ function formatLearnMethods(methods) {
 
 export default function MovesPage({ query = "", type = "", category = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
+  const [detailCache, setDetailCache] = useState({});
   const pendingExpandRef = useRef(parseExpandParam());
+  const detailRequestsRef = useRef(new Set());
 
   // Reset expanded when filters change
   useEffect(() => { setExpanded(null); }, [query, type, category, generation]);
@@ -67,6 +70,18 @@ export default function MovesPage({ query = "", type = "", category = "", genera
 
   const { data: moves, total, loading, loadingMore, hasMore, sentinelRef, loadMore } = useInfiniteApi(movesPath, { pageSize: 50 });
 
+  const loadMoveDetail = useCallback((id) => {
+    if (detailCache[id] || detailRequestsRef.current.has(id)) return;
+    detailRequestsRef.current.add(id);
+    unifiedApi(`/moves/${id}`)
+      .then((r) => {
+        setDetailCache((prev) => ({ ...prev, [id]: r.data }));
+      })
+      .catch(() => {
+        detailRequestsRef.current.delete(id);
+      });
+  }, [detailCache]);
+
   // Auto-expand move from URL hash param (e.g. #/moves?expand=123)
   useEffect(() => {
     const expandId = pendingExpandRef.current;
@@ -81,6 +96,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
     if (target) {
       pendingExpandRef.current = null;
       setExpanded(target.id);
+      loadMoveDetail(target.id);
       requestAnimationFrame(() => {
         const el = document.querySelector(`[data-move-id="${target.id}"]`);
         if (el) el.scrollIntoView({ block: "center", behavior: "instant" });
@@ -100,14 +116,19 @@ export default function MovesPage({ query = "", type = "", category = "", genera
         window.history.replaceState(null, "", hash.slice(0, qIdx));
       }
     }
-  }, [moves, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [moves, loading, hasMore, loadingMore, loadMore, loadMoveDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 宝可梦区域展开状态（独立于招式详情的展开）
   const [pokemonExpanded, setPokemonExpanded] = useState({});
 
   const toggleExpand = useCallback((id) => {
-    setExpanded((prev) => (prev === id ? null : id));
-  }, []);
+    if (expanded === id) {
+      setExpanded(null);
+      return;
+    }
+    setExpanded(id);
+    loadMoveDetail(id);
+  }, [expanded, loadMoveDetail]);
 
   const togglePokemonSection = useCallback((id) => {
     setPokemonExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -145,6 +166,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
         <div className="mv-list">
           {moves.map((move) => {
             const isExpanded = expanded === move.id;
+            const detail = detailCache[move.id];
             const rowBg = move.type ? TYPE_BG_COLORS[move.type] : undefined;
             return (
               <div
@@ -183,82 +205,91 @@ export default function MovesPage({ query = "", type = "", category = "", genera
 
                 {isExpanded && (
                   <div className="mv-row-detail">
-                    {/* 名称标签 */}
-                    <div className="mv-detail-names">
-                      {move.nameJa && <span className="shared-name-tag shared-name-ja">{move.nameJa}</span>}
-                      {move.nameEn && <span className="shared-name-tag shared-name-en">{move.nameEn}</span>}
-                      {move.introducedGeneration && (
-                        <span className="shared-name-tag shared-name-gen">第 {move.introducedGeneration} 世代引入</span>
-                      )}
-                      <WikiLink url={move.source?.url} title={move.source?.title || "Wiki"} />
-                    </div>
-
-                    {/* 基础数据 */}
-                    <div className="mv-detail-stats-grid">
-                      <div className="mv-detail-stat">
-                        <span className="mv-detail-stat-label">属性</span>
-                        <span className="mv-detail-stat-value">
-                          {move.type ? <TypeIconChip type={move.type} /> : "—"}
-                        </span>
+                    {!detail ? (
+                      <div className="shared-detail-loading">
+                        <div className="pulse-dot" />
+                        <span>加载中…</span>
                       </div>
-                      <div className="mv-detail-stat">
-                        <span className="mv-detail-stat-label">分类</span>
-                        <span className="mv-detail-stat-value">
-                          <CategoryChip category={move.category} />
-                        </span>
-                      </div>
-                      <div className="mv-detail-stat">
-                        <span className="mv-detail-stat-label">威力</span>
-                        <span className="mv-detail-stat-value">{move.power ?? "—"}</span>
-                      </div>
-                      <div className="mv-detail-stat">
-                        <span className="mv-detail-stat-label">命中</span>
-                        <span className="mv-detail-stat-value">{move.accuracy != null ? `${move.accuracy}%` : "—"}</span>
-                      </div>
-                      <div className="mv-detail-stat">
-                        <span className="mv-detail-stat-label">PP</span>
-                        <span className="mv-detail-stat-value">{move.pp ?? "—"}</span>
-                      </div>
-                    </div>
-
-                    {/* 效果说明 */}
-                    <div className="shared-detail-effect">
-                      <div className="shared-detail-effect-title">招式效果</div>
-                      <div className="shared-detail-effect-text">
-                        {move.effectDetail || move.description || "暂无详细说明"}
-                      </div>
-                    </div>
-
-                    {/* 世代变更 */}
-                    <GenerationTimeline generations={move.generations} />
-
-                    {/* 能学习该招式的宝可梦 */}
-                    <div className="shared-pokemon-section">
-                      <button
-                        className={`shared-pokemon-toggle${pokemonExpanded[move.id] ? " shared-pokemon-toggle-open" : ""}`}
-                        onClick={() => togglePokemonSection(move.id)}
-                      >
-                        <span className="shared-pokemon-section-title">能学习该招式的宝可梦</span>
-                        <span className={`shared-pokemon-toggle-arrow${pokemonExpanded[move.id] ? " shared-pokemon-toggle-arrow-open" : ""}`}>▾</span>
-                      </button>
-                      {pokemonExpanded[move.id] && (
-                        <div className="shared-pokemon-content">
-                          <PokemonGrid
-                            apiPath={`/moves/${move.id}/pokemon`}
-                            emptyText="暂无能学习该招式的宝可梦数据"
-                            labelFn={(p) => formatLearnMethods(p.learnMethods)}
-                          />
+                    ) : (
+                      <>
+                        {/* 名称标签 */}
+                        <div className="mv-detail-names">
+                          {detail.nameJa && <span className="shared-name-tag shared-name-ja">{detail.nameJa}</span>}
+                          {detail.nameEn && <span className="shared-name-tag shared-name-en">{detail.nameEn}</span>}
+                          {detail.introducedGeneration && (
+                            <span className="shared-name-tag shared-name-gen">第 {detail.introducedGeneration} 世代引入</span>
+                          )}
+                          <WikiLink url={detail.source?.url} title={detail.source?.title || "Wiki"} />
                         </div>
-                      )}
-                    </div>
 
-                    {/* 来源 */}
-                    {move.source?.url && (
-                      <div className="shared-source">
-                        <a href={move.source.url} target="_blank" rel="noopener noreferrer">
-                          来源：{move.source.title || "52Poké Wiki"}
-                        </a>
-                      </div>
+                        {/* 基础数据 */}
+                        <div className="mv-detail-stats-grid">
+                          <div className="mv-detail-stat">
+                            <span className="mv-detail-stat-label">属性</span>
+                            <span className="mv-detail-stat-value">
+                              {detail.type ? <TypeIconChip type={detail.type} /> : "—"}
+                            </span>
+                          </div>
+                          <div className="mv-detail-stat">
+                            <span className="mv-detail-stat-label">分类</span>
+                            <span className="mv-detail-stat-value">
+                              <CategoryChip category={detail.category} />
+                            </span>
+                          </div>
+                          <div className="mv-detail-stat">
+                            <span className="mv-detail-stat-label">威力</span>
+                            <span className="mv-detail-stat-value">{detail.power ?? "—"}</span>
+                          </div>
+                          <div className="mv-detail-stat">
+                            <span className="mv-detail-stat-label">命中</span>
+                            <span className="mv-detail-stat-value">{detail.accuracy != null ? `${detail.accuracy}%` : "—"}</span>
+                          </div>
+                          <div className="mv-detail-stat">
+                            <span className="mv-detail-stat-label">PP</span>
+                            <span className="mv-detail-stat-value">{detail.pp ?? "—"}</span>
+                          </div>
+                        </div>
+
+                        {/* 效果说明 */}
+                        <div className="shared-detail-effect">
+                          <div className="shared-detail-effect-title">招式效果</div>
+                          <div className="shared-detail-effect-text">
+                            {detail.effectDetail || detail.description || "暂无详细说明"}
+                          </div>
+                        </div>
+
+                        {/* 世代变更 */}
+                        <GenerationTimeline generations={detail.generations} />
+
+                        {/* 能学习该招式的宝可梦 */}
+                        <div className="shared-pokemon-section">
+                          <button
+                            className={`shared-pokemon-toggle${pokemonExpanded[move.id] ? " shared-pokemon-toggle-open" : ""}`}
+                            onClick={() => togglePokemonSection(move.id)}
+                          >
+                            <span className="shared-pokemon-section-title">能学习该招式的宝可梦</span>
+                            <span className={`shared-pokemon-toggle-arrow${pokemonExpanded[move.id] ? " shared-pokemon-toggle-arrow-open" : ""}`}>▾</span>
+                          </button>
+                          {pokemonExpanded[move.id] && (
+                            <div className="shared-pokemon-content">
+                              <PokemonGrid
+                                apiPath={`/moves/${move.id}/pokemon`}
+                                emptyText="暂无能学习该招式的宝可梦数据"
+                                labelFn={(p) => formatLearnMethods(p.learnMethods)}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 来源 */}
+                        {detail.source?.url && (
+                          <div className="shared-source">
+                            <a href={detail.source.url} target="_blank" rel="noopener noreferrer">
+                              来源：{detail.source.title || "52Poké Wiki"}
+                            </a>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
