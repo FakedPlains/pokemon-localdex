@@ -8,22 +8,33 @@ export default function TeamCard({ team, onEdit, onDelete }) {
   const menuRef = useRef(null);
   const resolved = useMemo(() => resolveTeamMembers(team), [team]);
   const [fetchedImages, setFetchedImages] = useState({});
+  const imageRequestsRef = useRef(new Set());
+  const mountedRef = useRef(true);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
 
   useEffect(() => {
-    const missing = resolved.filter((m) => m.pokemonId && !m.imageUrl && !fetchedImages[m.pokemonId]);
+    const missing = resolved.filter((m) => {
+      const pokemonId = String(m.pokemonId || "");
+      return pokemonId && !m.imageUrl && !fetchedImages[pokemonId] && !imageRequestsRef.current.has(pokemonId);
+    });
     if (missing.length === 0) return;
-    let cancelled = false;
     missing.forEach((m) => {
+      const pokemonId = String(m.pokemonId);
+      imageRequestsRef.current.add(pokemonId);
       unifiedApi(`/pokemon/${m.pokemonId}`).then((r) => {
-        if (cancelled) return;
+        if (!mountedRef.current) return;
         const img = getPokemonPreviewImage(r.data);
         if (img?.url) {
-          setFetchedImages((prev) => ({ ...prev, [m.pokemonId]: img.url }));
+          setFetchedImages((prev) => ({ ...prev, [pokemonId]: img.url }));
         }
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => {
+        imageRequestsRef.current.delete(pokemonId);
+      });
     });
-    return () => { cancelled = true; };
-  }, [resolved, fetchedImages]);
+  }, [resolved]);
 
   useEffect(() => {
     if (!menuOpen) return;

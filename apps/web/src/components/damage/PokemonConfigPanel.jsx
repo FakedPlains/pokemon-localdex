@@ -7,6 +7,7 @@ import {
   evToSp,
   getPokemonPreviewImage,
 } from "../../utils/helpers.js";
+import { unifiedApi } from "../../utils/api.js";
 import SearchSelect from "../SearchSelect.jsx";
 import TypeChip from "../TypeChip.jsx";
 import { getBox, getTeams, resolveTeamMembers } from "../../utils/teamStorage.js";
@@ -80,8 +81,9 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
     const formAbilities = form.abilities || [];
     const normalAbilities = formAbilities.filter((ab) => !ab.isHidden);
     const firstAbility = normalAbilities[0] || formAbilities[0];
-    const defaultAbilityId = firstAbility
-      ? (firstAbility.nameZh || firstAbility.abilityId || "")
+    const defaultAbilityId = firstAbility?.abilityId ? String(firstAbility.abilityId) : "";
+    const defaultAbilityName = firstAbility
+      ? (firstAbility.nameZh || "")
       : (detail.abilities?.[0] || "");
     const updates = {
       formId: form.id || "",
@@ -91,7 +93,7 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
       secondaryType: form.secondaryType || detail.secondaryType || "",
       imageUrl: officialImg?.url || member.imageUrl || "",
       abilityId: defaultAbilityId,
-      abilityName: defaultAbilityId,
+      abilityName: defaultAbilityName,
     };
     // 形态绑定道具：自动设置/清除道具
     if (form.requiredItem) {

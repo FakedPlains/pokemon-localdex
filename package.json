@@ -12,6 +12,7 @@
     "dev:web": "npm run dev -w @pokemon-localdex/web",
     "dev:worker": "wrangler dev apps/api/src/worker.ts --env development",
     "build:web": "npm run build -w @pokemon-localdex/web",
+    "check:web:static": "eslint --no-inline-config apps/web/src --ext .js,.jsx",
     "check:web:unit": "node --test apps/web/src/**/*.test.mjs",
     "build:cf": "npm run build:web && wrangler deploy --dry-run",
     "check:api": "node --enable-source-maps apps/api/src/smoke.ts",
@@ -40,6 +41,7 @@
     "hono": "^4.12.15"
   },
   "devDependencies": {
+    "eslint": "8.41.0",
     "wrangler": "^3.99.0"
   }
 }
