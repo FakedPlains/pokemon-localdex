@@ -42,8 +42,11 @@ export const WEATHER_MAP: Record<string, string | undefined> = {
   sun: "Sun",
   rain: "Rain",
   sand: "Sand",
-  hail: "Snow",   // Gen 9 中 hail 变为 snow
+  hail: "Snow",           // Gen 9 中 hail 变为 snow
   snow: "Snow",
+  harshSunlight: "Harsh Sunshine",  // 始源固拉多 终结之地
+  heavyRain: "Heavy Rain",          // 始源盖欧卡 始源之海
+  strongWinds: "Strong Winds",      // Mega 裂空座 德尔塔气流
 };
 
 export const TERRAIN_MAP: Record<string, string | undefined> = {

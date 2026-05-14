@@ -94,7 +94,7 @@ export type DamageCalcInput = {
   };
   field?: {
     gameType?: "singles" | "doubles";
-    weather?: string;       // "none" | "sun" | "rain" | "sand" | "hail" | "snow"
+    weather?: string;       // "none" | "sun" | "rain" | "sand" | "hail" | "snow" | "harshSunlight" | "heavyRain" | "strongWinds"
     terrain?: string;       // "none" | "electric" | "grassy" | "misty" | "psychic"
     isGravity?: boolean;
     isMagicRoom?: boolean;

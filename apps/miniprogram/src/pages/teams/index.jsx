@@ -1,9 +1,10 @@
-import { View, Text, Image, Input, ScrollView } from '@tarojs/components'
+import { View, Text, Input, ScrollView } from '@tarojs/components'
 import { useState, useEffect, useCallback } from 'react'
 import Taro from '@tarojs/taro'
 import { fetchPokemonList } from '../../utils/api'
 import { getTeams, createTeam, deleteTeam, updateTeam, addMember, removeMember } from '../../utils/teamStorage'
 import { TYPE_COLORS } from '@pokemon-localdex/store-types/constants'
+import SafeImage from '../../components/safe-image'
 import './index.less'
 
 export default function TeamsPage() {
@@ -84,9 +85,9 @@ export default function TeamsPage() {
     if (!activeTeamId) return
     addMember(activeTeamId, {
       pokemonId: pokemon.id,
-      name: pokemon.name_zh || pokemon.name,
-      types: pokemon.types || [],
-      sprite: pokemon.sprite || ''
+      name: pokemon.nameZh || pokemon.nameEn || '',
+      types: [pokemon.primaryType, pokemon.secondaryType].filter(Boolean),
+      imageUrl: pokemon.image?.url || ''
     })
     refreshTeams()
     closePicker()
@@ -168,8 +169,8 @@ export default function TeamsPage() {
               {/* 已有成员 */}
               {team.members.map(member => (
                 <View key={member.id} className='member-slot filled' onClick={() => goToDetail(member.pokemonId)}>
-                  {member.sprite && (
-                    <Image className='member-sprite' src={member.sprite} mode='aspectFit' />
+                  {member.imageUrl && (
+                    <SafeImage className='member-sprite' src={member.imageUrl} mode='aspectFit' />
                   )}
                   <Text className='member-name'>{member.name}</Text>
                   <View className='member-types'>
@@ -222,13 +223,13 @@ export default function TeamsPage() {
             >
               {pokemonList.map(pokemon => (
                 <View key={pokemon.id} className='pokemon-item' onClick={() => selectPokemon(pokemon)}>
-                  {pokemon.sprite && (
-                    <Image className='poke-sprite' src={pokemon.sprite} mode='aspectFit' />
+                  {pokemon.image?.url && (
+                    <SafeImage className='poke-sprite' src={pokemon.image.url} mode='aspectFit' />
                   )}
                   <View className='poke-info'>
-                    <Text className='poke-name'>#{pokemon.id} {pokemon.name_zh || pokemon.name}</Text>
+                    <Text className='poke-name'>#{pokemon.id} {pokemon.nameZh || pokemon.nameEn}</Text>
                     <View className='poke-types'>
-                      {(pokemon.types || []).map(type => (
+                      {[pokemon.primaryType, pokemon.secondaryType].filter(Boolean).map(type => (
                         <Text key={type} className='type-tag' style={{ background: TYPE_COLORS[type] || '#999' }}>
                           {type}
                         </Text>

@@ -1,8 +1,9 @@
-import { View, Text, Image, Input, ScrollView, Picker } from '@tarojs/components'
+import { View, Text, Input, ScrollView, Picker } from '@tarojs/components'
 import { useState, useCallback } from 'react'
 import Taro from '@tarojs/taro'
 import { fetchPokemonList, fetchMovesList } from '../../utils/api'
 import { apiBaseUrl } from '../../utils/config'
+import SafeImage from '../../components/safe-image'
 import {
   NATURES,
   NATURE_EFFECTS_BY_ID,
@@ -27,7 +28,7 @@ function createDefaultMember() {
   return {
     pokemonId: null,
     name: '',
-    sprite: '',
+    imageUrl: '',
     types: [],
     nature: '认真',
     level: 50,
@@ -147,9 +148,9 @@ export default function DamagePage() {
     const member = {
       ...createDefaultMember(),
       pokemonId: pokemon.id,
-      name: pokemon.name_zh || pokemon.name,
-      sprite: pokemon.sprite || '',
-      types: pokemon.types || [],
+      name: pokemon.nameZh || pokemon.nameEn || '',
+      imageUrl: pokemon.image?.url || '',
+      types: [pokemon.primaryType, pokemon.secondaryType].filter(Boolean),
     }
     if (pickerType === 'attacker') {
       setAttacker(member)
@@ -205,6 +206,7 @@ export default function DamagePage() {
       const body = {
         generation: 9,
         attacker: {
+          pokemonId: attacker.pokemonId,
           name: attacker.name,
           level: Number(level || 50),
           nature: attacker.nature || '认真',
@@ -214,6 +216,7 @@ export default function DamagePage() {
           ivs: attacker.ivs,
         },
         defender: {
+          pokemonId: defender.pokemonId,
           name: defender.name,
           level: Number(level || 50),
           nature: defender.nature || '认真',
@@ -223,7 +226,7 @@ export default function DamagePage() {
           ivs: defender.ivs,
         },
         move: {
-          name: selectedMove.name_zh || selectedMove.name || '',
+          name: selectedMove.nameZh || selectedMove.nameEn || '',
           isCrit: critical,
         },
         field: {
@@ -240,16 +243,16 @@ export default function DamagePage() {
       })
 
       if (res.statusCode === 200 && res.data) {
-        const data = res.data
+        const result = res.data.data || res.data
         setResult({
-          min: data.min,
-          max: data.max,
-          average: data.average,
-          description: data.description || '',
-          minPercent: data.minPercent || 0,
-          maxPercent: data.maxPercent || 0,
-          defHp: data.defenderHp || 0,
-          moveName: selectedMove.name_zh || selectedMove.name || '',
+          min: result.min,
+          max: result.max,
+          average: result.average,
+          description: result.description || '',
+          minPercent: result.minPercent || 0,
+          maxPercent: result.maxPercent || 0,
+          defHp: result.defenderHp || 0,
+          moveName: selectedMove.nameZh || selectedMove.nameEn || '',
           moveType: selectedMove.type || '',
           attackerName: attacker.name,
           defenderName: defender.name,
@@ -278,8 +281,8 @@ export default function DamagePage() {
       <View className='section'>
         <Text className='section-title'>攻击方</Text>
         <View className='pokemon-selector' onClick={() => openPokemonPicker('attacker')}>
-          {attacker.sprite ? (
-            <Image className='selector-sprite' src={attacker.sprite} mode='aspectFit' />
+          {attacker.imageUrl ? (
+            <SafeImage className='selector-sprite' src={attacker.imageUrl} mode='aspectFit' />
           ) : null}
           <View className='selector-info'>
             {attacker.name ? (
@@ -321,8 +324,8 @@ export default function DamagePage() {
       <View className='section'>
         <Text className='section-title'>防守方</Text>
         <View className='pokemon-selector' onClick={() => openPokemonPicker('defender')}>
-          {defender.sprite ? (
-            <Image className='selector-sprite' src={defender.sprite} mode='aspectFit' />
+          {defender.imageUrl ? (
+            <SafeImage className='selector-sprite' src={defender.imageUrl} mode='aspectFit' />
           ) : null}
           <View className='selector-info'>
             {defender.name ? (
@@ -367,7 +370,7 @@ export default function DamagePage() {
           <View className='selector-info'>
             {selectedMove ? (
               <View style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Text className='selector-name'>{selectedMove.name_zh || selectedMove.name}</Text>
+                <Text className='selector-name'>{selectedMove.nameZh || selectedMove.nameEn}</Text>
                 {selectedMove.type && (
                   <Text style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', color: '#fff', background: TYPE_COLORS[selectedMove.type] || '#999' }}>
                     {selectedMove.type}
@@ -473,11 +476,11 @@ export default function DamagePage() {
             <ScrollView scrollY className='pokemon-list' onScrollToLower={handlePickerLoadMore}>
               {pickerList.map(pokemon => (
                 <View key={pokemon.id} className='pokemon-item' onClick={() => selectPokemon(pokemon)}>
-                  {pokemon.sprite && (
-                    <Image className='poke-sprite' src={pokemon.sprite} mode='aspectFit' />
+                  {pokemon.image?.url && (
+                    <SafeImage className='poke-sprite' src={pokemon.image.url} mode='aspectFit' />
                   )}
                   <View className='poke-info'>
-                    <Text className='poke-name'>#{pokemon.id} {pokemon.name_zh || pokemon.name}</Text>
+                    <Text className='poke-name'>#{pokemon.id} {pokemon.nameZh || pokemon.nameEn}</Text>
                   </View>
                 </View>
               ))}
@@ -508,7 +511,7 @@ export default function DamagePage() {
             <ScrollView scrollY className='move-list' onScrollToLower={handlePickerLoadMore}>
               {pickerList.map(move => (
                 <View key={move.id} className='move-list-item' onClick={() => selectMove(move)}>
-                  <Text className='move-item-name'>{move.name_zh || move.name}</Text>
+                  <Text className='move-item-name'>{move.nameZh || move.nameEn}</Text>
                   {move.type && (
                     <Text className='move-item-type' style={{ background: TYPE_COLORS[move.type] || '#999' }}>
                       {move.type}

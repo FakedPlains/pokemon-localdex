@@ -73,7 +73,7 @@ export function updateTeam(teamId, updates) {
 /**
  * 添加成员到队伍
  * @param {string} teamId
- * @param {object} pokemon { pokemonId, name, types, sprite, ... }
+ * @param {object} pokemon { pokemonId, name, types, imageUrl, ... }
  */
 export function addMember(teamId, pokemon) {
   const teams = getTeams()
@@ -85,7 +85,7 @@ export function addMember(teamId, pokemon) {
     pokemonId: pokemon.pokemonId,
     name: pokemon.name,
     types: pokemon.types || [],
-    sprite: pokemon.sprite || '',
+    imageUrl: pokemon.imageUrl || '',
     level: 50,
     nature: '认真',
     ability: '',
