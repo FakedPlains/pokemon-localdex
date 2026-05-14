@@ -5,7 +5,7 @@
  * 两个 store 包均从此处导入并重新导出，保证类型一致。
  */
 
-import { TYPE_ALIASES, TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.ts";
+import { TYPE_ALIASES, TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 基础类型
@@ -387,7 +387,7 @@ export const GAME_VERSION_NAMES = new Map<string, string>(
   GAME_VERSIONS.map(([code, nameZh]) => [code, nameZh])
 );
 
-export * from "./constants.ts";
+export * from "./constants.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 共享辅助函数

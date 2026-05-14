@@ -1,51 +1,6 @@
-type TypeDefinition = {
-  id: number;
-  key: string;
-  nameZh: string;
-  nameEn: string;
-  color: string;
-  rgb: string;
-  effectiveness: number[];
-};
+const toMap = (entries) => Object.fromEntries(entries);
 
-type StatDefinition = {
-  id: number;
-  key: string;
-  label: string;
-  shortLabel: string;
-  compactLabel: string;
-  color: string;
-};
-
-type NatureDefinition = {
-  id: number;
-  key: string;
-  nameZh: string;
-  nameEn: string;
-  upStatId?: number;
-  downStatId?: number;
-};
-
-type LearnMethodOption = {
-  id: number;
-  key: string;
-  label: string;
-};
-
-type CategoryOption = {
-  id: number;
-  key: string;
-  nameZh: string;
-  colors: {
-    bg: string;
-    text: string;
-  };
-};
-
-const toMap = <K extends PropertyKey, V>(entries: Iterable<readonly [K, V]>): Record<K, V> =>
-  Object.fromEntries(entries) as Record<K, V>;
-
-const TYPE_DEFS: TypeDefinition[] = [
+const TYPE_DEFS = [
   { id: 1, key: "normal", nameZh: "一般", nameEn: "Normal", color: "#a8a878", rgb: "187,187,170", effectiveness: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0, 1, 1, 0.5, 1] },
   { id: 2, key: "fire", nameZh: "火", nameEn: "Fire", color: "#f08030", rgb: "255,68,34", effectiveness: [1, 0.5, 0.5, 1, 2, 2, 1, 1, 1, 1, 1, 2, 0.5, 1, 0.5, 1, 2, 1] },
   { id: 3, key: "water", nameZh: "水", nameEn: "Water", color: "#6890f0", rgb: "51,153,255", effectiveness: [1, 2, 0.5, 1, 0.5, 1, 1, 1, 2, 1, 1, 1, 2, 1, 0.5, 1, 1, 1] },
@@ -113,7 +68,7 @@ export const TYPE_BG_COLORS_CARD = makeTypeBgColors(0.18);
 export const TYPE_BG_COLORS_BY_ID = makeTypeBgColorsById(0.10);
 export const TYPE_BG_COLORS_CARD_BY_ID = makeTypeBgColorsById(0.18);
 
-const STAT_DEFS: StatDefinition[] = [
+const STAT_DEFS = [
   { id: 1, key: "hp", label: "HP", shortLabel: "HP", compactLabel: "HP", color: "#8AC654" },
   { id: 2, key: "atk", label: "攻击", shortLabel: "ATK", compactLabel: "攻", color: "#F8CB3C" },
   { id: 3, key: "def", label: "防御", shortLabel: "DEF", compactLabel: "防", color: "#D98837" },
@@ -136,7 +91,7 @@ export const STAT_LABELS_COMPACT_BY_ID = toMap(STAT_OPTIONS.map(({ id, compactLa
 export const STAT_COLORS = toMap(STAT_OPTIONS.map(({ key, color }) => [key, color]));
 export const STAT_COLORS_BY_ID = toMap(STAT_OPTIONS.map(({ id, color }) => [id, color]));
 
-const NATURE_DEFS: NatureDefinition[] = [
+const NATURE_DEFS = [
   { id: 1, key: "hardy", nameZh: "勤奋", nameEn: "Hardy" },
   { id: 2, key: "lonely", nameZh: "怕寂寞", nameEn: "Lonely", upStatId: 2, downStatId: 3 },
   { id: 3, key: "adamant", nameZh: "固执", nameEn: "Adamant", upStatId: 2, downStatId: 4 },
@@ -191,7 +146,7 @@ export function natureIdToName(natureId) {
 export const GENERATION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 export const GENERATION_OPTION_OBJECTS = GENERATION_OPTIONS.map((id) => ({ id, label: String(id) }));
 
-export const LEARN_METHOD_OPTIONS: LearnMethodOption[] = [
+export const LEARN_METHOD_OPTIONS = [
   { id: 1, key: "level-up", label: "升级" },
   { id: 2, key: "tm", label: "招式学习器" },
   { id: 3, key: "hm", label: "秘传学习器" },
@@ -210,7 +165,7 @@ export const LEARN_METHOD_KEY_BY_ID = toMap(LEARN_METHOD_OPTIONS.map(({ id, key 
 export const LEARN_METHOD_LABELS = toMap(LEARN_METHOD_OPTIONS.map(({ key, label }) => [key, label]));
 export const LEARN_METHOD_LABELS_BY_ID = toMap(LEARN_METHOD_OPTIONS.map(({ id, label }) => [id, label]));
 
-export const CATEGORY_OPTIONS: CategoryOption[] = [
+export const CATEGORY_OPTIONS = [
   { id: 1, key: "physical", nameZh: "物理", colors: { bg: "#FF4400", text: "#FFCC00" } },
   { id: 2, key: "special", nameZh: "特殊", colors: { bg: "#2266CC", text: "#BBEEFF" } },
   { id: 3, key: "status", nameZh: "变化", colors: { bg: "#999999", text: "#EEEEEE" } },
