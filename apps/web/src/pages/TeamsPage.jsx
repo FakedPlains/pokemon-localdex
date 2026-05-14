@@ -1,345 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
-import { unifiedApi } from "../utils/api.js";
-import Modal from "../components/Modal.jsx";
 import ViewToggle from "../components/ViewToggle.jsx";
-import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
-import { createDraftMember, createDefaultStats, getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers.js";
+import { createDraftMember, createDefaultStats } from "../utils/helpers.js";
 import {
   getBox, saveBoxConfig, deleteBoxConfig, duplicateBoxConfig,
   getTeams, saveTeam, deleteTeam,
   resolveTeamMembers
 } from "../utils/teamStorage.js";
-import PokemonConfigCard from "../components/PokemonConfigCard.jsx";
-import PokemonEditor from "../components/PokemonEditor.jsx";
-import PokemonPickerList from "../components/PokemonPickerList.jsx";
 import { useToast } from "../components/Toast.jsx";
 import CustomSelect from "../components/CustomSelect.jsx";
-
-
-const BOX_SORT_OPTIONS = [
-  { value: "current", label: "当前顺序" },
-  { value: "number", label: "按编号" },
-];
-
-function normalizeBoxSearch(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function boxSearchText(config) {
-  return [
-    config.configName,
-    config.nameZh,
-    config.formName,
-    config.pokemonId,
-  ].map(normalizeBoxSearch).join(" ");
-}
-
-function pokemonNumber(config) {
-  const number = Number(config.pokemonId);
-  return Number.isFinite(number) ? number : Number.POSITIVE_INFINITY;
-}
-
-function isDefaultForm(config) {
-  const formKey = normalizeBoxSearch(config.formKey);
-  const formName = normalizeBoxSearch(config.formName);
-  const nameZh = normalizeBoxSearch(config.nameZh);
-  return !formKey || formKey === "default" || !formName || formName === nameZh;
-}
-
-function pokemonFormNumber(config) {
-  const number = Number(config.formId);
-  return Number.isFinite(number) ? number : Number.POSITIVE_INFINITY;
-}
-
-function pokemonFormLabel(config) {
-  return normalizeBoxSearch(config.formKey || config.formName || "");
-}
-
-function comparePokemonForm(a, b) {
-  const byDefault = Number(isDefaultForm(a)) - Number(isDefaultForm(b));
-  if (byDefault !== 0) return -byDefault;
-
-  const formIdA = pokemonFormNumber(a);
-  const formIdB = pokemonFormNumber(b);
-  if (formIdA !== formIdB) return formIdA - formIdB;
-
-  return pokemonFormLabel(a).localeCompare(pokemonFormLabel(b), "zh-Hans", { numeric: true });
-}
-
-// ══════════════════════════════════════════════
-//  盒子卡片
-// ══════════════════════════════════════════════
-
-function BoxCard({ config, onEdit, onDelete, onDuplicate }) {
-  const menuActions = [
-    { label: "编辑", onClick: () => onEdit(config) },
-    { label: "复制", onClick: () => onDuplicate(config.configId) },
-    { label: "删除", onClick: () => onDelete(config.configId), className: "danger-text" },
-  ];
-
-  return <PokemonConfigCard data={config} menuActions={menuActions} />;
-}
-
-// ══════════════════════════════════════════════
-//  盒子列表行（列表视图）
-// ══════════════════════════════════════════════
-
-function BoxListRow({ config, onEdit, onDelete, onDuplicate }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [fetchedInfo, setFetchedInfo] = useState(null);
-  const [fetchedItemImageUrl, setFetchedItemImageUrl] = useState("");
-  const menuRef = useRef(null);
-  const btnRef = useRef(null);
-  const dropdownRef = useRef(null);
-  const [dropdownPos, setDropdownPos] = useState(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e) => {
-      const inBtn = menuRef.current && menuRef.current.contains(e.target);
-      const inDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
-      if (!inBtn && !inDropdown) setMenuOpen(false);
-    };
-    const scrollHandler = () => setMenuOpen(false);
-    document.addEventListener("mousedown", handler);
-    window.addEventListener("scroll", scrollHandler, true);
-    return () => { document.removeEventListener("mousedown", handler); window.removeEventListener("scroll", scrollHandler, true); };
-  }, [menuOpen]);
-
-  // 计算 dropdown 的 fixed 定位
-  useEffect(() => {
-    if (menuOpen && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-    } else if (!menuOpen) {
-      setDropdownPos(null);
-    }
-  }, [menuOpen]);
-
-  // 按需获取宝可梦信息
-  useEffect(() => {
-    if (config.imageUrl || !config.pokemonId) return;
-    let cancelled = false;
-    unifiedApi(`/pokemon/${config.pokemonId}`).then((r) => {
-      if (cancelled) return;
-      const p = r.data;
-      const img = getPokemonPreviewImage(p);
-      const shinyObj = p?.forms?.[0]?.images?.shiny || p?.images?.shiny;
-      const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
-      const baseStats = p?.forms?.[0]?.baseStats || p?.baseStats || null;
-      setFetchedInfo({ imageUrl: img?.url || "", shinyImageUrl: shinyUrl, primaryType: p?.primaryType || "", secondaryType: p?.secondaryType || "", baseStats });
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [config.pokemonId, config.imageUrl]);
-
-  // 按需获取道具图片
-  useEffect(() => {
-    if (config.itemImageUrl || !config.itemId) return;
-    let cancelled = false;
-    unifiedApi(`/items/${config.itemId}`).then((r) => {
-      if (cancelled) return;
-      const item = r.data;
-      if (item?.imageUrl) setFetchedItemImageUrl(item.imageUrl);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [config.itemId, config.itemImageUrl]);
-
-  const resolveShinyUrl = (v) => (typeof v === "string" ? v : v?.url || "");
-  const normalImageUrl = config.imageUrl || fetchedInfo?.imageUrl || "";
-  const shinyImageUrl = resolveShinyUrl(config.shinyImageUrl) || resolveShinyUrl(fetchedInfo?.shinyImageUrl);
-  const imageUrl = (config.isShiny && shinyImageUrl) ? shinyImageUrl : normalImageUrl;
-  const types = [config.primaryType || fetchedInfo?.primaryType, config.secondaryType || fetchedInfo?.secondaryType].filter(Boolean);
-  const itemImgUrl = config.itemImageUrl || fetchedItemImageUrl;
-  const baseStats = config.baseStats || fetchedInfo?.baseStats;
-
-  // 计算最终能力值
-  const finalStats = useMemo(() => {
-    if (!baseStats) return null;
-    const detail = { baseStats };
-    return Object.fromEntries(
-      STAT_KEYS.map((key) => [key, calculateFinalStat(config, detail, key)])
-    );
-  }, [baseStats, config]);
-
-  return (
-    <div className={`box-list-row${menuOpen ? " box-list-row-menu-open" : ""}`} onClick={() => onEdit(config)}>
-      {/* 图片 + 道具叠加 */}
-      <div className="box-list-col box-list-col-img">
-        <div className="box-list-thumb">
-          {imageUrl ? <img src={imageUrl} alt={config.nameZh || ""} referrerPolicy="no-referrer" /> : <span className="box-list-thumb-empty">?</span>}
-            {itemImgUrl && (
-              <img className="box-list-item-overlay" src={itemImgUrl} alt={config.itemName || config.itemId} title={config.itemName || config.itemId} referrerPolicy="no-referrer" />
-            )}
-        </div>
-      </div>
-
-      {/* 名称 */}
-      <div className="box-list-col box-list-col-name">
-        <span className="box-list-name-zh">{config.configName || config.nameZh || config.pokemonId || "未命名"}</span>
-        <span className="box-list-config-name">{config.formName && config.formName !== config.nameZh ? config.formName : (config.nameZh || "")}</span>
-      </div>
-
-      {/* 属性 */}
-      <div className="box-list-col box-list-col-types">
-        {types.map((t) => (
-          <span key={t} className={`type-chip type-${t} box-list-type-chip`}>
-            <img className="type-chip-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${t}@sm.png`} alt={t} />
-            {t}
-          </span>
-        ))}
-      </div>
-
-      {/* 特性 */}
-      <div className="box-list-col box-list-col-ability">
-        <span className="box-list-ability">{config.abilityName || config.abilityId || "—"}</span>
-      </div>
-
-      {/* 性格 */}
-      <div className="box-list-col box-list-col-nature">
-        <span className="box-list-nature">{config.nature || "认真"}</span>
-      </div>
-
-      {/* 种族值 / 能力值（同行展示） */}
-      {STAT_KEYS.map((k) => (
-        <div key={k} className="box-list-col box-list-col-combined-stat">
-          <span className="box-list-base-val">{baseStats?.[k] ?? "—"}</span>
-          <span className="box-list-combined-sep">/</span>
-          <span className="box-list-stat-val">{finalStats?.[k] ?? "—"}</span>
-        </div>
-      ))}
-
-      {/* 操作菜单 */}
-      <div className="box-list-col box-list-col-actions" onClick={(e) => e.stopPropagation()}>
-        <div className="box-card-menu" ref={menuRef}>
-          <button className="box-card-menu-btn" ref={btnRef} onClick={() => setMenuOpen(!menuOpen)} title="操作">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="2" r="1.4"/><circle cx="7" cy="7" r="1.4"/><circle cx="7" cy="12" r="1.4"/></svg>
-          </button>
-          {menuOpen && dropdownPos && createPortal(
-            <div className="box-card-dropdown box-list-dropdown-fixed" ref={dropdownRef} style={{ position: "fixed", top: dropdownPos.top, right: dropdownPos.right }}>
-              <button onClick={() => { onEdit(config); setMenuOpen(false); }}>编辑</button>
-              <button onClick={() => { onDuplicate(config.configId); setMenuOpen(false); }}>复制</button>
-              <button className="danger-text" onClick={() => { onDelete(config.configId); setMenuOpen(false); }}>删除</button>
-            </div>,
-            document.body
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════
-//  队伍成员槽位
-// ══════════════════════════════════════════════
-
-function TeamSlot({ slot, member, boxConfigs, onSelectFromBox, onRemove, onInlineEdit, onEditMember }) {
-  const hasMember = member && member.pokemonId;
-  const boxOptions = useMemo(() => boxConfigs.map((c) => ({ value: c.configId, label: c.configName || c.nameZh || c.pokemonId || "未命名" })), [boxConfigs]);
-
-  if (!hasMember) {
-    return (
-      <div className="te-slot te-slot-empty" onClick={() => onInlineEdit(slot)}>
-        <div className="te-slot-empty-inner">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.4"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-          <span className="te-slot-empty-text">位置 {slot}</span>
-          <CustomSelect
-            className="te-slot-select"
-            value=""
-            placeholder="从盒子选择…"
-            options={boxOptions}
-            onChange={(val) => { if (val) onSelectFromBox(slot, val); }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // 已填充的槽位 — 使用公共卡片组件
-  const menuActions = [
-    { label: "编辑", onClick: () => onEditMember(slot, member) },
-    { label: "移除", onClick: () => onRemove(slot), className: "danger-text" },
-  ];
-
-  return <PokemonConfigCard data={member} menuActions={menuActions} className="te-member-card" />;
-}
-
-// ══════════════════════════════════════════════
-//  队伍卡片
-// ══════════════════════════════════════════════
-
-function TeamCard({ team, onEdit, onDelete }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
-  const resolved = resolveTeamMembers(team);
-  const [fetchedImages, setFetchedImages] = useState({});
-
-  // 对于缺少 imageUrl 的成员，按需获取图片
-  useEffect(() => {
-    const missing = resolved.filter((m) => m.pokemonId && !m.imageUrl && !fetchedImages[m.pokemonId]);
-    if (missing.length === 0) return;
-    let cancelled = false;
-    missing.forEach((m) => {
-      unifiedApi(`/pokemon/${m.pokemonId}`).then((r) => {
-        if (cancelled) return;
-        const img = getPokemonPreviewImage(r.data);
-        if (img?.url) {
-          setFetchedImages((prev) => ({ ...prev, [m.pokemonId]: img.url }));
-        }
-      }).catch(() => {});
-    });
-    return () => { cancelled = true; };
-  }, [resolved]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
-
-  return (
-    <div className="team-card">
-      <div className="team-card-header">
-        <div className="team-card-title-row">
-          <strong className="team-card-name">{team.name || "未命名队伍"}</strong>
-          <span className="team-card-format">{team.format === "doubles" ? "双打" : "单打"}</span>
-        </div>
-        <div className="box-card-menu" ref={menuRef}>
-          <button className="box-card-menu-btn" onClick={() => setMenuOpen(!menuOpen)} title="操作">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="7" cy="2" r="1.4"/><circle cx="7" cy="7" r="1.4"/><circle cx="7" cy="12" r="1.4"/></svg>
-          </button>
-          {menuOpen && (
-            <div className="box-card-dropdown">
-              <button onClick={() => { onEdit(team); setMenuOpen(false); }}>编辑</button>
-              <button className="danger-text" onClick={() => { onDelete(team.teamId); setMenuOpen(false); }}>删除</button>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="team-card-members">
-        {resolved.length > 0 ? (
-          resolved.map((m, i) => {
-            const imgUrl = m.isShiny && m.shinyImageUrl
-              ? (typeof m.shinyImageUrl === "string" ? m.shinyImageUrl : m.shinyImageUrl?.url || "")
-              : (m.imageUrl || fetchedImages[m.pokemonId] || "");
-            return (
-              <div key={i} className="team-card-member">
-                <div className="team-card-member-img">
-                  {imgUrl ? <img src={imgUrl} alt={m.nameZh || ""} referrerPolicy="no-referrer" /> : <span>?</span>}
-                  {m.itemImageUrl && <img className="team-card-item-overlay" src={m.itemImageUrl} alt={m.itemId || ""} title={m.itemId || ""} referrerPolicy="no-referrer" />}
-                </div>
-                <span className="team-card-member-name">{m.nameZh || m.pokemonId || "?"}</span>
-              </div>
-            );
-          })
-        ) : (
-          <span className="muted" style={{ fontSize: 12 }}>暂无成员</span>
-        )}
-      </div>
-    </div>
-  );
-}
+import { BOX_SORT_OPTIONS, getDisplayedBoxConfigs } from "../components/teams/boxSort.ts";
+import BoxCard from "../components/teams/BoxCard.jsx";
+import BoxListRow from "../components/teams/BoxListRow.jsx";
+import PokemonConfigInlineEditor from "../components/teams/PokemonConfigInlineEditor.jsx";
+import TeamCard from "../components/teams/TeamCard.jsx";
+import TeamSlot from "../components/teams/TeamSlot.jsx";
 
 // ══════════════════════════════════════════════
 //  主页面
@@ -407,24 +81,10 @@ export default function TeamsPage() {
   const refreshBox = useCallback(() => setBoxConfigs(getBox()), []);
   const refreshTeams = useCallback(() => setTeams(getTeams()), []);
 
-  const displayedBoxConfigs = useMemo(() => {
-    const query = normalizeBoxSearch(boxSearch);
-    const indexed = boxConfigs.map((config, index) => ({ config, index }));
-    const filtered = query
-      ? indexed.filter(({ config }) => boxSearchText(config).includes(query))
-      : indexed;
-
-    if (boxSortMode === "number") {
-      return [...filtered]
-        .sort((a, b) => {
-          const byNumber = pokemonNumber(a.config) - pokemonNumber(b.config);
-          return byNumber || comparePokemonForm(a.config, b.config) || a.index - b.index;
-        })
-        .map(({ config }) => config);
-    }
-
-    return filtered.map(({ config }) => config);
-  }, [boxConfigs, boxSearch, boxSortMode]);
+  const displayedBoxConfigs = useMemo(
+    () => getDisplayedBoxConfigs(boxConfigs, boxSearch, boxSortMode),
+    [boxConfigs, boxSearch, boxSortMode]
+  );
 
   // ── 盒子操作 ──
   const handleNewConfig = useCallback(() => { setEditingConfig(createDraftMember()); setIsNewConfig(true); }, []);
@@ -580,71 +240,18 @@ export default function TeamsPage() {
           {/* ── 盒子 Tab ── */}
           {activeTab === "box" && (
             <>
-              {/* 编辑模式：内联展示 */}
               {editingConfig ? (
-                <div className="cfg-inline-wrap" ref={editorRef}>
-                  {/* 顶部栏：标题 + 搜索/宝可梦名 + 配置名称 + 取消 */}
-                  <div className="cfg-toolbar">
-                    <strong>{isNewConfig ? "新建配置" : "编辑配置"}</strong>
-                    {!editingConfig.pokemonId ? (
-                      <div className="cfg-toolbar-search">
-                        <svg className="cfg-toolbar-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4 4" />
-                        </svg>
-                        <input
-                          className="cfg-toolbar-search-input"
-                          placeholder="搜索宝可梦名称 / 编号…"
-                          value={pickerSearch}
-                          onChange={(e) => setPickerSearch(e.target.value)}
-                          autoFocus
-                        />
-                        {pickerSearch && (
-                          <button className="cfg-toolbar-search-clear" onClick={() => setPickerSearch("")}>✕</button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="cfg-toolbar-pokemon">
-                        <span className="cfg-toolbar-pokemon-name">{editingConfig.nameZh || editingConfig.pokemonId}</span>
-                        <span id="cfg-form-slider-portal"></span>
-                        <button className="cfg-toolbar-pokemon-change" onClick={() => { handleEditingConfigChange({ ...editingConfig, pokemonId: "", nameZh: "", formKey: "", formName: "" }); setPickerSearch(""); }}>更换</button>
-                      </div>
-                    )}
-                    <input
-                      className="cfg-toolbar-name"
-                      value={editingConfig.configName || ""}
-                      onChange={(e) => handleEditingConfigChange({ ...editingConfig, configName: e.target.value })}
-                      placeholder="配置名称"
-                    />
-                    <button className="cfg-toolbar-cancel" onClick={handleCancelEdit}>取消</button>
-                  </div>
-
-                  {/* 未选择宝可梦时：展示宝可梦搜索列表 */}
-                  {!editingConfig.pokemonId ? (
-                    <PokemonPickerList
-                      search={pickerSearch}
-                      onSelect={(p) => {
-                        const img = getPokemonPreviewImage(p);
-                        handleEditingConfigChange({
-                          ...editingConfig,
-                          pokemonId: String(p.id),
-                          nameZh: p.nameZh || "",
-                          primaryType: p.primaryType || "",
-                          secondaryType: p.secondaryType || "",
-                          imageUrl: img?.url || "",
-                        });
-                        setPickerSearch("");
-                      }}
-                    />
-                  ) : (
-                    <PokemonEditor
-                      config={editingConfig}
-                      onChange={handleEditingConfigChange}
-                      onSave={handleSaveConfig}
-                      onCancel={handleCancelEdit}
-                      saveLabel={isNewConfig ? "添加到盒子" : "保存修改"}
-                    />
-                  )}
-                </div>
+                <PokemonConfigInlineEditor
+                  ref={editorRef}
+                  title={isNewConfig ? "新建配置" : "编辑配置"}
+                  config={editingConfig}
+                  pickerSearch={pickerSearch}
+                  onPickerSearchChange={setPickerSearch}
+                  onChange={handleEditingConfigChange}
+                  onSave={handleSaveConfig}
+                  onCancel={handleCancelEdit}
+                  saveLabel={isNewConfig ? "添加到盒子" : "保存修改"}
+                />
               ) : null}
 
               {/* 操作栏：新建配置 + 视图切换（同一行） */}
@@ -771,70 +378,19 @@ export default function TeamsPage() {
                     <button className="cfg-toolbar-cancel" onClick={handleCancelTeamEdit}>取消</button>
                   </div>
 
-                  {/* 内联编辑器在 grid 上方展示（和盒子编辑一致） */}
                   {inlineEditSlot && inlineEditDraft && (
-                    <div className="cfg-inline-wrap te-slot-inline-standalone" ref={inlineEditorRef}>
-                      <div className="cfg-toolbar">
-                        <strong>位置 {inlineEditSlot} — {inlineEditIsNew ? "手动添加" : "编辑配置"}</strong>
-                        {!inlineEditDraft.pokemonId ? (
-                          <div className="cfg-toolbar-search">
-                            <svg className="cfg-toolbar-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4 4" />
-                            </svg>
-                            <input
-                              className="cfg-toolbar-search-input"
-                              placeholder="搜索宝可梦名称 / 编号…"
-                              value={inlinePickerSearch}
-                              onChange={(e) => setInlinePickerSearch(e.target.value)}
-                              autoFocus
-                            />
-                            {inlinePickerSearch && (
-                              <button className="cfg-toolbar-search-clear" onClick={() => setInlinePickerSearch("")}>✕</button>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="cfg-toolbar-pokemon">
-                            <span className="cfg-toolbar-pokemon-name">{inlineEditDraft.nameZh || inlineEditDraft.pokemonId}</span>
-                            <span id="cfg-form-slider-portal"></span>
-                            <button className="cfg-toolbar-pokemon-change" onClick={() => { handleInlineEditDraftChange({ ...inlineEditDraft, pokemonId: "", nameZh: "", formKey: "", formName: "" }); setInlinePickerSearch(""); }}>更换</button>
-                          </div>
-                        )}
-                        <input
-                          className="cfg-toolbar-name"
-                          value={inlineEditDraft.configName || ""}
-                          onChange={(e) => handleInlineEditDraftChange({ ...inlineEditDraft, configName: e.target.value })}
-                          placeholder="配置名称"
-                        />
-                        <button className="cfg-toolbar-cancel" onClick={handleCancelInlineEdit}>取消</button>
-                      </div>
-
-                      {/* 未选择宝可梦时：展示宝可梦搜索列表 */}
-                      {!inlineEditDraft.pokemonId ? (
-                        <PokemonPickerList
-                          search={inlinePickerSearch}
-                          onSelect={(p) => {
-                            const img = getPokemonPreviewImage(p);
-                            handleInlineEditDraftChange({
-                              ...inlineEditDraft,
-                              pokemonId: String(p.id),
-                              nameZh: p.nameZh || "",
-                              primaryType: p.primaryType || "",
-                              secondaryType: p.secondaryType || "",
-                              imageUrl: img?.url || "",
-                            });
-                            setInlinePickerSearch("");
-                          }}
-                        />
-                      ) : (
-                        <PokemonEditor
-                          config={inlineEditDraft}
-                          onChange={handleInlineEditDraftChange}
-                          onSave={handleConfirmInlineEdit}
-                          onCancel={handleCancelInlineEdit}
-                          saveLabel={inlineEditIsNew ? "确认添加" : "保存修改"}
-                        />
-                      )}
-                    </div>
+                    <PokemonConfigInlineEditor
+                      ref={inlineEditorRef}
+                      className="cfg-inline-wrap te-slot-inline-standalone"
+                      title={`位置 ${inlineEditSlot} — ${inlineEditIsNew ? "手动添加" : "编辑配置"}`}
+                      config={inlineEditDraft}
+                      pickerSearch={inlinePickerSearch}
+                      onPickerSearchChange={setInlinePickerSearch}
+                      onChange={handleInlineEditDraftChange}
+                      onSave={handleConfirmInlineEdit}
+                      onCancel={handleCancelInlineEdit}
+                      saveLabel={inlineEditIsNew ? "确认添加" : "保存修改"}
+                    />
                   )}
 
                   <div className="team-slot-grid">
