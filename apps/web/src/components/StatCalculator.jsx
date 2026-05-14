@@ -7,6 +7,7 @@ import {
   STAT_LABELS_COMPACT as STAT_LABELS_SHORT,
   NATURES,
   NATURE_EFFECTS_BY_ID,
+  natureNameToId,
 } from "@pokemon-localdex/store-types/constants";
 import { getNatureMultiplier } from "../utils/helpers.js";
 import SearchSelect from "./SearchSelect.jsx";
@@ -284,7 +285,7 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
   );
 
   const currentNature = mode === "champions" ? champNature : nature;
-  const natureEffect = NATURE_EFFECTS[currentNature];
+  const natureEffect = NATURE_EFFECTS_BY_ID[natureNameToId(currentNature)];
 
   if (!baseStats) {
     return <div className="sc-empty">暂无种族值数据，无法计算能力值。</div>;
@@ -591,9 +592,9 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
       {natureEffect && (
         <div className="sc-nature-hint">
           {currentNature}性格：
-          <span className="sc-nature-up">{STAT_LABELS[natureEffect.up]} ×1.1</span>
+          <span className="sc-nature-up">{STAT_LABELS_BY_ID[natureEffect.up]} ×1.1</span>
           {" / "}
-          <span className="sc-nature-down">{STAT_LABELS[natureEffect.down]} ×0.9</span>
+          <span className="sc-nature-down">{STAT_LABELS_BY_ID[natureEffect.down]} ×0.9</span>
         </div>
       )}
 
