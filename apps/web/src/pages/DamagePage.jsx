@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api.js";
 import { GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import { createDraftMember } from "../utils/helpers.js";
@@ -11,6 +11,7 @@ import PokemonConfigPanel from "../components/damage/PokemonConfigPanel.jsx";
 import useDamageMoves from "../components/damage/useDamageMoves.js";
 import useDamageSideState from "../components/damage/useDamageSideState.ts";
 import useDamageStatMode from "../components/damage/useDamageStatMode.js";
+import useFieldState from "../components/damage/useFieldState.js";
 import useMoveExtraState from "../components/damage/useMoveExtraState.ts";
 import usePokemonDetails from "../components/damage/usePokemonDetails.js";
 import StatusPanel from "../components/damage/StatusPanel.jsx";
@@ -52,19 +53,9 @@ export default function DamagePage() {
   const attackerMoveExtras = useMoveExtraState();
   const defenderMoveExtras = useMoveExtraState();
 
-  // ── 场地环境 ──
+  // ── 场地环境（weather/terrain/gravity/magicRoom/wonderRoom/灾厄四宝） ──
   const [battleMode, setBattleMode] = useState("doubles");
-  const [weather, setWeather] = useState("none");
-  const [terrain, setTerrain] = useState("none");
-  const [gravity, setGravity] = useState(false);
-  const [magicRoom, setMagicRoom] = useState(false);
-  const [wonderRoom, setWonderRoom] = useState(false);
-
-  // ── 灾厄四宝 ──
-  const [beadsOfRuin, setBeadsOfRuin] = useState(false);
-  const [tabletsOfRuin, setTabletsOfRuin] = useState(false);
-  const [swordOfRuin, setSwordOfRuin] = useState(false);
-  const [vesselOfRuin, setVesselOfRuin] = useState(false);
+  const { field, setField, toggleField, resetField } = useFieldState();
 
   // ── 攻守双方状态 ──
   const attackerSide = useDamageSideState();
@@ -117,15 +108,15 @@ export default function DamagePage() {
         defTimesUsedWithMetronome: defenderMoveExtras.values.timesUsedWithMetronome,
         defIsStellarFirstUse: defenderMoveExtras.values.isStellarFirstUse,
         battleMode,
-        weather,
-        terrain,
-        gravity,
-        magicRoom,
-        wonderRoom,
-        beadsOfRuin,
-        tabletsOfRuin,
-        swordOfRuin,
-        vesselOfRuin,
+        weather: field.weather,
+        terrain: field.terrain,
+        gravity: field.gravity,
+        magicRoom: field.magicRoom,
+        wonderRoom: field.wonderRoom,
+        beadsOfRuin: field.beadsOfRuin,
+        tabletsOfRuin: field.tabletsOfRuin,
+        swordOfRuin: field.swordOfRuin,
+        vesselOfRuin: field.vesselOfRuin,
         atkTeraType,
         defTeraType,
         atkSide: attackerSide.values,
@@ -144,8 +135,7 @@ export default function DamagePage() {
     setCalculating(false);
   }, [selectedMove, calcDirection, attacker, attackerDetail, defender, defenderDetail, generation, isChampions, level,
     attackerMoveExtras.recalcKey, defenderMoveExtras.recalcKey,
-    battleMode, weather, terrain, gravity, magicRoom, wonderRoom,
-    beadsOfRuin, tabletsOfRuin, swordOfRuin, vesselOfRuin,
+    battleMode, field,
     atkTeraType, defTeraType,
     attackerSide.recalcKey, defenderSide.recalcKey]);
 
@@ -162,27 +152,27 @@ export default function DamagePage() {
   }, [selectedMove]);
 
   // 其他参数变化时防抖重新计算（500ms）
-  const depsForRecalc = JSON.stringify([
-    attacker.pokemonId, attacker.formId, attacker.nature, attacker.abilityId, attacker.itemId,
-    attacker.evs, attacker.sps, attacker.ivs,
-    defender.pokemonId, defender.formId, defender.nature, defender.abilityId, defender.itemId,
-    defender.evs, defender.sps, defender.ivs,
-    level, generation, isChampions, calcDirection,
-    attackerMoveExtras.recalcKey,
-    defenderMoveExtras.recalcKey,
-    battleMode, weather, terrain, gravity, magicRoom, wonderRoom,
-    beadsOfRuin, tabletsOfRuin, swordOfRuin, vesselOfRuin,
-    atkTeraType,
-    defTeraType,
-    attackerSide.recalcKey,
-    defenderSide.recalcKey,
-  ]);
+  const recalcKey = useMemo(() => JSON.stringify({
+    atk: [attacker.pokemonId, attacker.formId, attacker.nature, attacker.abilityId, attacker.itemId, attacker.evs, attacker.sps, attacker.ivs],
+    def: [defender.pokemonId, defender.formId, defender.nature, defender.abilityId, defender.itemId, defender.evs, defender.sps, defender.ivs],
+    level, generation, calcDirection,
+    atkExtras: attackerMoveExtras.recalcKey,
+    defExtras: defenderMoveExtras.recalcKey,
+    battleMode, field,
+    atkTeraType, defTeraType,
+    atkSide: attackerSide.recalcKey,
+    defSide: defenderSide.recalcKey,
+  }), [attacker, defender, level, generation, calcDirection,
+    attackerMoveExtras.recalcKey, defenderMoveExtras.recalcKey,
+    battleMode, field, atkTeraType, defTeraType,
+    attackerSide.recalcKey, defenderSide.recalcKey]);
+
   useEffect(() => {
     if (!selectedMove || !attacker.pokemonId || !defender.pokemonId) return;
     const timer = setTimeout(() => calcRef.current(), 500);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [depsForRecalc]);
+  }, [recalcKey]);
 
   const handleReset = useCallback(() => {
     setAttacker({ ...createDraftMember(), statMode: isChampions ? "champions" : "classic" });
@@ -192,8 +182,9 @@ export default function DamagePage() {
     defenderMoveExtras.reset();
     setAtkTeraType("none"); attackerSide.clearBattleSpecials();
     setDefTeraType("none"); defenderSide.clearBattleSpecials();
+    resetField();
     setResult(null);
-  }, [attackerMoveExtras, attackerSide, defenderMoveExtras, defenderSide, isChampions, resetMoves]);
+  }, [attackerMoveExtras, attackerSide, defenderMoveExtras, defenderSide, isChampions, resetMoves, resetField]);
 
 
   return (
@@ -289,24 +280,9 @@ export default function DamagePage() {
 
             {/* 场地环境 */}
             <FieldControlPanel
-              weather={weather}
-              setWeather={setWeather}
-              terrain={terrain}
-              setTerrain={setTerrain}
-              gravity={gravity}
-              setGravity={setGravity}
-              magicRoom={magicRoom}
-              setMagicRoom={setMagicRoom}
-              wonderRoom={wonderRoom}
-              setWonderRoom={setWonderRoom}
-              beadsOfRuin={beadsOfRuin}
-              setBeadsOfRuin={setBeadsOfRuin}
-              tabletsOfRuin={tabletsOfRuin}
-              setTabletsOfRuin={setTabletsOfRuin}
-              swordOfRuin={swordOfRuin}
-              setSwordOfRuin={setSwordOfRuin}
-              vesselOfRuin={vesselOfRuin}
-              setVesselOfRuin={setVesselOfRuin}
+              field={field}
+              setField={setField}
+              toggleField={toggleField}
             />
 
             {/* 攻守双方状态 */}

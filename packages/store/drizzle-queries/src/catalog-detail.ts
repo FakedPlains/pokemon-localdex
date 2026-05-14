@@ -13,7 +13,7 @@ import {
   items,
   itemGenerationRecords,
 } from "@pokemon-localdex/drizzle-schema";
-import type { AbilityEntry, ItemEntry, MoveEntry } from "@pokemon-localdex/store-types";
+import type { AbilityEntry, ItemEntry, MoveEntry, PokemonByMoveSummary, PokemonByAbilitySummary, PaginatedResult } from "@pokemon-localdex/store-types";
 import { buildSource, hydrateGenRecord } from "./hydration.ts";
 
 async function hydrateMoveRow(db: any, row: any): Promise<MoveEntry> {
@@ -174,7 +174,7 @@ export async function getPokemonByMoveRows(
   db: any,
   moveId: number,
   pagination?: { limit?: number; offset?: number },
-): Promise<any[] | { items: any[]; total: number }> {
+): Promise<PokemonByMoveSummary[] | PaginatedResult<PokemonByMoveSummary>> {
   const usePagination = pagination?.limit !== undefined;
   const baseWhere = eq(pokemonLearnsets.moveId, moveId);
 
@@ -232,7 +232,7 @@ export async function getPokemonByAbilityRows(
   db: any,
   abilityId: number,
   pagination?: { limit?: number; offset?: number },
-): Promise<any[] | { items: any[]; total: number }> {
+): Promise<PokemonByAbilitySummary[] | PaginatedResult<PokemonByAbilitySummary>> {
   const usePagination = pagination?.limit !== undefined;
   const baseWhere = eq(pokemonFormAbilities.abilityId, abilityId);
 

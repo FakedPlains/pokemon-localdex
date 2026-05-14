@@ -1,10 +1,10 @@
 import { eq, and, sql, asc } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { moves, pokemonLearnsets } from "@pokemon-localdex/drizzle-schema";
-import type { LearnsetRecord } from "@pokemon-localdex/store-types";
+import type { LearnsetRecord, LearnsetMeta } from "@pokemon-localdex/store-types";
 import { GAME_VERSION_NAMES } from "@pokemon-localdex/store-types";
 
-export async function getLearnsetMetaRows(db: any, pokemonId: number) {
+export async function getLearnsetMetaRows(db: any, pokemonId: number): Promise<LearnsetMeta> {
   const [genRows, formRows, versionRows] = await Promise.all([
     db.selectDistinct({ generation: pokemonLearnsets.generation })
       .from(pokemonLearnsets)

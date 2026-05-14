@@ -18,9 +18,14 @@ import type {
   AbilityEntry,
   ItemEntry,
   LearnsetRecord,
+  LearnsetMeta,
+  PokemonByMoveSummary,
+  PokemonByAbilitySummary,
   PaginatedResult,
   IStore,
 } from "@pokemon-localdex/store-types";
+
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 
 import {
   listAbilityRows,
@@ -65,9 +70,12 @@ import {
  * 基于 Drizzle ORM 的统一 Store 实现。
  * 构造时传入 drizzle() 返回的 db 实例（node-sqlite 或 d1 均可）。
  */
+/** Drizzle db 实例类型，兼容 node:sqlite (sync) 和 D1 (async) 两种运行时 */
+type DrizzleDb = BaseSQLiteDatabase<"sync" | "async", unknown>;
+
 export class DrizzleStore implements IStore {
-  private db: any;
-  constructor(db: any) {
+  private db: DrizzleDb;
+  constructor(db: DrizzleDb) {
     this.db = db;
   }
 
@@ -114,7 +122,7 @@ export class DrizzleStore implements IStore {
   // Pokemon: getLearnsetMeta
   // ────────────────────────────────────────────────────────────────────────────
 
-  async getLearnsetMeta(pokemonId: number) {
+  async getLearnsetMeta(pokemonId: number): Promise<LearnsetMeta> {
     return getLearnsetMetaRows(this.db, pokemonId);
   }
 
@@ -151,7 +159,7 @@ export class DrizzleStore implements IStore {
   // Moves: getPokemonByMove
   // ────────────────────────────────────────────────────────────────────────────
 
-  async getPokemonByMove(moveId: number, pagination?: { limit?: number; offset?: number }): Promise<any[] | { items: any[]; total: number }> {
+  async getPokemonByMove(moveId: number, pagination?: { limit?: number; offset?: number }): Promise<PokemonByMoveSummary[] | PaginatedResult<PokemonByMoveSummary>> {
     return getPokemonByMoveRows(this.db, moveId, pagination);
   }
 
@@ -175,7 +183,7 @@ export class DrizzleStore implements IStore {
   // Abilities: getPokemonByAbility
   // ────────────────────────────────────────────────────────────────────────────
 
-  async getPokemonByAbility(abilityId: number, pagination?: { limit?: number; offset?: number }): Promise<any[] | { items: any[]; total: number }> {
+  async getPokemonByAbility(abilityId: number, pagination?: { limit?: number; offset?: number }): Promise<PokemonByAbilitySummary[] | PaginatedResult<PokemonByAbilitySummary>> {
     return getPokemonByAbilityRows(this.db, abilityId, pagination);
   }
 
@@ -233,6 +241,8 @@ export class DrizzleStore implements IStore {
  * 创建 DrizzleStore 实例。
  * @param db - drizzle() 返回的数据库实例（node-sqlite 或 d1 均可）
  */
-export function createDrizzleStore(db: any): DrizzleStore {
+export function createDrizzleStore(db: DrizzleDb): DrizzleStore {
   return new DrizzleStore(db);
 }
+
+export type { DrizzleDb };

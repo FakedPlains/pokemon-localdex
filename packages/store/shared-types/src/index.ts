@@ -273,6 +273,44 @@ export type LearnsetRecord = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// 招式表 Meta / 宝可梦反查摘要
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type LearnsetMeta = {
+  generations: number[];
+  formKeys: string[];
+  versionsByGen: Record<number, Array<{ code: string; name: string }>>;
+};
+
+/** getPokemonByMove 返回的宝可梦摘要 */
+export type PokemonByMoveSummary = {
+  id: number;
+  dexNumber: number;
+  slug: string;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  primaryType?: string;
+  secondaryType?: string;
+  image?: string;
+  learnMethods: string[];
+};
+
+/** getPokemonByAbility 返回的宝可梦摘要 */
+export type PokemonByAbilitySummary = {
+  id: number;
+  dexNumber: number;
+  slug: string;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  primaryType?: string;
+  secondaryType?: string;
+  image?: string;
+  isHidden: boolean;
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // 分页
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -318,7 +356,7 @@ export interface IStore {
   } & PaginationParams): Promise<PokemonTableSummary[] | PaginatedResult<PokemonTableSummary>>;
   getPokemon(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<PokemonEntry | undefined>;
   getPokemonIdentity(idOrSlug: string): Promise<PokemonIdentity | undefined>;
-  getLearnsetMeta(pokemonId: number): Promise<any>;
+  getLearnsetMeta(pokemonId: number): Promise<LearnsetMeta>;
   getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string }>;
 
   // Champions
@@ -327,12 +365,12 @@ export interface IStore {
   // Moves
   listMoves(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams): Promise<MoveEntry[] | PaginatedResult<MoveEntry>>;
   getMove(idOrSlug: string): Promise<MoveEntry | undefined>;
-  getPokemonByMove(moveId: number, pagination?: PaginationParams): Promise<any[] | PaginatedResult<any>>;
+  getPokemonByMove(moveId: number, pagination?: PaginationParams): Promise<PokemonByMoveSummary[] | PaginatedResult<PokemonByMoveSummary>>;
 
   // Abilities
   listAbilities(filters?: { query?: string; generation?: number } & PaginationParams): Promise<AbilityEntry[] | PaginatedResult<AbilityEntry>>;
   getAbility(idOrName: string): Promise<AbilityEntry | undefined>;
-  getPokemonByAbility(abilityId: number, pagination?: PaginationParams): Promise<any[] | PaginatedResult<any>>;
+  getPokemonByAbility(abilityId: number, pagination?: PaginationParams): Promise<PokemonByAbilitySummary[] | PaginatedResult<PokemonByAbilitySummary>>;
 
   // Items
   listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;

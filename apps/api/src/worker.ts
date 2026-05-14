@@ -21,6 +21,7 @@ export interface Env {
   DB: D1Database;
   ASSETS?: { fetch: (req: Request) => Promise<Response> };
   DATA_SOURCE?: string;
+  ALLOWED_ORIGINS?: string;
 }
 
 // ── D1Store 单例缓存 ──
@@ -76,7 +77,16 @@ async function withApiCache(
   }
 
   const cache = runtimeCaches.default;
-  const cacheKey = new Request(request.url, { method: "GET" });
+
+  // 将请求 Origin 编入 cache key URL，保证不同来源的 CORS 响应头不会互相串用。
+  // Cloudflare Cache API 对 Vary 中非 Accept-Encoding 字段的支持不可靠，
+  // 用 URL 区分是最稳妥的方案。
+  const origin = request.headers.get("Origin") || "";
+  const cacheUrl = origin
+    ? `${request.url}${request.url.includes("?") ? "&" : "?"}__origin=${encodeURIComponent(origin)}`
+    : request.url;
+  const cacheKey = new Request(cacheUrl, { method: "GET" });
+
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
@@ -85,7 +95,7 @@ async function withApiCache(
 
   const headers = new Headers(response.headers);
   headers.set("Cache-Control", API_GET_CACHE_CONTROL);
-  headers.set("Vary", "Accept-Encoding");
+  headers.set("Vary", "Origin, Accept-Encoding");
   const cacheableResponse = new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -99,11 +109,19 @@ async function withApiCache(
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("*", cors({
-  origin: "*",
-  allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
-  allowHeaders: ["Content-Type"],
-}));
+app.use("*", async (c, next) => {
+  const allowedRaw = c.env.ALLOWED_ORIGINS || "*";
+  const allowed = allowedRaw.split(",").map((s: string) => s.trim());
+  const corsMiddleware = cors({
+    origin: (origin: string) => {
+      if (allowed.includes("*")) return origin;
+      return allowed.includes(origin) ? origin : "";
+    },
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type"],
+  });
+  return corsMiddleware(c, next);
+});
 
 app.get("/health", (c) =>
   c.json({ ok: true, service: "pokemon-localdex-api", dataSource: "d1" })

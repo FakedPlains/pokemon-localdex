@@ -16,10 +16,11 @@ database_id = "ebd4055f-ab56-4183-b95e-5056f0b500f3"
 
 [vars]
 DATA_SOURCE = "d1"
+ALLOWED_ORIGINS = "https://pokemon-localdex.pages.dev,https://pokemon-localdex.pages.dev"
 
 [env.production]
 name = "pokemon-localdex-api"
-vars = { DATA_SOURCE = "d1" }
+vars = { DATA_SOURCE = "d1", ALLOWED_ORIGINS = "https://pokemon-localdex.pages.dev" }
 
 [env.production.placement]
 mode = "smart"
