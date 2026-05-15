@@ -160,13 +160,13 @@ export default function PokemonDetailPage() {
     }
   }, [detail?.id, activeGen, currentForm?.formKey])
 
-  // 世代/形态变化时重新加载第一页（保留当前 methodFilter）
+  // 世代/形态变化时重新加载第一页，统一清空招式筛选默认展示全部
   useEffect(() => {
     if (!detail?.id || !activeGen) return
+    setMethodFilter('')
     setLearnsetLoading(true)
     learnsetOffsetRef.current = 0
-    fetchMovesPage(0, true, methodFilter).then((accepted) => {
-      // 竞态保护：被丢弃的请求不应关闭 loading
+    fetchMovesPage(0, true, '').then((accepted) => {
       if (accepted !== false) setLearnsetLoading(false)
     })
   }, [fetchMovesPage])
