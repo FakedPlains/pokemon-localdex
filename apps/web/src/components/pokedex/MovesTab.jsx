@@ -118,25 +118,22 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
   }, [pokemonId, activeGen, activeFormKey, selectedVersion]);
 
   // 初始加载（世代/形态/版本/宝可梦变化时重置）
-  // 宝可梦切换的筛选器重置也在此处完成，避免两个 effect 之间的时序问题。
+  // 切换世代/版本/形态/宝可梦时统一清空招式筛选，默认展示全部招式。
   useEffect(() => {
-    // 宝可梦切换时：同步重置筛选器，确保首次请求不带旧 methodFilter
     const pokemonChanged = prevPokemonIdRef.current !== pokemonId;
     if (pokemonChanged) {
       prevPokemonIdRef.current = pokemonId;
-      setMethodFilter("");
       setSelectedVersion(null);
       setVersionGenRef(null);
       setLearnsetFormKey(null);
       resolvedFormKeyRef.current = null;
     }
+    // 无论哪个维度变化，都重置招式筛选为“全部”
+    setMethodFilter("");
     if (!activeGen) { setAllMoves([]); setHasMore(false); setMethodCounts({}); return; }
     setInitialLoading(true);
     offsetRef.current = 0;
-    // pokemonChanged 时强制使用空 methodFilter，否则沿用当前值
-    const method = pokemonChanged ? "" : methodFilter;
-    fetchPage(0, true, method).then((accepted) => {
-      // 竞态保护：被丢弃的请求不应关闭 loading，新请求开头已设置了 loading=true
+    fetchPage(0, true, "").then((accepted) => {
       if (accepted !== false) setInitialLoading(false);
     });
   }, [fetchPage, activeGen]); // fetchPage 已包含 pokemonId/gen/form/version 依赖
