@@ -1,0 +1,235 @@
+.profile-page {
+  min-height: 100vh;
+  background: #FAF8F5;
+  padding: 0 32rpx 60rpx;
+}
+
+/* ── 用户信息卡片 ── */
+.user-card {
+  padding: 40rpx;
+  margin-bottom: 40rpx;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 32rpx;
+}
+
+.avatar {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #E63946 0%, #FF6B6B 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatar-icon {
+  font-size: 56rpx;
+  color: #fff;
+}
+
+.user-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #2D2D2D;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.user-bio {
+  font-size: 24rpx;
+  color: #8A8A8A;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
+.user-stats {
+  display: flex;
+  gap: 48rpx;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-num {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #E63946;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 22rpx;
+  color: #B5B5B5;
+  margin-top: 2rpx;
+}
+
+/* ── 区块 ── */
+.section {
+  margin-bottom: 40rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #2D2D2D;
+  display: block;
+  margin-bottom: 20rpx;
+}
+
+/* ── 工具网格 ── */
+.tools-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24rpx;
+}
+
+.tool-card {
+  padding: 32rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 32rpx;
+}
+
+.tool-icon-wrap {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16rpx;
+}
+
+.tool-icon-text {
+  font-size: 40rpx;
+}
+
+.icon-damage {
+  background: rgba(230, 57, 70, 0.08);
+}
+
+.icon-type {
+  background: rgba(104, 144, 240, 0.10);
+}
+
+.icon-speed {
+  background: rgba(52, 199, 89, 0.10);
+}
+
+.icon-more {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tool-name {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #2D2D2D;
+  display: block;
+}
+
+.tool-desc {
+  font-size: 22rpx;
+  color: #B5B5B5;
+  margin-top: 4rpx;
+  display: block;
+}
+
+/* ── 设置卡片 ── */
+.settings-card {
+  padding: 0 32rpx;
+  border-radius: 32rpx;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.setting-row-last {
+  border-bottom: none;
+}
+
+.setting-left {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.setting-icon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+}
+
+.setting-icon-gen {
+  background: rgba(248, 208, 48, 0.12);
+}
+
+.setting-icon-img {
+  background: rgba(168, 144, 240, 0.12);
+}
+
+.setting-icon-cache {
+  background: rgba(230, 57, 70, 0.08);
+}
+
+.setting-icon-about {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.setting-icon-source {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.setting-label {
+  font-size: 28rpx;
+  color: #2D2D2D;
+}
+
+.setting-right {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.setting-value {
+  font-size: 26rpx;
+  color: #8A8A8A;
+}
+
+.setting-arrow {
+  font-size: 32rpx;
+  color: #B5B5B5;
+}
+
+/* ── 底部版本号 ── */
+.footer {
+  text-align: center;
+  padding: 40rpx 0 20rpx;
+}
+
+.version-text {
+  font-size: 22rpx;
+  color: #B5B5B5;
+}

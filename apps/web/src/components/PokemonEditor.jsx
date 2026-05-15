@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { unifiedApi } from "../utils/api.js";
-import { STAT_KEYS } from "../utils/constants.js";
+import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import { createDefaultStats, getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers.js";
 import StatCalculator from "./StatCalculator.jsx";
 
@@ -28,7 +28,6 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
   const [pokemonDetail, setPokemonDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [isShiny, setIsShiny] = useState(config.isShiny || false);
-  const [configName, setConfigName] = useState(config.configName || "");
   const [selectedFormKey, setSelectedFormKey] = useState(config.formKey || null); // 当前选中的形态 key
   const [activePanel, setActivePanel] = useState(null); // "item" | "move-0" | "move-1" | "move-2" | "move-3" | "stats" | null
   const [panelSearch, setPanelSearch] = useState("");
@@ -42,7 +41,6 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
   const itemsInitRef = useRef(false);
   const itemListRef = useRef(null);
   const moveListRef = useRef(null);
-  const itemSearchTimer = useRef(null);
   const pokemonId = config.pokemonId;
 
   // 道具分页加载（仅在面板打开时触发）
@@ -330,12 +328,6 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     if (arr.length > 0) return arr;
     return pokemonDetail.types || [];
   }, [pokemonDetail, currentForm]);
-
-  const handleField = (field, value) => {
-    const draft = { ...config };
-    draft[field] = field === "level" ? Number(value || 50) : value;
-    onChange(draft);
-  };
 
   const handleMove = (moveIndex, value, moveOpt) => {
     const draft = { ...config, moves: [...(config.moves || ["", "", "", ""])] };

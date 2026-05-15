@@ -21,6 +21,7 @@ export interface Env {
   DB: D1Database;
   ASSETS?: { fetch: (req: Request) => Promise<Response> };
   DATA_SOURCE?: string;
+  ALLOWED_ORIGINS?: string;
 }
 
 // ── D1Store 单例缓存 ──
@@ -29,7 +30,17 @@ export interface Env {
 let cachedStore: D1Store | null = null;
 let cachedDb: D1Database | null = null;
 
-const API_GET_CACHE_CONTROL = "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400";
+// ── 分层缓存策略 ──
+// 静态资料库数据更新频率极低，可以长缓存；搜索请求高基数，短缓存。
+const CACHE_TIERS = {
+  // 列表/详情：浏览器 2min，边缘 24h，stale 3天
+  long: "public, max-age=120, s-maxage=86400, stale-while-revalidate=259200",
+  // learnset/champions 等中频数据：浏览器 1min，边缘 6h，stale 1天
+  medium: "public, max-age=60, s-maxage=21600, stale-while-revalidate=86400",
+  // 含搜索参数的请求：浏览器 30s，边缘 10min，减少高基数缓存占用
+  search: "public, max-age=30, s-maxage=600, stale-while-revalidate=3600",
+} as const;
+
 const CACHEABLE_API_PREFIXES = [
   "/api/pokemon",
   "/api/moves",
@@ -42,6 +53,16 @@ const CACHEABLE_API_PREFIXES = [
   "/items",
   "/champions",
 ];
+
+function getCacheTier(url: URL): string {
+  const path = url.pathname;
+  // 含搜索参数用短 TTL
+  if (url.searchParams.has("q")) return CACHE_TIERS.search;
+  // learnset / champions 用中等 TTL
+  if (path.includes("/learnset") || path.includes("/champions")) return CACHE_TIERS.medium;
+  // 其余资料库列表/详情用长 TTL
+  return CACHE_TIERS.long;
+}
 
 function getOrCreateStore(db: D1Database): D1Store {
   if (cachedStore && cachedDb === db) return cachedStore;
@@ -59,15 +80,19 @@ function isCacheableApiGet(request: Request, url: URL): boolean {
 
 async function withApiCache(
   request: Request,
+  url: URL,
   ctx: ExecutionContext,
   handler: () => Promise<Response>,
 ): Promise<Response> {
+  const cacheControl = getCacheTier(url);
   const runtimeCaches = (globalThis as any).caches;
+
   if (!runtimeCaches?.default) {
     const response = await handler();
     if (!response.ok) return response;
     const headers = new Headers(response.headers);
-    headers.set("Cache-Control", API_GET_CACHE_CONTROL);
+    headers.set("Cache-Control", cacheControl);
+    headers.set("X-LocalDex-Cache", "BYPASS");
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -76,16 +101,37 @@ async function withApiCache(
   }
 
   const cache = runtimeCaches.default;
-  const cacheKey = new Request(request.url, { method: "GET" });
-  const cached = await cache.match(cacheKey);
-  if (cached) return cached;
 
+  // 将请求 Origin 编入 cache key URL，保证不同来源的 CORS 响应头不会互相串用。
+  // Cloudflare Cache API 对 Vary 中非 Accept-Encoding 字段的支持不可靠，
+  // 用 URL 区分是最稳妥的方案。
+  const origin = request.headers.get("Origin") || "";
+  const cacheUrl = origin
+    ? `${request.url}${request.url.includes("?") ? "&" : "?"}__origin=${encodeURIComponent(origin)}`
+    : request.url;
+  const cacheKey = new Request(cacheUrl, { method: "GET" });
+
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    const hitHeaders = new Headers(cached.headers);
+    hitHeaders.set("X-LocalDex-Cache", "HIT");
+    return new Response(cached.body, {
+      status: cached.status,
+      statusText: cached.statusText,
+      headers: hitHeaders,
+    });
+  }
+
+  const t0 = Date.now();
   const response = await handler();
   if (!response.ok) return response;
+  const duration = Date.now() - t0;
 
   const headers = new Headers(response.headers);
-  headers.set("Cache-Control", API_GET_CACHE_CONTROL);
-  headers.set("Vary", "Accept-Encoding");
+  headers.set("Cache-Control", cacheControl);
+  headers.set("Vary", "Origin, Accept-Encoding");
+  headers.set("X-LocalDex-Cache", "MISS");
+  headers.set("Server-Timing", `d1;dur=${duration}`);
   const cacheableResponse = new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -99,11 +145,19 @@ async function withApiCache(
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("*", cors({
-  origin: "*",
-  allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
-  allowHeaders: ["Content-Type"],
-}));
+app.use("*", async (c, next) => {
+  const allowedRaw = c.env.ALLOWED_ORIGINS || "*";
+  const allowed = allowedRaw.split(",").map((s: string) => s.trim());
+  const corsMiddleware = cors({
+    origin: (origin: string) => {
+      if (allowed.includes("*")) return origin;
+      return allowed.includes(origin) ? origin : "";
+    },
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type"],
+  });
+  return corsMiddleware(c, next);
+});
 
 app.get("/health", (c) =>
   c.json({ ok: true, service: "pokemon-localdex-api", dataSource: "d1" })
@@ -139,7 +193,7 @@ export default {
 
     const handleApi = () => app.fetch(request, env, ctx);
     if (isCacheableApiGet(request, url)) {
-      return withApiCache(request, ctx, handleApi);
+      return withApiCache(request, url, ctx, handleApi);
     }
 
     return handleApi();

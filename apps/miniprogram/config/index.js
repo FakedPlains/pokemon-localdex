@@ -8,6 +8,16 @@ try {
   // dotenv 不可用时静默跳过，依赖 process.env 中已有的值
 }
 
+// API 地址优先级：
+//   1. .env 或 shell 环境变量中的 API_BASE_URL（手动覆盖）
+//   2. development 模式默认 http://localhost:3030（本地 API 服务）
+//   3. production 模式默认 https://pokemon-localdex.pages.dev（Cloudflare Worker）
+const isDev = process.env.NODE_ENV !== 'production'
+const defaultApiUrl = isDev
+  ? 'http://localhost:3030'
+  : 'https://pokemon-localdex.pages.dev'
+const apiBaseUrl = process.env.API_BASE_URL || defaultApiUrl
+
 const config = {
   projectName: 'pokemon-localdex-miniprogram',
   date: '2025-05-03',
@@ -22,7 +32,7 @@ const config = {
   outputRoot: 'dist',
   plugins: ['@tarojs/plugin-framework-react'],
   defineConstants: {
-    API_BASE_URL: JSON.stringify(process.env.API_BASE_URL || 'https://pokemon-localdex.pages.dev'),
+    API_BASE_URL: JSON.stringify(apiBaseUrl),
   },
   copy: {
     patterns: [],

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
-import { TYPE_BG_COLORS, CATEGORY_COLORS, typeIconSrc, categoryIconSrc } from "../utils/constants.js";
+import { TYPE_BG_COLORS, CATEGORY_COLORS } from "@pokemon-localdex/store-types/constants";
+import { typeIconSrc, categoryIconSrc } from "../utils/iconPaths.js";
 import { parseExpandParam } from "../utils/helpers.js";
 import Loading from "../components/Loading.jsx";
 import PokemonGrid from "../components/PokemonGrid.jsx";
@@ -142,7 +143,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
         <div className="mv-header">
           <h2 className="panel-title">招式资料</h2>
           <span className="panel-subtitle">
-            共收录 {total > 0 ? total : moves.length} 个招式，按编号排序。点击展开查看详细效果与世代变更。
+            已加载 {moves.length} 个招式，按编号排序。点击展开查看详细效果与世代变更。
           </span>
         </div>
 

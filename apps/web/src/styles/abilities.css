@@ -112,8 +112,6 @@
 .mv-table {
   display: grid;
   gap: 4px;
-  max-height: 480px;
-  overflow: auto;
 }
 
 .mv-row {
@@ -142,5 +140,24 @@
 .mv-move-name {
   font-weight: 600;
   color: var(--accent-strong);
+}
+
+.mv-load-more-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 0;
+  margin: 8px 0;
+  border: 1px dashed rgba(138, 166, 90, 0.4);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(138, 166, 90, 0.06);
+  cursor: pointer;
+  transition: background 200ms;
+}
+
+.mv-load-more-btn:hover {
+  background: rgba(138, 166, 90, 0.15);
 }
 

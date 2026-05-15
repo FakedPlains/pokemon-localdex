@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>招式详情 - 地震 - Pokemon LocalDex</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #E5E5E5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .wechat-container {
+            width: 393px;
+            height: 852px;
+            position: relative;
+            overflow: hidden;
+            background: #FAF8F5;
+        }
+
+        /* 状态栏 */
+        .status-bar {
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            background: #FAF8F5;
+            position: relative;
+            z-index: 10;
+        }
+        .status-bar .time {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2D2D2D;
+        }
+        .status-icons {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .status-icons .network {
+            font-size: 12px;
+            font-weight: 600;
+            color: #2D2D2D;
+        }
+        .signal-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 1.5px;
+            margin-left: 4px;
+        }
+        .signal-bars span {
+            width: 3px;
+            background: #2D2D2D;
+            border-radius: 1px;
+        }
+        .signal-bars span:nth-child(1) { height: 4px; }
+        .signal-bars span:nth-child(2) { height: 6px; }
+        .signal-bars span:nth-child(3) { height: 8px; }
+        .signal-bars span:nth-child(4) { height: 10px; }
+        .battery-wrap {
+            display: flex;
+            align-items: center;
+            margin-left: 4px;
+        }
+        .battery {
+            width: 24px;
+            height: 11px;
+            border: 1.5px solid #2D2D2D;
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+        .battery::after {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px; bottom: 2px;
+            width: 70%;
+            background: #2D2D2D;
+            border-radius: 1px;
+        }
+        .battery-tip {
+            width: 2px;
+            height: 5px;
+            background: #2D2D2D;
+            border-radius: 0 1px 1px 0;
+            margin-left: 1px;
+        }
+        .battery-pct {
+            font-size: 12px;
+            color: #2D2D2D;
+            margin-left: 3px;
+        }
+
+        /* 内容区域 */
+        .content-area {
+            height: 808px;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+            position: relative;
+        }
+        .content-area::-webkit-scrollbar { display: none; }
+
+        /* 微信胶囊按钮 */
+        .capsule-button {
+            position: absolute;
+            right: 12px;
+            top: 6px;
+            display: flex;
+            width: 88px;
+            height: 28px;
+            background: rgba(255,255,255,0.55);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.5);
+            border-radius: 999px;
+            z-index: 20;
+        }
+        .capsule-button .capsule-left,
+        .capsule-button .capsule-right {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .capsule-button .capsule-divider {
+            width: 1px;
+            height: 16px;
+            background: rgba(0,0,0,0.12);
+            align-self: center;
+        }
+        .capsule-dots {
+            display: flex;
+            gap: 2.5px;
+        }
+        .capsule-dots span {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #2D2D2D;
+        }
+        .capsule-circle {
+            width: 15px;
+            height: 15px;
+            border: 1.5px solid #2D2D2D;
+            border-radius: 50%;
+        }
+
+        /* 自定义导航 */
+        .custom-nav {
+            display: flex;
+            align-items: center;
+            padding: 4px 16px 8px;
+            height: 44px;
+        }
+        .nav-back {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .nav-back svg {
+            width: 20px;
+            height: 20px;
+        }
+        .nav-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: #2D2D2D;
+            margin-left: 4px;
+        }
+
+        /* Hero 区域 */
+        .hero {
+            margin: 0 16px 16px;
+            border-radius: 20px;
+            padding: 28px 20px 24px;
+            background: linear-gradient(135deg, #E0C068 0%, #d4ad4a 50%, #c9a03e 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -30px;
+            right: -30px;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.1);
+        }
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: -20px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.06);
+        }
+        .hero-name-zh {
+            font-size: 22px;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 4px;
+        }
+        .hero-name-en {
+            font-size: 13px;
+            color: rgba(255,255,255,0.7);
+            font-weight: 400;
+            margin-bottom: 16px;
+        }
+        .hero-tags {
+            display: flex;
+            gap: 8px;
+        }
+        .hero-tag {
+            padding: 5px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #FFFFFF;
+            letter-spacing: 0.5px;
+        }
+        .hero-tag-type {
+            background: rgba(255,255,255,0.25);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .hero-tag-category {
+            background: rgba(0,0,0,0.15);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+
+        /* 毛玻璃卡片 */
+        .glass-card {
+            margin: 0 16px 12px;
+            background: rgba(255, 252, 248, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+            border-radius: 16px;
+            padding: 16px;
+        }
+        .card-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #2D2D2D;
+            margin-bottom: 14px;
+        }
+
+        /* 基础数据 2×2 网格 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 14px 8px;
+            background: rgba(0,0,0,0.02);
+            border-radius: 12px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2D2D2D;
+            line-height: 1.2;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #8A8A8A;
+            margin-top: 4px;
+            font-weight: 400;
+        }
+
+        /* 效果说明 */
+        .effect-text {
+            font-size: 14px;
+            color: #2D2D2D;
+            line-height: 1.6;
+        }
+
+        /* 世代变更时间线 */
+        .timeline {
+            position: relative;
+            padding-left: 20px;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
+            background: #E8E4DF;
+            border-radius: 1px;
+        }
+        .timeline-item {
+            position: relative;
+            padding-bottom: 18px;
+        }
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: -20px;
+            top: 4px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #FFFFFF;
+            border: 2.5px solid #E0C068;
+            z-index: 1;
+        }
+        .timeline-item:first-child .timeline-dot {
+            border-color: #E63946;
+            background: #E63946;
+        }
+        .timeline-gen {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(0,0,0,0.05);
+            font-size: 11px;
+            font-weight: 600;
+            color: #8A8A8A;
+            margin-bottom: 6px;
+        }
+        .timeline-item:first-child .timeline-gen {
+            background: rgba(230, 57, 70, 0.08);
+            color: #E63946;
+        }
+        .timeline-desc {
+            font-size: 13px;
+            color: #2D2D2D;
+            line-height: 1.5;
+        }
+        .timeline-detail {
+            font-size: 12px;
+            color: #8A8A8A;
+            margin-top: 3px;
+            line-height: 1.4;
+        }
+
+        /* 可学习的宝可梦 - 横向滚动 */
+        .pokemon-scroll-wrapper {
+            margin: 0 -16px;
+            padding: 0 16px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .pokemon-scroll-wrapper::-webkit-scrollbar { display: none; }
+        .pokemon-scroll {
+            display: flex;
+            gap: 12px;
+            padding-bottom: 4px;
+        }
+        .pokemon-avatar-item {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 64px;
+        }
+        .pokemon-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
+            background: rgba(0,0,0,0.03);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.04);
+        }
+        .pokemon-avatar img {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+        }
+        .pokemon-avatar-name {
+            font-size: 10px;
+            color: #8A8A8A;
+            margin-top: 6px;
+            text-align: center;
+            width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* 底部安全间距 */
+        .bottom-spacer {
+            height: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="wechat-container">
+        <!-- 状态栏 -->
+        <div class="status-bar">
+            <div class="time">1:41</div>
+            <div class="status-icons">
+                <span class="network">5G</span>
+                <div class="signal-bars">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+                <div class="battery-wrap">
+                    <div class="battery"></div>
+                    <div class="battery-tip"></div>
+                    <span class="battery-pct">37</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="content-area">
+            <!-- 微信胶囊按钮 -->
+            <div class="capsule-button">
+                <div class="capsule-left">
+                    <div class="capsule-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+                <div class="capsule-divider"></div>
+                <div class="capsule-right">
+                    <div class="capsule-circle"></div>
+                </div>
+            </div>
+
+            <!-- 自定义导航 -->
+            <div class="custom-nav">
+                <div class="nav-back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#2D2D2D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </div>
+                <span class="nav-title">地震</span>
+            </div>
+
+            <!-- Hero 区域 -->
+            <div class="hero">
+                <div class="hero-name-zh">地震</div>
+                <div class="hero-name-en">Earthquake</div>
+                <div class="hero-tags">
+                    <span class="hero-tag hero-tag-type">地面</span>
+                    <span class="hero-tag hero-tag-category">物理</span>
+                </div>
+            </div>
+
+            <!-- 基础数据卡片 -->
+            <div class="glass-card">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">100</div>
+                        <div class="stat-label">威力</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">100</div>
+                        <div class="stat-label">命中</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">10</div>
+                        <div class="stat-label">PP</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">优先级</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 效果说明卡片 -->
+            <div class="glass-card">
+                <div class="card-title">效果</div>
+                <div class="effect-text">在战斗中对在场的所有其他宝可梦造成伤害。使用挖洞的宝可梦受到双倍伤害。</div>
+            </div>
+
+            <!-- 世代变更卡片 -->
+            <div class="glass-card">
+                <div class="card-title">世代变更</div>
+                <div class="timeline">
+                    <!-- 第一世代 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-gen">第一世代</div>
+                        <div class="timeline-desc">初次登场</div>
+                        <div class="timeline-detail">威力 100 · 命中 100 · PP 10</div>
+                    </div>
+                    <!-- 第四世代 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-gen">第四世代</div>
+                        <div class="timeline-desc">变为同时攻击对手和队友</div>
+                        <div class="timeline-detail">攻击范围由对手单体变为全体相邻</div>
+                    </div>
+                    <!-- 第六世代 -->
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-gen">第六世代</div>
+                        <div class="timeline-desc">威力保持为 100</div>
+                        <div class="timeline-detail">威力 100 · 命中 100 · PP 10（未变更）</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 可学习的宝可梦 -->
+            <div class="glass-card">
+                <div class="card-title">可学习的宝可梦</div>
+                <div class="pokemon-scroll-wrapper">
+                    <div class="pokemon-scroll">
+                        <!-- 烈咬陆鲨 -->
+                        <div class="pokemon-avatar-item">
+                            <div class="pokemon-avatar">
+                                <img src="https://s1.52poke.wiki/wiki/thumb/f/fa/445Garchomp.png/120px-445Garchomp.png" alt="烈咬陆鲨" onerror="this.style.display='none'">
+                            </div>
+                            <div class="pokemon-avatar-name">烈咬陆鲨</div>
+                        </div>
+                        <!-- 暴鲤龙 -->
+                        <div class="pokemon-avatar-item">
+                            <div class="pokemon-avatar">
+                                <img src="https://s1.52poke.wiki/wiki/thumb/0/02/130Gyarados.png/120px-130Gyarados.png" alt="暴鲤龙" onerror="this.style.display='none'">
+                            </div>
+                            <div class="pokemon-avatar-name">暴鲤龙</div>
+                        </div>
+                        <!-- 超梦 -->
+                        <div class="pokemon-avatar-item">
+                            <div class="pokemon-avatar">
+                                <img src="https://s1.52poke.wiki/wiki/thumb/7/78/150Mewtwo.png/120px-150Mewtwo.png" alt="超梦" onerror="this.style.display='none'">
+                            </div>
+                            <div class="pokemon-avatar-name">超梦</div>
+                        </div>
+                        <!-- 路卡利欧 -->
+                        <div class="pokemon-avatar-item">
+                            <div class="pokemon-avatar">
+                                <img src="https://s1.52poke.wiki/wiki/thumb/6/63/448Lucario.png/120px-448Lucario.png" alt="路卡利欧" onerror="this.style.display='none'">
+                            </div>
+                            <div class="pokemon-avatar-name">路卡利欧</div>
+                        </div>
+                        <!-- 快龙 -->
+                        <div class="pokemon-avatar-item">
+                            <div class="pokemon-avatar">
+                                <img src="https://s1.52poke.wiki/wiki/thumb/7/79/149Dragonite.png/120px-149Dragonite.png" alt="快龙" onerror="this.style.display='none'">
+                            </div>
+                            <div class="pokemon-avatar-name">快龙</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部间距 -->
+            <div class="bottom-spacer"></div>
+        </div>
+    </div>
+</body>
+</html>

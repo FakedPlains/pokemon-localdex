@@ -1,269 +1,412 @@
+/* ══════════════════════════════════════════════
+   队伍页 — teams/index.less
+   平铺类名，不嵌套
+   ══════════════════════════════════════════════ */
+
+/* ── 页面容器 ── */
 .teams-page {
-  padding: 16px;
-  background: #f5f5f5;
   min-height: 100vh;
+  background: #FAF8F5;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
 
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
+/* ── 自定义导航 ── */
+.teams-nav {
+  padding: 24rpx 32rpx 8rpx;
+}
 
-    .title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #333;
-    }
+.teams-nav-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #2D2D2D;
+}
 
-    .add-btn {
-      padding: 8px 16px;
-      background: #e53935;
-      color: #fff;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 600;
-    }
-  }
+/* ── 分段控件区域 ── */
+.teams-segment-wrap {
+  padding: 16rpx 32rpx 24rpx;
+}
 
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #999;
-    font-size: 14px;
+/* ── 滚动区域 ── */
+.teams-scroll-area {
+  flex: 1;
+  height: 0;
+  overflow: hidden;
+}
 
-    .empty-icon {
-      font-size: 48px;
-      margin-bottom: 12px;
-    }
-  }
+/* ── 队伍列表容器 ── */
+.teams-list {
+  padding: 0 32rpx 240rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
 
-  .team-card {
-    background: #fff;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+/* ── 空态 ── */
+.teams-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 160rpx 40rpx;
+}
 
-    .team-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
+.teams-empty-icon {
+  font-size: 80rpx;
+  margin-bottom: 24rpx;
+}
 
-      .team-name {
-        font-size: 16px;
-        font-weight: 600;
-        color: #333;
-      }
+.teams-empty-text {
+  font-size: 28rpx;
+  color: #B5B5B5;
+}
 
-      .team-actions {
-        display: flex;
-        gap: 8px;
+/* ══════════════════════════════════════════════
+   队伍卡片
+   ══════════════════════════════════════════════ */
 
-        .action-btn {
-          padding: 4px 10px;
-          border-radius: 12px;
-          font-size: 12px;
-          background: #f5f5f5;
-          color: #666;
+.team-card {
+  padding: 28rpx 28rpx 24rpx;
+}
 
-          &.danger {
-            color: #e53935;
-            background: #fce4ec;
-          }
-        }
-      }
-    }
+/* ── 卡片头部 ── */
+.team-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
 
-    .members-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+.team-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
 
-      .member-slot {
-        width: calc(33.33% - 6px);
-        aspect-ratio: 1;
-        border-radius: 8px;
-        border: 2px dashed #ddd;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-        background: #fafafa;
+.team-card-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2D2D2D;
+}
 
-        &.filled {
-          border: 2px solid #e0e0e0;
-          background: #fff;
-        }
+.team-card-format-tag {
+  font-size: 22rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(0, 0, 0, 0.04);
+  color: #8A8A8A;
+  font-weight: 500;
+}
 
-        .member-sprite {
-          width: 48px;
-          height: 48px;
-        }
+.team-card-edit-icon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 16rpx;
+  background: rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-        .member-name {
-          font-size: 11px;
-          color: #333;
-          margin-top: 2px;
-          text-align: center;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          max-width: 90%;
-        }
+.team-card-edit-text {
+  font-size: 30rpx;
+  color: #8A8A8A;
+}
 
-        .member-types {
-          display: flex;
-          gap: 2px;
-          margin-top: 2px;
+/* ── 成员网格 3×2 ── */
+.team-member-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+}
 
-          .type-badge {
-            font-size: 9px;
-            padding: 1px 4px;
-            border-radius: 4px;
-            color: #fff;
-          }
-        }
+/* ── 单个成员槽位 ── */
+.team-member-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
 
-        .remove-btn {
-          position: absolute;
-          top: 2px;
-          right: 2px;
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background: rgba(0,0,0,0.4);
-          color: #fff;
-          font-size: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
+/* ── 成员头像框 ── */
+.team-member-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 28rpx;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
 
-        .add-icon {
-          font-size: 24px;
-          color: #ccc;
-        }
-      }
-    }
+.team-member-sprite {
+  width: 100%;
+  height: 100%;
+}
 
-    .team-meta {
-      margin-top: 8px;
-      font-size: 11px;
-      color: #999;
-    }
-  }
+.team-member-placeholder {
+  font-size: 48rpx;
+  color: #D0CCC6;
+}
 
-  /* 宝可梦选择器弹窗 */
-  .picker-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 999;
+/* ── 成员移除按钮 ── */
+.team-member-remove {
+  position: absolute;
+  top: 4rpx;
+  right: 4rpx;
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-    .picker-mask {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.5);
-    }
+.team-member-remove-text {
+  font-size: 22rpx;
+  color: #fff;
+  line-height: 1;
+}
 
-    .picker-content {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 70vh;
-      background: #fff;
-      border-radius: 16px 16px 0 0;
-      display: flex;
-      flex-direction: column;
+/* ── 成员名字 ── */
+.team-member-name {
+  font-size: 22rpx;
+  font-weight: 500;
+  color: #2D2D2D;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120rpx;
+}
 
-      .picker-header {
-        padding: 16px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #eee;
+/* ── 成员属性标签行 ── */
+.team-member-types {
+  display: flex;
+  gap: 4rpx;
+}
 
-        .picker-title {
-          font-size: 16px;
-          font-weight: 600;
-        }
+/* ── 空槽位 ── */
+.team-member-empty {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 28rpx;
+  border: 2px dashed rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.01);
+}
 
-        .close-btn {
-          font-size: 14px;
-          color: #999;
-          padding: 4px 8px;
-        }
-      }
+.team-member-empty-icon {
+  font-size: 40rpx;
+  color: #C0BBB3;
+}
 
-      .search-bar {
-        padding: 12px 16px;
+.team-member-empty-label {
+  font-size: 22rpx;
+  color: #B5B5B5;
+}
 
-        .search-input {
-          width: 100%;
-          height: 36px;
-          border-radius: 18px;
-          background: #f5f5f5;
-          padding: 0 16px;
-          font-size: 14px;
-          border: none;
-        }
-      }
+/* ══════════════════════════════════════════════
+   新建队伍按钮（底部固定）
+   ══════════════════════════════════════════════ */
 
-      .pokemon-list {
-        flex: 1;
-        overflow-y: auto;
+.teams-create-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24rpx 32rpx;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, #FAF8F5 60%, transparent);
+  z-index: 10;
+}
 
-        .pokemon-item {
-          display: flex;
-          align-items: center;
-          padding: 10px 16px;
-          border-bottom: 1px solid #f5f5f5;
+.teams-create-btn {
+  background: #E63946;
+  border-radius: 28rpx;
+  padding: 28rpx 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 32px rgba(230, 57, 70, 0.3);
+}
 
-          .poke-sprite {
-            width: 40px;
-            height: 40px;
-            margin-right: 12px;
-          }
+.teams-create-btn-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 1rpx;
+}
 
-          .poke-info {
-            flex: 1;
+/* ══════════════════════════════════════════════
+   宝可梦选择器弹窗
+   ══════════════════════════════════════════════ */
 
-            .poke-name {
-              font-size: 14px;
-              font-weight: 500;
-              color: #333;
-            }
+.picker-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
 
-            .poke-types {
-              display: flex;
-              gap: 4px;
-              margin-top: 2px;
+.picker-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
 
-              .type-tag {
-                font-size: 10px;
-                padding: 1px 6px;
-                border-radius: 4px;
-                color: #fff;
-              }
-            }
-          }
-        }
-      }
+.picker-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 70vh;
+  background: rgba(255, 252, 248, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 40rpx 40rpx 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-bottom: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
-      .loading-more {
-        text-align: center;
-        padding: 12px;
-        color: #999;
-        font-size: 13px;
-      }
-    }
-  }
+/* ── 弹窗头部 ── */
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 32rpx 16rpx;
+}
+
+.picker-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2D2D2D;
+}
+
+.picker-close {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.picker-close-text {
+  font-size: 36rpx;
+  color: #8A8A8A;
+  line-height: 1;
+}
+
+/* ── 药丸搜索栏 ── */
+.picker-search {
+  padding: 8rpx 32rpx 20rpx;
+}
+
+.picker-search-bar {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 999rpx;
+  padding: 0 28rpx;
+  height: 76rpx;
+  gap: 12rpx;
+}
+
+.picker-search-icon {
+  font-size: 28rpx;
+  color: #B5B5B5;
+  flex-shrink: 0;
+}
+
+.picker-search-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #2D2D2D;
+  height: 76rpx;
+  line-height: 76rpx;
+}
+
+/* ── 列表区域 ── */
+.picker-list {
+  flex: 1;
+  height: 0;
+}
+
+/* ── 列表项 ── */
+.picker-item {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 32rpx;
+  gap: 20rpx;
+}
+
+.picker-item-avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 20rpx;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.picker-item-sprite {
+  width: 100%;
+  height: 100%;
+}
+
+.picker-item-placeholder {
+  font-size: 36rpx;
+  color: #D0CCC6;
+}
+
+.picker-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.picker-item-name {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #2D2D2D;
+}
+
+.picker-item-types {
+  display: flex;
+  gap: 8rpx;
+}
+
+/* ── 加载状态 ── */
+.picker-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx 0;
+}
+
+.picker-loading-text {
+  font-size: 24rpx;
+  color: #B5B5B5;
 }
