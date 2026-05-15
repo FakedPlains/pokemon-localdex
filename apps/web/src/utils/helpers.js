@@ -253,10 +253,47 @@ export function buildEvolutionFamilies(pokemonList) {
   });
 }
 
+/**
+ * 从形态的 statVariants / typeVariants / abilityVariants 推导可用世代列表。
+ * 不再依赖 detail.generations（pokemon_generation_regions 表），
+ * 避免详情首开需要额外请求 /generations。
+ *
+ * 推导逻辑：收集所有 variant 的 generationStart / generationEnd，
+ * 展开为连续的世代范围。如果没有任何 variant 则返回空数组（单世代无需切换）。
+ */
 export function buildPokemonGenerationOptions(detail) {
+  const forms = detail.forms || [];
   const values = new Set();
-  for (const g of detail.generations || []) values.add(Number(g));
-  return [...values].filter(Boolean).sort((a, b) => a - b);
+
+  for (const form of forms) {
+    const allVariants = [
+      ...(form.statVariants || []),
+      ...(form.typeVariants || []),
+      ...(form.abilityVariants || []),
+    ];
+    for (const v of allVariants) {
+      const gs = v.generationStart;
+      const ge = v.generationEnd;
+      if (gs) values.add(Number(gs));
+      if (ge) values.add(Number(ge));
+    }
+  }
+
+  // 如果没有任何 variant，世代切换没有意义——返回空数组
+  if (values.size === 0) return [];
+
+  // 补齐连续世代：从最小到最大（上界默认到 9）
+  const sorted = [...values].filter(Boolean).sort((a, b) => a - b);
+  const min = sorted[0];
+  const hasOpenEnd = forms.some((f) =>
+    [...(f.statVariants || []), ...(f.typeVariants || []), ...(f.abilityVariants || [])]
+      .some((v) => v.generationStart && !v.generationEnd),
+  );
+  const max = hasOpenEnd ? 9 : sorted[sorted.length - 1];
+
+  const result = [];
+  for (let g = min; g <= max; g++) result.push(g);
+  return result;
 }
 
 /**

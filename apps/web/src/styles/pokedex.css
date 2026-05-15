@@ -877,6 +877,80 @@ display: block;
 .drawer-tab-body { min-height: 120px; }
 
 /* ═══════════════════════════════════════════════════════
+   POKEDEX — Evolution Tab
+   ═══════════════════════════════════════════════════════ */
+
+.tab-evolution { padding: 4px 0; }
+
+.evo-chain {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.evo-stage-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.evo-arrow {
+  font-size: 20px;
+  color: var(--muted, #888);
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
+.evo-stage-members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evo-member {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+  min-width: 80px;
+}
+
+.evo-member:hover { background: rgba(0,0,0,0.04); }
+.evo-member-current { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); }
+
+.evo-member-img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.evo-member-name {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.evo-member-types {
+  display: flex;
+  gap: 3px;
+}
+
+.evo-member-method {
+  font-size: 11px;
+  color: var(--muted, #888);
+  text-align: center;
+  max-width: 100px;
+  word-break: break-word;
+}
+
+/* ═══════════════════════════════════════════════════════
    POKEDEX — View Toggle & Table View
    ═══════════════════════════════════════════════════════ */
 

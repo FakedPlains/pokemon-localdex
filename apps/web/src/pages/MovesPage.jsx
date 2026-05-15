@@ -143,7 +143,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
         <div className="mv-header">
           <h2 className="panel-title">招式资料</h2>
           <span className="panel-subtitle">
-            共收录 {total > 0 ? total : moves.length} 个招式，按编号排序。点击展开查看详细效果与世代变更。
+            已加载 {moves.length} 个招式，按编号排序。点击展开查看详细效果与世代变更。
           </span>
         </div>
 

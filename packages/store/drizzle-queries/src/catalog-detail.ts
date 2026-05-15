@@ -178,17 +178,6 @@ export async function getPokemonByMoveRows(
   const usePagination = pagination?.limit !== undefined;
   const baseWhere = eq(pokemonLearnsets.moveId, moveId);
 
-  let total = 0;
-  if (usePagination) {
-    const countRows: any[] = await db
-      .select({ cnt: sql<number>`COUNT(DISTINCT ${pokemon.id})` })
-      .from(pokemonLearnsets)
-      .innerJoin(pokemon, eq(pokemon.id, pokemonLearnsets.pokemonId))
-      .where(baseWhere);
-    total = Number(countRows[0]?.cnt ?? 0);
-    if (total === 0) return { items: [], total: 0 };
-  }
-
   let query = db
     .select({
       id: pokemon.id,
@@ -208,14 +197,18 @@ export async function getPokemonByMoveRows(
     .orderBy(asc(pokemon.dexNumber));
 
   if (usePagination) {
-    query = query.limit(Number(pagination!.limit)).offset(Number(pagination?.offset ?? 0));
+    query = query.limit(Number(pagination!.limit) + 1).offset(Number(pagination?.offset ?? 0));
   }
 
   const rows: any[] = await query;
-  if (rows.length === 0) return usePagination ? { items: [], total } : [];
+  if (rows.length === 0) return usePagination ? { items: [], hasMore: false } : [];
 
-  const entries = await hydratePokemonReferenceRows(db, rows, true);
-  return usePagination ? { items: entries, total } : entries;
+  const limit = Number(pagination!.limit);
+  const hasMore = usePagination && rows.length > limit;
+  const effectiveRows = usePagination ? rows.slice(0, limit) : rows;
+
+  const entries = await hydratePokemonReferenceRows(db, effectiveRows, true);
+  return usePagination ? { items: entries, hasMore } : entries;
 }
 
 export async function getAbilityRow(db: any, idOrName: string): Promise<AbilityEntry | undefined> {
@@ -236,18 +229,6 @@ export async function getPokemonByAbilityRows(
   const usePagination = pagination?.limit !== undefined;
   const baseWhere = eq(pokemonFormAbilities.abilityId, abilityId);
 
-  let total = 0;
-  if (usePagination) {
-    const countRows: any[] = await db
-      .select({ cnt: sql<number>`COUNT(DISTINCT ${pokemon.id})` })
-      .from(pokemonFormAbilities)
-      .innerJoin(pokemonForms, and(eq(pokemonForms.id, pokemonFormAbilities.formId), eq(pokemonForms.isDefault, 1)))
-      .innerJoin(pokemon, eq(pokemon.id, pokemonForms.pokemonId))
-      .where(baseWhere);
-    total = Number(countRows[0]?.cnt ?? 0);
-    if (total === 0) return { items: [], total: 0 };
-  }
-
   let query = db
     .selectDistinct({
       id: pokemon.id,
@@ -266,14 +247,18 @@ export async function getPokemonByAbilityRows(
     .orderBy(asc(pokemon.dexNumber));
 
   if (usePagination) {
-    query = query.limit(Number(pagination!.limit)).offset(Number(pagination?.offset ?? 0));
+    query = query.limit(Number(pagination!.limit) + 1).offset(Number(pagination?.offset ?? 0));
   }
 
   const rows: any[] = await query;
-  if (rows.length === 0) return usePagination ? { items: [], total } : [];
+  if (rows.length === 0) return usePagination ? { items: [], hasMore: false } : [];
 
-  const entries = await hydratePokemonReferenceRows(db, rows);
-  return usePagination ? { items: entries, total } : entries;
+  const limit = Number(pagination!.limit);
+  const hasMore = usePagination && rows.length > limit;
+  const effectiveRows = usePagination ? rows.slice(0, limit) : rows;
+
+  const entries = await hydratePokemonReferenceRows(db, effectiveRows);
+  return usePagination ? { items: entries, hasMore } : entries;
 }
 
 export async function getItemRow(db: any, idOrSlug: string): Promise<ItemEntry | undefined> {

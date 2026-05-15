@@ -83,16 +83,6 @@ export async function listPokemonRows(
   const where = conditions.length ? and(...conditions) : undefined;
   const usePagination = filters?.limit !== undefined;
 
-  let total = 0;
-  if (usePagination) {
-    const countRows = await db
-      .select({ cnt: sql<number>`COUNT(*)` })
-      .from(pokemon)
-      .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
-      .where(where);
-    total = Number(countRows[0]?.cnt ?? 0);
-  }
-
   const orderByClauses: SQL[] = filters?.sort === "speed"
     ? [
         sql`${pokemonFormStats.spe} IS NULL`,
@@ -124,16 +114,21 @@ export async function listPokemonRows(
     .orderBy(...orderByClauses);
 
   if (usePagination) {
-    query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));
+    query = query.limit(Number(filters!.limit) + 1).offset(Number(filters?.offset ?? 0));
   }
 
   const rows: any[] = await query;
 
   if (rows.length === 0) {
-    return usePagination ? { items: [], total } : [];
+    return usePagination ? { items: [], hasMore: false } : [];
   }
 
-  const formIds = rows.map((r: any) => Number(r.formId));
+  // limit+1: 截断多余行并计算 hasMore
+  const requestedLimit = Number(filters?.limit ?? 0);
+  const hasMore = usePagination && rows.length > requestedLimit;
+  const effectiveRows = usePagination ? rows.slice(0, requestedLimit) : rows;
+
+  const formIds = effectiveRows.map((r: any) => Number(r.formId));
 
   // 批量查询：属性、特性、图片
   const [typeRows, abilityRows, imageRows] = await Promise.all([
@@ -193,7 +188,7 @@ export async function listPokemonRows(
     };
   }
 
-  const resultItems = rows.map((row: any) => {
+  const resultItems = effectiveRows.map((row: any) => {
     const fid = Number(row.formId);
     const pid = Number(row.id);
     const types = typeMap.get(fid) || [];
@@ -217,5 +212,5 @@ export async function listPokemonRows(
     } as PokemonSummary;
   });
 
-  return usePagination ? { items: resultItems, total } : resultItems;
+  return usePagination ? { items: resultItems, hasMore } : resultItems;
 }

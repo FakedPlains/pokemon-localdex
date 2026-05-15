@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
-import { fetchPokemonDetail, fetchLearnsetMeta, fetchPokemonLearnset } from '../../utils/api'
-import { STAT_KEYS, STAT_LABELS_SHORT, LEARN_METHOD_LABELS } from '@pokemon-localdex/store-types/constants'
+import { fetchPokemonSummary, fetchPokemonEvolution, fetchLearnsetMeta, fetchPokemonLearnset } from '../../utils/api'
+import { STAT_KEYS, LEARN_METHOD_LABELS } from '@pokemon-localdex/store-types/constants'
 import TypeChip from '../../components/type-chip'
 import CategoryBadge from '../../components/category-badge'
 import StatBar from '../../components/stat-bar'
@@ -10,6 +10,8 @@ import Loading from '../../components/loading'
 import SafeImage from '../../components/safe-image'
 import { TYPE_BG_COLORS, TYPE_GRADIENT_COLORS } from '../../utils/constants'
 import './index.less'
+
+const MOVES_PAGE_SIZE = 50
 
 function getHeroGradient(primary, secondary) {
   const c1 = TYPE_GRADIENT_COLORS[primary] || ['#A8A878', '#C8C8A0']
@@ -26,37 +28,77 @@ export default function PokemonDetailPage() {
   const [activeForm, setActiveForm] = useState(null)
   const [imageMode, setImageMode] = useState('official')
 
+  // 进化链：懒加载
+  const [evolutionChain, setEvolutionChain] = useState(null)
+  const [evolutionLoading, setEvolutionLoading] = useState(false)
+
   // Learnset state
   const [learnsetMeta, setLearnsetMeta] = useState(null)
   const [learnsetData, setLearnsetData] = useState([])
   const [learnsetLoading, setLearnsetLoading] = useState(false)
+  const [learnsetLoadingMore, setLearnsetLoadingMore] = useState(false)
+  const [learnsetHasMore, setLearnsetHasMore] = useState(false)
   const [activeGen, setActiveGen] = useState(null)
   const [methodFilter, setMethodFilter] = useState('')
+  // 服务端返回的全量方法计数（精确到当前 form+gen+version，不受 method 筛选影响）
+  const [methodCounts, setMethodCounts] = useState({})
+  // 服务端首次请求返回的实际 formKey（可能经过 fallback），state 仅用于 UI fallback 提示
+  const [learnsetFormKey, setLearnsetFormKey] = useState(null)
+  // 用 ref 存服务端实际 formKey，避免驱动 fetchMovesPage 重建导致 effect 重复执行
+  const resolvedFormKeyRef = useRef(null)
+  // 竞态保护：递增 requestId，回调中检查是否过时
+  const movesRequestIdRef = useRef(0)
 
+  const learnsetOffsetRef = useRef(0)
+
+  // ─── 加载摘要（轻量接口，不含进化链和世代数据） ───
   useEffect(() => {
     if (!pokemonId) { setLoading(false); return }
     setLoading(true)
-    fetchPokemonDetail(pokemonId).then(r => {
+    setDetail(null)
+    setEvolutionChain(null)
+    setLearnsetMeta(null)
+    setLearnsetData([])
+    setActiveForm(null)
+    setActiveGen(null)
+    setMethodFilter('')
+    setMethodCounts({})
+    setLearnsetFormKey(null)
+    resolvedFormKeyRef.current = null
+    fetchPokemonSummary(pokemonId).then(r => {
       setDetail(r.data)
       if (r.data) {
-        Taro.setNavigationBarTitle({ title: r.data.nameZh || '\u5b9d\u53ef\u68a6\u8be6\u60c5' })
+        Taro.setNavigationBarTitle({ title: r.data.nameZh || '宝可梦详情' })
       }
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [pokemonId])
 
+  // ─── 加载招式表元数据 ───
   useEffect(() => {
     if (!detail?.id) return
     fetchLearnsetMeta(detail.id).then(r => {
       setLearnsetMeta(r.data)
       const gens = r.data?.generations || []
       if (gens.length > 0) {
-        // 优先选最新正统世代（排除 99/Champions），没有正统世代时 fallback 到最大值
         const normalGens = gens.filter(g => g !== 99)
         setActiveGen(normalGens.length > 0 ? normalGens[normalGens.length - 1] : gens[gens.length - 1])
       }
     })
   }, [detail?.id])
+
+  // ─── 懒加载进化链 ───
+  const loadEvolution = useCallback(() => {
+    if (!detail?.id || evolutionChain || evolutionLoading) return
+    setEvolutionLoading(true)
+    fetchPokemonEvolution(detail.id).then(r => {
+      setEvolutionChain(r.data || [])
+      setEvolutionLoading(false)
+    }).catch(() => {
+      setEvolutionChain([])
+      setEvolutionLoading(false)
+    })
+  }, [detail?.id, evolutionChain, evolutionLoading])
 
   const currentForm = useMemo(() => {
     if (!detail?.forms?.length) return null
@@ -79,50 +121,85 @@ export default function PokemonDetailPage() {
     return images.official?.url || detail?.image?.url
   }, [currentForm, imageMode, detail])
 
-  // Load learnset when gen available
+  // ─── 加载招式表（分页 + 服务端方法筛选） ───
+  // 返回 false 表示被竞态丢弃，调用方据此决定是否更新 loading 状态
+  const fetchMovesPage = useCallback(async (offset, isInitial, method) => {
+    if (!detail?.id || !activeGen) return false
+    const rid = ++movesRequestIdRef.current
+    // 追加请求使用服务端首次返回的实际 formKey（可能是 fallback 后的），
+    // 读 ref 而非 state，避免 learnsetFormKey 变化驱动 fetchMovesPage/effect 重建。
+    const formKey = (!isInitial && resolvedFormKeyRef.current) ? resolvedFormKeyRef.current : (currentForm?.formKey || 'default')
+    try {
+      const r = await fetchPokemonLearnset(detail.id, activeGen, formKey, undefined, {
+        limit: MOVES_PAGE_SIZE,
+        offset,
+        method: method || undefined,
+      })
+      // 竞态保护：如果已经有更新的请求发出，丢弃本次结果
+      if (rid !== movesRequestIdRef.current) return false
+      const moves = r.data || []
+      const hasMore = r.hasMore ?? false
+
+      if (isInitial) {
+        setLearnsetData(moves)
+        resolvedFormKeyRef.current = r.formKey || formKey
+        setLearnsetFormKey(r.formKey || formKey)
+        // methodCounts 来自服务端，是当前 form+gen+version 的全量计数
+        if (r.methodCounts) setMethodCounts(r.methodCounts)
+      } else {
+        setLearnsetData(prev => [...prev, ...moves])
+      }
+      setLearnsetHasMore(hasMore)
+      learnsetOffsetRef.current = offset + moves.length
+      return true
+    } catch {
+      if (rid !== movesRequestIdRef.current) return false
+      if (isInitial) { setLearnsetData([]); setMethodCounts({}) }
+      setLearnsetHasMore(false)
+      return true
+    }
+  }, [detail?.id, activeGen, currentForm?.formKey])
+
+  // 世代/形态变化时重新加载第一页（保留当前 methodFilter）
   useEffect(() => {
     if (!detail?.id || !activeGen) return
     setLearnsetLoading(true)
-    const formKey = currentForm?.formKey || 'default'
-    fetchPokemonLearnset(detail.id, activeGen, formKey).then(r => {
-      setLearnsetData(r.data || [])
-      setLearnsetLoading(false)
-    }).catch(() => {
-      setLearnsetData([])
-      setLearnsetLoading(false)
+    learnsetOffsetRef.current = 0
+    fetchMovesPage(0, true, methodFilter).then((accepted) => {
+      // 竞态保护：被丢弃的请求不应关闭 loading
+      if (accepted !== false) setLearnsetLoading(false)
     })
-  }, [detail?.id, activeGen, currentForm?.formKey])
+  }, [fetchMovesPage])
 
-  const methodCounts = useMemo(() => {
-    const counts = {}
-    for (const entry of learnsetData) {
-      const m = entry.learnMethod || 'other'
-      counts[m] = (counts[m] || 0) + 1
-    }
-    return counts
-  }, [learnsetData])
-
-  const sortedEntries = useMemo(() => {
-    const methodOrder = { 'level-up': 1, evolution: 2, 'pre-evolution': 3, 'form-change': 4, tm: 5, hm: 6, tutor: 7, egg: 8, event: 9, other: 10 }
-    let filtered = learnsetData
-    if (methodFilter) {
-      filtered = learnsetData.filter(e => e.learnMethod === methodFilter)
-    }
-    return [...filtered].sort((a, b) => {
-      const am = methodOrder[a.learnMethod] || 99
-      const bm = methodOrder[b.learnMethod] || 99
-      if (am !== bm) return am - bm
-      const al = a.level ?? 999
-      const bl = b.level ?? 999
-      return al - bl
+  // 加载更多招式
+  const handleLoadMoreMoves = useCallback(() => {
+    if (learnsetLoadingMore || !learnsetHasMore) return
+    setLearnsetLoadingMore(true)
+    fetchMovesPage(learnsetOffsetRef.current, false, methodFilter).then((accepted) => {
+      if (accepted !== false) setLearnsetLoadingMore(false)
     })
-  }, [learnsetData, methodFilter])
+  }, [fetchMovesPage, learnsetLoadingMore, learnsetHasMore, methodFilter])
+
+  // 方法筛选变化时重置分页并重新请求（服务端筛选）
+  const handleMethodChange = useCallback((method) => {
+    const newMethod = method === methodFilter ? '' : method
+    setMethodFilter(newMethod)
+    setLearnsetData([])
+    setLearnsetHasMore(false)
+    setLearnsetLoading(true)
+    learnsetOffsetRef.current = 0
+    fetchMovesPage(0, true, newMethod).then((accepted) => {
+      if (accepted !== false) setLearnsetLoading(false)
+    })
+  }, [fetchMovesPage, methodFilter])
+
+  const totalMethodCount = Object.values(methodCounts).reduce((s, c) => s + c, 0)
 
   if (loading) return <Loading />
   if (!detail) {
     return (
       <View className='pd-empty'>
-        <Text>\u672a\u627e\u5230\u8be5\u5b9d\u53ef\u68a6</Text>
+        <Text>未找到该宝可梦</Text>
       </View>
     )
   }
@@ -149,11 +226,11 @@ export default function PokemonDetailPage() {
           <Text
             className={`pd-toggle-btn ${imageMode === 'official' ? 'pd-toggle-active' : ''}`}
             onClick={() => setImageMode('official')}
-          >{'\u666e\u901a'}</Text>
+          >{'普通'}</Text>
           <Text
             className={`pd-toggle-btn ${imageMode === 'shiny' ? 'pd-toggle-active' : ''}`}
             onClick={() => setImageMode('shiny')}
-          >{'\u95ea\u5149'}</Text>
+          >{'闪光'}</Text>
         </View>
 
         <Text className='pd-hero-name'>{detail.nameZh}</Text>
@@ -192,13 +269,13 @@ export default function PokemonDetailPage() {
 
       {/* Abilities card */}
       <View className='pd-section'>
-        <Text className='pd-section-title'>{'\u7279\u6027'}</Text>
+        <Text className='pd-section-title'>{'特性'}</Text>
         <View className='pd-ability-grid'>
           {abilities.map((ab, i) => (
             <View key={i} className='pd-ability-card glass-card'>
               <View className='pd-ability-header'>
                 <Text className='pd-ability-name'>{ab.nameZh}</Text>
-                {ab.isHidden && <Text className='pd-ability-badge'>{'\u9690\u85cf'}</Text>}
+                {ab.isHidden && <Text className='pd-ability-badge'>{'隐藏'}</Text>}
               </View>
               {ab.effect && <Text className='pd-ability-desc'>{ab.effect}</Text>}
             </View>
@@ -209,22 +286,32 @@ export default function PokemonDetailPage() {
       {/* Stats card */}
       <View className='pd-section'>
         <View className='pd-section-header'>
-          <Text className='pd-section-title'>{'\u79cd\u65cf\u503c'}</Text>
-          <Text className='pd-section-total'>{'\u5408\u8ba1'} {totalStats}</Text>
+          <Text className='pd-section-title'>{'种族值'}</Text>
+          <Text className='pd-section-total'>{'合计'} {totalStats}</Text>
         </View>
         <View className='glass-card pd-stats-card'>
           <StatBar stats={stats} />
         </View>
       </View>
 
-      {/* Evolution card */}
-      {detail.evolutionChain?.length > 0 && (
-        <View className='pd-section'>
-          <Text className='pd-section-title'>{'\u8fdb\u5316\u94fe'}</Text>
+      {/* Evolution card — 懒加载 */}
+      <View className='pd-section'>
+        <Text className='pd-section-title'>{'进化链'}</Text>
+        {evolutionChain === null ? (
+          <View className='glass-card pd-evo-card'>
+            {evolutionLoading ? (
+              <Loading text='加载进化链…' />
+            ) : (
+              <View className='pd-evo-load-trigger' onClick={loadEvolution}>
+                <Text className='pd-evo-load-text'>点击加载进化链</Text>
+              </View>
+            )}
+          </View>
+        ) : evolutionChain.length > 0 ? (
           <View className='glass-card pd-evo-card'>
             <ScrollView scrollX className='pd-evo-scroll'>
               <View className='pd-evo-chain'>
-                {detail.evolutionChain.map((evo, i) => (
+                {evolutionChain.map((evo, i) => (
                   <View key={i} className='pd-evo-step'>
                     {evo.method && (
                       <View className='pd-evo-arrow-wrap'>
@@ -234,7 +321,7 @@ export default function PokemonDetailPage() {
                           {evo.item ? ` ${evo.item}` : ''}
                           {evo.condition ? ` ${evo.condition}` : ''}
                         </Text>
-                        <Text className='pd-evo-arrow'>{'\u2192'}</Text>
+                        <Text className='pd-evo-arrow'>{'→'}</Text>
                       </View>
                     )}
                     <View
@@ -253,12 +340,16 @@ export default function PokemonDetailPage() {
               </View>
             </ScrollView>
           </View>
-        </View>
-      )}
+        ) : (
+          <View className='glass-card pd-evo-card'>
+            <Text className='muted'>{'该宝可梦没有进化链数据'}</Text>
+          </View>
+        )}
+      </View>
 
       {/* Moves card */}
       <View className='pd-section'>
-        <Text className='pd-section-title'>{'\u62db\u5f0f\u8868'}</Text>
+        <Text className='pd-section-title'>{'招式表'}</Text>
         <View className='glass-card pd-moves-card'>
           {/* Generation pills */}
           <ScrollView scrollX className='pd-gen-scroll'>
@@ -267,9 +358,9 @@ export default function PokemonDetailPage() {
                 <View
                   key={gen}
                   className={`chip ${gen === activeGen ? 'chip-active' : 'chip-inactive'}`}
-                  onClick={() => { setActiveGen(gen); setMethodFilter('') }}
+                  onClick={() => { setActiveGen(gen); setMethodFilter(''); setMethodCounts({}); setLearnsetFormKey(null); resolvedFormKeyRef.current = null }}
                 >
-                  <Text>{gen === 99 ? 'Champions' : `\u7b2c${gen}\u4e16\u4ee3`}</Text>
+                  <Text>{gen === 99 ? 'Champions' : `第${gen}世代`}</Text>
                 </View>
               ))}
             </View>
@@ -281,15 +372,20 @@ export default function PokemonDetailPage() {
               <View className='pd-method-pills'>
                 <View
                   className={`chip ${!methodFilter ? 'chip-active' : 'chip-inactive'}`}
-                  onClick={() => setMethodFilter('')}
+                  onClick={() => handleMethodChange('')}
                 >
-                  <Text>{'\u5168\u90e8'} ({learnsetData.length})</Text>
+                  <Text>{'全部'} ({totalMethodCount})</Text>
                 </View>
-                {Object.entries(methodCounts).map(([method, count]) => (
+                {Object.entries(methodCounts)
+                  .sort(([a], [b]) => {
+                    const order = { 'level-up': 1, evolution: 2, 'pre-evolution': 3, 'form-change': 4, tm: 5, hm: 6, tutor: 7, egg: 8, event: 9 }
+                    return (order[a] || 99) - (order[b] || 99)
+                  })
+                  .map(([method, count]) => (
                   <View
                     key={method}
                     className={`chip ${methodFilter === method ? 'chip-active' : 'chip-inactive'}`}
-                    onClick={() => setMethodFilter(method)}
+                    onClick={() => handleMethodChange(method)}
                   >
                     <Text>{LEARN_METHOD_LABELS[method] || method} ({count})</Text>
                   </View>
@@ -299,14 +395,14 @@ export default function PokemonDetailPage() {
           )}
 
           {learnsetLoading ? (
-            <Loading text='\u52a0\u8f7d\u62db\u5f0f\u2026' />
-          ) : sortedEntries.length === 0 ? (
+            <Loading text='加载招式…' />
+          ) : learnsetData.length === 0 ? (
             <View className='pd-moves-empty'>
-              <Text className='muted'>{'\u5f53\u524d\u4e16\u4ee3\u8fd8\u6ca1\u6709\u5bfc\u5165\u53ef\u5b66\u62db\u5f0f\u8868'}</Text>
+              <Text className='muted'>{'当前世代还没有导入可学招式表'}</Text>
             </View>
           ) : (
             <View className='pd-moves-list'>
-              {sortedEntries.map((entry, i) => {
+              {learnsetData.map((entry, i) => {
                 const learnText = entry.learnMethod === 'level-up' && entry.level !== undefined
                   ? `Lv.${entry.level}`
                   : (LEARN_METHOD_LABELS[entry.learnMethod] || entry.learnMethod)
@@ -324,20 +420,34 @@ export default function PokemonDetailPage() {
                     <View className='pd-move-color-bar' style={{ background: typeColor }} />
                     <View className='pd-move-main'>
                       <View className='pd-move-top'>
-                        <Text className='pd-move-name'>{entry.moveNameZh || '\u672a\u77e5'}</Text>
+                        <Text className='pd-move-name'>{entry.moveNameZh || '未知'}</Text>
                         <TypeChip type={entry.moveType} size='sm' />
                         {entry.moveCategory && <CategoryBadge category={entry.moveCategory} size='sm' />}
                         <Text className='pd-move-method-tag'>{learnText}</Text>
                       </View>
                       <View className='pd-move-bottom'>
-                        <Text className='pd-move-stat'>{'\u5a01\u529b'} {entry.movePower ?? '\u2014'}</Text>
-                        <Text className='pd-move-stat'>{'\u547d\u4e2d'} {entry.moveAccuracy ?? '\u2014'}</Text>
-                        <Text className='pd-move-stat'>PP {entry.movePP ?? '\u2014'}</Text>
+                        <Text className='pd-move-stat'>{'威力'} {entry.movePower ?? '—'}</Text>
+                        <Text className='pd-move-stat'>{'命中'} {entry.moveAccuracy ?? '—'}</Text>
+                        <Text className='pd-move-stat'>PP {entry.movePP ?? '—'}</Text>
                       </View>
                     </View>
                   </View>
                 )
               })}
+
+              {/* 加载更多按钮 */}
+              {learnsetHasMore && (
+                <View
+                  className='pd-moves-load-more'
+                  onClick={handleLoadMoreMoves}
+                >
+                  {learnsetLoadingMore ? (
+                    <Loading text='加载更多…' />
+                  ) : (
+                    <Text className='pd-moves-load-more-text'>加载更多招式</Text>
+                  )}
+                </View>
+              )}
             </View>
           )}
         </View>

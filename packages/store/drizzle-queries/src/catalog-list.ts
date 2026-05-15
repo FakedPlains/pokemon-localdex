@@ -101,15 +101,6 @@ export async function listMoveRows(
   const where = conditions.length ? and(...conditions) : undefined;
   const usePagination = filters?.limit !== undefined;
 
-  let total = 0;
-  if (usePagination) {
-    const countRows = await db
-      .select({ cnt: sql<number>`COUNT(*)` })
-      .from(moves)
-      .where(where);
-    total = Number(countRows[0]?.cnt ?? 0);
-  }
-
   let query = db
     .select()
     .from(moves)
@@ -120,12 +111,18 @@ export async function listMoveRows(
     );
 
   if (usePagination) {
-    query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));
+    // limit+1 策略：多查一行判断是否还有下一页
+    query = query.limit(Number(filters!.limit) + 1).offset(Number(filters?.offset ?? 0));
   }
 
   const rows: any[] = await query;
-  const entries = rows.map((r: any) => hydrateMoveSummary(r));
-  return usePagination ? { items: entries, total } : entries;
+  if (!usePagination) {
+    return rows.map((r: any) => hydrateMoveSummary(r));
+  }
+  const limit = Number(filters!.limit);
+  const hasMore = rows.length > limit;
+  const entries = rows.slice(0, limit).map((r: any) => hydrateMoveSummary(r));
+  return { items: entries, hasMore };
 }
 
 export async function listAbilityRows(
@@ -153,15 +150,6 @@ export async function listAbilityRows(
   const where = conditions.length ? and(...conditions) : undefined;
   const usePagination = filters?.limit !== undefined;
 
-  let total = 0;
-  if (usePagination) {
-    const countRows = await db
-      .select({ cnt: sql<number>`COUNT(*)` })
-      .from(abilities)
-      .where(where);
-    total = Number(countRows[0]?.cnt ?? 0);
-  }
-
   let query = db
     .select()
     .from(abilities)
@@ -169,12 +157,17 @@ export async function listAbilityRows(
     .orderBy(asc(abilities.number), asc(abilities.nameZh));
 
   if (usePagination) {
-    query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));
+    query = query.limit(Number(filters!.limit) + 1).offset(Number(filters?.offset ?? 0));
   }
 
   const rows: any[] = await query;
-  const entries = rows.map((r: any) => hydrateAbilitySummary(r));
-  return usePagination ? { items: entries, total } : entries;
+  if (!usePagination) {
+    return rows.map((r: any) => hydrateAbilitySummary(r));
+  }
+  const limit = Number(filters!.limit);
+  const hasMore = rows.length > limit;
+  const entries = rows.slice(0, limit).map((r: any) => hydrateAbilitySummary(r));
+  return { items: entries, hasMore };
 }
 
 export async function listItemRows(
@@ -202,15 +195,6 @@ export async function listItemRows(
   const where = conditions.length ? and(...conditions) : undefined;
   const usePagination = filters?.limit !== undefined;
 
-  let total = 0;
-  if (usePagination) {
-    const countRows = await db
-      .select({ cnt: sql<number>`COUNT(*)` })
-      .from(items)
-      .where(where);
-    total = Number(countRows[0]?.cnt ?? 0);
-  }
-
   let query = db
     .select()
     .from(items)
@@ -218,10 +202,15 @@ export async function listItemRows(
     .orderBy(asc(items.id));
 
   if (usePagination) {
-    query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));
+    query = query.limit(Number(filters!.limit) + 1).offset(Number(filters?.offset ?? 0));
   }
 
   const rows: any[] = await query;
-  const entries = rows.map((r: any) => hydrateItemSummary(r));
-  return usePagination ? { items: entries, total } : entries;
+  if (!usePagination) {
+    return rows.map((r: any) => hydrateItemSummary(r));
+  }
+  const limit = Number(filters!.limit);
+  const hasMore = rows.length > limit;
+  const entries = rows.slice(0, limit).map((r: any) => hydrateItemSummary(r));
+  return { items: entries, hasMore };
 }

@@ -15,7 +15,7 @@ const POKEMON_PAGE_SIZE = 20;
  */
 export default function PokemonGrid({ apiPath, emptyText = "暂无数据", labelFn }) {
   const [pokemon, setPokemon] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -24,7 +24,7 @@ export default function PokemonGrid({ apiPath, emptyText = "暂无数据", label
     unifiedApi(`${apiPath}?limit=${POKEMON_PAGE_SIZE}&offset=${newOffset}`)
       .then((r) => {
         setPokemon(r.data || []);
-        setTotal(r.total ?? 0);
+        setHasMore(r.hasMore ?? false);
         setOffset(newOffset);
       })
       .finally(() => setLoading(false));
@@ -41,12 +41,12 @@ export default function PokemonGrid({ apiPath, emptyText = "暂无数据", label
     );
   }
 
-  if (!loading && total === 0) {
+  if (!loading && pokemon.length === 0) {
     return <div className="shared-pokemon-empty">{emptyText}</div>;
   }
 
-  const totalPages = Math.ceil(total / POKEMON_PAGE_SIZE);
   const page = Math.floor(offset / POKEMON_PAGE_SIZE);
+  const showPager = page > 0 || hasMore;
 
   return (
     <>
@@ -92,7 +92,7 @@ export default function PokemonGrid({ apiPath, emptyText = "暂无数据", label
           </a>
         ))}
       </div>
-      {totalPages > 1 && (
+      {showPager && (
         <div className="shared-pokemon-pager">
           <button
             className="shared-pokemon-pager-btn"
@@ -102,11 +102,11 @@ export default function PokemonGrid({ apiPath, emptyText = "暂无数据", label
             ‹ 上一页
           </button>
           <span className="shared-pokemon-pager-info">
-            {offset + 1}–{Math.min(offset + POKEMON_PAGE_SIZE, total)} / {total}
+            {offset + 1}–{offset + pokemon.length}
           </span>
           <button
             className="shared-pokemon-pager-btn"
-            disabled={page >= totalPages - 1 || loading}
+            disabled={!hasMore || loading}
             onClick={() => fetchPage((page + 1) * POKEMON_PAGE_SIZE)}
           >
             下一页 ›

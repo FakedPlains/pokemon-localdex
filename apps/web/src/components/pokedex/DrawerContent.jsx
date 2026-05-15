@@ -8,6 +8,7 @@ import DrawerImage from "./DrawerImage.jsx";
 import MetaPill from "./MetaPill.jsx";
 import MovesTab from "./MovesTab.jsx";
 import StatsTab from "./StatsTab.jsx";
+import EvolutionTab from "./EvolutionTab.jsx";
 
 /* ─── Drawer Content with Tabs ─── */
 export default function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
@@ -16,6 +17,10 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
   const [detailForm, setDetailForm] = useState("default");
   const [learnsetMeta, setLearnsetMeta] = useState(null);
   const [learnsetFormOverride, setLearnsetFormOverride] = useState(null);
+
+  // 进化链按需懒加载
+  const [evolutionChain, setEvolutionChain] = useState(null);
+  const [evolutionLoading, setEvolutionLoading] = useState(false);
 
   const pokemonId = detail.id;
 
@@ -26,16 +31,35 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
     setDetailForm("default");
     setLearnsetFormOverride(null);
     setLearnsetMeta(null);
+    setEvolutionChain(null);
+    setEvolutionLoading(false);
   }, [detail]);
 
-  // 加载 learnset meta（可用世代和形态列表）
+  // 加载 learnset meta（可用世代和形态列表）— 仅在切换到招式表 tab 时才加载
   useEffect(() => {
+    if (tab !== "moves" || learnsetMeta) return;
     let cancelled = false;
     unifiedApi(`/pokemon/${pokemonId}/learnset/meta`).then((r) => {
       if (!cancelled) setLearnsetMeta(r.data);
     });
     return () => { cancelled = true; };
-  }, [pokemonId]);
+  }, [pokemonId, tab, learnsetMeta]);
+
+  // 懒加载进化链 — 仅在切换到进化链 tab 时才加载
+  useEffect(() => {
+    if (tab !== "evolution" || evolutionChain) return;
+    let cancelled = false;
+    setEvolutionLoading(true);
+    unifiedApi(`/pokemon/${pokemonId}/evolution`).then((r) => {
+      if (!cancelled) {
+        setEvolutionChain(r.data || []);
+        setEvolutionLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) { setEvolutionChain([]); setEvolutionLoading(false); }
+    });
+    return () => { cancelled = true; };
+  }, [pokemonId, tab, evolutionChain]);
 
   const learnsetFormKeys = learnsetMeta?.formKeys || [];
 
@@ -93,7 +117,8 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
 
   const tabs = [
     { key: "stats", label: "种族值" },
-    { key: "moves", label: "招式表" }
+    { key: "moves", label: "招式表" },
+    { key: "evolution", label: "进化链" },
   ];
 
   return (
@@ -196,6 +221,13 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
               onDetailGenerationChange={onDetailGenerationChange}
               learnsetMeta={learnsetMeta}
               externalFormKey={activeLearnsetFormKey}
+            />
+          )}
+          {tab === "evolution" && (
+            <EvolutionTab
+              detail={detail}
+              evolutionChain={evolutionChain}
+              loading={evolutionLoading}
             />
           )}
         </motion.div>

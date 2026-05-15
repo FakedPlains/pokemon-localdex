@@ -13,6 +13,7 @@ import type {
   PokemonTableSummary,
   PokemonEntry,
   PokemonIdentity,
+  EvolutionStep,
   ChampionsSeasonSummary,
   MoveEntry,
   AbilityEntry,
@@ -22,6 +23,7 @@ import type {
   PokemonByMoveSummary,
   PokemonByAbilitySummary,
   PaginatedResult,
+  PaginationParams,
   IStore,
 } from "@pokemon-localdex/store-types";
 
@@ -60,6 +62,10 @@ import {
 import {
   getPokemonIdentityRow,
   getPokemonRow,
+  getPokemonSummaryRow,
+  getPokemonEvolutionRow,
+  getPokemonGenerationsRow,
+  type PokemonSummaryResult,
 } from "./pokemon-detail.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -118,6 +124,21 @@ export class DrizzleStore implements IStore {
     return getPokemonRow(this.db, idOrSlug, filters);
   }
 
+  async getPokemonSummary(
+    idOrSlug: string,
+    filters?: { championsSeasonId?: number },
+  ): Promise<PokemonSummaryResult | undefined> {
+    return getPokemonSummaryRow(this.db, idOrSlug, filters);
+  }
+
+  async getPokemonEvolution(pokemonId: number): Promise<EvolutionStep[]> {
+    return getPokemonEvolutionRow(this.db, pokemonId);
+  }
+
+  async getPokemonGenerations(pokemonId: number): Promise<number[]> {
+    return getPokemonGenerationsRow(this.db, pokemonId);
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // Pokemon: getLearnsetMeta
   // ────────────────────────────────────────────────────────────────────────────
@@ -130,14 +151,16 @@ export class DrizzleStore implements IStore {
   // Pokemon: getPokemonLearnset
   // ────────────────────────────────────────────────────────────────────────────
 
-  async getPokemonLearnset(
-    pokemonId: number,
-    generation: number,
-    formKey = "default",
-    gameVersionCode?: string,
-  ): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string }> {
-    return getPokemonLearnsetRows(this.db, pokemonId, generation, formKey, gameVersionCode);
-  }
+async getPokemonLearnset(
+pokemonId: number,
+generation: number,
+formKey = "default",
+gameVersionCode?: string,
+pagination?: PaginationParams,
+learnMethod?: string,
+): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string; hasMore?: boolean; methodCounts?: Record<string, number> }> {
+return getPokemonLearnsetRows(this.db, pokemonId, generation, formKey, gameVersionCode, pagination, learnMethod);
+}
 
   // ────────────────────────────────────────────────────────────────────────────
   // Moves: listMoves

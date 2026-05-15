@@ -317,7 +317,7 @@ export type PokemonByAbilitySummary = {
 export type SortOrder = "asc" | "desc";
 export type PokemonListSortKey = "speed";
 export type PaginationParams = { offset?: number; limit?: number };
-export type PaginatedResult<T> = { items: T[]; total: number };
+export type PaginatedResult<T> = { items: T[]; total?: number; hasMore: boolean };
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Store 统一接口（sqlite-store 和 d1-store 共同实现）
@@ -355,9 +355,12 @@ export interface IStore {
     order?: SortOrder;
   } & PaginationParams): Promise<PokemonTableSummary[] | PaginatedResult<PokemonTableSummary>>;
   getPokemon(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<PokemonEntry | undefined>;
+  getPokemonSummary(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<Omit<PokemonEntry, "evolutionChain" | "generations"> | undefined>;
+  getPokemonEvolution(pokemonId: number): Promise<EvolutionStep[]>;
+  getPokemonGenerations(pokemonId: number): Promise<number[]>;
   getPokemonIdentity(idOrSlug: string): Promise<PokemonIdentity | undefined>;
   getLearnsetMeta(pokemonId: number): Promise<LearnsetMeta>;
-  getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string }>;
+  getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string, pagination?: PaginationParams, learnMethod?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string; hasMore?: boolean; methodCounts?: Record<string, number> }>;
 
   // Champions
   listChampionsSeasons(): Promise<ChampionsSeasonSummary[]>;

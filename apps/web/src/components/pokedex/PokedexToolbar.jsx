@@ -35,7 +35,7 @@ export default function PokedexToolbar({
         <div className="dex-season-note">
           <strong>{selectedSeason.regulationName || selectedSeason.regulationCode}</strong>
           {selectedSeason.periodText && <span>{selectedSeason.periodText}</span>}
-          <span>{isRefreshingList ? "正在更新可用名单…" : `${displayTotal} 只可用宝可梦`}</span>
+          <span>{isRefreshingList ? "正在更新可用名单…" : `${displayListLength} 只可用宝可梦`}</span>
         </div>
       )}
 

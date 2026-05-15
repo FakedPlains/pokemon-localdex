@@ -30,7 +30,17 @@ export interface Env {
 let cachedStore: D1Store | null = null;
 let cachedDb: D1Database | null = null;
 
-const API_GET_CACHE_CONTROL = "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400";
+// ── 分层缓存策略 ──
+// 静态资料库数据更新频率极低，可以长缓存；搜索请求高基数，短缓存。
+const CACHE_TIERS = {
+  // 列表/详情：浏览器 2min，边缘 24h，stale 3天
+  long: "public, max-age=120, s-maxage=86400, stale-while-revalidate=259200",
+  // learnset/champions 等中频数据：浏览器 1min，边缘 6h，stale 1天
+  medium: "public, max-age=60, s-maxage=21600, stale-while-revalidate=86400",
+  // 含搜索参数的请求：浏览器 30s，边缘 10min，减少高基数缓存占用
+  search: "public, max-age=30, s-maxage=600, stale-while-revalidate=3600",
+} as const;
+
 const CACHEABLE_API_PREFIXES = [
   "/api/pokemon",
   "/api/moves",
@@ -43,6 +53,16 @@ const CACHEABLE_API_PREFIXES = [
   "/items",
   "/champions",
 ];
+
+function getCacheTier(url: URL): string {
+  const path = url.pathname;
+  // 含搜索参数用短 TTL
+  if (url.searchParams.has("q")) return CACHE_TIERS.search;
+  // learnset / champions 用中等 TTL
+  if (path.includes("/learnset") || path.includes("/champions")) return CACHE_TIERS.medium;
+  // 其余资料库列表/详情用长 TTL
+  return CACHE_TIERS.long;
+}
 
 function getOrCreateStore(db: D1Database): D1Store {
   if (cachedStore && cachedDb === db) return cachedStore;
@@ -60,15 +80,19 @@ function isCacheableApiGet(request: Request, url: URL): boolean {
 
 async function withApiCache(
   request: Request,
+  url: URL,
   ctx: ExecutionContext,
   handler: () => Promise<Response>,
 ): Promise<Response> {
+  const cacheControl = getCacheTier(url);
   const runtimeCaches = (globalThis as any).caches;
+
   if (!runtimeCaches?.default) {
     const response = await handler();
     if (!response.ok) return response;
     const headers = new Headers(response.headers);
-    headers.set("Cache-Control", API_GET_CACHE_CONTROL);
+    headers.set("Cache-Control", cacheControl);
+    headers.set("X-LocalDex-Cache", "BYPASS");
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
@@ -88,14 +112,26 @@ async function withApiCache(
   const cacheKey = new Request(cacheUrl, { method: "GET" });
 
   const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    const hitHeaders = new Headers(cached.headers);
+    hitHeaders.set("X-LocalDex-Cache", "HIT");
+    return new Response(cached.body, {
+      status: cached.status,
+      statusText: cached.statusText,
+      headers: hitHeaders,
+    });
+  }
 
+  const t0 = Date.now();
   const response = await handler();
   if (!response.ok) return response;
+  const duration = Date.now() - t0;
 
   const headers = new Headers(response.headers);
-  headers.set("Cache-Control", API_GET_CACHE_CONTROL);
+  headers.set("Cache-Control", cacheControl);
   headers.set("Vary", "Origin, Accept-Encoding");
+  headers.set("X-LocalDex-Cache", "MISS");
+  headers.set("Server-Timing", `d1;dur=${duration}`);
   const cacheableResponse = new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -157,7 +193,7 @@ export default {
 
     const handleApi = () => app.fetch(request, env, ctx);
     if (isCacheableApiGet(request, url)) {
-      return withApiCache(request, ctx, handleApi);
+      return withApiCache(request, url, ctx, handleApi);
     }
 
     return handleApi();

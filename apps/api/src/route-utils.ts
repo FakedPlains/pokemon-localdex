@@ -14,8 +14,10 @@ export function numberQuery(c: AnyContext, key: string): number | undefined {
 }
 
 export function paginatedJson(c: AnyContext, result: unknown, offset: number, limit: number) {
-  const { items, total } = result as { items: unknown[]; total: number };
-  return c.json({ data: items, total, offset, limit, hasMore: offset + items.length < total });
+  const { items, hasMore, total } = result as { items: unknown[]; hasMore: boolean; total?: number };
+  const body: Record<string, unknown> = { data: items, offset, limit, hasMore };
+  if (total !== undefined) body.total = total;
+  return c.json(body);
 }
 
 function pokemonSortQuery(c: AnyContext): { sort?: "speed"; order?: "asc" | "desc" } {

@@ -90,15 +90,6 @@ function pokemonListOrderBy(filters?: PokemonListFilters): SQL[] {
     : [asc(pokemon.dexNumber)];
 }
 
-async function countDefaultPokemonRows(db: any, where: SQL | undefined): Promise<number> {
-  const countRows = await db
-    .select({ cnt: sql<number>`COUNT(*)` })
-    .from(pokemon)
-    .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
-    .where(where);
-  return Number(countRows[0]?.cnt ?? 0);
-}
-
 export async function listPokemonCardRows(
   db: any,
   filters?: PokemonListFilters,
@@ -106,8 +97,6 @@ export async function listPokemonCardRows(
   const where = buildPokemonListWhere(filters);
   const usePagination = filters?.limit !== undefined;
   const needsSpeedJoin = filters?.sort === "speed";
-
-  const total = usePagination ? await countDefaultPokemonRows(db, where) : 0;
 
   let query = db
     .select({
@@ -129,13 +118,18 @@ export async function listPokemonCardRows(
   query = query.where(where).orderBy(...pokemonListOrderBy(filters));
 
   if (usePagination) {
-    query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));
+    query = query.limit(Number(filters!.limit) + 1).offset(Number(filters?.offset ?? 0));
   }
 
   const rows: any[] = await query;
-  if (rows.length === 0) return usePagination ? { items: [], total } : [];
+  if (rows.length === 0) return usePagination ? { items: [], hasMore: false } : [];
 
-  const formIds = rows.map((r: any) => Number(r.formId));
+  // limit+1: 截断多余行并计算 hasMore
+  const requestedLimit = Number(filters?.limit ?? 0);
+  const hasMore = usePagination && rows.length > requestedLimit;
+  const effectiveRows = usePagination ? rows.slice(0, requestedLimit) : rows;
+
+  const formIds = effectiveRows.map((r: any) => Number(r.formId));
   const [typeRows, imageRows] = await Promise.all([
     db.select({
       formId: pokemonFormTypes.formId,
@@ -168,7 +162,7 @@ export async function listPokemonCardRows(
     });
   }
 
-  const items = rows.map((row: any) => {
+  const items = effectiveRows.map((row: any) => {
     const fid = Number(row.formId);
     const types = typeMap.get(fid) || [];
     return {
@@ -183,7 +177,7 @@ export async function listPokemonCardRows(
     } as PokemonCardSummary;
   });
 
-  return usePagination ? { items, total } : items;
+  return usePagination ? { items, hasMore } : items;
 }
 
 export async function listPokemonTableRows(
@@ -192,7 +186,6 @@ export async function listPokemonTableRows(
 ): Promise<PaginatedResult<PokemonTableSummary> | PokemonTableSummary[]> {
   const where = buildPokemonListWhere(filters);
   const usePagination = filters?.limit !== undefined;
-  const total = usePagination ? await countDefaultPokemonRows(db, where) : 0;
 
   let query = db
     .select({
@@ -216,13 +209,18 @@ export async function listPokemonTableRows(
     .orderBy(...pokemonListOrderBy(filters));
 
   if (usePagination) {
-    query = query.limit(Number(filters!.limit)).offset(Number(filters?.offset ?? 0));
+    query = query.limit(Number(filters!.limit) + 1).offset(Number(filters?.offset ?? 0));
   }
 
   const rows: any[] = await query;
-  if (rows.length === 0) return usePagination ? { items: [], total } : [];
+  if (rows.length === 0) return usePagination ? { items: [], hasMore: false } : [];
 
-  const formIds = rows.map((r: any) => Number(r.formId));
+  // limit+1: 截断多余行并计算 hasMore
+  const requestedLimit = Number(filters?.limit ?? 0);
+  const hasMore = usePagination && rows.length > requestedLimit;
+  const effectiveRows = usePagination ? rows.slice(0, requestedLimit) : rows;
+
+  const formIds = effectiveRows.map((r: any) => Number(r.formId));
   const [typeRows, abilityRows, imageRows] = await Promise.all([
     db.select({
       formId: pokemonFormTypes.formId,
@@ -272,7 +270,7 @@ export async function listPokemonTableRows(
     });
   }
 
-  const items = rows.map((row: any) => {
+  const items = effectiveRows.map((row: any) => {
     const fid = Number(row.formId);
     const types = typeMap.get(fid) || [];
     const ab = abilityMap.get(fid) || { abilities: [] };
@@ -291,5 +289,5 @@ export async function listPokemonTableRows(
     } as PokemonTableSummary;
   });
 
-  return usePagination ? { items, total } : items;
+  return usePagination ? { items, hasMore } : items;
 }

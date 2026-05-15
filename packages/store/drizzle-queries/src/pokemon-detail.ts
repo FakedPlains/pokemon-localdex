@@ -16,6 +16,7 @@ import type {
   PokemonFormEntry,
   PokemonEntry,
   PokemonIdentity,
+  EvolutionStep,
 } from "@pokemon-localdex/store-types";
 import {
   buildSource,
@@ -55,11 +56,11 @@ export async function getPokemonIdentityRow(db: any, idOrSlug: string): Promise<
     : undefined;
 }
 
-export async function getPokemonRow(
-  db: any,
-  idOrSlug: string,
-  filters?: { championsSeasonId?: number },
-): Promise<PokemonEntry | undefined> {
+// ────────────────────────────────────────────────────────────────────────────
+// 内部共享辅助函数
+// ────────────────────────────────────────────────────────────────────────────
+
+async function lookupPokemonRow(db: any, idOrSlug: string) {
   const rows = await db
     .select()
     .from(pokemon)
@@ -72,19 +73,19 @@ export async function getPokemonRow(
       ),
     )
     .limit(1);
+  return rows[0] || undefined;
+}
 
-  const row = rows[0];
-  if (!row) return undefined;
-
-  const pokemonId = Number(row.id);
-  const dexNumber = Number(row.dexNumber);
-
-  const championRows = filters?.championsSeasonId !== undefined
-    ? await championRegulationPokemonRows(db, filters.championsSeasonId, pokemonId, dexNumber)
-    : undefined;
-  if (filters?.championsSeasonId !== undefined && championRows?.length === 0) return undefined;
-
-  // 查询所有形态（含绑定道具）
+/**
+ * 查询指定宝可梦的所有形态并构建 PokemonFormEntry[]。
+ * 返回 undefined 表示没有形态数据。
+ */
+async function queryFormsAndBuild(
+  db: any,
+  row: any,
+  pokemonId: number,
+  championRows?: any[],
+): Promise<PokemonFormEntry[] | undefined> {
   let formRows: any[] = await db
     .select({
       id: pokemonForms.id,
@@ -129,27 +130,10 @@ export async function getPokemonRow(
   }
 
   const formIds = formRows.map((f: any) => Number(f.id));
+  if (formIds.length === 0) return undefined;
 
-  if (formIds.length === 0) {
-    return {
-      id: pokemonId,
-      dexNumber: Number(row.dexNumber),
-      slug: String(row.slug),
-      nameZh: String(row.nameZh),
-      nameJa: row.nameJa ? String(row.nameJa) : undefined,
-      nameEn: row.nameEn ? String(row.nameEn) : undefined,
-      primaryType: undefined,
-      secondaryType: undefined,
-      abilities: [],
-      generations: [],
-      forms: [],
-      evolutionChain: [],
-      source: buildSource(row),
-    };
-  }
-
-  // 并行批量查询形态详情
-  const [fsRows, ftRows, faRows, fiRows, evolutionChainResult, genRows] = await Promise.all([
+  // 并行批量查询形态详情（种族值/属性/特性/图片）
+  const [fsRows, ftRows, faRows, fiRows] = await Promise.all([
     db.select({
       formId: pokemonFormStats.formId,
       generationStart: pokemonFormStats.generationStart,
@@ -191,13 +175,6 @@ export async function getPokemonRow(
       alt: pokemonFormImages.alt,
     }).from(pokemonFormImages)
       .where(inArray(pokemonFormImages.formId, formIds)),
-
-    getPokemonEvolutionChainRows(db, pokemonId),
-
-    db.select({ generation: pokemonGenerationRegions.generation })
-      .from(pokemonGenerationRegions)
-      .where(eq(pokemonGenerationRegions.pokemonId, pokemonId))
-      .orderBy(asc(pokemonGenerationRegions.generation)),
   ]);
 
   // 构建形态种族值 Map
@@ -258,7 +235,7 @@ export async function getPokemonRow(
   }
 
   // 组装形态列表
-  const forms: PokemonFormEntry[] = formRows.map((f: any) => {
+  return formRows.map((f: any) => {
     const fid = Number(f.id);
     const statEntries = fsMap.get(fid) || [];
     const latestStat = statEntries.find((s) => s.genEnd === undefined) || statEntries[0];
@@ -309,10 +286,10 @@ export async function getPokemonRow(
 
     return entry;
   });
+}
 
-  const generations = [...new Set(genRows.map((r: any) => Number(r.generation)))];
+function buildBaseFields(row: any, pokemonId: number, forms: PokemonFormEntry[]) {
   const defaultForm = forms.find((f) => f.isDefault) || forms[0];
-
   return {
     id: pokemonId,
     dexNumber: Number(row.dexNumber),
@@ -327,12 +304,122 @@ export async function getPokemonRow(
     baseStats: defaultForm?.baseStats,
     image: defaultForm?.images.official,
     shinyImage: defaultForm?.images.shiny,
-    generations,
     category: row.category ? String(row.category) : undefined,
     heightM: row.heightM != null ? Number(row.heightM) : undefined,
     weightKg: row.weightKg != null ? Number(row.weightKg) : undefined,
     forms,
-    evolutionChain: evolutionChainResult,
     source: buildSource(row),
+  };
+}
+
+function buildEmptyEntry(row: any, pokemonId: number): PokemonEntry {
+  return {
+    id: pokemonId,
+    dexNumber: Number(row.dexNumber),
+    slug: String(row.slug),
+    nameZh: String(row.nameZh),
+    nameJa: row.nameJa ? String(row.nameJa) : undefined,
+    nameEn: row.nameEn ? String(row.nameEn) : undefined,
+    primaryType: undefined,
+    secondaryType: undefined,
+    abilities: [],
+    generations: [],
+    forms: [],
+    evolutionChain: [],
+    source: buildSource(row),
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// getPokemonSummaryRow — 轻量摘要，跳过 evolutionChain 和 generations
+// 用于抽屉初始加载，减少 4 次 D1 查询
+// ────────────────────────────────────────────────────────────────────────────
+
+export type PokemonSummaryResult = Omit<PokemonEntry, "evolutionChain" | "generations">;
+
+export async function getPokemonSummaryRow(
+  db: any,
+  idOrSlug: string,
+  filters?: { championsSeasonId?: number },
+): Promise<PokemonSummaryResult | undefined> {
+  const row = await lookupPokemonRow(db, idOrSlug);
+  if (!row) return undefined;
+
+  const pokemonId = Number(row.id);
+  const dexNumber = Number(row.dexNumber);
+
+  const championRows = filters?.championsSeasonId !== undefined
+    ? await championRegulationPokemonRows(db, filters.championsSeasonId, pokemonId, dexNumber)
+    : undefined;
+  if (filters?.championsSeasonId !== undefined && championRows?.length === 0) return undefined;
+
+  const forms = await queryFormsAndBuild(db, row, pokemonId, championRows);
+  if (!forms) {
+    const { evolutionChain: _e, generations: _g, ...rest } = buildEmptyEntry(row, pokemonId);
+    return rest;
+  }
+
+  return buildBaseFields(row, pokemonId, forms);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// getPokemonEvolutionRow — 独立的进化链查询
+// ────────────────────────────────────────────────────────────────────────────
+
+export async function getPokemonEvolutionRow(
+  db: any,
+  pokemonId: number,
+): Promise<EvolutionStep[]> {
+  return getPokemonEvolutionChainRows(db, pokemonId);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// getPokemonGenerationsRow — 独立的世代地区查询
+// ────────────────────────────────────────────────────────────────────────────
+
+export async function getPokemonGenerationsRow(
+  db: any,
+  pokemonId: number,
+): Promise<number[]> {
+  const genRows = await db.select({ generation: pokemonGenerationRegions.generation })
+    .from(pokemonGenerationRegions)
+    .where(eq(pokemonGenerationRegions.pokemonId, pokemonId))
+    .orderBy(asc(pokemonGenerationRegions.generation));
+  return [...new Set(genRows.map((r: any) => Number(r.generation)))];
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// getPokemonRow — 完整详情（保留向后兼容，含 evolutionChain + generations）
+// ────────────────────────────────────────────────────────────────────────────
+
+export async function getPokemonRow(
+  db: any,
+  idOrSlug: string,
+  filters?: { championsSeasonId?: number },
+): Promise<PokemonEntry | undefined> {
+  const row = await lookupPokemonRow(db, idOrSlug);
+  if (!row) return undefined;
+
+  const pokemonId = Number(row.id);
+  const dexNumber = Number(row.dexNumber);
+
+  const championRows = filters?.championsSeasonId !== undefined
+    ? await championRegulationPokemonRows(db, filters.championsSeasonId, pokemonId, dexNumber)
+    : undefined;
+  if (filters?.championsSeasonId !== undefined && championRows?.length === 0) return undefined;
+
+  const forms = await queryFormsAndBuild(db, row, pokemonId, championRows);
+  if (!forms) return buildEmptyEntry(row, pokemonId);
+
+  // 进化链和世代地区并行查询
+  const [evolutionChain, generations] = await Promise.all([
+    getPokemonEvolutionRow(db, pokemonId),
+    getPokemonGenerationsRow(db, pokemonId),
+  ]);
+
+  return {
+    ...buildBaseFields(row, pokemonId, forms),
+    generations,
+    evolutionChain,
   };
 }

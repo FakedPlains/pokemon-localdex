@@ -127,7 +127,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     const params = new URLSearchParams();
     if (championsSeasonId) params.set("seasonId", championsSeasonId);
     const qs = params.toString();
-    unifiedApi(`/pokemon/${selectedSlug}${qs ? `?${qs}` : ""}`).then((r) => {
+    unifiedApi(`/pokemon/${selectedSlug}/summary${qs ? `?${qs}` : ""}`).then((r) => {
       if (!cancelled) {
         setDetail(r.data);
         setDetailGeneration("");

@@ -177,7 +177,7 @@ export default function PokedexPage() {
       {!loading && (
         <View className='stats-bar'>
           <Text className='stats-text'>
-            {total > 0 ? `共 ${total} 只宝可梦` : ''}
+            {list.length > 0 ? `已加载 ${list.length} 只宝可梦` : ''}
           </Text>
         </View>
       )}
