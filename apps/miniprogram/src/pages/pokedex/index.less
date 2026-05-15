@@ -1,216 +1,125 @@
 .pokedex-page {
   padding-bottom: 20px;
+  background: #FAF8F5;
+  min-height: 100vh;
 }
 
-/* ── 搜索栏 ── */
-.search-bar {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  gap: 16px;
-  background: #fff;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+/* ── 搜索区 ── */
+.search-section {
+  padding: 16px 32px;
 }
 
-.search-input-wrap {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  background: #f5f5f5;
-  border-radius: 32px;
-  padding: 0 24px;
-  height: 72px;
+.search-placeholder {
+  color: #B5B5B5;
 }
 
-.search-icon {
-  font-size: 28px;
-  margin-right: 12px;
-}
-
-.search-input {
-  flex: 1;
-  font-size: 28px;
-  height: 72px;
-  line-height: 72px;
-}
-
-.filter-btn {
-  padding: 12px 24px;
-  border-radius: 32px;
-  background: #f5f5f5;
-  font-size: 26px;
-  color: #666;
-  flex-shrink: 0;
-}
-
-.filter-btn-active {
-  background: #e63946;
-  color: #fff;
-}
-
-.filter-btn-badge {
-  background: #e63946;
-  color: #fff;
-}
-
-/* ── 筛选面板 ── */
-.filter-panel {
-  background: #fff;
-  padding: 16px 24px 24px;
-  border-bottom: 1px solid #eee;
-}
-
-.filter-title {
-  font-size: 24px;
-  color: #999;
-  margin-bottom: 12px;
-  margin-top: 16px;
-  display: block;
-
-  &:first-child {
-    margin-top: 0;
-  }
+/* ── 筛选区 ── */
+.filter-scroll {
+  padding: 0 0 0 32px;
+  margin-bottom: 16px;
 }
 
 .filter-chips {
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
   gap: 12px;
-  margin-bottom: 8px;
+  padding-right: 32px;
 }
 
-.filter-chip {
-  padding: 8px 24px;
-  border-radius: 24px;
-  background: #f0f0f0;
-  font-size: 24px;
-  color: #666;
+.type-filter-scroll {
+  margin-bottom: 12px;
 }
 
-.filter-chip-active {
-  background: #e63946;
+.type-filter-chips {
+  display: inline-flex;
+  gap: 10px;
+  padding-right: 32px;
+}
+
+.type-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.type-filter-active {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.type-filter-text {
+  font-size: 22px;
   color: #fff;
-}
-
-.filter-types {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.filter-clear {
-  margin-top: 16px;
-  text-align: center;
-  padding: 12px 0;
-}
-
-.filter-clear-text {
-  font-size: 24px;
-  color: #e63946;
-}
-
-.type-chip-dim {
-  opacity: 0.5;
-}
-
-.type-chip-selected {
-  opacity: 1;
-  box-shadow: 0 0 0 3px rgba(230, 57, 70, 0.4);
+  font-weight: 500;
 }
 
 /* ── 统计栏 ── */
 .stats-bar {
-  padding: 12px 24px;
+  padding: 0 32px 12px;
 }
 
 .stats-text {
   font-size: 24px;
-  color: #999;
+  color: #8A8A8A;
 }
 
 /* ── 宝可梦网格 ── */
 .pokemon-grid {
-  display: flex;
-  flex-wrap: wrap;
-  padding: 0 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 0 24px;
 }
 
-.pokemon-card {
-  width: calc(50% - 16px);
-  margin: 8px;
-  background: #fff;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.card-img-wrap {
-  width: 100%;
-  height: 240px;
+.poke-card {
+  padding: 20px 16px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: #fafafa;
+  overflow: hidden;
 }
 
-.card-img {
-  width: 180px;
-  height: 180px;
-}
-
-.card-img-placeholder {
-  font-size: 80px;
-  color: #ddd;
-}
-
-.card-info {
-  padding: 16px;
-}
-
-.card-dex {
+.poke-dex {
+  align-self: flex-start;
   font-size: 22px;
-  color: #999;
   font-family: monospace;
 }
 
-.card-name {
-  display: block;
-  font-size: 30px;
-  font-weight: 700;
-  color: #333;
-  margin-top: 4px;
+.poke-img-wrap {
+  width: 100%;
+  padding-bottom: 100%;
+  position: relative;
+  margin: 8px 0;
 }
 
-.card-name-en {
-  display: block;
-  font-size: 22px;
-  color: #999;
-  margin-top: 2px;
+.poke-img {
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  width: 80%;
+  height: 80%;
 }
 
-.card-types {
+.poke-name {
+  font-size: 28px;
+  font-weight: 600;
+  color: #2D2D2D;
+  margin-bottom: 8px;
+}
+
+.poke-types {
   display: flex;
-  margin-top: 12px;
   gap: 8px;
 }
 
-/* ── 空状态 ── */
-.empty-state {
-  width: 100%;
-  text-align: center;
-  padding: 120px 0;
-  color: #999;
-  font-size: 28px;
-}
-
-/* ── 加载更多 ── */
-.load-more {
-  padding: 20px 0;
+/* ── 空态 / 加载更多 ── */
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
 }
 
 .load-end {
   text-align: center;
-  padding: 32px 0;
+  padding: 32px 0 48px;
 }

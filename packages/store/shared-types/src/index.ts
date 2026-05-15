@@ -5,6 +5,8 @@
  * 两个 store 包均从此处导入并重新导出，保证类型一致。
  */
 
+import { TYPE_ALIASES, TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.js";
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 基础类型
 // ══════════════════════════════════════════════════════════════════════════════
@@ -271,13 +273,51 @@ export type LearnsetRecord = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// 招式表 Meta / 宝可梦反查摘要
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type LearnsetMeta = {
+  generations: number[];
+  formKeys: string[];
+  versionsByGen: Record<number, Array<{ code: string; name: string }>>;
+};
+
+/** getPokemonByMove 返回的宝可梦摘要 */
+export type PokemonByMoveSummary = {
+  id: number;
+  dexNumber: number;
+  slug: string;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  primaryType?: string;
+  secondaryType?: string;
+  image?: string;
+  learnMethods: string[];
+};
+
+/** getPokemonByAbility 返回的宝可梦摘要 */
+export type PokemonByAbilitySummary = {
+  id: number;
+  dexNumber: number;
+  slug: string;
+  nameZh: string;
+  nameJa?: string;
+  nameEn?: string;
+  primaryType?: string;
+  secondaryType?: string;
+  image?: string;
+  isHidden: boolean;
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // 分页
 // ══════════════════════════════════════════════════════════════════════════════
 
 export type SortOrder = "asc" | "desc";
 export type PokemonListSortKey = "speed";
 export type PaginationParams = { offset?: number; limit?: number };
-export type PaginatedResult<T> = { items: T[]; total: number };
+export type PaginatedResult<T> = { items: T[]; total?: number; hasMore: boolean };
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Store 统一接口（sqlite-store 和 d1-store 共同实现）
@@ -315,9 +355,12 @@ export interface IStore {
     order?: SortOrder;
   } & PaginationParams): Promise<PokemonTableSummary[] | PaginatedResult<PokemonTableSummary>>;
   getPokemon(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<PokemonEntry | undefined>;
+  getPokemonSummary(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<Omit<PokemonEntry, "evolutionChain" | "generations"> | undefined>;
+  getPokemonEvolution(pokemonId: number): Promise<EvolutionStep[]>;
+  getPokemonGenerations(pokemonId: number): Promise<number[]>;
   getPokemonIdentity(idOrSlug: string): Promise<PokemonIdentity | undefined>;
-  getLearnsetMeta(pokemonId: number): Promise<any>;
-  getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string }>;
+  getLearnsetMeta(pokemonId: number): Promise<LearnsetMeta>;
+  getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string, pagination?: PaginationParams, learnMethod?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string; hasMore?: boolean; methodCounts?: Record<string, number> }>;
 
   // Champions
   listChampionsSeasons(): Promise<ChampionsSeasonSummary[]>;
@@ -325,12 +368,12 @@ export interface IStore {
   // Moves
   listMoves(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams): Promise<MoveEntry[] | PaginatedResult<MoveEntry>>;
   getMove(idOrSlug: string): Promise<MoveEntry | undefined>;
-  getPokemonByMove(moveId: number, pagination?: PaginationParams): Promise<any[] | PaginatedResult<any>>;
+  getPokemonByMove(moveId: number, pagination?: PaginationParams): Promise<PokemonByMoveSummary[] | PaginatedResult<PokemonByMoveSummary>>;
 
   // Abilities
   listAbilities(filters?: { query?: string; generation?: number } & PaginationParams): Promise<AbilityEntry[] | PaginatedResult<AbilityEntry>>;
   getAbility(idOrName: string): Promise<AbilityEntry | undefined>;
-  getPokemonByAbility(abilityId: number, pagination?: PaginationParams): Promise<any[] | PaginatedResult<any>>;
+  getPokemonByAbility(abilityId: number, pagination?: PaginationParams): Promise<PokemonByAbilitySummary[] | PaginatedResult<PokemonByAbilitySummary>>;
 
   // Items
   listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;
@@ -385,22 +428,15 @@ export const GAME_VERSION_NAMES = new Map<string, string>(
   GAME_VERSIONS.map(([code, nameZh]) => [code, nameZh])
 );
 
-export const TYPE_NAMES = [
-  "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
-  "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精",
-];
-
-export const TYPE_ALIASES: Record<string, string> = {
-  電: "电", 飛行: "飞行", 蟲: "虫", 龍: "龙",
-  惡: "恶", 鋼: "钢", 格鬥: "格斗", 幽靈: "幽灵",
-};
+export * from "./constants.js";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 共享辅助函数
 // ══════════════════════════════════════════════════════════════════════════════
 
 export function normalizeTypeName(type: string | undefined): string {
-  return type ? (TYPE_ALIASES[type] || type).trim() : "";
+  const id = typeNameToId(type);
+  return id ? typeIdToName(id) : type ? type.trim() : "";
 }
 
 export function typeLegacyId(type: string | undefined): string | undefined {
@@ -411,11 +447,11 @@ export function typeLegacyId(type: string | undefined): string | undefined {
 export function splitTypeNames(type: string | undefined): string[] {
   const normalized = normalizeTypeName(type);
   if (!normalized) return [];
-  if (TYPE_NAMES.includes(normalized)) return [normalized];
+  if (typeNameToId(normalized)) return [normalized];
   const compact = normalized.replace(/\s+/g, "");
   const result: string[] = [];
   let rest = compact;
-  const candidates = [...TYPE_NAMES, ...Object.keys(TYPE_ALIASES)].sort((a, b) => b.length - a.length);
+  const candidates = [...TYPE_OPTIONS.map((typeOption) => typeOption.nameZh), ...Object.keys(TYPE_ALIASES)].sort((a, b) => b.length - a.length);
   while (rest) {
     const match = candidates.find((c) => rest.startsWith(c));
     if (!match) break;

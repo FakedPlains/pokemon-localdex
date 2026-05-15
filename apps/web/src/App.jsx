@@ -1,14 +1,15 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { createDraftMember } from "./utils/helpers.js";
-import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from "./utils/constants.js";
+import { TYPE_OPTIONS, CATEGORY_OPTIONS, GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import { ToastProvider } from "./components/Toast.jsx";
-import PokedexPage from "./pages/PokedexPage.jsx";
-import ItemsPage from "./pages/ItemsPage.jsx";
-import MovesPage from "./pages/MovesPage.jsx";
-import AbilitiesPage from "./pages/AbilitiesPage.jsx";
-import TeamsPage from "./pages/TeamsPage.jsx";
-import DamagePage from "./pages/DamagePage.jsx";
-import TypeChartPage from "./pages/TypeChartPage.jsx";
+
+const PokedexPage = lazy(() => import("./pages/PokedexPage.jsx"));
+const ItemsPage = lazy(() => import("./pages/ItemsPage.jsx"));
+const MovesPage = lazy(() => import("./pages/MovesPage.jsx"));
+const AbilitiesPage = lazy(() => import("./pages/AbilitiesPage.jsx"));
+const TeamsPage = lazy(() => import("./pages/TeamsPage.jsx"));
+const DamagePage = lazy(() => import("./pages/DamagePage.jsx"));
+const TypeChartPage = lazy(() => import("./pages/TypeChartPage.jsx"));
 
 const NAV_ITEMS = [
   { key: "pokedex", label: "图鉴", hash: "#/pokedex" },
@@ -297,25 +298,25 @@ export default function App() {
                   {route === "moves" && <span className="filter-hint">（招式页仅支持单选）</span>}
                 </span>
                 <div className="filter-chips">
-                  {ALL_TYPE_OPTIONS.map((t) => {
-                    const isActive = types.includes(t);
+                  {TYPE_OPTIONS.map((type) => {
+                    const isActive = types.includes(type.nameZh);
                     return (
                       <button
-                        key={t}
-                        data-type={t}
+                        key={type.id}
+                        data-type={type.nameZh}
                         className={`filter-chip filter-chip-type${isActive ? " filter-chip-type-active" : ""}`}
                         onClick={() => {
                           if (route === "moves") {
                             // Moves page: single select
-                            setTypes(isActive ? [] : [t]);
+                            setTypes(isActive ? [] : [type.nameZh]);
                           } else {
                             // Pokedex: multi select
-                            setTypes((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
+                            setTypes((prev) => prev.includes(type.nameZh) ? prev.filter((x) => x !== type.nameZh) : [...prev, type.nameZh]);
                           }
                         }}
                       >
-                        <img className="filter-type-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${t}@sm.png`} alt="" />
-                        {t}
+                        <img className="filter-type-icon" src={`${import.meta.env.BASE_URL}assets/type-icons/type-${type.nameZh}@sm.png`} alt="" />
+                        {type.nameZh}
                       </button>
                     );
                   })}
@@ -332,13 +333,13 @@ export default function App() {
                     className={`filter-chip${moveCategory === "" ? " filter-chip-active" : ""}`}
                     onClick={() => setMoveCategory("")}
                   >全部</button>
-                  {["物理", "特殊", "变化"].map((c) => (
+                  {CATEGORY_OPTIONS.map((category) => (
                     <button
-                      key={c}
-                      className={`filter-chip${moveCategory === c ? " filter-chip-active" : ""}`}
-                      onClick={() => setMoveCategory(moveCategory === c ? "" : c)}
+                      key={category.id}
+                      className={`filter-chip${moveCategory === category.nameZh ? " filter-chip-active" : ""}`}
+                      onClick={() => setMoveCategory(moveCategory === category.nameZh ? "" : category.nameZh)}
                     >
-                      {c}
+                      {category.nameZh}
                     </button>
                   ))}
                 </div>
@@ -359,7 +360,9 @@ export default function App() {
       )}
 
       <main className="main-panel">
-        {pageElement}
+        <Suspense fallback={<div className="shared-loading">加载中…</div>}>
+          {pageElement}
+        </Suspense>
       </main>
     </div>
     </ToastProvider>

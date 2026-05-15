@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
-import { STAT_KEYS } from "../utils/constants.js";
+import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import { getPokemonPreviewImage } from "../utils/helpers.js";
 
 /**

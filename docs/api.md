@@ -43,6 +43,8 @@ API 启用了全局 CORS，允许任意来源访问。
 | limit | number | 每页条数，传入后启用分页模式 |
 | offset | number | 偏移量，默认 0 |
 
+注意：`total` 字段只在 store 返回了计数时才包含在响应中。部分接口（如 `/pokemon/:id/learnset`）使用 `limit+1` 策略判断 `hasMore`，不执行额外的 COUNT 查询，因此不返回 `total`。客户端应依赖 `hasMore` 而非 `total` 来判断是否还有更多数据。
+
 
 ## 宝可梦
 
@@ -124,8 +126,11 @@ GET /api/pokemon/2?seasonId=1
 | generation | number | 9 | 世代编号 |
 | form | string | "default" | 形态标识（form_key） |
 | version | string | — | 游戏版本代码（可选，如 "SV"） |
+| limit | number | — | 每页条数，传入后启用分页模式 |
+| offset | number | 0 | 偏移量 |
+| method | string | — | 学习方式筛选（如 "level-up"、"tm"、"egg" 等） |
 
-返回数据按学习方式（升级、招式学习器、遗传、教授等）分组。响应中还包含实际使用的 `formKey` 和 `gameVersionCode`。
+返回数据按学习方式和排序编号排序。响应中还包含实际使用的 `formKey` 和 `gameVersionCode`。分页时使用 `limit+1` 策略返回 `hasMore`，不返回 `total`。首次请求（offset=0）额外返回 `methodCounts` 对象，包含当前 form+gen+version 下各学习方式的全量计数。
 
 示例：
 
@@ -134,7 +139,7 @@ GET /api/pokemon/皮卡丘/learnset?generation=1&form=default
 GET /api/pokemon/25/learnset?generation=9&version=SV
 ```
 
-小程序端对应函数：`fetchPokemonLearnset(pokemonId, generation, formKey, gameVersionCode)`。支持形态回退逻辑：如果指定形态无数据，依次尝试 `default` 形态和该世代的第一个可用形态。
+小程序端对应函数：`fetchPokemonLearnset(pokemonId, generation, formKey, gameVersionCode, { limit, offset, method })`。支持形态回退逻辑：如果指定形态无数据，依次尝试 `default` 形态和该世代的第一个可用形态。形态回退和 `methodCounts` 仅在首次请求（offset=0）时执行，追加请求直接查询数据。
 
 ### GET /pokemon/:id/learnset/meta
 

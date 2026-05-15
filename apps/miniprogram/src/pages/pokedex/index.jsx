@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
 import Taro, { useReachBottom, usePullDownRefresh } from '@tarojs/taro'
 import { fetchPokemonCards } from '../../utils/api'
-import { ALL_TYPE_OPTIONS, GENERATION_OPTIONS } from '../../utils/constants'
+import { TYPE_OPTIONS, GENERATION_OPTIONS } from '@pokemon-localdex/store-types/constants'
 import { PAGE_SIZE } from '../../utils/config'
 import TypeChip from '../../components/type-chip'
 import Loading from '../../components/loading'
 import SafeImage from '../../components/safe-image'
+import { TYPE_BG_COLORS } from '../../utils/constants'
 import './index.less'
 
 export default function PokedexPage() {
@@ -16,9 +17,8 @@ export default function PokedexPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [query, setQuery] = useState('')
-  const [selectedTypes, setSelectedTypes] = useState([])
+  const [selectedType, setSelectedType] = useState('')
   const [selectedGen, setSelectedGen] = useState('')
-  const [showFilter, setShowFilter] = useState(false)
 
   const offsetRef = useRef(0)
   const fetchIdRef = useRef(0)
@@ -58,40 +58,51 @@ export default function PokedexPage() {
     }
   }, [])
 
-  const typeStr = selectedTypes.join(',')
-
-  // 初始加载
   useEffect(() => {
     offsetRef.current = 0
-    doFetch(query, typeStr, 0, false, selectedGen)
-  }, [query, typeStr, selectedGen, doFetch])
+    doFetch(query, selectedType, 0, false, selectedGen)
+  }, [query, selectedType, selectedGen, doFetch])
 
-  // 下拉刷新
   usePullDownRefresh(() => {
     offsetRef.current = 0
-    doFetch(query, typeStr, 0, false, selectedGen)
+    doFetch(query, selectedType, 0, false, selectedGen)
   })
 
-  // 触底加载更多
   useReachBottom(() => {
     if (!loadingMore && !loading && hasMore) {
-      doFetch(query, typeStr, offsetRef.current, true, selectedGen)
+      doFetch(query, selectedType, offsetRef.current, true, selectedGen)
     }
   })
 
+  // debounce 搜索：onInput 设置临时值，延迟 300ms 后才更新 query 触发请求
+  const [inputValue, setInputValue] = useState('')
+  const debounceRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
+  const handleInput = useCallback((e) => {
+    const val = e.detail.value || ''
+    setInputValue(val)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setQuery(val), 300)
+  }, [])
+
   const handleSearch = useCallback((e) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
     setQuery(e.detail.value || '')
   }, [])
 
   const handleTypeFilter = useCallback((type) => {
-    setSelectedTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type])
+    setSelectedType(prev => prev === type ? '' : type)
   }, [])
 
   const handleGenFilter = useCallback((gen) => {
     setSelectedGen(prev => prev === gen ? '' : gen)
   }, [])
-
-  const hasActiveFilters = selectedTypes.length > 0 || selectedGen !== ''
 
   const handleCardTap = useCallback((pokemon) => {
     Taro.navigateTo({
@@ -102,66 +113,71 @@ export default function PokedexPage() {
   return (
     <View className='pokedex-page'>
       {/* 搜索栏 */}
-      <View className='search-bar'>
-        <View className='search-input-wrap'>
+      <View className='search-section'>
+        <View className='search-bar-pill'>
           <Text className='search-icon'>🔍</Text>
           <Input
             className='search-input'
-            placeholder='搜索宝可梦名称…'
+            placeholder='搜索宝可梦名称或编号'
+            placeholderClass='search-placeholder'
             confirmType='search'
-            value={query}
+            value={inputValue}
             onConfirm={handleSearch}
-            onInput={handleSearch}
+            onInput={handleInput}
           />
-        </View>
-        <View
-          className={`filter-btn ${showFilter ? 'filter-btn-active' : ''} ${hasActiveFilters ? 'filter-btn-badge' : ''}`}
-          onClick={() => setShowFilter(!showFilter)}
-        >
-          <Text>筛选{hasActiveFilters ? ` (${selectedTypes.length + (selectedGen ? 1 : 0)})` : ''}</Text>
         </View>
       </View>
 
-      {/* 筛选面板 */}
-      {showFilter && (
-        <View className='filter-panel'>
-          <Text className='filter-title'>世代</Text>
-          <View className='filter-chips'>
-            {GENERATION_OPTIONS.map(g => (
-              <View
-                key={g}
-                className={`filter-chip ${selectedGen === String(g) ? 'filter-chip-active' : ''}`}
-                onClick={() => handleGenFilter(String(g))}
-              >
-                <Text>{g}</Text>
-              </View>
-            ))}
+      {/* 世代筛选 */}
+      <ScrollView scrollX className='filter-scroll' enhanced showScrollbar={false}>
+        <View className='filter-chips'>
+          <View
+            className={`chip ${!selectedGen ? 'chip-active' : 'chip-inactive'}`}
+            onClick={() => setSelectedGen('')}
+          >
+            <Text>全部</Text>
           </View>
-          <Text className='filter-title'>属性（可多选）</Text>
-          <View className='filter-types'>
-            {ALL_TYPE_OPTIONS.map(type => (
-              <View
-                key={type}
-                className={`type-chip type-${type} ${selectedTypes.includes(type) ? 'type-chip-selected' : 'type-chip-dim'}`}
-                onClick={() => handleTypeFilter(type)}
-              >
-                <Text>{type}</Text>
-              </View>
-            ))}
-          </View>
-          {hasActiveFilters && (
-            <View className='filter-clear' onClick={() => { setSelectedTypes([]); setSelectedGen('') }}>
-              <Text className='filter-clear-text'>清除筛选</Text>
+          {GENERATION_OPTIONS.map(g => (
+            <View
+              key={g}
+              className={`chip ${selectedGen === String(g) ? 'chip-active' : 'chip-inactive'}`}
+              onClick={() => handleGenFilter(String(g))}
+            >
+              <Text>第{g}世代</Text>
             </View>
-          )}
+          ))}
         </View>
-      )}
+      </ScrollView>
 
-      {/* 统计信息 */}
+      {/* 属性筛选 */}
+      <ScrollView scrollX className='filter-scroll type-filter-scroll' enhanced showScrollbar={false}>
+        <View className='type-filter-chips'>
+          {TYPE_OPTIONS.map(type => {
+            const isActive = selectedType === type.nameZh
+            const bgColor = TYPE_BG_COLORS[type.nameZh] || '#999'
+            return (
+              <View
+                key={type.id}
+                className={`type-filter-chip ${isActive ? 'type-filter-active' : ''}`}
+                style={{
+                  background: bgColor,
+                  opacity: !selectedType || isActive ? 1 : 0.45,
+                  borderColor: isActive ? bgColor : 'transparent'
+                }}
+                onClick={() => handleTypeFilter(type.nameZh)}
+              >
+                <Text className='type-filter-text'>{type.nameZh}</Text>
+              </View>
+            )
+          })}
+        </View>
+      </ScrollView>
+
+      {/* 统计 */}
       {!loading && (
         <View className='stats-bar'>
           <Text className='stats-text'>
-            {total > 0 ? `共 ${total} 只宝可梦` : `${list.length} 只宝可梦`}
+            {list.length > 0 ? `已加载 ${list.length} 只宝可梦` : ''}
           </Text>
         </View>
       )}
@@ -169,56 +185,45 @@ export default function PokedexPage() {
       {/* 列表 */}
       {loading && list.length === 0 ? (
         <Loading />
+      ) : list.length === 0 && !loading ? (
+        <View className='empty-state'>
+          <Text className='empty-icon'>🔍</Text>
+          <Text>没有找到相关结果</Text>
+        </View>
       ) : (
         <View className='pokemon-grid'>
-          {list.length === 0 && !loading && (
-            <View className='empty-state'>
-              <Text>没有匹配的宝可梦</Text>
-            </View>
-          )}
-          {list.map(pokemon => {
-            const slug = pokemon.slug || pokemon.id
-            return (
-              <View
-                key={slug}
-                className='pokemon-card'
-                onClick={() => handleCardTap(pokemon)}
-              >
-                <View className='card-img-wrap'>
-                  <SafeImage
-                    className='card-img'
-                    src={pokemon.image?.url}
-                    mode='aspectFit'
-                    lazyLoad
-                  />
-                </View>
-                <View className='card-info'>
-                  <Text className='card-dex'>
-                    #{String(pokemon.dexNumber || '?').padStart(4, '0')}
-                  </Text>
-                  <Text className='card-name'>{pokemon.nameZh}</Text>
-                  <Text className='card-name-en'>{pokemon.nameEn || ''}</Text>
-                  <View className='card-types'>
-                    <TypeChip type={pokemon.primaryType} />
-                    <TypeChip type={pokemon.secondaryType} />
-                  </View>
-                </View>
+          {list.map(pokemon => (
+            <View
+              key={pokemon.slug || pokemon.id}
+              className='poke-card glass-card press-scale'
+              onClick={() => handleCardTap(pokemon)}
+            >
+              <Text className='poke-dex faint'>
+                #{String(pokemon.dexNumber || '?').padStart(4, '0')}
+              </Text>
+              <View className='poke-img-wrap'>
+                <SafeImage
+                  className='poke-img'
+                  src={pokemon.image?.url}
+                  mode='aspectFit'
+                  lazyLoad
+                />
               </View>
-            )
-          })}
+              <Text className='poke-name'>{pokemon.nameZh}</Text>
+              <View className='poke-types'>
+                <TypeChip type={pokemon.primaryType} size='sm' />
+                {pokemon.secondaryType && <TypeChip type={pokemon.secondaryType} size='sm' />}
+              </View>
+            </View>
+          ))}
         </View>
       )}
 
       {/* 加载更多 */}
-      {loadingMore && (
-        <View className='load-more'>
-          <Loading text='加载更多…' />
-        </View>
-      )}
-
+      {loadingMore && <Loading text='加载更多…' />}
       {!hasMore && list.length > 0 && !loading && (
         <View className='load-end'>
-          <Text className='muted'>已加载全部</Text>
+          <Text className='faint'>已加载全部</Text>
         </View>
       )}
     </View>

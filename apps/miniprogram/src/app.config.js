@@ -1,27 +1,28 @@
 export default defineAppConfig({
   pages: [
     'pages/pokedex/index',
-    'pages/pokemon-detail/index',
-    'pages/moves/index',
-    'pages/abilities/index',
-    'pages/items/index',
-    'pages/tools/index',
-    'pages/type-chart/index',
+    'pages/database/index',
     'pages/teams/index',
-    'pages/damage/index'
+    'pages/profile/index',
+    'pages/pokemon-detail/index',
+    'pages/move-detail/index',
+    'pages/ability-detail/index',
+    'pages/item-detail/index',
+    'pages/damage/index',
+    'pages/type-chart/index'
   ],
   window: {
     backgroundTextStyle: 'light',
-    navigationBarBackgroundColor: '#e63946',
-    navigationBarTitleText: '宝可梦图鉴',
-    navigationBarTextStyle: 'white',
-    backgroundColor: '#f5f5f5'
+    navigationBarBackgroundColor: '#FAF8F5',
+    navigationBarTitleText: 'LocalDex',
+    navigationBarTextStyle: 'black',
+    backgroundColor: '#FAF8F5'
   },
   tabBar: {
-    color: '#999',
-    selectedColor: '#e63946',
-    backgroundColor: '#fff',
-    borderStyle: 'black',
+    color: '#B5B5B5',
+    selectedColor: '#E63946',
+    backgroundColor: '#FFFCF8',
+    borderStyle: 'white',
     list: [
       {
         pagePath: 'pages/pokedex/index',
@@ -30,28 +31,22 @@ export default defineAppConfig({
         selectedIconPath: 'assets/tabbar/pokedex-active.png'
       },
       {
-        pagePath: 'pages/moves/index',
-        text: '招式',
-        iconPath: 'assets/tabbar/moves.png',
-        selectedIconPath: 'assets/tabbar/moves-active.png'
+        pagePath: 'pages/database/index',
+        text: '资料库',
+        iconPath: 'assets/tabbar/database.png',
+        selectedIconPath: 'assets/tabbar/database-active.png'
       },
       {
-        pagePath: 'pages/abilities/index',
-        text: '特性',
-        iconPath: 'assets/tabbar/abilities.png',
-        selectedIconPath: 'assets/tabbar/abilities-active.png'
+        pagePath: 'pages/teams/index',
+        text: '队伍',
+        iconPath: 'assets/tabbar/teams.png',
+        selectedIconPath: 'assets/tabbar/teams-active.png'
       },
       {
-        pagePath: 'pages/items/index',
-        text: '道具',
-        iconPath: 'assets/tabbar/items.png',
-        selectedIconPath: 'assets/tabbar/items-active.png'
-      },
-      {
-        pagePath: 'pages/tools/index',
-        text: '工具',
-        iconPath: 'assets/tabbar/tools.png',
-        selectedIconPath: 'assets/tabbar/tools-active.png'
+        pagePath: 'pages/profile/index',
+        text: '我的',
+        iconPath: 'assets/tabbar/profile.png',
+        selectedIconPath: 'assets/tabbar/profile-active.png'
       }
     ]
   }

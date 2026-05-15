@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图鉴 - Pokemon LocalDex</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    pokered: { DEFAULT: '#E63946', dark: '#C62833', light: 'rgba(230,57,70,0.08)' },
+                    warm: { bg: '#FAF8F5', card: '#FFFCF8', border: 'rgba(255,255,255,0.6)' },
+                    ink: { DEFAULT: '#2D2D2D', muted: '#8A8A8A', faint: '#B5B5B5' },
+                }
+            }
+        }
+    }
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+        .wechat-container { width: 393px; height: 852px; position: relative; overflow: hidden; }
+        .capsule-button { background: rgba(0,0,0,0.08); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); }
+        .capsule-divider { background: rgba(0,0,0,0.15); }
+        .content-area { height: 808px; overflow-y: scroll; scroll-behavior: smooth; }
+        .content-area::-webkit-scrollbar { display: none; }
+
+        .glass-card {
+            background: rgba(255, 252, 248, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+        }
+        .type-tag {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            color: white;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        .chip {
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all 0.2s;
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+        .chip-active {
+            background: #E63946;
+            color: white;
+            border-color: #E63946;
+            box-shadow: 0 2px 8px rgba(230,57,70,0.25);
+        }
+        .chip-inactive {
+            background: rgba(255,252,248,0.85);
+            color: #8A8A8A;
+        }
+        .poke-card {
+            transition: transform 0.15s ease;
+        }
+        .poke-card:active {
+            transform: scale(0.97);
+        }
+        /* 属性颜色 */
+        .type-grass { background: #78C850; }
+        .type-poison { background: #A040A0; }
+        .type-fire { background: #F08030; }
+        .type-water { background: #6890F0; }
+        .type-electric { background: #F8D030; color: #2D2D2D; }
+        .type-flying { background: #A890F0; }
+        .type-ghost { background: #705898; }
+        .type-dragon { background: #7038F8; }
+        .type-ground { background: #E0C068; }
+        .type-psychic { background: #F85888; }
+        .type-fighting { background: #C03028; }
+        .type-steel { background: #B8B8D0; }
+        .type-normal { background: #A8A878; }
+        .type-ice { background: #98D8D8; }
+        .type-rock { background: #B8A038; }
+        .type-bug { background: #A8B820; }
+        .type-dark { background: #705848; }
+        .type-fairy { background: #EE99AC; }
+
+        .tabbar-item { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; }
+        .tabbar-item.active { color: #E63946; }
+        .tabbar-item.inactive { color: #B5B5B5; }
+
+        /* 筛选区滚动 */
+        .filter-scroll { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        .filter-scroll::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="wechat-container mx-auto relative" style="background: #FAF8F5;">
+        <!-- 状态栏 -->
+        <div class="h-11 flex items-center justify-between px-4 relative z-10" style="background: #FAF8F5;">
+            <div class="text-sm font-medium" style="color: #2D2D2D;">1:41</div>
+            <div class="flex items-center gap-1">
+                <div class="text-xs font-medium" style="color: #2D2D2D;">5G</div>
+                <div class="flex items-end gap-0.5 ml-1">
+                    <div class="w-1 h-1 bg-current rounded-full" style="color: #2D2D2D;"></div>
+                    <div class="w-1 h-1.5 bg-current rounded-full" style="color: #2D2D2D;"></div>
+                    <div class="w-1 h-2 bg-current rounded-full" style="color: #2D2D2D;"></div>
+                    <div class="w-1 h-2.5 bg-current rounded-full" style="color: #2D2D2D;"></div>
+                </div>
+                <div class="ml-1 flex items-center" style="color: #2D2D2D;">
+                    <div class="w-6 h-3 border border-current rounded-sm relative">
+                        <div class="absolute inset-0.5 bg-current rounded-sm" style="width: 74%;"></div>
+                    </div>
+                    <div class="w-0.5 h-1.5 bg-current rounded-r-sm ml-0.5"></div>
+                    <span class="text-xs ml-1">37</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="relative content-area" style="background: #FAF8F5;">
+            <!-- 微信胶囊按钮 -->
+            <div class="absolute right-3 top-1.5 flex capsule-button rounded-full h-7 z-20" style="width: 88px;">
+                <div class="flex-1 h-7 flex items-center justify-center">
+                    <div class="flex gap-0.5">
+                        <div class="w-1 h-1 rounded-full" style="background: #2D2D2D;"></div>
+                        <div class="w-1 h-1 rounded-full" style="background: #2D2D2D;"></div>
+                        <div class="w-1 h-1 rounded-full" style="background: #2D2D2D;"></div>
+                    </div>
+                </div>
+                <div class="w-px h-4 capsule-divider self-center"></div>
+                <div class="flex-1 h-7 flex items-center justify-center">
+                    <div class="w-3.5 h-3.5 border rounded-full" style="border-color: #2D2D2D;"></div>
+                </div>
+            </div>
+
+            <!-- 自定义导航区 -->
+            <div class="px-4 pt-1 pb-3">
+                <div class="flex items-center justify-between h-10">
+                    <h1 class="text-xl font-bold" style="color: #2D2D2D;">图鉴</h1>
+                </div>
+            </div>
+
+            <!-- 搜索栏 -->
+            <div class="px-4 pb-3">
+                <div class="flex items-center gap-2.5 px-4 py-2.5 rounded-full" style="background: rgba(0,0,0,0.04);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B5B5B5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path>
+                    </svg>
+                    <span class="text-sm" style="color: #B5B5B5;">搜索宝可梦名称或编号</span>
+                </div>
+            </div>
+
+            <!-- 世代筛选 -->
+            <div class="filter-scroll px-4 pb-2 flex gap-2">
+                <div class="chip chip-active">全部</div>
+                <div class="chip chip-inactive">第一世代</div>
+                <div class="chip chip-inactive">第二世代</div>
+                <div class="chip chip-inactive">第三世代</div>
+                <div class="chip chip-inactive">第四世代</div>
+                <div class="chip chip-inactive">第五世代</div>
+                <div class="chip chip-inactive">第六世代</div>
+                <div class="chip chip-inactive">第七世代</div>
+                <div class="chip chip-inactive">第八世代</div>
+                <div class="chip chip-inactive">第九世代</div>
+            </div>
+
+            <!-- 属性筛选 -->
+            <div class="filter-scroll px-4 pb-4 flex gap-1.5">
+                <div class="type-tag type-normal" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">一般</div>
+                <div class="type-tag type-fire" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">火</div>
+                <div class="type-tag type-water" style="padding: 4px 10px; font-size: 11px; border: 2px solid #6890F0; opacity: 1;">水</div>
+                <div class="type-tag type-grass" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">草</div>
+                <div class="type-tag type-electric" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">电</div>
+                <div class="type-tag type-ice" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">冰</div>
+                <div class="type-tag type-fighting" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">格斗</div>
+                <div class="type-tag type-poison" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">毒</div>
+                <div class="type-tag type-ground" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">地面</div>
+                <div class="type-tag type-flying" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">飞行</div>
+                <div class="type-tag type-psychic" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">超能力</div>
+                <div class="type-tag type-bug" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">虫</div>
+                <div class="type-tag type-rock" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">岩石</div>
+                <div class="type-tag type-ghost" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">幽灵</div>
+                <div class="type-tag type-dragon" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">龙</div>
+                <div class="type-tag type-dark" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">恶</div>
+                <div class="type-tag type-steel" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">钢</div>
+                <div class="type-tag type-fairy" style="padding: 4px 10px; font-size: 11px; opacity: 0.55;">妖精</div>
+            </div>
+
+            <!-- 宝可梦网格列表 -->
+            <div class="px-4 grid grid-cols-2 gap-3 pb-20">
+                <!-- 卡片1：妙蛙种子 -->
+                <div class="poke-card glass-card rounded-2xl p-3 flex flex-col items-center">
+                    <div class="text-xs font-medium mb-1" style="color: #B5B5B5;">#0001</div>
+                    <div class="w-20 h-20 flex items-center justify-center mb-2">
+                        <img src="https://s1.52poke.wiki/wiki/thumb/2/21/001Bulbasaur.png/200px-001Bulbasaur.png" alt="妙蛙种子" class="w-full h-full object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-full h-full items-center justify-center text-3xl hidden" style="color: #E0DCD6;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3"/></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold mb-1" style="color: #2D2D2D;">妙蛙种子</div>
+                    <div class="flex gap-1">
+                        <span class="type-tag type-grass">草</span>
+                        <span class="type-tag type-poison">毒</span>
+                    </div>
+                </div>
+
+                <!-- 卡片2：小火龙 -->
+                <div class="poke-card glass-card rounded-2xl p-3 flex flex-col items-center">
+                    <div class="text-xs font-medium mb-1" style="color: #B5B5B5;">#0004</div>
+                    <div class="w-20 h-20 flex items-center justify-center mb-2">
+                        <img src="https://s1.52poke.wiki/wiki/thumb/7/73/004Charmander.png/200px-004Charmander.png" alt="小火龙" class="w-full h-full object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-full h-full items-center justify-center text-3xl hidden" style="color: #E0DCD6;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3"/></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold mb-1" style="color: #2D2D2D;">小火龙</div>
+                    <div class="flex gap-1">
+                        <span class="type-tag type-fire">火</span>
+                    </div>
+                </div>
+
+                <!-- 卡片3：喷火龙 -->
+                <div class="poke-card glass-card rounded-2xl p-3 flex flex-col items-center">
+                    <div class="text-xs font-medium mb-1" style="color: #B5B5B5;">#0006</div>
+                    <div class="w-20 h-20 flex items-center justify-center mb-2">
+                        <img src="https://s1.52poke.wiki/wiki/thumb/7/7e/006Charizard.png/200px-006Charizard.png" alt="喷火龙" class="w-full h-full object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-full h-full items-center justify-center text-3xl hidden" style="color: #E0DCD6;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3"/></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold mb-1" style="color: #2D2D2D;">喷火龙</div>
+                    <div class="flex gap-1">
+                        <span class="type-tag type-fire">火</span>
+                        <span class="type-tag type-flying">飞行</span>
+                    </div>
+                </div>
+
+                <!-- 卡片4：皮卡丘 -->
+                <div class="poke-card glass-card rounded-2xl p-3 flex flex-col items-center">
+                    <div class="text-xs font-medium mb-1" style="color: #B5B5B5;">#0025</div>
+                    <div class="w-20 h-20 flex items-center justify-center mb-2">
+                        <img src="https://s1.52poke.wiki/wiki/thumb/0/0d/025Pikachu.png/200px-025Pikachu.png" alt="皮卡丘" class="w-full h-full object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-full h-full items-center justify-center text-3xl hidden" style="color: #E0DCD6;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3"/></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold mb-1" style="color: #2D2D2D;">皮卡丘</div>
+                    <div class="flex gap-1">
+                        <span class="type-tag type-electric">电</span>
+                    </div>
+                </div>
+
+                <!-- 卡片5：耿鬼 -->
+                <div class="poke-card glass-card rounded-2xl p-3 flex flex-col items-center">
+                    <div class="text-xs font-medium mb-1" style="color: #B5B5B5;">#0094</div>
+                    <div class="w-20 h-20 flex items-center justify-center mb-2">
+                        <img src="https://s1.52poke.wiki/wiki/thumb/b/b8/094Gengar.png/200px-094Gengar.png" alt="耿鬼" class="w-full h-full object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-full h-full items-center justify-center text-3xl hidden" style="color: #E0DCD6;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3"/></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold mb-1" style="color: #2D2D2D;">耿鬼</div>
+                    <div class="flex gap-1">
+                        <span class="type-tag type-ghost">幽灵</span>
+                        <span class="type-tag type-poison">毒</span>
+                    </div>
+                </div>
+
+                <!-- 卡片6：暴鲤龙 -->
+                <div class="poke-card glass-card rounded-2xl p-3 flex flex-col items-center">
+                    <div class="text-xs font-medium mb-1" style="color: #B5B5B5;">#0130</div>
+                    <div class="w-20 h-20 flex items-center justify-center mb-2">
+                        <img src="https://s1.52poke.wiki/wiki/thumb/0/02/130Gyarados.png/200px-130Gyarados.png" alt="暴鲤龙" class="w-full h-full object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-full h-full items-center justify-center text-3xl hidden" style="color: #E0DCD6;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3"/></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold mb-1" style="color: #2D2D2D;">暴鲤龙</div>
+                    <div class="flex gap-1">
+                        <span class="type-tag type-water">水</span>
+                        <span class="type-tag type-flying">飞行</span>
+                    </div>
+                </div>
+
+                <!-- 卡片7：快龙 -->
+                <div class="poke-card glass-card rounded-2xl p-3 flex flex-col items-center">
+                    <div class="text-xs font-medium mb-1" style="color: #B5B5B5;">#0149</div>
+                    <div class="w-20 h-20 flex items-center justify-center mb-2">
+                        <img src="https://s1.52poke.wiki/wiki/thumb/7/79/149Dragonite.png/200px-149Dragonite.png" alt="快龙" class="w-full h-full object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-full h-full items-center justify-center text-3xl hidden" style="color: #E0DCD6;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3"/></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold mb-1" style="color: #2D2D2D;">快龙</div>
+                    <div class="flex gap-1">
+                        <span class="type-tag type-dragon">龙</span>
+                        <span class="type-tag type-flying">飞行</span>
+                    </div>
+                </div>
+
+                <!-- 卡片8：超梦 -->
+                <div class="poke-card glass-card rounded-2xl p-3 flex flex-col items-center">
+                    <div class="text-xs font-medium mb-1" style="color: #B5B5B5;">#0150</div>
+                    <div class="w-20 h-20 flex items-center justify-center mb-2">
+                        <img src="https://s1.52poke.wiki/wiki/thumb/7/78/150Mewtwo.png/200px-150Mewtwo.png" alt="超梦" class="w-full h-full object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="w-full h-full items-center justify-center text-3xl hidden" style="color: #E0DCD6;">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3"/></svg>
+                        </div>
+                    </div>
+                    <div class="text-sm font-semibold mb-1" style="color: #2D2D2D;">超梦</div>
+                    <div class="flex gap-1">
+                        <span class="type-tag type-psychic">超能力</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 加载更多指示器 -->
+            <div class="flex justify-center py-4 pb-20">
+                <div class="flex items-center gap-1.5">
+                    <div class="w-1.5 h-1.5 rounded-full bg-pokered animate-pulse"></div>
+                    <div class="w-1.5 h-1.5 rounded-full bg-pokered animate-pulse" style="animation-delay: 0.2s;"></div>
+                    <div class="w-1.5 h-1.5 rounded-full bg-pokered animate-pulse" style="animation-delay: 0.4s;"></div>
+                    <span class="text-xs ml-1" style="color: #B5B5B5;">加载更多</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部 TabBar -->
+        <div class="absolute bottom-0 left-0 right-0 flex items-end justify-around px-6 pb-5 pt-2 z-30" style="background: rgba(255,252,248,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid rgba(0,0,0,0.04);">
+            <!-- 图鉴 (active) -->
+            <div class="tabbar-item active">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3" fill="currentColor"/>
+                </svg>
+                <span>图鉴</span>
+            </div>
+            <!-- 资料库 -->
+            <div class="tabbar-item inactive">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+                <span>资料库</span>
+            </div>
+            <!-- 队伍 -->
+            <div class="tabbar-item inactive">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <span>队伍</span>
+            </div>
+            <!-- 我的 -->
+            <div class="tabbar-item inactive">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+                <span>我的</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,4 +1,12 @@
-import { ALL_TYPE_OPTIONS, TYPE_ALIASES, NATURE_EFFECTS, STAT_KEYS, LEARN_METHOD_LABELS } from "./constants.js";
+import {
+  TYPE_OPTIONS,
+  TYPE_ALIASES,
+  NATURE_EFFECTS,
+  STAT_KEYS,
+  LEARN_METHOD_LABELS,
+  typeNameToId,
+  typeIdToName,
+} from "@pokemon-localdex/store-types/constants";
 
 /**
  * 从 hash 路由的 query string 中解析 expand 参数
@@ -14,17 +22,18 @@ export function parseExpandParam() {
 }
 
 export function normalizeTypeName(type) {
-  return TYPE_ALIASES[String(type || "").trim()] || String(type || "").trim();
+  const id = typeNameToId(type);
+  return id ? typeIdToName(id) : String(type || "").trim();
 }
 
 export function splitTypeNames(type) {
   const normalized = normalizeTypeName(type);
   if (!normalized) return [];
-  if (ALL_TYPE_OPTIONS.includes(normalized)) return [normalized];
+  if (typeNameToId(normalized)) return [normalized];
 
   const result = [];
   let remaining = normalized;
-  const candidates = [...ALL_TYPE_OPTIONS, ...Object.keys(TYPE_ALIASES)]
+  const candidates = [...TYPE_OPTIONS.map((typeOption) => typeOption.nameZh), ...Object.keys(TYPE_ALIASES)]
     .sort((a, b) => b.length - a.length);
 
   while (remaining) {
@@ -108,6 +117,7 @@ export function calculateClassicStatValue(base, statKey, {
 
 export function calculateSpeedLine(baseSpe, level = 50) {
   return {
+    noInvestment: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 0, level, nature: "认真" }),
     full: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "认真" }),
     max: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "爽朗" }),
   };
@@ -243,10 +253,47 @@ export function buildEvolutionFamilies(pokemonList) {
   });
 }
 
+/**
+ * 从形态的 statVariants / typeVariants / abilityVariants 推导可用世代列表。
+ * 不再依赖 detail.generations（pokemon_generation_regions 表），
+ * 避免详情首开需要额外请求 /generations。
+ *
+ * 推导逻辑：收集所有 variant 的 generationStart / generationEnd，
+ * 展开为连续的世代范围。如果没有任何 variant 则返回空数组（单世代无需切换）。
+ */
 export function buildPokemonGenerationOptions(detail) {
+  const forms = detail.forms || [];
   const values = new Set();
-  for (const g of detail.generations || []) values.add(Number(g));
-  return [...values].filter(Boolean).sort((a, b) => a - b);
+
+  for (const form of forms) {
+    const allVariants = [
+      ...(form.statVariants || []),
+      ...(form.typeVariants || []),
+      ...(form.abilityVariants || []),
+    ];
+    for (const v of allVariants) {
+      const gs = v.generationStart;
+      const ge = v.generationEnd;
+      if (gs) values.add(Number(gs));
+      if (ge) values.add(Number(ge));
+    }
+  }
+
+  // 如果没有任何 variant，世代切换没有意义——返回空数组
+  if (values.size === 0) return [];
+
+  // 补齐连续世代：从最小到最大（上界默认到 9）
+  const sorted = [...values].filter(Boolean).sort((a, b) => a - b);
+  const min = sorted[0];
+  const hasOpenEnd = forms.some((f) =>
+    [...(f.statVariants || []), ...(f.typeVariants || []), ...(f.abilityVariants || [])]
+      .some((v) => v.generationStart && !v.generationEnd),
+  );
+  const max = hasOpenEnd ? 9 : sorted[sorted.length - 1];
+
+  const result = [];
+  for (let g = min; g <= max; g++) result.push(g);
+  return result;
 }
 
 /**

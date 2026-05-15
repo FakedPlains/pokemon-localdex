@@ -79,6 +79,18 @@ export async function fetchPokemonDetail(idOrSlug) {
   return res
 }
 
+/** 轻量摘要（不含 evolutionChain、generations） */
+export async function fetchPokemonSummary(idOrSlug) {
+  const res = await request(`/pokemon/${encodeURIComponent(idOrSlug)}/summary`)
+  return res
+}
+
+/** 独立进化链 */
+export async function fetchPokemonEvolution(pokemonId) {
+  const res = await request(`/pokemon/${pokemonId}/evolution`)
+  return res
+}
+
 // ── Pokemon Learnset Meta ──
 
 export async function fetchLearnsetMeta(pokemonId) {
@@ -88,11 +100,14 @@ export async function fetchLearnsetMeta(pokemonId) {
 
 // ── Pokemon Learnset ──
 
-export async function fetchPokemonLearnset(pokemonId, generation, formKey = 'default', gameVersionCode) {
+export async function fetchPokemonLearnset(pokemonId, generation, formKey = 'default', gameVersionCode, { limit, offset, method } = {}) {
   const params = {}
   if (generation !== undefined) params.generation = generation
   if (formKey) params.form = formKey
   if (gameVersionCode !== undefined) params.version = gameVersionCode
+  if (limit !== undefined) params.limit = limit
+  if (offset !== undefined) params.offset = offset
+  if (method) params.method = method
 
   const res = await request(`/pokemon/${pokemonId}/learnset`, { params })
   return res
@@ -157,5 +172,25 @@ export async function fetchItemsList({ q, category, limit, offset } = {}) {
 
 export async function fetchItemDetail(idOrSlug) {
   const res = await request(`/items/${encodeURIComponent(idOrSlug)}`)
+  return res
+}
+
+// ── 招式反查宝可梦 ──
+
+export async function fetchPokemonByMove(moveId, { limit, offset } = {}) {
+  const params = {}
+  if (limit !== undefined) params.limit = limit
+  if (offset !== undefined) params.offset = offset
+  const res = await request(`/moves/${moveId}/pokemon`, { params })
+  return res
+}
+
+// ── 特性反查宝可梦 ──
+
+export async function fetchPokemonByAbility(abilityId, { limit, offset } = {}) {
+  const params = {}
+  if (limit !== undefined) params.limit = limit
+  if (offset !== undefined) params.offset = offset
+  const res = await request(`/abilities/${abilityId}/pokemon`, { params })
   return res
 }

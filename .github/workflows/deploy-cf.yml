@@ -10,9 +10,52 @@ permissions:
   packages: read   # 读取 GitHub Packages（@fakedplains/smogon-calc）
 
 jobs:
+  # D1 schema 迁移（仅在 schema/d1-schema.sql 变更时触发，先于 deploy 执行）
+  # d1-schema.sql 使用 CREATE TABLE IF NOT EXISTS，幂等安全，先跑不会破坏旧代码
+  migrate-d1:
+    runs-on: ubuntu-latest
+    name: D1 Schema Migration
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for schema changes
+        id: schema-check
+        run: |
+          if git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q '^schema/d1-schema.sql$'; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node.js
+        if: steps.schema-check.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        if: steps.schema-check.outputs.changed == 'true'
+        run: npm install --no-audit --no-fund
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run D1 migration
+        if: steps.schema-check.outputs.changed == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 execute pokemon-localdex-d1 --remote --file=schema/d1-schema.sql
+
   deploy:
     runs-on: ubuntu-latest
     name: Build & Deploy to Cloudflare Pages
+    needs: [migrate-d1]
+    if: ${{ always() && !failure() && !cancelled() }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,6 +69,8 @@ jobs:
         run: |
           rm -f package-lock.json
           npm install --no-audit --no-fund
+          echo "--- Installed top-level dependency versions ---"
+          npm ls --depth=0 || true
         env:
           # 让 .npmrc 中的 ${GITHUB_TOKEN} 占位符生效，用于拉取 @fakedplains 私有包
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -46,32 +91,3 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=pokemon-localdex --branch=${{ github.ref_name }}
-
-  # 可选：D1 schema 迁移（仅在 schema/d1-schema.sql 变更时触发）
-  migrate-d1:
-    runs-on: ubuntu-latest
-    name: D1 Schema Migration
-    needs: []
-    if: |
-      github.ref == 'refs/heads/main' &&
-      contains(github.event.head_commit.modified, 'schema/d1-schema.sql')
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run D1 migration
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 execute pokemon-localdex-d1 --remote --file=schema/d1-schema.sql

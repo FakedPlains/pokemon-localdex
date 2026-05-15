@@ -1,21 +1,24 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { STAT_KEYS, NATURE_OPTIONS, NATURE_EFFECTS } from "../utils/constants.js";
+import {
+  STAT_KEYS,
+  STAT_COLORS,
+  STAT_LABELS,
+  STAT_LABELS_BY_ID,
+  STAT_LABELS_COMPACT as STAT_LABELS_SHORT,
+  NATURES,
+  NATURE_EFFECTS_BY_ID,
+  natureNameToId,
+} from "@pokemon-localdex/store-types/constants";
 import { getNatureMultiplier } from "../utils/helpers.js";
 import SearchSelect from "./SearchSelect.jsx";
 
-const STAT_LABELS = { hp: "HP", atk: "攻击", def: "防御", spa: "特攻", spd: "特防", spe: "速度" };
-const STAT_LABELS_SHORT = { hp: "HP", atk: "攻", def: "防", spa: "特攻", spd: "特防", spe: "速" };
-const STAT_COLORS = {
-  hp: "#8AC654", atk: "#F8CB3C", def: "#D98837",
-  spa: "#59C3D0", spd: "#5890CD", spe: "#A456D0"
-};
-
-const NATURE_SELECT_OPTIONS = NATURE_OPTIONS.map((n) => {
-  const eff = NATURE_EFFECTS[n];
+const NATURE_SELECT_OPTIONS = NATURES.map((nature) => {
+  const eff = NATURE_EFFECTS_BY_ID[nature.id];
   return {
-    value: n,
-    label: n,
-    sublabel: eff ? `+${STAT_LABELS[eff.up]} -${STAT_LABELS[eff.down]}` : "无修正",
+    id: nature.id,
+    value: nature.nameZh,
+    label: nature.nameZh,
+    sublabel: eff ? `+${STAT_LABELS_BY_ID[eff.up]} -${STAT_LABELS_BY_ID[eff.down]}` : "无修正",
   };
 });
 
@@ -282,7 +285,7 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
   );
 
   const currentNature = mode === "champions" ? champNature : nature;
-  const natureEffect = NATURE_EFFECTS[currentNature];
+  const natureEffect = NATURE_EFFECTS_BY_ID[natureNameToId(currentNature)];
 
   if (!baseStats) {
     return <div className="sc-empty">暂无种族值数据，无法计算能力值。</div>;
@@ -589,9 +592,9 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
       {natureEffect && (
         <div className="sc-nature-hint">
           {currentNature}性格：
-          <span className="sc-nature-up">{STAT_LABELS[natureEffect.up]} ×1.1</span>
+          <span className="sc-nature-up">{STAT_LABELS_BY_ID[natureEffect.up]} ×1.1</span>
           {" / "}
-          <span className="sc-nature-down">{STAT_LABELS[natureEffect.down]} ×0.9</span>
+          <span className="sc-nature-down">{STAT_LABELS_BY_ID[natureEffect.down]} ×0.9</span>
         </div>
       )}
 
