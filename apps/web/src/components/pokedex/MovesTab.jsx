@@ -19,11 +19,13 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
   const learnsetFormKeys = learnsetMeta?.formKeys || [];
   const versionsByGen = learnsetMeta?.versionsByGen || {};
 
-  // 当前选中的世代：优先用 detailGeneration，否则取 learnset 可用世代中最大的
+  // 当前选中的世代：优先用 detailGeneration，否则取最新正统世代（排除 99/Champions）
   const activeGen = useMemo(() => {
     const requested = Number(detailGeneration || 0);
     if (requested && learnsetGenOptions.includes(requested)) return requested;
-    return learnsetGenOptions.length > 0 ? learnsetGenOptions[learnsetGenOptions.length - 1] : null;
+    if (learnsetGenOptions.length === 0) return null;
+    const normalGens = learnsetGenOptions.filter(g => g !== 99);
+    return normalGens.length > 0 ? normalGens[normalGens.length - 1] : learnsetGenOptions[learnsetGenOptions.length - 1];
   }, [detailGeneration, learnsetGenOptions]);
 
   // 当前世代下可用的游戏版本

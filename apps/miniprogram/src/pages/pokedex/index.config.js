@@ -1,5 +1,8 @@
 export default definePageConfig({
-  navigationBarTitleText: '宝可梦图鉴',
+  navigationBarTitleText: '图鉴',
   enablePullDownRefresh: true,
-  onReachBottomDistance: 200
+  onReachBottomDistance: 200,
+  navigationBarBackgroundColor: '#FAF8F5',
+  navigationBarTextStyle: 'black',
+  backgroundColor: '#FAF8F5'
 })

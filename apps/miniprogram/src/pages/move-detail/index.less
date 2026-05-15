@@ -1,0 +1,277 @@
+.md-page {
+  height: 100vh;
+  background: #FAF8F5;
+}
+
+.md-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  color: #999;
+  font-size: 28px;
+}
+
+/* ── Hero 区域 ── */
+.md-hero {
+  margin: 0 32rpx 24rpx;
+  border-radius: 40rpx;
+  padding: 56rpx 40rpx 48rpx;
+  position: relative;
+  overflow: hidden;
+}
+
+.md-hero-circle1 {
+  position: absolute;
+  top: -60rpx;
+  right: -60rpx;
+  width: 240rpx;
+  height: 240rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.md-hero-circle2 {
+  position: absolute;
+  bottom: -40rpx;
+  left: -40rpx;
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.md-hero-name {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #ffffff;
+  display: block;
+  margin-bottom: 8rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.md-hero-name-en {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.7);
+  display: block;
+  margin-bottom: 32rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.md-hero-tags {
+  display: flex;
+  gap: 16rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.md-hero-tag {
+  padding: 10rpx 28rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 1rpx;
+}
+
+.md-hero-tag-type {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.md-hero-tag-category {
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ── 毛玻璃卡片 ── */
+.md-glass-card {
+  margin: 0 32rpx 24rpx;
+  background: rgba(255, 252, 248, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  border-radius: 32rpx;
+  padding: 32rpx;
+}
+
+.md-card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2D2D2D;
+  margin-bottom: 28rpx;
+  display: block;
+}
+
+/* ── 基础数据 2×2 网格 ── */
+.md-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24rpx;
+}
+
+.md-stat-item {
+  text-align: center;
+  padding: 28rpx 16rpx;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 24rpx;
+}
+
+.md-stat-value {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #2D2D2D;
+  line-height: 1.2;
+  display: block;
+}
+
+.md-stat-label {
+  font-size: 24rpx;
+  color: #8A8A8A;
+  margin-top: 8rpx;
+  display: block;
+}
+
+/* ── 效果说明 ── */
+.md-effect-text {
+  font-size: 28rpx;
+  color: #2D2D2D;
+  line-height: 1.6;
+}
+
+/* ── 世代变更时间线 ── */
+.md-timeline {
+  position: relative;
+  padding-left: 40rpx;
+}
+
+.md-timeline::before {
+  content: '';
+  position: absolute;
+  left: 10rpx;
+  top: 16rpx;
+  bottom: 16rpx;
+  width: 4rpx;
+  background: #E8E4DF;
+  border-radius: 2rpx;
+}
+
+.md-timeline-item {
+  position: relative;
+  padding-bottom: 36rpx;
+}
+
+.md-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.md-timeline-dot {
+  position: absolute;
+  left: -40rpx;
+  top: 8rpx;
+  width: 24rpx;
+  height: 24rpx;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 5rpx solid #E0C068;
+  z-index: 1;
+}
+
+.md-timeline-dot-first {
+  border-color: #E63946;
+  background: #E63946;
+}
+
+.md-timeline-gen {
+  display: inline-block;
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  background: rgba(0, 0, 0, 0.05);
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #8A8A8A;
+  margin-bottom: 12rpx;
+}
+
+.md-timeline-gen-first {
+  background: rgba(230, 57, 70, 0.08);
+  color: #E63946;
+}
+
+.md-timeline-desc {
+  font-size: 26rpx;
+  color: #2D2D2D;
+  line-height: 1.5;
+  display: block;
+}
+
+.md-timeline-detail {
+  font-size: 24rpx;
+  color: #8A8A8A;
+  margin-top: 6rpx;
+  line-height: 1.4;
+  display: block;
+}
+
+/* ── 可学习的宝可梦 ── */
+.md-pokemon-scroll-wrap {
+  margin: 0 -32rpx;
+  padding: 0 32rpx;
+  white-space: nowrap;
+}
+
+.md-pokemon-scroll {
+  display: inline-flex;
+  gap: 24rpx;
+  padding-bottom: 8rpx;
+}
+
+.md-pokemon-avatar-item {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 128rpx;
+}
+
+.md-pokemon-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 28rpx;
+  background: rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.md-pokemon-avatar-img {
+  width: 100rpx;
+  height: 100rpx;
+}
+
+.md-pokemon-avatar-name {
+  font-size: 20rpx;
+  color: #8A8A8A;
+  margin-top: 12rpx;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-muted {
+  font-size: 26rpx;
+  color: #8A8A8A;
+}
+
+/* ── 底部间距 ── */
+.md-bottom-spacer {
+  height: 80rpx;
+}

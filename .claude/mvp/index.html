@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokemon LocalDex - 微信小程序原型预览</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+            background: #0f0f14;
+            color: #e8e6e3;
+            min-height: 100vh;
+        }
+
+        /* 顶部 hero */
+        .hero-section {
+            background: linear-gradient(160deg, #1a1020 0%, #0f0f14 40%, #14100a 100%);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .hero-section::before {
+            content: '';
+            position: absolute; inset: 0;
+            background:
+                radial-gradient(ellipse 600px 400px at 20% 50%, rgba(230,57,70,0.08), transparent),
+                radial-gradient(ellipse 500px 350px at 80% 30%, rgba(112,56,248,0.06), transparent);
+            pointer-events: none;
+        }
+
+        /* 页面预览网格 */
+        .preview-grid {
+            display: grid;
+            gap: 48px;
+            justify-items: center;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+        }
+        @media (min-width: 1800px) {
+            .preview-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        @media (max-width: 900px) {
+            .preview-grid { grid-template-columns: 1fr; }
+        }
+
+        .preview-item {
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .preview-frame {
+            width: 393px; height: 852px;
+            border-radius: 40px;
+            overflow: hidden;
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,0.08),
+                0 20px 60px rgba(0,0,0,0.5),
+                0 0 120px rgba(230,57,70,0.04);
+            position: relative;
+            background: #FAF8F5;
+        }
+        .preview-frame iframe {
+            width: 393px; height: 852px;
+            border: none; border-radius: 40px;
+        }
+        .preview-label {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .preview-label h3 {
+            font-size: 16px; font-weight: 600;
+            color: #e8e6e3;
+            margin-bottom: 4px;
+        }
+        .preview-label p {
+            font-size: 13px;
+            color: #6b6970;
+        }
+
+        /* 标签 */
+        .tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .tag-tab { background: rgba(230,57,70,0.15); color: #E63946; }
+        .tag-detail { background: rgba(112,56,248,0.15); color: #A890F0; }
+        .tag-tool { background: rgba(52,199,89,0.15); color: #34C759; }
+
+        /* 设计说明区 */
+        .design-notes {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px;
+        }
+        .color-swatch {
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        .flow-arrow {
+            color: #3a3840;
+            font-size: 20px;
+        }
+        .flow-node {
+            padding: 8px 16px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .flow-node.active {
+            background: rgba(230,57,70,0.1);
+            border-color: rgba(230,57,70,0.3);
+            color: #E63946;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Hero Section -->
+    <header class="hero-section relative py-16 px-8">
+        <div class="max-w-6xl mx-auto relative z-10">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #E63946, #FF6B6B);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h8M14 12h8"/><circle cx="12" cy="12" r="3" fill="white"/></svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold">Pokemon LocalDex</h1>
+                    <p class="text-sm" style="color: #6b6970;">微信小程序高保真原型</p>
+                </div>
+            </div>
+            <p class="text-base leading-relaxed max-w-2xl" style="color: #9b99a1;">
+                面向中文宝可梦玩家的一站式移动工具，将百科图鉴浏览与对战辅助无缝整合。
+                覆盖全 9 世代、1025 只宝可梦的完整数据，支持队伍构筑和伤害计算。
+            </p>
+            <!-- 流程示意 -->
+            <div class="flex items-center gap-3 mt-8 overflow-x-auto pb-2 flex-wrap">
+                <div class="flow-node active">图鉴浏览</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node">查看详情</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node">查阅资料</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node">组建队伍</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node">伤害验证</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 页面预览 -->
+    <main class="max-w-7xl mx-auto px-8 py-16">
+        <div class="mb-12">
+            <h2 class="text-xl font-bold mb-2">页面预览</h2>
+            <p class="text-sm" style="color: #6b6970;">共 7 个核心页面，按用户使用流程排列。点击页面可交互滚动。</p>
+        </div>
+
+        <div class="preview-grid">
+            <!-- 1. 图鉴首页 -->
+            <div class="preview-item">
+                <div class="preview-frame">
+                    <iframe src="home.html" loading="lazy"></iframe>
+                </div>
+                <div class="preview-label">
+                    <div class="flex items-center justify-center gap-2 mb-1">
+                        <h3>图鉴首页</h3>
+                        <span class="tag tag-tab">TabBar</span>
+                    </div>
+                    <p>搜索 · 世代/属性筛选 · 双列卡片网格</p>
+                </div>
+            </div>
+
+            <!-- 2. 宝可梦详情 -->
+            <div class="preview-item">
+                <div class="preview-frame">
+                    <iframe src="pokemon-detail.html" loading="lazy"></iframe>
+                </div>
+                <div class="preview-label">
+                    <div class="flex items-center justify-center gap-2 mb-1">
+                        <h3>宝可梦详情</h3>
+                        <span class="tag tag-detail">详情页</span>
+                    </div>
+                    <p>属性渐变 Hero · 种族值 · 特性 · 进化链 · 招式</p>
+                </div>
+            </div>
+
+            <!-- 3. 资料库 -->
+            <div class="preview-item">
+                <div class="preview-frame">
+                    <iframe src="database.html" loading="lazy"></iframe>
+                </div>
+                <div class="preview-label">
+                    <div class="flex items-center justify-center gap-2 mb-1">
+                        <h3>资料库</h3>
+                        <span class="tag tag-tab">TabBar</span>
+                    </div>
+                    <p>招式/特性/道具 · 分段Tab · 分类筛选</p>
+                </div>
+            </div>
+
+            <!-- 4. 招式详情 -->
+            <div class="preview-item">
+                <div class="preview-frame">
+                    <iframe src="move-detail.html" loading="lazy"></iframe>
+                </div>
+                <div class="preview-label">
+                    <div class="flex items-center justify-center gap-2 mb-1">
+                        <h3>招式详情</h3>
+                        <span class="tag tag-detail">详情页</span>
+                    </div>
+                    <p>基础数据 · 效果说明 · 世代变更 · 可学习宝可梦</p>
+                </div>
+            </div>
+
+            <!-- 5. 队伍构筑 -->
+            <div class="preview-item">
+                <div class="preview-frame">
+                    <iframe src="teams.html" loading="lazy"></iframe>
+                </div>
+                <div class="preview-label">
+                    <div class="flex items-center justify-center gap-2 mb-1">
+                        <h3>队伍构筑</h3>
+                        <span class="tag tag-tab">TabBar</span>
+                    </div>
+                    <p>盒子/队伍切换 · 3×2 成员网格 · 快捷编辑</p>
+                </div>
+            </div>
+
+            <!-- 6. 伤害计算 -->
+            <div class="preview-item">
+                <div class="preview-frame">
+                    <iframe src="damage.html" loading="lazy"></iframe>
+                </div>
+                <div class="preview-label">
+                    <div class="flex items-center justify-center gap-2 mb-1">
+                        <h3>伤害计算</h3>
+                        <span class="tag tag-tool">工具</span>
+                    </div>
+                    <p>攻守配置 · 招式选择 · 结果可视化 · 场地设置</p>
+                </div>
+            </div>
+
+            <!-- 7. 个人中心 -->
+            <div class="preview-item">
+                <div class="preview-frame">
+                    <iframe src="profile.html" loading="lazy"></iframe>
+                </div>
+                <div class="preview-label">
+                    <div class="flex items-center justify-center gap-2 mb-1">
+                        <h3>个人中心</h3>
+                        <span class="tag tag-tab">TabBar</span>
+                    </div>
+                    <p>用户信息 · 工具入口 · 设置 · 关于</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 设计说明 -->
+    <footer class="max-w-6xl mx-auto px-8 pb-20">
+        <div class="design-notes p-8">
+            <h2 class="text-lg font-bold mb-6">设计说明</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- 配色方案 -->
+                <div>
+                    <h3 class="text-sm font-semibold mb-4" style="color: #9b99a1;">配色方案 —「精灵球红·暖质感」</h3>
+                    <div class="flex flex-wrap gap-3">
+                        <div class="flex items-center gap-2">
+                            <div class="color-swatch" style="background: #E63946;"></div>
+                            <div><div class="text-xs font-medium">精灵球红</div><div class="text-xs" style="color: #6b6970;">#E63946</div></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="color-swatch" style="background: #FAF8F5;"></div>
+                            <div><div class="text-xs font-medium">暖白背景</div><div class="text-xs" style="color: #6b6970;">#FAF8F5</div></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="color-swatch" style="background: #2D2D2D;"></div>
+                            <div><div class="text-xs font-medium">主文字</div><div class="text-xs" style="color: #6b6970;">#2D2D2D</div></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="color-swatch" style="background: #8A8A8A;"></div>
+                            <div><div class="text-xs font-medium">辅助文字</div><div class="text-xs" style="color: #6b6970;">#8A8A8A</div></div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        <div class="color-swatch" style="background: #78C850; width: 28px; height: 28px; border-radius: 8px;" title="草"></div>
+                        <div class="color-swatch" style="background: #F08030; width: 28px; height: 28px; border-radius: 8px;" title="火"></div>
+                        <div class="color-swatch" style="background: #6890F0; width: 28px; height: 28px; border-radius: 8px;" title="水"></div>
+                        <div class="color-swatch" style="background: #F8D030; width: 28px; height: 28px; border-radius: 8px;" title="电"></div>
+                        <div class="color-swatch" style="background: #7038F8; width: 28px; height: 28px; border-radius: 8px;" title="龙"></div>
+                        <div class="color-swatch" style="background: #E0C068; width: 28px; height: 28px; border-radius: 8px;" title="地面"></div>
+                        <div class="color-swatch" style="background: #705898; width: 28px; height: 28px; border-radius: 8px;" title="幽灵"></div>
+                        <div class="color-swatch" style="background: #A040A0; width: 28px; height: 28px; border-radius: 8px;" title="毒"></div>
+                        <div class="color-swatch" style="background: #A890F0; width: 28px; height: 28px; border-radius: 8px;" title="飞行"></div>
+                        <div class="color-swatch" style="background: #EE99AC; width: 28px; height: 28px; border-radius: 8px;" title="妖精"></div>
+                    </div>
+                </div>
+
+                <!-- 设计原则 -->
+                <div>
+                    <h3 class="text-sm font-semibold mb-4" style="color: #9b99a1;">设计原则</h3>
+                    <div class="space-y-3 text-sm" style="color: #9b99a1; line-height: 1.7;">
+                        <p><span style="color: #e8e6e3; font-weight: 600;">毛玻璃卡片</span> — 半透明暖白面板 + backdrop-filter 模糊，营造温暖质感和层次深度。</p>
+                        <p><span style="color: #e8e6e3; font-weight: 600;">药丸形元素</span> — 按钮、标签、筛选 chip 统一使用全圆角（999px），保持圆润和谐。</p>
+                        <p><span style="color: #e8e6e3; font-weight: 600;">属性色彩</span> — 18 种宝可梦属性各有专属配色，贯穿标签、渐变背景、边框等视觉元素。</p>
+                        <p><span style="color: #e8e6e3; font-weight: 600;">信息折中</span> — 默认展示关键信息保持视觉清爽，详细数据按需展开或跳转查看。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 导航结构 -->
+            <div class="mt-8 pt-6" style="border-top: 1px solid rgba(255,255,255,0.06);">
+                <h3 class="text-sm font-semibold mb-4" style="color: #9b99a1;">导航结构 — 4 Tab 精简方案</h3>
+                <div class="flex items-start gap-8 flex-wrap text-sm" style="color: #9b99a1;">
+                    <div>
+                        <div class="font-medium mb-2" style="color: #E63946;">📱 图鉴</div>
+                        <div>宝可梦列表 → 详情页</div>
+                    </div>
+                    <div>
+                        <div class="font-medium mb-2" style="color: #A890F0;">📖 资料库</div>
+                        <div>招式 / 特性 / 道具 → 各详情页</div>
+                    </div>
+                    <div>
+                        <div class="font-medium mb-2" style="color: #34C759;">👥 队伍</div>
+                        <div>宝可梦盒子 / 我的队伍</div>
+                    </div>
+                    <div>
+                        <div class="font-medium mb-2" style="color: #F8D030;">👤 我的</div>
+                        <div>工具入口 / 设置 / 关于</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 设备信息 -->
+            <div class="mt-6 pt-4 flex items-center justify-between text-xs" style="border-top: 1px solid rgba(255,255,255,0.06); color: #4a4850;">
+                <span>设备基准：iPhone 16 Pro (393×852px)</span>
+                <span>技术栈：HTML + Tailwind CSS</span>
+                <span>数据来源：52Poké Wiki</span>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>

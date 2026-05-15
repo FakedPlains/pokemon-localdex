@@ -159,3 +159,23 @@ export async function fetchItemDetail(idOrSlug) {
   const res = await request(`/items/${encodeURIComponent(idOrSlug)}`)
   return res
 }
+
+// ── 招式反查宝可梦 ──
+
+export async function fetchPokemonByMove(moveId, { limit, offset } = {}) {
+  const params = {}
+  if (limit !== undefined) params.limit = limit
+  if (offset !== undefined) params.offset = offset
+  const res = await request(`/moves/${moveId}/pokemon`, { params })
+  return res
+}
+
+// ── 特性反查宝可梦 ──
+
+export async function fetchPokemonByAbility(abilityId, { limit, offset } = {}) {
+  const params = {}
+  if (limit !== undefined) params.limit = limit
+  if (offset !== undefined) params.offset = offset
+  const res = await request(`/abilities/${abilityId}/pokemon`, { params })
+  return res
+}

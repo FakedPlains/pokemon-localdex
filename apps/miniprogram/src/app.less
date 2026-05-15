@@ -1,84 +1,287 @@
-/* ── 全局样式 ── */
+/* ══════════════════════════════════════════════
+   Pokemon LocalDex 小程序 — 全局样式
+   设计系统：「精灵球红·暖质感」
+   ══════════════════════════════════════════════ */
 
 page {
-  background-color: #f5f5f5;
-  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica,
-    'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  background-color: #FAF8F5;
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 28px;
-  color: #333;
+  color: #2D2D2D;
   box-sizing: border-box;
+  --color-primary: #E63946;
+  --color-primary-dark: #C62833;
+  --color-primary-light: rgba(230, 57, 70, 0.08);
+  --color-bg: #FAF8F5;
+  --color-card: rgba(255, 252, 248, 0.85);
+  --color-card-solid: #FFFCF8;
+  --color-ink: #2D2D2D;
+  --color-ink-muted: #8A8A8A;
+  --color-ink-faint: #B5B5B5;
+  --color-divider: rgba(0, 0, 0, 0.06);
+  --color-success: #34C759;
+  --color-warning: #FF9500;
+  --color-error: #FF3B30;
 }
 
 view, text, image {
   box-sizing: border-box;
 }
 
-/* ── 属性颜色（使用英文类名避免 WXSS 中文编译问题） ── */
+/* ── 毛玻璃卡片 ── */
+.glass-card {
+  background: rgba(255, 252, 248, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+}
+
+.floating-panel {
+  background: rgba(255, 252, 248, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.08);
+}
+
+/* ── 药丸形元素基类 ── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+/* ── Chip 筛选标签 ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 28px;
+  border-radius: 999px;
+  font-size: 26px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.2s;
+}
+
+.chip-active {
+  background: #E63946;
+  color: #fff;
+  border-color: #E63946;
+  box-shadow: 0 4px 16px rgba(230, 57, 70, 0.25);
+}
+
+.chip-inactive {
+  background: rgba(255, 252, 248, 0.85);
+  color: #8A8A8A;
+}
+
+/* ── 分段控件 ── */
+.segment-control {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 999px;
+  padding: 6px;
+}
+
+.segment-item {
+  padding: 12px 32px;
+  border-radius: 999px;
+  font-size: 28px;
+  font-weight: 500;
+  color: #8A8A8A;
+  transition: all 0.2s;
+}
+
+.segment-active {
+  background: #E63946;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(230, 57, 70, 0.25);
+}
+
+/* ── 属性标签（药丸形） ── */
 .type-chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 14px;
-  border-radius: 20px;
-  font-size: 22px;
+  padding: 4px 16px;
+  border-radius: 999px;
+  font-size: 20px;
   color: #fff;
   font-weight: 500;
-  margin-right: 8px;
-  margin-bottom: 4px;
 }
 
-.type-normal { background: #8a8a7f; }
-.type-fire { background: #d26a2e; }
-.type-water { background: #3b84c5; }
-.type-electric { background: #e4c02a; color: #333; }
-.type-grass { background: #8aa65a; }
-.type-ice { background: #6ebec9; }
-.type-fighting { background: #b4473f; }
-.type-poison { background: #8b5ea7; }
-.type-ground { background: #b68f4e; }
-.type-flying { background: #7f9cd6; }
-.type-psychic { background: #db6390; }
-.type-bug { background: #7a9a2a; }
-.type-rock { background: #9a8752; }
-.type-ghost { background: #6b5b95; }
-.type-dragon { background: #4c62d4; }
-.type-dark { background: #5a4b43; }
-.type-steel { background: #7b8da1; }
-.type-fairy { background: #d98db8; }
+.type-normal { background: #A8A878; }
+.type-fire { background: #F08030; }
+.type-water { background: #6890F0; }
+.type-electric { background: #F8D030; color: #2D2D2D; }
+.type-grass { background: #78C850; }
+.type-ice { background: #98D8D8; }
+.type-fighting { background: #C03028; }
+.type-poison { background: #A040A0; }
+.type-ground { background: #E0C068; }
+.type-flying { background: #A890F0; }
+.type-psychic { background: #F85888; }
+.type-bug { background: #A8B820; }
+.type-rock { background: #B8A038; }
+.type-ghost { background: #705898; }
+.type-dragon { background: #7038F8; }
+.type-dark { background: #705848; }
+.type-steel { background: #B8B8D0; }
+.type-fairy { background: #EE99AC; }
 
-/* ── 通用工具类 ── */
+/* ── 搜索栏 ── */
+.search-bar-pill {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 999px;
+  padding: 0 32px;
+  height: 80px;
+  gap: 12px;
+}
+
+.search-bar-pill .search-icon {
+  font-size: 28px;
+  color: #B5B5B5;
+  flex-shrink: 0;
+}
+
+.search-bar-pill .search-input {
+  flex: 1;
+  font-size: 28px;
+  color: #2D2D2D;
+  height: 80px;
+  line-height: 80px;
+}
+
+/* ── 横向滚动容器 ── */
+.filter-scroll {
+  white-space: nowrap;
+}
+
+.filter-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── 通用辅助类 ── */
 .muted {
-  color: #999;
+  color: #8A8A8A;
   font-size: 24px;
 }
 
+.faint {
+  color: #B5B5B5;
+  font-size: 22px;
+}
+
+.text-primary {
+  color: #E63946;
+}
+
 .panel {
-  background: #fff;
-  border-radius: 16px;
-  margin: 16px;
+  background: rgba(255, 252, 248, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+  margin: 0 32px;
   overflow: hidden;
 }
 
 .panel-title {
   font-size: 32px;
-  font-weight: 700;
-  color: #333;
+  font-weight: 600;
+  color: #2D2D2D;
 }
 
-.panel-subtitle {
-  font-size: 24px;
-  color: #999;
-  margin-top: 4px;
-}
-
+/* ── 加载动画 ── */
 .pulse-dot {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #e63946;
+  background: #E63946;
   animation: pulse 1s ease-in-out infinite;
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 0.4; transform: scale(0.8); }
   50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* ── 按压反馈 ── */
+.press-scale {
+  transition: transform 0.15s;
+}
+
+.press-scale:active {
+  transform: scale(0.97);
+}
+
+/* ── 分类图标 ── */
+.category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 18px;
+  color: #fff;
+  font-weight: 600;
+}
+
+.category-physical {
+  background: linear-gradient(135deg, #E65C3A, #C74424);
+}
+
+.category-special {
+  background: linear-gradient(135deg, #6E5BA8, #4F3D8E);
+}
+
+.category-status {
+  background: linear-gradient(135deg, #9E9E9E, #757575);
+}
+
+/* ── 空态 ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 40px;
+  color: #B5B5B5;
+  font-size: 28px;
+}
+
+/* ── 加载更多指示器 ── */
+.load-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 0;
+}
+
+.load-dots .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #E63946;
+  animation: loadPulse 1.2s ease-in-out infinite;
+}
+
+.load-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.load-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes loadPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
 }

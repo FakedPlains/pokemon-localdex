@@ -1,13 +1,14 @@
 import { View, Text, Input, ScrollView } from '@tarojs/components'
 import { useState, useEffect, useCallback } from 'react'
 import Taro from '@tarojs/taro'
-import { fetchPokemonList } from '../../utils/api'
+import { fetchPokemonCards } from '../../utils/api'
 import { getTeams, createTeam, deleteTeam, updateTeam, addMember, removeMember } from '../../utils/teamStorage'
-import { TYPE_COLORS } from '@pokemon-localdex/store-types/constants'
 import SafeImage from '../../components/safe-image'
+import TypeChip from '../../components/type-chip'
 import './index.less'
 
 export default function TeamsPage() {
+  const [activeTab, setActiveTab] = useState('teams') // 'box' | 'teams'
   const [teams, setTeams] = useState([])
   const [showPicker, setShowPicker] = useState(false)
   const [activeTeamId, setActiveTeamId] = useState(null)
@@ -32,15 +33,14 @@ export default function TeamsPage() {
     try {
       const limit = 40
       const offset = (pageNum - 1) * limit
-      const res = await fetchPokemonList({ q: search || undefined, limit, offset })
-      const data = res.data || res || []
-      const list = Array.isArray(data) ? data : []
+      const res = await fetchPokemonCards({ q: search || undefined, limit, offset })
+      const list = res.data || []
       if (pageNum === 1) {
         setPokemonList(list)
       } else {
         setPokemonList(prev => [...prev, ...list])
       }
-      setHasMore(list.length >= limit)
+      setHasMore(res.hasMore ?? list.length >= limit)
       setPage(pageNum)
     } catch (e) {
       console.error('加载宝可梦列表失败:', e)
@@ -115,8 +115,6 @@ export default function TeamsPage() {
 
   // 重命名队伍
   const handleRename = (teamId, currentName) => {
-    // 微信小程序不支持 prompt，用 showModal 配合输入框模拟会很复杂
-    // 这里简化处理，用编号递增的方式
     Taro.showModal({
       title: '重命名队伍',
       editable: true,
@@ -142,104 +140,191 @@ export default function TeamsPage() {
     Taro.navigateTo({ url: `/pages/pokemon-detail/index?id=${pokemonId}` })
   }
 
+  // 编辑队伍（弹出操作菜单）
+  const handleEditTeam = (team) => {
+    Taro.showActionSheet({
+      itemList: ['重命名', '删除队伍'],
+      success(res) {
+        if (res.tapIndex === 0) {
+          handleRename(team.id, team.name)
+        } else if (res.tapIndex === 1) {
+          handleDeleteTeam(team.id)
+        }
+      }
+    })
+  }
+
   return (
     <View className='teams-page'>
-      <View className='header'>
-        <Text className='title'>我的队伍</Text>
-        <Text className='add-btn' onClick={handleCreateTeam}>+ 新建队伍</Text>
+      {/* 自定义导航 */}
+      <View className='teams-nav'>
+        <Text className='teams-nav-title'>队伍</Text>
       </View>
 
-      {teams.length === 0 ? (
-        <View className='empty-state'>
-          <Text className='empty-icon'>📋</Text>
-          <Text>还没有队伍，点击上方按钮创建一个吧！</Text>
+      {/* 分段控件 */}
+      <View className='teams-segment-wrap'>
+        <View className='segment-control'>
+          <View
+            className={`segment-item ${activeTab === 'box' ? 'segment-active' : ''}`}
+            onClick={() => setActiveTab('box')}
+          >
+            <Text>宝可梦盒子</Text>
+          </View>
+          <View
+            className={`segment-item ${activeTab === 'teams' ? 'segment-active' : ''}`}
+            onClick={() => setActiveTab('teams')}
+          >
+            <Text>我的队伍</Text>
+          </View>
         </View>
-      ) : (
-        teams.map(team => (
-          <View key={team.id} className='team-card'>
-            <View className='team-header'>
-              <Text className='team-name'>{team.name}</Text>
-              <View className='team-actions'>
-                <Text className='action-btn' onClick={() => handleRename(team.id, team.name)}>重命名</Text>
-                <Text className='action-btn danger' onClick={() => handleDeleteTeam(team.id)}>删除</Text>
-              </View>
-            </View>
+      </View>
 
-            <View className='members-grid'>
-              {/* 已有成员 */}
-              {team.members.map(member => (
-                <View key={member.id} className='member-slot filled' onClick={() => goToDetail(member.pokemonId)}>
-                  {member.imageUrl && (
-                    <SafeImage className='member-sprite' src={member.imageUrl} mode='aspectFit' />
-                  )}
-                  <Text className='member-name'>{member.name}</Text>
-                  <View className='member-types'>
-                    {(member.types || []).map(type => (
-                      <Text key={type} className='type-badge' style={{ background: TYPE_COLORS[type] || '#999' }}>
-                        {type}
-                      </Text>
+      {/* 宝可梦盒子 tab（暂为空态） */}
+      {activeTab === 'box' && (
+        <View className='teams-empty-state'>
+          <Text className='teams-empty-icon'>📦</Text>
+          <Text className='teams-empty-text'>宝可梦盒子功能即将上线</Text>
+        </View>
+      )}
+
+      {/* 我的队伍 tab */}
+      {activeTab === 'teams' && (
+        <ScrollView scrollY className='teams-scroll-area'>
+          <View className='teams-list'>
+            {teams.length === 0 ? (
+              <View className='teams-empty-state'>
+                <Text className='teams-empty-icon'>📋</Text>
+                <Text className='teams-empty-text'>还没有队伍，点击下方按钮创建一个吧</Text>
+              </View>
+            ) : (
+              teams.map(team => (
+                <View key={team.id} className='team-card glass-card'>
+                  {/* 卡片头部 */}
+                  <View className='team-card-header'>
+                    <View className='team-card-title-row'>
+                      <Text className='team-card-name'>{team.name}</Text>
+                      <Text className='team-card-format-tag'>单打</Text>
+                    </View>
+                    <View className='team-card-edit-icon' onClick={() => handleEditTeam(team)}>
+                      <Text className='team-card-edit-text'>✎</Text>
+                    </View>
+                  </View>
+
+                  {/* 成员网格 3×2 */}
+                  <View className='team-member-grid'>
+                    {/* 已有成员 */}
+                    {team.members.map(member => (
+                      <View key={member.id} className='team-member-slot' onClick={() => goToDetail(member.pokemonId)}>
+                        <View className='team-member-avatar'>
+                          {member.imageUrl ? (
+                            <SafeImage className='team-member-sprite' src={member.imageUrl} mode='aspectFit' />
+                          ) : (
+                            <Text className='team-member-placeholder'>?</Text>
+                          )}
+                          <View className='team-member-remove' onClick={(e) => handleRemoveMember(e, team.id, member.id)}>
+                            <Text className='team-member-remove-text'>×</Text>
+                          </View>
+                        </View>
+                        <Text className='team-member-name'>{member.name}</Text>
+                        <View className='team-member-types'>
+                          {(member.types || []).map(type => (
+                            <TypeChip key={type} type={type} size='sm' />
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+                    {/* 空槽位 */}
+                    {Array.from({ length: Math.max(0, 6 - team.members.length) }).map((_, i) => (
+                      <View key={`empty-${i}`} className='team-member-slot' onClick={() => openPicker(team.id)}>
+                        <View className='team-member-empty'>
+                          <Text className='team-member-empty-icon'>+</Text>
+                        </View>
+                        <Text className='team-member-empty-label'>添加</Text>
+                      </View>
                     ))}
                   </View>
-                  <Text className='remove-btn' onClick={(e) => handleRemoveMember(e, team.id, member.id)}>×</Text>
                 </View>
-              ))}
-              {/* 空位 */}
-              {Array.from({ length: Math.max(0, 6 - team.members.length) }).map((_, i) => (
-                <View key={`empty-${i}`} className='member-slot' onClick={() => openPicker(team.id)}>
-                  <Text className='add-icon'>+</Text>
-                </View>
-              ))}
-            </View>
-
-            <View className='team-meta'>
-              <Text>更新于 {new Date(team.updatedAt).toLocaleDateString()}</Text>
-            </View>
+              ))
+            )}
           </View>
-        ))
+        </ScrollView>
+      )}
+
+      {/* 新建队伍按钮 - 底部固定 */}
+      {activeTab === 'teams' && (
+        <View className='teams-create-bar'>
+          <View className='teams-create-btn' onClick={handleCreateTeam}>
+            <Text className='teams-create-btn-text'>+ 新建队伍</Text>
+          </View>
+        </View>
       )}
 
       {/* 宝可梦选择器弹窗 */}
       {showPicker && (
-        <View className='picker-modal'>
-          <View className='picker-mask' onClick={closePicker}></View>
-          <View className='picker-content'>
+        <View className='picker-overlay'>
+          <View className='picker-mask' onClick={closePicker} />
+          <View className='picker-panel'>
+            {/* 弹窗头部 */}
             <View className='picker-header'>
               <Text className='picker-title'>选择宝可梦</Text>
-              <Text className='close-btn' onClick={closePicker}>关闭</Text>
+              <View className='picker-close' onClick={closePicker}>
+                <Text className='picker-close-text'>×</Text>
+              </View>
             </View>
-            <View className='search-bar'>
-              <Input
-                className='search-input'
-                placeholder='搜索宝可梦...'
-                value={searchText}
-                onConfirm={handleSearch}
-                onBlur={handleSearch}
-              />
+
+            {/* 药丸搜索栏 */}
+            <View className='picker-search'>
+              <View className='picker-search-bar'>
+                <Text className='picker-search-icon'>🔍</Text>
+                <Input
+                  className='picker-search-input'
+                  placeholder='搜索宝可梦...'
+                  value={searchText}
+                  onConfirm={handleSearch}
+                  onBlur={handleSearch}
+                />
+              </View>
             </View>
+
+            {/* 列表 */}
             <ScrollView
               scrollY
-              className='pokemon-list'
+              className='picker-list'
               onScrollToLower={loadMore}
             >
               {pokemonList.map(pokemon => (
-                <View key={pokemon.id} className='pokemon-item' onClick={() => selectPokemon(pokemon)}>
-                  {pokemon.image?.url && (
-                    <SafeImage className='poke-sprite' src={pokemon.image.url} mode='aspectFit' />
-                  )}
-                  <View className='poke-info'>
-                    <Text className='poke-name'>#{pokemon.id} {pokemon.nameZh || pokemon.nameEn}</Text>
-                    <View className='poke-types'>
+                <View key={pokemon.id} className='picker-item' onClick={() => selectPokemon(pokemon)}>
+                  <View className='picker-item-avatar'>
+                    {pokemon.image?.url ? (
+                      <SafeImage className='picker-item-sprite' src={pokemon.image.url} mode='aspectFit' />
+                    ) : (
+                      <Text className='picker-item-placeholder'>?</Text>
+                    )}
+                  </View>
+                  <View className='picker-item-info'>
+                    <Text className='picker-item-name'>#{pokemon.id} {pokemon.nameZh || pokemon.nameEn}</Text>
+                    <View className='picker-item-types'>
                       {[pokemon.primaryType, pokemon.secondaryType].filter(Boolean).map(type => (
-                        <Text key={type} className='type-tag' style={{ background: TYPE_COLORS[type] || '#999' }}>
-                          {type}
-                        </Text>
+                        <TypeChip key={type} type={type} size='sm' />
                       ))}
                     </View>
                   </View>
                 </View>
               ))}
-              {loading && <View className='loading-more'><Text>加载中...</Text></View>}
-              {!hasMore && pokemonList.length > 0 && <View className='loading-more'><Text>没有更多了</Text></View>}
+              {loading && (
+                <View className='picker-loading'>
+                  <View className='load-dots'>
+                    <View className='dot' />
+                    <View className='dot' />
+                    <View className='dot' />
+                  </View>
+                </View>
+              )}
+              {!hasMore && pokemonList.length > 0 && (
+                <View className='picker-loading'>
+                  <Text className='picker-loading-text'>没有更多了</Text>
+                </View>
+              )}
             </ScrollView>
           </View>
         </View>

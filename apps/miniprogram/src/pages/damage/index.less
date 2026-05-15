@@ -1,428 +1,748 @@
+/* ══════════════════════════════════════════════
+   伤害计算页 — dc- 命名空间
+   Less 平铺类名，不嵌套
+   ══════════════════════════════════════════════ */
+
 .damage-page {
-  padding: 16px;
-  background: #f5f5f5;
+  padding: 24rpx 32rpx;
+  padding-bottom: 60rpx;
+  background: #FAF8F5;
   min-height: 100vh;
+}
 
-  .section {
-    background: #fff;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+/* ── 全局设置行 ── */
 
-    .section-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 12px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #f0f0f0;
-    }
-  }
+.dc-global-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+  flex-wrap: wrap;
+}
 
-  .form-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 10px;
+.dc-gen-chip {
+  padding: 10rpx 24rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+}
 
-    .form-label {
-      width: 60px;
-      font-size: 13px;
-      color: #666;
-      flex-shrink: 0;
-    }
+.dc-level-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 10rpx 24rpx;
+  font-size: 24rpx;
+  gap: 4rpx;
+}
 
-    .form-input {
-      flex: 1;
-      height: 32px;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 0 10px;
-      font-size: 13px;
-    }
+.dc-level-input {
+  width: 60rpx;
+  font-size: 24rpx;
+  text-align: center;
+  color: #2D2D2D;
+  height: 40rpx;
+  line-height: 40rpx;
+}
 
-    .form-picker {
-      flex: 1;
-      height: 32px;
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: 0 10px;
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      background: #fafafa;
-      color: #333;
-    }
-  }
+.dc-battle-mode {
+  margin-left: auto;
+}
 
-  .pokemon-selector {
-    display: flex;
-    align-items: center;
-    padding: 10px 12px;
-    background: #fafafa;
-    border-radius: 8px;
-    margin-bottom: 12px;
-    border: 1px solid #e8e8e8;
+/* ── 攻击方/防守方卡片 ── */
 
-    .selector-sprite {
-      width: 40px;
-      height: 40px;
-      margin-right: 10px;
-    }
+.dc-side-card {
+  padding: 28rpx 28rpx 24rpx;
+  margin-bottom: 24rpx;
+}
 
-    .selector-info {
-      flex: 1;
+.dc-side-header {
+  margin-bottom: 20rpx;
+}
 
-      .selector-name {
-        font-size: 14px;
-        font-weight: 500;
-        color: #333;
-      }
+.dc-side-label {
+  display: inline-flex;
+  padding: 6rpx 20rpx;
+  border-radius: 999px;
+  font-size: 22rpx;
+  font-weight: 600;
+}
 
-      .selector-hint {
-        font-size: 12px;
-        color: #999;
-      }
-    }
+/* ── 宝可梦选择区 ── */
 
-    .selector-arrow {
-      color: #999;
-      font-size: 16px;
-    }
-  }
+.dc-pokemon-select {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+  margin-bottom: 16rpx;
+}
 
-  .stat-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 6px;
+.dc-pokemon-sprite-wrap {
+  width: 96rpx;
+  height: 96rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
 
-    .stat-label {
-      width: 36px;
-      font-size: 12px;
-      color: #666;
-      font-weight: 500;
-    }
+.dc-pokemon-sprite {
+  width: 96rpx;
+  height: 96rpx;
+}
 
-    .stat-input {
-      width: 50px;
-      height: 28px;
-      border: 1px solid #e0e0e0;
-      border-radius: 4px;
-      text-align: center;
-      font-size: 12px;
-      margin-right: 6px;
-    }
+.dc-pokemon-sprite-placeholder {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-    .stat-slider {
-      flex: 1;
-    }
-  }
+.dc-placeholder-icon {
+  font-size: 40rpx;
+  color: #B5B5B5;
+}
 
-  .moves-section {
-    .move-item {
-      display: flex;
-      align-items: center;
-      padding: 8px;
-      background: #fafafa;
-      border-radius: 6px;
-      margin-bottom: 6px;
+.dc-pokemon-info {
+  flex: 1;
+  min-width: 0;
+}
 
-      .move-name {
-        flex: 1;
-        font-size: 13px;
-        color: #333;
-      }
+.dc-pokemon-name-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
 
-      .move-type {
-        font-size: 10px;
-        padding: 2px 6px;
-        border-radius: 4px;
-        color: #fff;
-        margin-right: 6px;
-      }
+.dc-pokemon-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2D2D2D;
+}
 
-      .move-power {
-        font-size: 12px;
-        color: #666;
-        width: 40px;
-        text-align: right;
-      }
-    }
+.dc-pokemon-types {
+  display: flex;
+  gap: 8rpx;
+}
 
-    .add-move-btn {
-      text-align: center;
-      padding: 8px;
-      color: #1976d2;
-      font-size: 13px;
-      border: 1px dashed #1976d2;
-      border-radius: 6px;
-    }
-  }
+.dc-pokemon-hint {
+  font-size: 28rpx;
+  color: #B5B5B5;
+}
 
-  .calc-btn {
-    width: 100%;
-    height: 44px;
-    background: linear-gradient(135deg, #e53935, #d32f2f);
-    color: #fff;
-    border: none;
-    border-radius: 22px;
-    font-size: 16px;
-    font-weight: 600;
-    margin: 16px 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+.dc-arrow {
+  font-size: 32rpx;
+  color: #B5B5B5;
+  margin-left: 8rpx;
+  flex-shrink: 0;
+}
 
-  .calc-btn-disabled {
-    opacity: 0.5;
-  }
+/* ── 2x2 配置网格 ── */
 
-  .result-section {
-    .result-title {
-      font-size: 15px;
-      font-weight: 600;
-      margin-bottom: 12px;
-      color: #333;
-    }
+.dc-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
 
-    .result-item {
-      padding: 12px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      margin-bottom: 8px;
+.dc-config-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 20rpx;
+  border-radius: 16rpx;
+  font-size: 22rpx;
+  background: rgba(0, 0, 0, 0.03);
+  gap: 8rpx;
+  overflow: hidden;
+}
 
-      .result-move-name {
-        font-size: 14px;
-        font-weight: 600;
-        color: #333;
-        margin-bottom: 6px;
-      }
+.dc-config-tag-label {
+  color: #8A8A8A;
+  font-size: 22rpx;
+  flex-shrink: 0;
+}
 
-      .result-damage-range {
-        font-size: 13px;
-        color: #555;
-        margin-bottom: 4px;
-      }
+.dc-config-tag-value {
+  color: #2D2D2D;
+  font-size: 22rpx;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-      .result-bar {
-        height: 8px;
-        background: #e0e0e0;
-        border-radius: 4px;
-        overflow: hidden;
-        margin: 6px 0;
+/* ── 2x2 招式槽位 ── */
 
-        .result-bar-fill {
-          height: 100%;
-          border-radius: 4px;
-          transition: width 0.3s;
-        }
+.dc-move-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12rpx;
+}
 
-        .bar-green { background: #4caf50; }
-        .bar-yellow { background: #ff9800; }
-        .bar-red { background: #f44336; }
-      }
+.dc-move-slot {
+  display: flex;
+  align-items: center;
+  padding: 14rpx 24rpx;
+  border-radius: 999px;
+  font-size: 24rpx;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.03);
+  border: 3rpx solid transparent;
+  overflow: hidden;
+  position: relative;
+}
 
-      .result-ko {
-        font-size: 12px;
-        color: #888;
-      }
-    }
-  }
+.dc-move-slot-active {
+  border-width: 3rpx;
+  border-style: solid;
+}
 
-  /* 搜索弹窗复用 teams 页面的样式 */
-  .picker-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 999;
+.dc-move-type-bar {
+  width: 6rpx;
+  height: 28rpx;
+  border-radius: 3rpx;
+  margin-right: 12rpx;
+  flex-shrink: 0;
+}
 
-    .picker-mask {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.5);
-    }
+.dc-move-slot-name {
+  flex: 1;
+  font-size: 24rpx;
+  font-weight: 500;
+  color: #2D2D2D;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-    .picker-content {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 60vh;
-      background: #fff;
-      border-radius: 16px 16px 0 0;
-      display: flex;
-      flex-direction: column;
+.dc-move-slot-power {
+  font-size: 20rpx;
+  color: #8A8A8A;
+  margin-left: 8rpx;
+  flex-shrink: 0;
+}
 
-      .picker-header {
-        padding: 16px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #eee;
+.dc-move-slot-empty {
+  font-size: 24rpx;
+  color: #B5B5B5;
+  width: 100%;
+  text-align: center;
+}
 
-        .picker-title {
-          font-size: 16px;
-          font-weight: 600;
-        }
+/* ── 计算按钮 ── */
 
-        .close-btn {
-          font-size: 14px;
-          color: #999;
-          padding: 4px 8px;
-        }
-      }
+.dc-calc-btn {
+  width: 100%;
+  height: 88rpx;
+  background: linear-gradient(135deg, #E63946, #C62833);
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+  box-shadow: 0 8rpx 32rpx rgba(230, 57, 70, 0.30);
+}
 
-      .search-bar {
-        padding: 12px 16px;
+.dc-calc-btn-disabled {
+  opacity: 0.5;
+}
 
-        .search-input {
-          width: 100%;
-          height: 36px;
-          border-radius: 18px;
-          background: #f5f5f5;
-          padding: 0 16px;
-          font-size: 14px;
-          border: none;
-        }
-      }
+.dc-calc-btn-text {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 2rpx;
+}
 
-      .pokemon-list {
-        flex: 1;
-        overflow-y: auto;
+/* ── 计算结果卡片 ── */
 
-        .pokemon-item {
-          display: flex;
-          align-items: center;
-          padding: 10px 16px;
-          border-bottom: 1px solid #f5f5f5;
+.dc-result-card {
+  background: linear-gradient(135deg, rgba(230, 57, 70, 0.06), rgba(230, 57, 70, 0.02));
+  border: 3rpx solid rgba(230, 57, 70, 0.15);
+  border-radius: 32rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
 
-          .poke-sprite {
-            width: 40px;
-            height: 40px;
-            margin-right: 12px;
-          }
+.dc-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
 
-          .poke-info {
-            flex: 1;
+.dc-result-label {
+  font-size: 24rpx;
+  color: #8A8A8A;
+  font-weight: 500;
+}
 
-            .poke-name {
-              font-size: 14px;
-              font-weight: 500;
-              color: #333;
-            }
-          }
-        }
-      }
+.dc-result-move-tag {
+  font-size: 20rpx;
+  color: #fff;
+  padding: 4rpx 16rpx;
+  border-radius: 999px;
+  font-weight: 500;
+}
 
-      .loading-more {
-        text-align: center;
-        padding: 12px;
-        color: #999;
-        font-size: 13px;
-      }
-    }
-  }
+.dc-result-percent-row {
+  margin-bottom: 8rpx;
+}
 
-  /* 招式选择弹窗 */
-  .move-picker-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1000;
+.dc-result-percent {
+  font-size: 52rpx;
+  font-weight: 700;
+  color: #E63946;
+  letter-spacing: -1rpx;
+}
 
-    .picker-mask {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.5);
-    }
+.dc-result-damage-row {
+  margin-bottom: 16rpx;
+}
 
-    .picker-content {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 60vh;
-      background: #fff;
-      border-radius: 16px 16px 0 0;
-      display: flex;
-      flex-direction: column;
+.dc-result-damage-text {
+  font-size: 24rpx;
+  color: #8A8A8A;
+}
 
-      .picker-header {
-        padding: 16px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #eee;
+.dc-result-bar {
+  height: 12rpx;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 6rpx;
+  overflow: hidden;
+  margin-bottom: 16rpx;
+}
 
-        .picker-title {
-          font-size: 16px;
-          font-weight: 600;
-        }
+.dc-result-bar-fill {
+  height: 100%;
+  border-radius: 6rpx;
+  transition: width 0.3s;
+}
 
-        .close-btn {
-          font-size: 14px;
-          color: #999;
-          padding: 4px 8px;
-        }
-      }
+.dc-bar-green {
+  background: linear-gradient(90deg, #34C759, #30D158);
+}
 
-      .search-bar {
-        padding: 12px 16px;
+.dc-bar-yellow {
+  background: linear-gradient(90deg, #FF9500, #FFB340);
+}
 
-        .search-input {
-          width: 100%;
-          height: 36px;
-          border-radius: 18px;
-          background: #f5f5f5;
-          padding: 0 16px;
-          font-size: 14px;
-          border: none;
-        }
-      }
+.dc-bar-red {
+  background: linear-gradient(90deg, #E63946, #FF3B30);
+}
 
-      .move-list {
-        flex: 1;
-        overflow-y: auto;
+.dc-ko-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 20rpx;
+  border-radius: 999px;
+  background: rgba(230, 57, 70, 0.10);
+  margin-bottom: 12rpx;
+}
 
-        .move-list-item {
-          display: flex;
-          align-items: center;
-          padding: 10px 16px;
-          border-bottom: 1px solid #f5f5f5;
+.dc-ko-pill-text {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #E63946;
+}
 
-          .move-item-name {
-            flex: 1;
-            font-size: 14px;
-            color: #333;
-          }
+.dc-result-desc {
+  font-size: 22rpx;
+  color: #8A8A8A;
+  line-height: 1.5;
+}
 
-          .move-item-type {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            color: #fff;
-            margin-right: 8px;
-          }
+/* ── 场地设置折叠卡片 ── */
 
-          .move-item-power {
-            font-size: 12px;
-            color: #666;
-            width: 36px;
-            text-align: right;
-          }
-        }
-      }
-    }
-  }
+.dc-field-card {
+  padding: 0;
+  margin-bottom: 24rpx;
+  overflow: hidden;
+}
+
+.dc-field-header {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 28rpx;
+}
+
+.dc-field-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #2D2D2D;
+}
+
+.dc-field-summary {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-left: 16rpx;
+  overflow: hidden;
+}
+
+.dc-field-tag {
+  display: inline-flex;
+  padding: 4rpx 14rpx;
+  border-radius: 999px;
+  font-size: 20rpx;
+  color: #E63946;
+  background: rgba(230, 57, 70, 0.08);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.dc-field-tag-empty {
+  font-size: 20rpx;
+  color: #B5B5B5;
+}
+
+.dc-field-arrow {
+  font-size: 28rpx;
+  color: #B5B5B5;
+  transform: rotate(90deg);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.dc-field-arrow-up {
+  transform: rotate(-90deg);
+}
+
+.dc-field-body {
+  padding: 0 28rpx 24rpx;
+  border-top: 1rpx solid rgba(0, 0, 0, 0.06);
+}
+
+.dc-field-row {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.04);
+}
+
+.dc-field-row:last-child {
+  border-bottom: none;
+}
+
+.dc-field-label {
+  width: 80rpx;
+  font-size: 26rpx;
+  color: #8A8A8A;
+  flex-shrink: 0;
+}
+
+.dc-field-picker {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12rpx 20rpx;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 16rpx;
+}
+
+.dc-field-picker-text {
+  font-size: 26rpx;
+  color: #2D2D2D;
+}
+
+.dc-field-picker-arrow {
+  font-size: 24rpx;
+  color: #B5B5B5;
+}
+
+/* ── 开关 ── */
+
+.dc-toggle {
+  width: 80rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  background: rgba(0, 0, 0, 0.08);
+  position: relative;
+  transition: background 0.2s;
+}
+
+.dc-toggle-on {
+  background: #34C759;
+}
+
+.dc-toggle-thumb {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 4rpx;
+  left: 4rpx;
+  transition: left 0.2s;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
+}
+
+.dc-toggle-on .dc-toggle-thumb {
+  left: 40rpx;
+}
+
+/* ── 通用弹窗 ── */
+
+.dc-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+.dc-modal-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.dc-modal-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #FFFCF8;
+  border-radius: 40rpx 40rpx 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.dc-modal-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 65vh;
+  background: #FFFCF8;
+  border-radius: 40rpx 40rpx 0 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.dc-modal-header {
+  padding: 28rpx 32rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.06);
+}
+
+.dc-modal-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2D2D2D;
+}
+
+.dc-modal-close {
+  font-size: 28rpx;
+  color: #B5B5B5;
+  padding: 8rpx 16rpx;
+}
+
+/* ── 搜索栏 ── */
+
+.dc-search-bar {
+  padding: 20rpx 32rpx;
+}
+
+.dc-search-input {
+  width: 100%;
+  height: 72rpx;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0 32rpx;
+  font-size: 28rpx;
+  color: #2D2D2D;
+}
+
+/* ── 选择列表 ── */
+
+.dc-picker-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dc-picker-item {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 32rpx;
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.04);
+}
+
+.dc-picker-sprite {
+  width: 80rpx;
+  height: 80rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.dc-picker-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.dc-picker-name {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #2D2D2D;
+  margin-bottom: 4rpx;
+}
+
+.dc-picker-types {
+  display: flex;
+  gap: 8rpx;
+}
+
+/* ── 招式弹窗列表项 ── */
+
+.dc-move-item-type-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+}
+
+.dc-move-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 4rpx;
+}
+
+.dc-move-item-type-tag {
+  font-size: 20rpx;
+  color: #fff;
+  padding: 2rpx 12rpx;
+  border-radius: 999px;
+}
+
+.dc-move-item-cat {
+  font-size: 20rpx;
+  color: #8A8A8A;
+}
+
+.dc-move-item-power {
+  font-size: 20rpx;
+  color: #8A8A8A;
+}
+
+.dc-loading-more {
+  padding: 20rpx 0;
+}
+
+/* ── EV 编辑弹窗 ── */
+
+.dc-ev-edit-body {
+  padding: 24rpx 32rpx;
+}
+
+.dc-ev-edit-row {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+  gap: 16rpx;
+}
+
+.dc-ev-edit-label {
+  width: 80rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #2D2D2D;
+  flex-shrink: 0;
+}
+
+.dc-ev-edit-controls {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  flex: 1;
+}
+
+.dc-ev-btn {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: #2D2D2D;
+  flex-shrink: 0;
+}
+
+.dc-ev-edit-input {
+  flex: 1;
+  height: 56rpx;
+  text-align: center;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #2D2D2D;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 16rpx;
+}
+
+.dc-ev-presets {
+  display: flex;
+  gap: 8rpx;
+  flex-shrink: 0;
+}
+
+.dc-ev-preset {
+  padding: 8rpx 16rpx;
+  border-radius: 999px;
+  font-size: 22rpx;
+  background: rgba(0, 0, 0, 0.04);
+  color: #8A8A8A;
+}
+
+.dc-ev-total {
+  display: block;
+  text-align: center;
+  font-size: 24rpx;
+  color: #8A8A8A;
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid rgba(0, 0, 0, 0.06);
+}
+
+.dc-modal-footer {
+  display: flex;
+  gap: 20rpx;
+  padding: 20rpx 32rpx 28rpx;
+  border-top: 1rpx solid rgba(0, 0, 0, 0.06);
+}
+
+.dc-modal-btn-cancel {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: #8A8A8A;
+}
+
+.dc-modal-btn-confirm {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #E63946, #C62833);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4rpx 16rpx rgba(230, 57, 70, 0.25);
 }
