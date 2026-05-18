@@ -228,6 +228,9 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
               detail={detail}
               evolutionChain={evolutionChain}
               loading={evolutionLoading}
+              // display.form.id 是 buildPokemonFormOptions 覆盖后的 formKey 字符串（如 "default"/"mega"），
+              // 用它在 detail.forms 中匹配，取出数据库数字 id 传给进化链做高亮比较
+              currentFormId={(detail.forms || []).find((f) => (f.formKey || f.nameZh) === display.form?.id)?.id ?? null}
             />
           )}
         </motion.div>
