@@ -125,8 +125,8 @@ export const evolutionChains = sqliteTable("evolution_chains", {
   chainId: integer("chain_id").notNull(),
   fromPokemonId: integer("from_pokemon_id").references(() => pokemon.id, { onDelete: "cascade" }),
   toPokemonId: integer("to_pokemon_id").notNull().references(() => pokemon.id, { onDelete: "cascade" }),
-  fromFormKey: text("from_form_key"),
-  toFormKey: text("to_form_key"),
+  fromFormId: integer("from_form_id").references(() => pokemonForms.id, { onDelete: "set null" }),
+  toFormId: integer("to_form_id").references(() => pokemonForms.id, { onDelete: "set null" }),
   stage: integer("stage").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
   evolutionMethod: text("evolution_method"),
@@ -137,6 +137,7 @@ export const evolutionChains = sqliteTable("evolution_chains", {
 }, (table) => [
   index("idx_evo_chain").on(table.chainId),
   index("idx_evo_to").on(table.toPokemonId),
+  index("idx_evo_from").on(table.fromPokemonId),
 ]);
 
 // ══════════════════════════════════════════════════════════════════════════════

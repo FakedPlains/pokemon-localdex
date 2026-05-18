@@ -61,12 +61,24 @@ export async function getPokemonIdentityRow(db: any, idOrSlug: string): Promise<
 // ────────────────────────────────────────────────────────────────────────────
 
 async function lookupPokemonRow(db: any, idOrSlug: string) {
+  // 优先精确匹配 pokemon.id，避免 OR + LIMIT 1 在 id 与 dex_number 不一致时
+  // 返回错误的行（SQLite 按 ROWID 顺序扫描，dex_number 匹配可能先于 id 匹配）
+  const numericId = Number(idOrSlug) || 0;
+  if (numericId > 0) {
+    const byId = await db
+      .select()
+      .from(pokemon)
+      .where(eq(pokemon.id, numericId))
+      .limit(1);
+    if (byId[0]) return byId[0];
+  }
+
+  // Fallback: slug / 中文名 / 图鉴编号
   const rows = await db
     .select()
     .from(pokemon)
     .where(
       or(
-        eq(pokemon.id, Number(idOrSlug) || 0),
         eq(pokemon.slug, idOrSlug),
         eq(pokemon.nameZh, idOrSlug),
         eq(sql`CAST(${pokemon.dexNumber} AS TEXT)`, idOrSlug),

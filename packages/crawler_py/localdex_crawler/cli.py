@@ -25,6 +25,7 @@ from .pokemon import (
     build_learnset_page_url,
     learnset_cache_key,
     normalize_pokemon_detail_page,
+    parse_evolution_chain,
     parse_learnset_page,
     parse_pokemon_list_page,
     pokemon_cache_key,
@@ -39,10 +40,12 @@ from .sqlite_upsert import (
     clear_moves,
     clear_pokemon,
     connect,
+    generate_form_change_chains,
     pokemon_source_url,
     select_pokemon,
     upsert_ability_detail,
     upsert_champions_data,
+    upsert_evolution_chains,
     upsert_item_detail,
     upsert_move_detail,
     upsert_pokemon_abilities,
@@ -69,6 +72,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     pokemon_abilities = subparsers.add_parser("pokemon-abilities", help="Only refresh Pokemon ability records.")
     add_runtime_flags(pokemon_abilities)
     add_pokemon_filters(pokemon_abilities)
+    evolution = subparsers.add_parser("evolution", help="Crawl Pokemon evolution chain data.")
+    add_runtime_flags(evolution)
+    add_pokemon_filters(evolution)
+
+    form_changes = subparsers.add_parser("form-changes", help="Generate form change chains (mega, gigantamax, fusion, etc.) from existing form data.")
+    add_runtime_flags(form_changes)
+
     learnsets = subparsers.add_parser("learnsets", help="Crawl Pokemon generation learnsets.")
     add_runtime_flags(learnsets)
     add_pokemon_filters(learnsets)
@@ -133,6 +143,10 @@ def main(argv: list[str] | None = None) -> int:
         return crawl_pokemon(conn, fetcher, args)
     if command == "pokemon-abilities":
         return crawl_pokemon_abilities(conn, fetcher, args)
+    if command == "evolution":
+        return crawl_evolution(conn, fetcher, args)
+    if command == "form-changes":
+        return crawl_form_changes(conn, args)
     if command == "learnsets":
         return crawl_learnsets(conn, fetcher, args)
     if command == "champions":
@@ -146,9 +160,10 @@ def main(argv: list[str] | None = None) -> int:
             args.clean = False
         catalog_result = crawl_catalog(conn, fetcher, args)
         pokemon_result = crawl_pokemon(conn, fetcher, args)
+        evolution_result = crawl_evolution(conn, fetcher, args)
         learnset_result = crawl_learnsets(conn, fetcher, args)
         champions_result = crawl_champions(conn, fetcher, args) if getattr(args, "champions", True) else 0
-        return catalog_result or pokemon_result or learnset_result or champions_result
+        return catalog_result or pokemon_result or evolution_result or learnset_result or champions_result
     raise ValueError(f"Unsupported command: {command}")
 
 
@@ -290,6 +305,72 @@ def crawl_pokemon_abilities(conn, fetcher: PageFetcher, args) -> int:
             f"forms={summary.form_count}"
         )
     print(f"Pokemon abilities finished. matched={len(rows)} updated={updated} dryRun={args.dry_run}")
+    return 0
+
+
+def crawl_evolution(conn, fetcher: PageFetcher, args) -> int:
+    """爬取宝可梦进化链数据。
+
+    使用已缓存的宝可梦详情页 HTML 解析进化关系，写入 evolution_chains 表。
+    """
+    clean = getattr(args, "clean", False)
+    if clean and not args.dry_run:
+        conn.execute("DELETE FROM evolution_chains")
+        conn.commit()
+        print("[clean] Cleared evolution_chains table.")
+
+    names = parse_name_filters(args.pokemon)
+    rows = select_pokemon(
+        conn,
+        start_dex=args.start_dex,
+        end_dex=args.end_dex,
+        limit=args.limit,
+        names=names or None,
+    )
+    if not rows:
+        print("No Pokemon rows matched the crawler filters.")
+        return 0
+
+    updated = 0
+    total_steps = 0
+    skipped = 0
+    for idx, row in enumerate(rows, 1):
+        page = fetcher.load_or_fetch(cache_key(row), pokemon_source_url(row))
+        steps = parse_evolution_chain(page.html, row.name_zh)
+        if not steps:
+            skipped += 1
+            continue
+        if args.dry_run:
+            print(
+                f"[{idx}/{len(rows)}] dry-run #{row.dex_number:04d} {row.name_zh}: "
+                f"{len(steps)} evolution steps"
+            )
+            for step in steps:
+                print(f"  {step['from_name']} -> {step['to_name']} ({step['method'] or '?'})")
+            continue
+        count = upsert_evolution_chains(conn, row.id, steps)
+        total_steps += count
+        updated += 1
+        if count > 0:
+            print(f"[{idx}/{len(rows)}] #{row.dex_number:04d} {row.name_zh}: {count} steps")
+
+    print(
+        f"Evolution finished. matched={len(rows)} updated={updated} "
+        f"steps={total_steps} skipped={skipped} dryRun={args.dry_run}"
+    )
+
+    # 自动生成形态变化链（超级进化、超极巨化、合体等）
+    print("\n--- Generating form change chains ---")
+    form_stats = generate_form_change_chains(conn, dry_run=args.dry_run)
+    print(f"Form changes: {form_stats}")
+    return 0
+
+
+def crawl_form_changes(conn, args) -> int:
+    """独立的形态变化链生成命令。"""
+    dry_run = getattr(args, "dry_run", False)
+    stats = generate_form_change_chains(conn, dry_run=dry_run)
+    print(f"Form change chains generated: {stats}")
     return 0
 
 

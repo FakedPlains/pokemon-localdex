@@ -98,6 +98,42 @@ class ImageAsset:
     source_url: str | None = None
 
 
+def generation_from_dex_number(dex_number: int) -> int:
+    """根据全国图鉴编号推断初登场世代。
+
+    使用每个世代最后一个编号的精确分界：
+    第1世代: 001-151 (151只)
+    第2世代: 152-251 (100只)
+    第3世代: 252-386 (135只)
+    第4世代: 387-493 (107只)
+    第5世代: 494-649 (156只)
+    第6世代: 650-721 (72只)
+    第7世代: 722-809 (88只)
+    第8世代: 810-905 (96只)
+    第9世代: 906-1025 (120只)
+    """
+    if dex_number <= 151:
+        return 1
+    if dex_number <= 251:
+        return 2
+    if dex_number <= 386:
+        return 3
+    if dex_number <= 493:
+        return 4
+    if dex_number <= 649:
+        return 5
+    if dex_number <= 721:
+        return 6
+    if dex_number <= 809:
+        return 7
+    if dex_number <= 905:
+        return 8
+    if dex_number <= 1025:
+        return 9
+    # 未来世代（第10世代+）暂时返回 10
+    return 10
+
+
 def slugify(value: str) -> str:
     text = unicodedata.normalize("NFKC", value or "")
     text = re.sub(r"[^\w\u4e00-\u9fff]+", "-", text, flags=re.UNICODE)

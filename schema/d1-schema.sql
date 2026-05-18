@@ -94,8 +94,8 @@ CREATE TABLE IF NOT EXISTS evolution_chains (
   chain_id INTEGER NOT NULL,
   from_pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE CASCADE,
   to_pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-  from_form_key TEXT,
-  to_form_key TEXT,
+  from_form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
+  to_form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
   stage INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   evolution_method TEXT,
@@ -302,6 +302,7 @@ CREATE INDEX IF NOT EXISTS idx_form_images_kind ON pokemon_form_images(form_id, 
 
 CREATE INDEX IF NOT EXISTS idx_evo_chain ON evolution_chains(chain_id);
 CREATE INDEX IF NOT EXISTS idx_evo_to ON evolution_chains(to_pokemon_id);
+CREATE INDEX IF NOT EXISTS idx_evo_from ON evolution_chains(from_pokemon_id);
 
 CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon ON pokemon_learnsets(pokemon_id, form_key);
 CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon_gen ON pokemon_learnsets(pokemon_id, generation);
