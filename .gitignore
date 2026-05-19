@@ -52,3 +52,6 @@ apps/miniprogram/dist/
 
 # Wrangler (Cloudflare Workers local state)
 .wrangler/
+
+# CatPaw local config
+.catpaw/

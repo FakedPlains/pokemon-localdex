@@ -13,6 +13,191 @@ import './index.less'
 
 const MOVES_PAGE_SIZE = 50
 
+// ─── 进化链辅助函数 ───
+
+/** 格式化进化条件 */
+function formatCondition(evo) {
+  const parts = []
+  if (evo.level) parts.push(`Lv.${evo.level}`)
+  if (evo.item) parts.push(evo.item)
+  if (evo.condition) parts.push(evo.condition)
+  if (parts.length === 0 && evo.method) parts.push(evo.method)
+  return parts.join(' ')
+}
+
+/** 判断进化链是否包含形态分支 */
+function hasFormBranches(chain) {
+  return chain.some(e => e.stage > 0 && (e.fromFormId || e.toFormId))
+}
+
+/** 构建树结构 */
+function buildTree(chain) {
+  const bases = chain.filter(e => e.stage === 0)
+  const nonBases = chain.filter(e => e.stage > 0)
+  const used = new Set()
+
+  function findChildren(pid, fid) {
+    const result = []
+    nonBases.forEach((step, idx) => {
+      if (used.has(idx)) return
+      if (Number(step.fromPokemonId) !== Number(pid)) return
+      if ((step.fromFormId || null) !== (fid || null)) return
+      result.push(idx)
+    })
+    return result
+  }
+
+  function expand(evo) {
+    const childIdxs = findChildren(evo.toPokemonId, evo.toFormId)
+    for (const idx of childIdxs) used.add(idx)
+    return { evo, children: childIdxs.map(idx => expand(nonBases[idx])) }
+  }
+
+  const roots = bases.map(b => expand(b))
+  const uncovered = nonBases.filter((_, i) => !used.has(i))
+  if (uncovered.length > 0) {
+    roots.push({ evo: null, children: uncovered.map(e => ({ evo: e, children: [] })) })
+  }
+  return roots
+}
+
+/** 判断是否为当前宝可梦/形态 */
+function checkIsCurrent(evo, detail, currentForm) {
+  if (Number(evo.toPokemonId) !== Number(detail.id)) return false
+  if (evo.toFormId) {
+    return currentForm ? Number(evo.toFormId) === Number(currentForm.id) : false
+  }
+  // 无 toFormId 时，当前形态为默认形态即匹配
+  return !currentForm || currentForm.isDefault
+}
+
+/** 渲染单个进化成员 */
+function renderEvoMember(evo, detail, currentForm, key) {
+  const isCurrent = checkIsCurrent(evo, detail, currentForm)
+  return (
+    <View
+      key={key}
+      className={`pd-evo-pokemon ${isCurrent ? 'pd-evo-current' : ''}`}
+      onClick={() => {
+        if (!isCurrent && evo.toPokemonId) {
+          Taro.redirectTo({ url: `/pages/pokemon-detail/index?id=${evo.toPokemonId}` })
+        }
+      }}
+    >
+      <SafeImage className='pd-evo-img' src={evo.toImage?.url} mode='aspectFit' />
+      <Text className='pd-evo-name'>{evo.toFormName || evo.toNameZh}</Text>
+    </View>
+  )
+}
+
+/** 渲染进化链（入口） */
+function renderEvolutionChain(chain, detail, currentForm) {
+  if (hasFormBranches(chain)) {
+    return renderBranchView(chain, detail, currentForm)
+  }
+  return renderStageGroupView(chain, detail, currentForm)
+}
+
+/** 按 stage 分组展示（无形态分支的普通进化链） */
+function renderStageGroupView(chain, detail, currentForm) {
+  const stages = new Map()
+  for (const evo of chain) {
+    const stage = evo.stage ?? 0
+    if (!stages.has(stage)) stages.set(stage, [])
+    stages.get(stage).push(evo)
+  }
+
+  return (
+    <ScrollView scrollX className='pd-evo-scroll'>
+      <View className='pd-evo-chain'>
+        {[...stages.entries()].sort(([a], [b]) => a - b).map(([stage, evos], stageIdx) => (
+          <View key={stage} className='pd-evo-stage-group'>
+            {stageIdx > 0 && (
+              <View className='pd-evo-arrow-col'>
+                {evos.map((evo, i) => {
+                  const cond = formatCondition(evo)
+                  return (
+                    <View key={`arrow-${evo.toPokemonId}-${i}`} className='pd-evo-arrow-cell'>
+                      {cond ? <Text className='pd-evo-condition'>{cond}</Text> : null}
+                      <Text className='pd-evo-arrow'>{'→'}</Text>
+                    </View>
+                  )
+                })}
+              </View>
+            )}
+            <View className='pd-evo-stage-members'>
+              {evos.map((evo, i) => renderEvoMember(evo, detail, currentForm, `${evo.toPokemonId}-${i}`))}
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  )
+}
+
+/** 树形分支展示（有形态分支的进化链） */
+function renderBranchView(chain, detail, currentForm) {
+  const roots = buildTree(chain)
+  return (
+    <ScrollView scrollX className='pd-evo-scroll'>
+      <View className='pd-evo-branches'>
+        {roots.map((root, i) => renderTreeNode(root, detail, currentForm, true, `root-${i}`))}
+      </View>
+    </ScrollView>
+  )
+}
+
+/** 递归渲染树节点 */
+function renderTreeNode(node, detail, currentForm, isRoot, key) {
+  // 沿单链收集线性路径
+  const linear = []
+  let cur = node
+  while (cur.children.length === 1) {
+    linear.push(cur.children[0])
+    cur = cur.children[0]
+  }
+  const forkChildren = cur.children
+
+  return (
+    <View key={key} className='pd-evo-tree-node'>
+      <View className='pd-evo-tree-linear'>
+        {node.evo && (
+          <View className='pd-evo-branch-step'>
+            {!isRoot && (
+              <View className='pd-evo-arrow-cell'>
+                {formatCondition(node.evo) ? <Text className='pd-evo-condition'>{formatCondition(node.evo)}</Text> : null}
+                <Text className='pd-evo-arrow'>{'→'}</Text>
+              </View>
+            )}
+            {renderEvoMember(node.evo, detail, currentForm, `node-${node.evo.toPokemonId}-${node.evo.toFormId || 'd'}`)}
+          </View>
+        )}
+        {linear.map((child, i) => {
+          const cond = formatCondition(child.evo)
+          return (
+            <View key={`${child.evo.toPokemonId}-${child.evo.toFormId || 'd'}-${i}`} className='pd-evo-branch-step'>
+              <View className='pd-evo-arrow-cell'>
+                {cond ? <Text className='pd-evo-condition'>{cond}</Text> : null}
+                <Text className='pd-evo-arrow'>{'→'}</Text>
+              </View>
+              {renderEvoMember(child.evo, detail, currentForm, `lin-${child.evo.toPokemonId}-${child.evo.toFormId || 'd'}-${i}`)}
+            </View>
+          )
+        })}
+
+        {forkChildren.length > 1 && (
+          <View className='pd-evo-tree-fork'>
+            {forkChildren.map((child, i) => renderTreeNode(
+              child, detail, currentForm, false,
+              `fork-${child.evo.toPokemonId}-${child.evo.toFormId || 'd'}-${i}`
+            ))}
+          </View>
+        )}
+      </View>
+    </View>
+  )
+}
+
 function getHeroGradient(primary, secondary) {
   const c1 = TYPE_GRADIENT_COLORS[primary] || ['#A8A878', '#C8C8A0']
   const c2 = secondary ? (TYPE_GRADIENT_COLORS[secondary] || c1) : c1
@@ -309,36 +494,7 @@ export default function PokemonDetailPage() {
           </View>
         ) : evolutionChain.length > 0 ? (
           <View className='glass-card pd-evo-card'>
-            <ScrollView scrollX className='pd-evo-scroll'>
-              <View className='pd-evo-chain'>
-                {evolutionChain.map((evo, i) => (
-                  <View key={i} className='pd-evo-step'>
-                    {evo.method && (
-                      <View className='pd-evo-arrow-wrap'>
-                        <Text className='pd-evo-condition'>
-                          {evo.method}
-                          {evo.level ? ` Lv.${evo.level}` : ''}
-                          {evo.item ? ` ${evo.item}` : ''}
-                          {evo.condition ? ` ${evo.condition}` : ''}
-                        </Text>
-                        <Text className='pd-evo-arrow'>{'→'}</Text>
-                      </View>
-                    )}
-                    <View
-                      className={`pd-evo-pokemon ${evo.toPokemonId === detail.id ? 'pd-evo-current' : ''}`}
-                      onClick={() => {
-                        if (evo.toPokemonId && evo.toPokemonId !== detail.id) {
-                          Taro.redirectTo({ url: `/pages/pokemon-detail/index?id=${evo.toPokemonId}` })
-                        }
-                      }}
-                    >
-                      <SafeImage className='pd-evo-img' src={evo.toImage?.url} mode='aspectFit' />
-                      <Text className='pd-evo-name'>{evo.toNameZh}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
+            {renderEvolutionChain(evolutionChain, detail, currentForm)}
           </View>
         ) : (
           <View className='glass-card pd-evo-card'>
