@@ -172,8 +172,8 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 | chain_id | INTEGER | 进化链编号（同一进化链共享） |
 | from_pokemon_id | INTEGER FK | 进化前宝可梦（NULL 表示链起点） |
 | to_pokemon_id | INTEGER FK | 进化后宝可梦 |
-| from_form_key | TEXT | 进化前形态 |
-| to_form_key | TEXT | 进化后形态 |
+| from_form_id | INTEGER FK | 进化前形态 ID（关联 pokemon_forms.id） |
+| to_form_id | INTEGER FK | 进化后形态 ID（关联 pokemon_forms.id） |
 | stage | INTEGER | 进化阶段（0=基础，1=一阶，2=二阶） |
 | evolution_method | TEXT | 进化方式 |
 | evolution_condition | TEXT | 进化条件 |

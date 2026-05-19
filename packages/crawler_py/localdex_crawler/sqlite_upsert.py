@@ -411,6 +411,340 @@ def _lookup_ability_id(conn: sqlite3.Connection, name: str) -> int | None:
 
 
 # ---------------------------------------------------------------------------
+# Evolution chain upsert
+# ---------------------------------------------------------------------------
+
+def upsert_evolution_chains(
+    conn: sqlite3.Connection,
+    pokemon_id: int,
+    steps: list[dict],
+) -> int:
+    """写入宝可梦进化链到 evolution_chains 表。
+
+    steps 由 parse_evolution_chain() 生成，格式::
+
+        [
+            {
+                "from_name": "伊布", "to_name": "水伊布",
+                "from_form": "", "to_form": "",
+                "stage": 1, "condition": "使用 水之石",
+                "method": "item", "level": None, "item": "水之石",
+            },
+            ...
+        ]
+
+    chain_id 使用当前宝可梦的 pokemon_id（作为进化链的标识）。
+    from_form_id / to_form_id 通过 pokemon_forms 表解析得到。
+    """
+    with conn:
+        # 清除该宝可梦相关的旧进化链数据
+        conn.execute(
+            "DELETE FROM evolution_chains WHERE chain_id = ?",
+            (pokemon_id,),
+        )
+
+        if not steps:
+            return 0
+
+        count = 0
+        for sort_order, step in enumerate(steps, start=1):
+            from_id = _lookup_pokemon_by_name(conn, step["from_name"])
+            to_id = _lookup_pokemon_by_name(conn, step["to_name"])
+            if to_id is None:
+                continue  # 目标宝可梦必须存在
+
+            from_form_id = _lookup_form_id_by_name(
+                conn, from_id, step.get("from_form")
+            )
+            to_form_id = _lookup_form_id_by_name(
+                conn, to_id, step.get("to_form")
+            )
+
+            conn.execute(
+                """
+                INSERT INTO evolution_chains
+                  (chain_id, from_pokemon_id, to_pokemon_id,
+                   from_form_id, to_form_id,
+                   stage, sort_order,
+                   evolution_method, evolution_condition,
+                   evolution_item, evolution_level, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    pokemon_id,
+                    from_id,
+                    to_id,
+                    from_form_id,
+                    to_form_id,
+                    step.get("stage", 0),
+                    sort_order,
+                    step.get("method"),
+                    step.get("condition"),
+                    step.get("item"),
+                    step.get("level"),
+                    step.get("notes"),
+                ),
+            )
+            count += 1
+
+    return count
+
+
+def generate_form_change_chains(
+    conn: sqlite3.Connection,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """从 pokemon_forms 表中读取超级进化/超极巨化/合体等形态变化，写入 evolution_chains 表。
+
+    为每个符合条件的非默认形态生成一条进化链记录：
+    - from_pokemon_id = to_pokemon_id（同一宝可梦）
+    - from_form_id = 默认形态 ID
+    - to_form_id = 变化后形态 ID
+    - evolution_method 根据 form_type 和形态名推断
+
+    支持的形态变化类型：
+    - mega: 超级进化（需要超级进化石）
+    - gigantamax: 超极巨化
+    - primal: 原始回归（固拉多、盖欧卡）
+    - fusion: 宝可梦合体（酋雷姆、奈克洛兹玛、蕾冠王）
+    - ultra-burst: 究极爆发（奈克洛兹玛）
+
+    Returns:
+        各类型生成的记录数统计字典。
+    """
+    # 查询所有有非默认形态的宝可梦（排除地区形态，它们已有独立进化链）
+    EXCLUDED_FORM_TYPES = ("default", "regional-alola", "regional-galar",
+                           "regional-hisui", "regional-paldea", "terastal")
+
+    rows = conn.execute(
+        """
+        SELECT pf.id AS form_id, pf.pokemon_id, pf.name_zh AS form_name,
+               pf.form_type, pf.required_item_id,
+               p.name_zh AS pokemon_name,
+               i.name_zh AS item_name
+        FROM pokemon_forms pf
+        JOIN pokemon p ON pf.pokemon_id = p.id
+        LEFT JOIN items i ON pf.required_item_id = i.id
+        WHERE pf.is_default = 0 AND pf.form_type NOT IN (?, ?, ?, ?, ?, ?)
+        ORDER BY pf.pokemon_id, pf.sort_order
+        """,
+        EXCLUDED_FORM_TYPES,
+    ).fetchall()
+
+    if not rows:
+        return {"total": 0}
+
+    # 获取每个宝可梦的默认形态 ID
+    pokemon_ids = list({int(r["pokemon_id"]) for r in rows})
+    default_forms: dict[int, int] = {}
+    for pid in pokemon_ids:
+        default_row = conn.execute(
+            "SELECT id FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 LIMIT 1",
+            (pid,),
+        ).fetchone()
+        if default_row:
+            default_forms[pid] = int(default_row["id"])
+
+    # 确定哪些 chain_id 已被普通进化链使用
+    existing_chains = set()
+    for pid in pokemon_ids:
+        existing = conn.execute(
+            "SELECT 1 FROM evolution_chains WHERE chain_id = ? LIMIT 1",
+            (pid,),
+        ).fetchone()
+        if existing:
+            existing_chains.add(pid)
+
+    stats: dict[str, int] = {}
+    inserted = 0
+
+    # 删除旧的形态变化记录（通过 method 字段区分）
+    FORM_CHANGE_METHODS = ("mega", "gigantamax", "primal", "fusion", "ultra-burst")
+    if not dry_run:
+        conn.execute(
+            f"DELETE FROM evolution_chains WHERE evolution_method IN ({','.join('?' for _ in FORM_CHANGE_METHODS)})",
+            FORM_CHANGE_METHODS,
+        )
+
+    for r in rows:
+        pokemon_id = int(r["pokemon_id"])
+        form_id = int(r["form_id"])
+        form_type = r["form_type"]
+        form_name = r["form_name"]
+        pokemon_name = r["pokemon_name"]
+        item_name = r["item_name"]
+
+        # 推断 evolution_method 和 condition
+        method = _classify_form_change_method(form_type, form_name, pokemon_name)
+        if method is None:
+            continue  # 跳过不属于形态变化链的形态（如外观差异）
+
+        condition = _build_form_change_condition(method, form_name, item_name)
+
+        default_form_id = default_forms.get(pokemon_id)
+
+        # chain_id 策略：使用 pokemon_id（与普通进化共享同一个 chain）
+        chain_id = pokemon_id
+
+        stats[method] = stats.get(method, 0) + 1
+
+        if dry_run:
+            print(f"  [form-change] {pokemon_name} -> {form_name} ({method}, item={item_name or '-'})")
+            continue
+
+        conn.execute(
+            """
+            INSERT INTO evolution_chains
+              (chain_id, from_pokemon_id, to_pokemon_id,
+               from_form_id, to_form_id,
+               stage, sort_order,
+               evolution_method, evolution_condition,
+               evolution_item, evolution_level, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                chain_id,
+                pokemon_id,
+                pokemon_id,
+                default_form_id,
+                form_id,
+                0,  # stage=0: 形态变化不算进化阶段
+                900 + inserted,  # sort_order 使用大值避免与正常进化链冲突
+                method,
+                condition,
+                item_name,
+                None,
+                None,
+            ),
+        )
+        inserted += 1
+
+    if not dry_run:
+        conn.commit()
+
+    stats["total"] = inserted
+    return stats
+
+
+def _classify_form_change_method(form_type: str, form_name: str, pokemon_name: str) -> str | None:
+    """根据形态类型和名称推断 evolution_method。
+
+    返回 None 表示该形态不应生成进化链记录。
+    """
+    if form_type == "mega":
+        return "mega"
+    if form_type == "gigantamax":
+        return "gigantamax"
+
+    # alternate 类型需要按名称细分
+    if form_type == "alternate":
+        # 原始回归
+        if "原始" in form_name:
+            return "primal"
+        # 究极爆发
+        if "究极" in form_name and "奈克洛兹玛" in pokemon_name:
+            return "ultra-burst"
+        # 合体形态
+        fusion_indicators = [
+            ("酋雷姆", ("暗黑", "焰白")),
+            ("奈克洛兹玛", ("黄昏之鬃", "拂晓之翼")),
+            ("蕾冠王", ("骑白马", "骑黑马")),
+        ]
+        for poke_name, keywords in fusion_indicators:
+            if poke_name in pokemon_name:
+                if any(kw in form_name for kw in keywords):
+                    return "fusion"
+        # 其他 alternate 形态暂不纳入（如性别差异、外观差异等）
+        return None
+
+    return None
+
+
+def _build_form_change_condition(method: str, form_name: str, item_name: str | None) -> str:
+    """构建形态变化的条件描述。"""
+    if method == "mega":
+        if item_name:
+            return f"携带 {item_name} 进行超级进化"
+        return "超级进化"
+    if method == "gigantamax":
+        return "超极巨化"
+    if method == "primal":
+        if item_name:
+            return f"携带 {item_name} 原始回归"
+        return "原始回归"
+    if method == "fusion":
+        return f"合体变为 {form_name}"
+    if method == "ultra-burst":
+        return "究极爆发"
+    return form_name
+
+
+def _lookup_pokemon_by_name(conn: sqlite3.Connection, name: str) -> int | None:
+    """通过中文名查找 pokemon_id。"""
+    if not name:
+        return None
+    row = conn.execute(
+        "SELECT id FROM pokemon WHERE name_zh = ? LIMIT 1",
+        (name,),
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
+def _lookup_form_id_by_name(
+    conn: sqlite3.Connection,
+    pokemon_id: int | None,
+    form_name: str | None,
+) -> int | None:
+    """根据 pokemon_id 和形态描述文本解析 pokemon_forms.id。
+
+    匹配策略：
+    1. 如果 form_name 为空或 pokemon_id 为 None → 返回 None（默认形态由查询层推断）
+    2. form_key 精确匹配
+    3. name_zh 包含 form_name 去掉"的样子"后的前缀（如"阿罗拉"）
+    4. 只有一个非默认形态时取该形态
+    5. fallback 到默认形态
+    """
+    if not form_name or pokemon_id is None:
+        return None
+
+    rows = conn.execute(
+        "SELECT id, form_key, name_zh, is_default FROM pokemon_forms WHERE pokemon_id = ?",
+        (pokemon_id,),
+    ).fetchall()
+    if not rows:
+        return None
+
+    # 1. form_key 精确匹配
+    for r in rows:
+        if r["form_key"] == form_name:
+            return int(r["id"])
+
+    # 2. 地区前缀模糊匹配
+    prefix = form_name.replace("的样子", "")
+    if prefix and prefix != form_name:
+        for r in rows:
+            if not r["is_default"] and prefix in (r["name_zh"] or ""):
+                return int(r["id"])
+
+    # 3. 直接在 name_zh 中搜索
+    for r in rows:
+        if not r["is_default"] and form_name in (r["name_zh"] or ""):
+            return int(r["id"])
+
+    # 4. 只有一个非默认形态时取它
+    non_defaults = [r for r in rows if not r["is_default"]]
+    if len(non_defaults) == 1:
+        return int(non_defaults[0]["id"])
+
+    # 5. fallback 到默认形态
+    for r in rows:
+        if r["is_default"]:
+            return int(r["id"])
+
+    return int(rows[0]["id"]) if rows else None
+
+
+# ---------------------------------------------------------------------------
 # Pokemon abilities (focused updater for pokemon-abilities command)
 # ---------------------------------------------------------------------------
 

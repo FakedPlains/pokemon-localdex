@@ -83,10 +83,12 @@ export type PokemonFormEntry = {
 export type EvolutionStep = {
   fromPokemonId?: number;
   fromNameZh?: string;
-  fromFormKey?: string;
+  fromFormId?: number;
   toPokemonId: number;
   toNameZh: string;
-  toFormKey?: string;
+  toFormId?: number;
+  /** 形态的中文展示名（如"阿罗拉拉达"），仅非默认形态时有值 */
+  toFormName?: string;
   stage: number;
   method?: string;
   condition?: string;

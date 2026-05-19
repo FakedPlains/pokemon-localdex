@@ -882,31 +882,92 @@ display: block;
 
 .tab-evolution { padding: 4px 0; }
 
+/* ── Stage 分组布局（无形态分支时使用） ── */
 .evo-chain {
   display: flex;
   align-items: flex-start;
-  gap: 4px;
+  gap: 0;
   overflow-x: auto;
   padding-bottom: 8px;
 }
 
 .evo-stage-group {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  align-items: stretch;
+  gap: 0;
 }
 
-.evo-arrow {
-  font-size: 20px;
-  color: var(--muted, #888);
+.evo-arrow-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   flex-shrink: 0;
-  padding: 0 2px;
 }
 
 .evo-stage-members {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* ── 树形分支布局（有地区形态等形态分支时使用） ── */
+.evo-branches {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.evo-tree-node {
+  display: flex;
+  align-items: stretch;
+}
+
+.evo-tree-linear {
+  display: flex;
+  align-items: center;
+}
+
+.evo-tree-fork {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.evo-branch-step {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+/* ── 共享：箭头单元 ── */
+.evo-arrow-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  min-width: 0;
+}
+
+/* Stage 布局中箭头等高分配 */
+.evo-arrow-col .evo-arrow-cell { flex: 1; }
+/* 分支布局中箭头不伸缩 */
+.evo-branch-step .evo-arrow-cell { flex-shrink: 0; }
+
+.evo-arrow-cond {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--muted, #888);
+  text-align: center;
+  max-width: 90px;
+  word-break: break-word;
+  margin-bottom: 2px;
+}
+
+.evo-arrow-icon {
+  font-size: 18px;
+  color: var(--muted, #888);
 }
 
 .evo-member {
@@ -940,14 +1001,6 @@ display: block;
 .evo-member-types {
   display: flex;
   gap: 3px;
-}
-
-.evo-member-method {
-  font-size: 11px;
-  color: var(--muted, #888);
-  text-align: center;
-  max-width: 100px;
-  word-break: break-word;
 }
 
 /* ═══════════════════════════════════════════════════════
