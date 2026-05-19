@@ -7,6 +7,8 @@ export function useApi(path, options) {
   const [error, setError] = useState(null);
 
   const key = typeof path === "string" ? path : JSON.stringify(path);
+  // 序列化 options 以检测变化（调用方应保持 options 引用稳定，或传入可序列化对象）
+  const optionsKey = options ? JSON.stringify(options) : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -28,7 +30,7 @@ export function useApi(path, options) {
       });
 
     return () => { cancelled = true; };
-  }, [key]);
+  }, [key, optionsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { data, loading, error };
 }
