@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api.js";
+import { useToast } from "../components/Toast.jsx";
 import { GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import { createDraftMember } from "../utils/helpers.js";
 import { buildDamageRequest, buildDamageResult } from "../components/damage/damageCalculation.ts";
@@ -20,6 +21,8 @@ import StatusPanel from "../components/damage/StatusPanel.jsx";
 // ══════════════════════════════════════════════════════════════
 
 export default function DamagePage() {
+  const toast = useToast();
+
   // ── 世代 ──
   const [generation, setGeneration] = useState("0");
   const isChampions = Number(generation) === 0;
@@ -130,10 +133,10 @@ export default function DamagePage() {
 
       setResult(buildDamageResult(calcResult.data, meta));
     } catch (err) {
-      window.alert("计算失败: " + (err.message || "未知错误"));
+      toast.error("计算失败: " + (err.message || "未知错误"));
     }
     setCalculating(false);
-  }, [selectedMove, calcDirection, attacker, attackerDetail, defender, defenderDetail, generation, isChampions, level,
+  }, [toast, selectedMove, calcDirection, attacker, attackerDetail, defender, defenderDetail, generation, isChampions, level,
     attackerMoveExtras.recalcKey, defenderMoveExtras.recalcKey,
     battleMode, field,
     atkTeraType, defTeraType,

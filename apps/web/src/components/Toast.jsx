@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo, useRef } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from "react";
 
 const ToastContext = createContext(null);
 
@@ -29,8 +29,11 @@ export function ToastProvider({ children }) {
     info: (msg, duration) => addToast(msg, "info", duration),
   }), [addToast]);
 
-  // 暴露给非组件代码使用
-  globalToast = toast;
+  // 暴露给非组件代码使用（在 useEffect 中赋值，避免渲染阶段副作用）
+  useEffect(() => {
+    globalToast = toast;
+    return () => { globalToast = null; };
+  }, [toast]);
 
   return (
     <ToastContext.Provider value={toast}>

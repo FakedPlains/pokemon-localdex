@@ -4,7 +4,6 @@
   "type": "module",
   "exports": "./src/index.ts",
   "dependencies": {
-    "@pokemon-localdex/battle-core": "*",
     "@pokemon-localdex/store-types": "*",
     "@pokemon-localdex/drizzle-queries": "*",
     "drizzle-orm": "*"
