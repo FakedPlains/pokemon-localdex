@@ -154,7 +154,7 @@ interface NameLookup {
 
 所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。
 
-统一入口是 `apps/web/src/utils/api.ts` 中的 `unifiedApi` 对象，**所有页面和 hook 必须通过 `unifiedApi` 调用**。
+统一入口是 `apps/web/src/utils/api.ts` 中的 `api()` 函数，**所有页面和 hook 必须通过它调用**。组件层优先使用 `useApi` / `useInfiniteApi` / `useApiCallback` 等 hook 间接调用 `api()`，仅在缓存、链式调用、防抖等 hook 无法覆盖的场景下才直接使用 `api()`。
 
 ### 3.3 小程序层（apps/miniprogram）
 
@@ -173,10 +173,13 @@ defineConstants: {
 
 ### 4.1 数据请求 Hook
 
-- **单次请求**：使用 `useApi(fetchFn, deps)`，返回 `{ data, loading, error }`
-- **无限滚动分页**：使用 `useInfiniteApi(fetchFn, deps)`，返回 `{ data, loading, error, loadMore, hasMore }`
+Web 端提供三个请求 hook，位于 `apps/web/src/hooks/`：
 
-不要在组件内直接 `useEffect` + `fetch`，统一走这两个 hook。
+- **`useApi<T>(path | null, options?)`**：声明式单次请求。path 变化自动重新请求，传 `null` 或 `enabled: false` 跳过请求。返回 `{ data, loading, error }`。
+- **`useInfiniteApi<T>(basePath, options?)`**：无限滚动分页。自动拼接 offset/limit，通过 IntersectionObserver 哨兵元素触发加载更多。支持 `enabled` 开关。返回 `{ data, total, loading, loadingMore, hasMore, error, sentinelRef, loadMore, reset }`。
+- **`useApiCallback<T>()`**：命令式手动触发。适用于事件驱动的请求（如 POST 提交、按钮触发的搜索）。返回 `{ call, loading }`。
+
+新组件优先使用以上 hook。仅在 hook 无法覆盖的场景（链式调用、自定义缓存、搜索防抖、批量并发）下才直接使用 `api()`。
 
 ### 4.2 路由规范
 
@@ -713,7 +716,7 @@ npm install react@18.3.1 react-dom@18.3.1
 1. **确认数据是否已有**：先查 SQLite 数据库，确认所需字段是否已被爬虫采集
 2. **如需新字段**：先修改爬虫，重新爬取，再修改 schema 和 store 包
 3. **后端先行**：在 `apps/api` 中添加路由，用 `npm run check:api` 验证
-4. **前端对接**：在 `apps/web/src/utils/api.ts` 的 `unifiedApi` 中添加对应方法
+4. **前端对接**：通过 `apps/web/src/utils/api.ts` 的 `api()` 函数调用新接口，在组件中优先使用 `useApi` / `useInfiniteApi` hook
 5. **小程序同步**：如果功能需要在小程序中支持，同步修改 `apps/miniprogram/src/utils/api.js`
 
 ### 数据库变更流程

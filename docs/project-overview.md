@@ -73,10 +73,10 @@ pokemon-localdex/
 │   │   │   │   ├── PokemonEditor.tsx    宝可梦编辑器
 │   │   │   │   └── PokemonPickerList.tsx 宝可梦选择列表
 │   │   │   ├── hooks/
-│   │   │   │   ├── useApi.ts            单次请求 hook
+│   │   │   │   ├── useApi.ts            声明式单次请求 hook + useApiCallback 命令式 hook
 │   │   │   │   └── useInfiniteApi.ts    无限滚动分页 hook
 │   │   │   └── utils/
-│   │   │       ├── api.ts               统一 API 入口（unifiedApi / api）
+│   │   │       ├── api.ts               唯一底层请求函数 api()
 │   │   │       ├── constants.ts         全局常量（属性、性格、招式学习方式等）
 │   │   │       ├── helpers.ts           权威工具函数（evToSp、normalizeTypeName、splitTypeNames、getNatureMultiplier、resolvePokemonDisplayVariant）
 │   │   │       ├── teamStorage.ts       队伍/盒子存储 + 类型守卫（isPokemonConfig、isTeam）+ padMoves4 + completePokemonConfig

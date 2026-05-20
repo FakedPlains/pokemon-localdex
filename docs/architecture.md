@@ -56,7 +56,7 @@ pokemon-localdex/
 │   │   │   ├── styles/       模块化 CSS（16 个文件，Vite 打包合并）
 │   │   │   ├── pages/        七个页面（Pokedex、Moves、Abilities、Items、Teams、Damage、TypeChart）
 │   │   │   ├── components/   公共组件（TypeChip、CustomSelect、SearchSelect、StatCalculator 等）
-│   │   │   ├── hooks/        数据请求 hook（useApi、useInfiniteApi）
+│   │   │   ├── hooks/        数据请求 hook（useApi、useApiCallback、useInfiniteApi）
 │   │   │   └── utils/        工具函数（api、constants、helpers、teamStorage、migrateStorage）
 │   │   │       │                 helpers.ts：权威工具函数（evToSp、normalizeTypeName、getNatureMultiplier 等）
 │   │   │       │                 teamStorage.ts：队伍存储 + 类型守卫 + padMoves4 + completePokemonConfig

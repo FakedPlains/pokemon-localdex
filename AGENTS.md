@@ -185,14 +185,15 @@ calculateDamage(input, lookup)
 
 ## Web 端规则
 
-Web 数据请求必须走 `apps/web/src/utils/api.ts` 中的 `api`/`unifiedApi`，路径使用 `/api/...`。
+Web 数据请求必须走 `apps/web/src/utils/api.ts` 中的 `api()` 函数，路径使用 `/api/...`。
 
-不要在页面组件里随手写项目数据的原始 `fetch`，除非确有封装无法覆盖的理由。
+不要在页面组件里随手写项目数据的原始 `fetch`，除非确有封装无法覆盖的理由（如链式调用、自定义 detailCache、搜索防抖、批量并发）。
 
 请求状态优先使用现有 hooks：
 
-- `useApi(fetchFn, deps)`：单次请求。
-- `useInfiniteApi(fetchFn, deps)`：分页/无限滚动。
+- `useApi<T>(path | null, options?)`：声明式单次请求，支持 `enabled` 和 null path 跳过。
+- `useInfiniteApi<T>(basePath, options?)`：无限滚动分页，支持 `enabled` 开关。
+- `useApiCallback<T>()`：命令式手动触发（事件驱动、POST）。
 
 路由规则：
 

@@ -531,16 +531,17 @@ migrate-d1:
 
 **背景**
 
-`apps/web/src/hooks/useApi.js` 当前没有缓存和去重机制。相同的 API 请求在不同组件挂载时会重复发起。
+`apps/web/src/hooks/useApi.ts` 已经支持 `enabled` 条件请求和 `path: string | null` 的跳过语义，但仍没有缓存和去重机制。相同的 API 请求在不同组件挂载时会重复发起。`useApiCallback` 提供了手动触发的命令式请求能力，但也不涉及缓存。
 
 **涉及文件**
 
-- `apps/web/src/hooks/useApi.js`
-- 可能新增 `apps/web/src/utils/apiCache.js`
+- `apps/web/src/hooks/useApi.ts`
+- `apps/web/src/utils/api.ts`
+- 可能新增 `apps/web/src/utils/apiCache.ts`
 
 **具体步骤**
 
-短期方案：在 `api.js` 层加一个简单的内存缓存 Map，key 为请求路径+参数的序列化字符串，value 包含 Promise 和过期时间。相同 key 的并发请求复用同一个 Promise，已完成的请求在 TTL 内直接返回缓存结果。长期方案：如果请求场景进一步增多，可以评估引入 `@tanstack/react-query`。
+短期方案：在 `api.ts` 层加一个简单的内存缓存 Map，key 为请求路径+参数的序列化字符串，value 包含 Promise 和过期时间。相同 key 的并发请求复用同一个 Promise，已完成的请求在 TTL 内直接返回缓存结果。`useApi` 的 `enabled=false` 或 `path=null` 时不应创建缓存条目。长期方案：如果请求场景进一步增多，可以评估引入 `@tanstack/react-query`。
 
 **预估工作量**：约 2 小时（短期方案）。
 
