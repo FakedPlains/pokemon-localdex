@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { createDraftMember } from "./utils/helpers";
 import { TYPE_OPTIONS, CATEGORY_OPTIONS, GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
-import type { TypeOption, CategoryOption } from "@pokemon-localdex/store-types/constants";
 import { ToastProvider } from "./components/Toast";
+import Loading from "./components/Loading";
 import type { PokemonConfig } from "./utils/teamStorage";
 
 const PokedexPage = lazy(() => import("./pages/PokedexPage"));
@@ -379,7 +379,7 @@ export default function App(_props: AppProps) {
       )}
 
       <main className="main-panel">
-        <Suspense fallback={<div className="shared-loading">加载中…</div>}>
+        <Suspense fallback={<Loading />}>
           {pageElement}
         </Suspense>
       </main>

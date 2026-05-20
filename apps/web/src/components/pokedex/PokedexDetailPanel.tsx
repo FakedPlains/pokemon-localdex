@@ -2,11 +2,13 @@ import { RefObject } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { PokemonEntry } from "@pokemon-localdex/store-types";
 import DrawerContent from "./DrawerContent";
+import Loading from "../Loading";
 
 export interface PokedexDetailPanelProps {
   hasSelection: boolean;
   detailRef: RefObject<HTMLDivElement | null>;
   detail: PokemonEntry | null;
+  detailLoading: boolean;
   detailGeneration: number | string;
   onDetailGenerationChange: (gen: string) => void;
   onClose: () => void;
@@ -16,6 +18,7 @@ export default function PokedexDetailPanel({
   hasSelection,
   detailRef,
   detail,
+  detailLoading,
   detailGeneration,
   onDetailGenerationChange,
   onClose,
@@ -37,18 +40,15 @@ export default function PokedexDetailPanel({
               <line x1="4" y1="4" x2="14" y2="14" /><line x1="14" y1="4" x2="4" y2="14" />
             </svg>
           </button>
-          {detail ? (
+          {detail && !detailLoading ? (
             <DrawerContent
               detail={detail}
               detailGeneration={detailGeneration}
               onDetailGenerationChange={onDetailGenerationChange}
             />
-          ) : (
-            <div className="dex-drawer-loading">
-              <div className="pulse-dot" />
-              <span>加载详情…</span>
-            </div>
-          )}
+          ) : detailLoading ? (
+            <Loading />
+          ) : null}
         </motion.div>
       )}
     </AnimatePresence>

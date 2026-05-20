@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { unifiedApi } from "../utils/api";
 import { useApi } from "../hooks/useApi";
 import { useInfiniteApi } from "../hooks/useInfiniteApi";
 import Loading from "../components/Loading";
@@ -44,7 +43,8 @@ export default function PokedexPage({
   const [speedSortOrder, setSpeedSortOrder] = useState<"desc" | "asc" | "">("");
   const [showSpeedLine, setShowSpeedLine] = useState(false);
   const [hasLoadedList, setHasLoadedList] = useState(false);
-  const [lastList, setLastList] = useState<(PokemonCardSummary | PokemonTableSummary)[]>([]);
+  const [lastCardList, setLastCardList] = useState<PokemonCardSummary[]>([]);
+  const [lastTableList, setLastTableList] = useState<PokemonTableSummary[]>([]);
   const [lastTotal, setLastTotal] = useState(0);
 
   const { data: championsSeasonsData, loading: seasonsLoading } = useApi<ChampionsSeasonSummary[]>("/champions/seasons");
@@ -72,21 +72,30 @@ export default function PokedexPage({
   const filterChangedWhileOpenRef = useRef(false); // track filter changes with detail open
   const fromUrlNavRef = useRef(false); // true when selection comes from URL navigation (#/pokemon?id=X)
 
-  // 构建分页请求路径
-  const pokemonPath = useMemo(() => {
+  // 构建分页请求路径（card 和 table 各用独立 hook，通过 enabled 控制是否发请求）
+  const baseParams = useMemo(() => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     if (types.length > 0) params.set("type", types.join(","));
     if (generation) params.set("generation", generation);
     if (championsSeasonId) params.set("seasonId", championsSeasonId);
-    if (dexViewMode === "list" && speedSortOrder) {
+    return params;
+  }, [query, types, generation, championsSeasonId]);
+
+  const cardPath = useMemo(() => {
+    const qs = baseParams.toString();
+    return qs ? `/pokemon/cards?${qs}` : "/pokemon/cards";
+  }, [baseParams]);
+
+  const tablePath = useMemo(() => {
+    const params = new URLSearchParams(baseParams);
+    if (speedSortOrder) {
       params.set("sort", "speed");
       params.set("order", speedSortOrder);
     }
     const qs = params.toString();
-    const endpoint = dexViewMode === "list" ? "/pokemon/table" : "/pokemon/cards";
-    return qs ? `${endpoint}?${qs}` : endpoint;
-  }, [query, types, generation, championsSeasonId, speedSortOrder, dexViewMode]);
+    return qs ? `/pokemon/table?${qs}` : "/pokemon/table";
+  }, [baseParams, speedSortOrder]);
 
   // Mark that filters changed while detail panel is open
   useEffect(() => {
@@ -95,17 +104,32 @@ export default function PokedexPage({
     }
   }, [query, types, generation, championsSeasonId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: list, total, loading, hasMore, sentinelRef } = useInfiniteApi<PokemonCardSummary>(pokemonPath, { pageSize: 60 });
+  const isCardMode = dexViewMode === "card";
+  const cardResult = useInfiniteApi<PokemonCardSummary>(cardPath, { pageSize: 60, enabled: isCardMode });
+  const tableResult = useInfiniteApi<PokemonTableSummary>(tablePath, { pageSize: 60, enabled: !isCardMode });
+
+  // 统一输出：根据当前模式选择活跃 hook 的返回值
+  const list: PokemonCardSummary[] = isCardMode ? cardResult.data : tableResult.data;
+  const total = isCardMode ? cardResult.total : tableResult.total;
+  const loading = isCardMode ? cardResult.loading : tableResult.loading;
+  const hasMore = isCardMode ? cardResult.hasMore : tableResult.hasMore;
+  const sentinelRef = isCardMode ? cardResult.sentinelRef : tableResult.sentinelRef;
+
   const isRefreshingList = loading && hasLoadedList;
-  const displayList = isRefreshingList && list.length === 0 ? lastList : list;
+  const displayCardList = isRefreshingList && cardResult.data.length === 0 ? lastCardList : cardResult.data;
+  const displayTableList = isRefreshingList && tableResult.data.length === 0 ? lastTableList : tableResult.data;
   const displayTotal = isRefreshingList && list.length === 0 ? lastTotal : total;
 
   useEffect(() => {
     if (loading) return;
     setHasLoadedList(true);
-    setLastList(list);
+    if (isCardMode) {
+      setLastCardList(cardResult.data);
+    } else {
+      setLastTableList(tableResult.data);
+    }
     setLastTotal(total);
-  }, [list, loading, total]);
+  }, [cardResult.data, tableResult.data, loading, total, isCardMode]);
 
   // After list reloads due to filter change while detail is open:
   // - has results → auto-select the first pokemon
@@ -137,21 +161,24 @@ export default function PokedexPage({
   }, [initialPokemonId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch detail when a card is selected
-  useEffect(() => {
-    if (!selectedSlug) { setDetail(null); return; }
-    let cancelled = false;
-    setDetail(null);
+  const detailPath = useMemo(() => {
+    if (!selectedSlug) return null;
     const params = new URLSearchParams();
     if (championsSeasonId) params.set("seasonId", championsSeasonId);
     const qs = params.toString();
-    unifiedApi(`/pokemon/${selectedSlug}/summary${qs ? `?${qs}` : ""}`).then((r) => {
-      if (!cancelled) {
-        setDetail(r.data as PokemonEntry);
-        setDetailGeneration("");
-      }
-    });
-    return () => { cancelled = true; };
+    return `/pokemon/${selectedSlug}/summary${qs ? `?${qs}` : ""}`;
   }, [selectedSlug, championsSeasonId]);
+
+  const { data: fetchedDetail, loading: detailLoading } = useApi<PokemonEntry>(detailPath);
+
+  useEffect(() => {
+    if (fetchedDetail) {
+      setDetail(fetchedDetail);
+      setDetailGeneration("");
+    } else if (!selectedSlug) {
+      setDetail(null);
+    }
+  }, [fetchedDetail, selectedSlug]);
 
   // Scroll detail panel to top when detail changes
   useEffect(() => {
@@ -246,7 +273,7 @@ export default function PokedexPage({
         isRefreshingList={isRefreshingList}
         displayTotal={displayTotal}
         hasSelection={hasSelection}
-        displayListLength={displayList.length}
+        displayListLength={isCardMode ? displayCardList.length : displayTableList.length}
         showSpeedLine={showSpeedLine}
         onSpeedLineToggle={handleSpeedLineToggle}
         effectiveViewMode={effectiveViewMode}
@@ -258,8 +285,8 @@ export default function PokedexPage({
         <div className={`dex-list-panel${hasSelection ? " dex-list-panel-narrow" : ""}`}>
           {effectiveViewMode === "card" ? (
             <PokedexCardList
-              displayList={displayList as PokemonCardSummary[]}
-              loading={loading}
+              displayList={displayCardList}
+              loading={cardResult.loading}
               hasSelection={hasSelection}
               selectedSlug={selectedSlug ?? ""}
               onSelect={handleSelect}
@@ -269,8 +296,8 @@ export default function PokedexPage({
             />
           ) : (
             <PokedexTableList
-              displayList={displayList as PokemonTableSummary[]}
-              loading={loading}
+              displayList={displayTableList}
+              loading={tableResult.loading}
               showSpeedLine={showSpeedLine}
               speedSortOrder={speedSortOrder}
               onSpeedSortToggle={handleSpeedSortToggle}
@@ -286,6 +313,7 @@ export default function PokedexPage({
           hasSelection={hasSelection}
           detailRef={detailRef}
           detail={detail}
+          detailLoading={detailLoading}
           detailGeneration={detailGeneration}
           onDetailGenerationChange={setDetailGeneration}
           onClose={handleClose}
