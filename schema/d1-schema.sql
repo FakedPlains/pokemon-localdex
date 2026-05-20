@@ -1,6 +1,6 @@
 -- ============================================================
--- Pokemon LocalDex — Cloudflare D1 Schema
--- 与 packages/sqlite-store/src/index.ts 中的 ensureSchema() 保持同步
+-- Pokemon LocalDex — Database Schema (Source of Truth)
+-- 本地 SQLite 和 Cloudflare D1 共用此文件建库
 -- D1 使用 SQLite 语法，直接兼容
 -- ============================================================
 

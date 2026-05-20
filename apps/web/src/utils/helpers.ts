@@ -12,11 +12,9 @@ import type {
   StatBlock,
   PokemonFormEntry,
   PokemonEntry,
-  PokemonSummary,
   MoveEntry,
   MoveGenerationRecord,
   LearnsetRecord,
-  EvolutionStep,
   FormStatVariant,
   FormTypeVariant,
   FormAbilityVariant,
@@ -268,133 +266,6 @@ export function resolveMoveGenerationRecord(
   return previous || records[records.length - 1];
 }
 
-/**
- * @deprecated Legacy: generationRecords no longer exist in form-centric API.
- * Return undefined — callers should use forms[] instead.
- */
-export function resolvePokemonGenerationRecord(
-  _pokemon: unknown,
-  _generation: number | undefined,
-): undefined {
-  return undefined;
-}
-
-type LegacyGenerationRecord = {
-  learnset?: LearnsetRecord[];
-  moveIds?: number[];
-};
-
-type LegacyPokemon = {
-  moveIds?: number[];
-} & Partial<LegacyGenerationRecord>;
-
-export function getPokemonLearnsetEntries(
-  pokemon: LegacyPokemon | undefined,
-  generation: number | undefined,
-): Array<{ moveId?: number; moveNameZh?: string }> {
-  const record = resolvePokemonGenerationRecord(pokemon, generation) as LegacyGenerationRecord | undefined;
-  if (record?.learnset?.length) return record.learnset;
-  if (record?.moveIds?.length) return record.moveIds.map((moveId) => ({ moveId }));
-  if (pokemon?.moveIds?.length) return pokemon.moveIds.map((moveId) => ({ moveId }));
-  return [];
-}
-
-const METHOD_ORDER: Record<string, number> = {
-  "level-up": 1,
-  evolution: 2,
-  tm: 3,
-  hm: 4,
-  tutor: 5,
-  egg: 6,
-  event: 7,
-  other: 8,
-};
-
-export function sortLearnsetEntries(entries: LearnsetRecord[]): LearnsetRecord[] {
-  return [...entries].sort((a, b) => {
-    const am = METHOD_ORDER[a.learnMethod] ?? 99;
-    const bm = METHOD_ORDER[b.learnMethod] ?? 99;
-    if (am !== bm) return am - bm;
-    const al = a.level ?? 999;
-    const bl = b.level ?? 999;
-    if (al !== bl) return al - bl;
-    return String(a.moveNameZh || a.moveId || "").localeCompare(
-      String(b.moveNameZh || b.moveId || ""),
-      "zh-Hans-CN",
-    );
-  });
-}
-
-type MoveLookupItem = {
-  id: string;
-  slug?: string;
-  nameZh: string;
-  nameEn?: string;
-  nameJa?: string;
-};
-
-export function buildMoveLookup(allMoves: MoveLookupItem[] = []): Map<string, MoveLookupItem> {
-  const lookup = new Map<string, MoveLookupItem>();
-  for (const move of allMoves) {
-    for (const key of [move.id, move.slug, move.nameZh, move.nameEn, move.nameJa].filter(Boolean)) {
-      lookup.set(String(key), move);
-    }
-  }
-  return lookup;
-}
-
-export function resolveLearnsetMove(
-  entry: { moveId?: number; moveNameZh?: string },
-  moveLookup: Map<string, MoveLookupItem>,
-): MoveLookupItem | undefined {
-  return moveLookup.get(String(entry.moveId || "")) ||
-    moveLookup.get(String(entry.moveNameZh || "")) ||
-    undefined;
-}
-
-// ══════════════════════════════════════════════
-//  进化家族
-// ══════════════════════════════════════════════
-
-type EvolutionFamily = {
-  key: string;
-  chain: Array<EvolutionStep & { stageLabel?: string; image?: ImageAsset | string }>;
-  matches: PokemonEntry[];
-};
-
-export function buildEvolutionFamilies(pokemonList: PokemonEntry[]): EvolutionFamily[] {
-  const families = new Map<string, EvolutionFamily>();
-
-  function toEvolutionMember(pokemon: PokemonSummary): EvolutionStep & { stageLabel: string; image: ImageAsset | string | undefined } {
-    const previewUrl = getPokemonPreviewImage(pokemon);
-    return {
-      toPokemonId: pokemon.id,
-      toNameZh: pokemon.nameZh,
-      stage: 0,
-      stageLabel: "未进化",
-      image: previewUrl ? { url: previewUrl } : undefined,
-    };
-  }
-
-  for (const pokemon of pokemonList) {
-    const chain = Array.isArray(pokemon.evolutionChain) && pokemon.evolutionChain.length > 0
-      ? pokemon.evolutionChain
-      : [toEvolutionMember(pokemon)];
-    const key = chain.map((m) => m.toPokemonId || m.toNameZh).join("|");
-
-    if (!families.has(key)) {
-      families.set(key, { key, chain, matches: [] });
-    }
-    families.get(key)!.matches.push(pokemon);
-  }
-
-  return [...families.values()].sort((a, b) => {
-    const ad = Math.min(...a.chain.map((m) => Number(m.toPokemonId || 9999)));
-    const bd = Math.min(...b.chain.map((m) => Number(m.toPokemonId || 9999)));
-    return ad - bd;
-  });
-}
-
 // ══════════════════════════════════════════════
 //  世代 / 形态解析
 // ══════════════════════════════════════════════
@@ -604,34 +475,4 @@ export function resolvePokemonDisplayVariant(
     hiddenAbilityText,
     abilitiesDetailed,
   };
-}
-
-// ══════════════════════════════════════════════
-//  可学招式筛选
-// ══════════════════════════════════════════════
-
-type LearnableMoveEntry = {
-  moveId?: number;
-  moveNameZh?: string;
-};
-
-export function getLearnableDamageMoves(
-  pokemon: LegacyPokemon | undefined,
-  allMoves: MoveLookupItem[],
-  generation: number | undefined,
-): { moves: MoveLookupItem[]; learnsetEntries: LearnableMoveEntry[] } {
-  const learnsetEntries = getPokemonLearnsetEntries(pokemon, generation);
-  if (!pokemon || learnsetEntries.length === 0) {
-    return { moves: allMoves, learnsetEntries: [] };
-  }
-
-  const moveIds = new Set<string | number>(
-    learnsetEntries
-      .flatMap((entry) => [entry.moveId, entry.moveNameZh])
-      .filter((v): v is string | number => v !== undefined && v !== null && v !== ""),
-  );
-  const moves = allMoves.filter((move) =>
-    moveIds.has(move.id) || moveIds.has(move.slug || "") || moveIds.has(move.nameZh),
-  );
-  return { moves, learnsetEntries };
 }

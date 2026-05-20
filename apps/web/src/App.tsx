@@ -76,9 +76,7 @@ function parsePokemonIdFromHash(): string | null {
   return params.get("id") || null;
 }
 
-export interface AppProps {}
-
-export default function App(_props: AppProps) {
+export default function App() {
   const [route, setRoute] = useState<NavKey>(parseRoute);
   const [initialPokemonId, setInitialPokemonId] = useState<string | null>(parsePokemonIdFromHash);
   const initialPokemonIdRef = useRef<string | null>(initialPokemonId);
@@ -155,10 +153,6 @@ export default function App(_props: AppProps) {
     setInputValue(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => setQuery(value), 300);
-  }, []);
-
-  const _handleTeamDraftChange = useCallback((updater: typeof teamDraft | ((prev: typeof teamDraft) => typeof teamDraft)) => {
-    setTeamDraft((prev) => (typeof updater === "function" ? updater(prev) : updater));
   }, []);
 
   const isSearchable = SEARCHABLE_PAGES.has(route);
