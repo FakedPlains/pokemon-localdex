@@ -30,7 +30,7 @@ export default function PokedexCardList({
       {displayList.map((member) => {
         const slug = String(member.id);
         const isActive = selectedSlug === slug;
-        const image = getPokemonPreviewImage(member as Parameters<typeof getPokemonPreviewImage>[0]);
+        const image = getPokemonPreviewImage(member);
         const imageSrc = typeof image === "string" ? image : undefined;
         const imageAlt = member.nameZh;
         return (

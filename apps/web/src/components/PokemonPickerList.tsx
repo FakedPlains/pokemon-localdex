@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { unifiedApi } from "../utils/api";
+import { api } from "../utils/api";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import type { StatKey, PokemonSummary } from "@pokemon-localdex/store-types";
 import { getStatValue } from "@pokemon-localdex/store-types";
@@ -11,13 +11,15 @@ import { getPokemonPreviewImage } from "../utils/helpers";
 
 const PAGE_SIZE = 50;
 
+type SortableKey = StatKey | "bst";
+
 export interface PokemonPickerListProps {
   search?: string;
   onSelect: (pokemon: PokemonSummary) => void;
 }
 
 export default function PokemonPickerList({ search = "", onSelect }: PokemonPickerListProps) {
-  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortableKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [allData, setAllData] = useState<PokemonSummary[]>([]);
   const [offset, setOffset] = useState(0);
@@ -32,7 +34,7 @@ export default function PokemonPickerList({ search = "", onSelect }: PokemonPick
     try {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(currentOffset) });
       if (query.trim()) params.set("q", query.trim());
-      const r = await unifiedApi<PokemonSummary[]>(`/pokemon?${params.toString()}`);
+      const r = await api<PokemonSummary[]>(`/pokemon?${params.toString()}`);
       const list = r.data || [];
       if (reset) {
         setAllData(list);
@@ -76,15 +78,15 @@ export default function PokemonPickerList({ search = "", onSelect }: PokemonPick
     return [...allData].sort((a, b) => {
       const va = (sortKey === "bst")
         ? STAT_KEYS.reduce((s, k) => s + getStatValue(a.baseStats, k), 0)
-        : getStatValue(a.baseStats, sortKey as StatKey);
+        : getStatValue(a.baseStats, sortKey);
       const vb = (sortKey === "bst")
         ? STAT_KEYS.reduce((s, k) => s + getStatValue(b.baseStats, k), 0)
-        : getStatValue(b.baseStats, sortKey as StatKey);
+        : getStatValue(b.baseStats, sortKey);
       return sortDir === "desc" ? vb - va : va - vb;
     });
   }, [allData, sortKey, sortDir]);
 
-  const handleSort = (key: string) => {
+  const handleSort = (key: SortableKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === "desc" ? "asc" : "desc"));
     } else {
@@ -93,7 +95,7 @@ export default function PokemonPickerList({ search = "", onSelect }: PokemonPick
     }
   };
 
-  const statCols: Array<{ key: string; label: string }> = [
+  const statCols: Array<{ key: SortableKey; label: string }> = [
     { key: "hp", label: "HP" },
     { key: "atk", label: "Atk" },
     { key: "def", label: "Def" },

@@ -4,6 +4,7 @@ import { useToast } from "../components/Toast";
 import { GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import { createDraftMember } from "../utils/helpers";
 import { buildDamageRequest, buildDamageResult } from "../components/damage/damageCalculation";
+import type { DamageApiResponse } from "../components/damage/damageCalculation";
 import DamageResultPanel from "../components/damage/DamageResultPanel";
 import FieldControlPanel from "../components/damage/FieldControlPanel";
 import MoveExtrasPanel from "../components/damage/MoveExtrasPanel";
@@ -17,7 +18,6 @@ import useMoveExtraState from "../components/damage/useMoveExtraState";
 import usePokemonDetails from "../components/damage/usePokemonDetails";
 import StatusPanel from "../components/damage/StatusPanel";
 import type { PokemonConfig } from "../utils/teamStorage";
-import type { PokemonEntry } from "@pokemon-localdex/store-types";
 
 export interface DamagePageProps {
   teamDraft?: {
@@ -121,9 +121,9 @@ export default function DamagePage(_props: DamagePageProps) {
         selectedMove,
         calcDirection,
         attacker,
-        attackerDetail: attackerDetail as PokemonEntry | null,
+        attackerDetail,
         defender,
-        defenderDetail: defenderDetail as PokemonEntry | null,
+        defenderDetail,
         generation,
         isChampions,
         level,
@@ -157,12 +157,12 @@ export default function DamagePage(_props: DamagePageProps) {
         defSide: defenderSide.values,
       });
 
-      const calcResult = await api<Record<string, unknown>>("/battle/damage", {
+      const calcResult = await api<DamageApiResponse>("/battle/damage", {
         method: "POST",
         body: JSON.stringify(payload),
       });
 
-      setResult(buildDamageResult(calcResult.data, meta as Record<string, unknown>) as DamageResult);
+      setResult(buildDamageResult(calcResult.data, meta));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "未知错误";
       toast.error("计算失败: " + message);

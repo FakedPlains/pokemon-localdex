@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import CustomSelect from "../CustomSelect";
 import PokemonConfigCard from "../PokemonConfigCard";
-import type { PokemonConfigDisplay, PokemonConfigEditState, MenuAction } from "./types.js";
+import type { PokemonConfigDisplay, PokemonConfigEditState, MenuAction } from "./types";
 
 interface SelectOption {
   value: string;

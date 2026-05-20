@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { unifiedApi } from "../utils/api";
+import { api } from "../utils/api";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
-import type { StatKey, StatBlock, PokemonEntry, ItemEntry, LearnsetRecord, LearnsetMeta, LearnsetResponse } from "@pokemon-localdex/store-types";
-import { getStatValue } from "@pokemon-localdex/store-types";
+import type { StatBlock, PokemonEntry, ItemEntry, LearnsetMeta, LearnsetResponse } from "@pokemon-localdex/store-types";
 import type { PokemonConfigDraft } from "../utils/teamStorage";
 import { getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers";
 
@@ -55,7 +54,7 @@ export default function PokemonConfigCard({ data, menuActions, className = "" }:
   useEffect(() => {
     if (data.imageUrl || !data.pokemonId) return;
     let cancelled = false;
-    unifiedApi<PokemonEntry>(`/pokemon/${data.pokemonId}`).then((r) => {
+    api<PokemonEntry>(`/pokemon/${data.pokemonId}`).then((r) => {
       if (cancelled) return;
       const p = r.data;
       const img = getPokemonPreviewImage(p);
@@ -72,7 +71,7 @@ export default function PokemonConfigCard({ data, menuActions, className = "" }:
   useEffect(() => {
     if (data.itemImageUrl || !data.itemId) return;
     let cancelled = false;
-    unifiedApi<ItemEntry>(`/items/${data.itemId}`).then((r) => {
+    api<ItemEntry>(`/items/${data.itemId}`).then((r) => {
       if (cancelled) return;
       const item = r.data;
       if (item?.imageUrl) setFetchedItemImageUrl(item.imageUrl);
@@ -86,17 +85,17 @@ export default function PokemonConfigCard({ data, menuActions, className = "" }:
     if (moves.length === 0 || data._movesInfo) return;
     if (!data.pokemonId) return;
     let cancelled = false;
-    unifiedApi<PokemonEntry>(`/pokemon/${data.pokemonId}`).then((r) => {
+    api<PokemonEntry>(`/pokemon/${data.pokemonId}`).then((r) => {
       if (cancelled) return;
       const pid = r.data?.id;
       if (!pid) return;
-      return unifiedApi<LearnsetMeta>(`/pokemon/${pid}/learnset/meta`).then((meta) => {
+      return api<LearnsetMeta>(`/pokemon/${pid}/learnset/meta`).then((meta) => {
         if (cancelled) return;
         const gens = meta.data?.generations || [];
         const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
         const formKeys = meta.data?.formKeys || [];
         const form = formKeys[0] || "default";
-        return unifiedApi<LearnsetResponse>(`/pokemon/${pid}/learnset?generation=${latestGen}&form=${form}`);
+        return api<LearnsetResponse>(`/pokemon/${pid}/learnset?generation=${latestGen}&form=${form}`);
       });
     }).then(async (r) => {
       if (cancelled || !r) return;
@@ -111,7 +110,7 @@ export default function PokemonConfigCard({ data, menuActions, className = "" }:
       const missing = moves.filter((m) => !moveMap[m]);
       if (missing.length > 0) {
         const results = await Promise.all(
-          missing.map((name) => unifiedApi<Array<{ nameZh: string; type?: string; power?: number }>>(`/moves?q=${encodeURIComponent(name)}`).catch(() => null))
+          missing.map((name) => api<Array<{ nameZh: string; type?: string; power?: number }>>(`/moves?q=${encodeURIComponent(name)}`).catch(() => null))
         );
         for (let i = 0; i < missing.length; i++) {
           if (cancelled) return;

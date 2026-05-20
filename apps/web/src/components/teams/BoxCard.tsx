@@ -1,7 +1,7 @@
 import PokemonConfigCard from "../PokemonConfigCard";
-import type { PokemonConfigDisplay, MenuAction } from "./types.js";
+import type { PokemonConfigDisplay, MenuAction } from "./types";
 
-export type { MenuAction } from "./types.js";
+export type { MenuAction } from "./types";
 
 export interface BoxCardProps {
   config: PokemonConfigDisplay;

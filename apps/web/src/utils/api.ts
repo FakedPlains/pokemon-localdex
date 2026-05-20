@@ -21,13 +21,3 @@ export async function api<T = unknown>(
 
   return response.json() as Promise<{ data: T; total?: number; hasMore?: boolean }>;
 }
-
-/**
- * 统一入口
- */
-export async function unifiedApi<T = unknown>(
-  path: string,
-  options?: RequestInit,
-): Promise<{ data: T; total?: number; hasMore?: boolean }> {
-  return api<T>(path, options);
-}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ViewToggle from "../components/ViewToggle";
-import { createDraftMember, createDefaultStats } from "../utils/helpers";
+import { createDraftMember } from "../utils/helpers";
 import {
   getBox, saveBoxConfig, deleteBoxConfig, duplicateBoxConfig,
   getTeams, saveTeam, deleteTeam,
@@ -14,8 +14,8 @@ import BoxListRow from "../components/teams/BoxListRow";
 import PokemonConfigInlineEditor from "../components/teams/PokemonConfigInlineEditor";
 import TeamCard from "../components/teams/TeamCard";
 import TeamSlot from "../components/teams/TeamSlot";
-import type { PokemonConfig, PokemonConfigDraft, Team, TeamMember, TeamMemberInline, TeamMemberRef } from "../utils/teamStorage";
-import { completePokemonConfig, padMoves4 } from "../utils/teamStorage";
+import type { PokemonConfig, Team, TeamMember, TeamMemberInline, TeamMemberRef } from "../utils/teamStorage";
+import { completePokemonConfig } from "../utils/teamStorage";
 import type { PokemonConfigDisplay, PokemonConfigEditState } from "../components/teams/types";
 
 export interface TeamsPageProps {}
@@ -128,20 +128,8 @@ export default function TeamsPage(_props: TeamsPageProps) {
     if (validMembers.length === 0) { toast.error("请至少添加一只宝可梦。"); return; }
     const membersToSave = validMembers.map((m, i): TeamMember => {
       if (m.configId) return { slot: i + 1, configId: m.configId } satisfies TeamMemberRef;
-      return {
-        slot: i + 1, configId: "", pokemonId: m.pokemonId, nameZh: m.nameZh || "", level: Number(m.level || 50),
-        formKey: m.formKey || "", formName: m.formName || "",
-        itemId: m.itemId || "", itemName: m.itemName || "", itemImageUrl: m.itemImageUrl || "",
-        abilityId: m.abilityId || "", abilityName: m.abilityName || "", nature: m.nature || "认真",
-        moves: padMoves4(m.moves), _movesInfo: m._movesInfo || undefined,
-        ivs: { ...createDefaultStats("iv"), ...(m.ivs || {}) },
-        evs: { ...createDefaultStats("ev"), ...(m.evs || {}) },
-        statMode: m.statMode || "classic", sps: m.sps || {}, champNature: m.champNature || m.nature || "认真",
-        imageUrl: m.imageUrl || "", shinyImageUrl: m.shinyImageUrl || "", isShiny: m.isShiny || false,
-        primaryType: m.primaryType || "", secondaryType: m.secondaryType || "",
-        baseStats: m.baseStats || undefined,
-        createdAt: m.createdAt || Date.now(), updatedAt: Date.now(),
-      } satisfies TeamMemberInline;
+      const config = completePokemonConfig(m, { configId: "", updatedAt: Date.now() });
+      return { ...config, slot: i + 1 } satisfies TeamMemberInline;
     });
     saveTeam({ ...editingTeam, members: membersToSave }); refreshTeams(); setEditingTeam(null); setIsNewTeam(false); setInlineEditSlot(null); setInlineEditDraft(null);
   }, [editingTeam, refreshTeams]);

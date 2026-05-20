@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { unifiedApi } from "../utils/api.js";
+import { api } from "../utils/api";
 
 /** 分页 API 响应的约定结构 */
 export interface PaginatedResponse<T> {
@@ -14,6 +14,8 @@ export interface UseInfiniteApiOptions {
   pageSize?: number;
   /** IntersectionObserver 提前触发距离，默认 "400px" */
   rootMargin?: string;
+  /** 是否启用请求，默认 true；设为 false 时不发请求、返回空状态 */
+  enabled?: boolean;
 }
 
 /** useInfiniteApi 返回的状态类型 */
@@ -48,11 +50,11 @@ export function useInfiniteApi<T = unknown>(
   basePath: string,
   options: UseInfiniteApiOptions = {}
 ): UseInfiniteApiResult<T> {
-  const { pageSize = 40, rootMargin = "400px" } = options;
+  const { pageSize = 40, rootMargin = "400px", enabled = true } = options;
 
   const [data, setData] = useState<T[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);         // 首屏加载
+  const [loading, setLoading] = useState(enabled);       // 首屏加载
   const [loadingMore, setLoadingMore] = useState(false); // 追加加载
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -75,7 +77,7 @@ export function useInfiniteApi<T = unknown>(
     setError(null);
 
     try {
-      const result = await unifiedApi<T[]>(buildUrl(offset));
+      const result = await api<T[]>(buildUrl(offset));
       if (id !== fetchIdRef.current) return; // 竞态丢弃
 
       const newItems = result.data ?? [];
@@ -101,20 +103,24 @@ export function useInfiniteApi<T = unknown>(
     }
   }, [buildUrl]);
 
-  // basePath 变化时重置并加载首页
+  // basePath 变化时重置并加载首页（disabled 时只重置不请求）
   useEffect(() => {
     offsetRef.current = 0;
     setData([]);
     setTotal(0);
     setHasMore(false);
-    fetchPage(0, false);
-  }, [fetchPage]);
+    if (enabled) {
+      fetchPage(0, false);
+    } else {
+      setLoading(false);
+    }
+  }, [fetchPage, enabled]);
 
   // 加载更多
   const loadMore = useCallback((): void => {
-    if (loadingMore || loading || !hasMore) return;
+    if (!enabled || loadingMore || loading || !hasMore) return;
     fetchPage(offsetRef.current, true);
-  }, [fetchPage, loadingMore, loading, hasMore]);
+  }, [enabled, fetchPage, loadingMore, loading, hasMore]);
 
   // IntersectionObserver 自动触发加载更多
   useEffect(() => {
@@ -134,12 +140,13 @@ export function useInfiniteApi<T = unknown>(
 
   // 手动重置
   const reset = useCallback((): void => {
+    if (!enabled) return;
     offsetRef.current = 0;
     setData([]);
     setTotal(0);
     setHasMore(false);
     fetchPage(0, false);
-  }, [fetchPage]);
+  }, [enabled, fetchPage]);
 
   // 将 ref 对象转为 RefCallback 以满足 React 19 兼容性
   const sentinelRefCallback = useCallback((node: HTMLElement | null): void => {

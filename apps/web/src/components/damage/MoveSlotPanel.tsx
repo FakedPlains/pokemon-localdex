@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { MoveOption } from "./useDamageMoves";
-import { unifiedApi } from "../../utils/api.js";
+import { api } from "../../utils/api";
 
 //  子组件：招式槽位面板（4个招式，样式与盒子一致）
 // ══════════════════════════════════════════════════════════════
@@ -80,13 +80,13 @@ export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelec
     if (editingSlot === null || !pokemonId || learnsetLoaded) return;
     let cancelled = false;
     setLoading(true);
-    unifiedApi<{ generations: number[]; formKeys: string[] }>(`/pokemon/${pokemonId}/learnset/meta`).then((meta) => {
+    api<{ generations: number[]; formKeys: string[] }>(`/pokemon/${pokemonId}/learnset/meta`).then((meta) => {
       if (cancelled) return;
       const gens = meta.data?.generations || [];
       const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
       const formKeys = meta.data?.formKeys || [];
       const form = formKeys[0] || "default";
-      return unifiedApi<LearnsetEntry[]>(`/pokemon/${pokemonId}/learnset?generation=${latestGen}&form=${form}`);
+      return api<LearnsetEntry[]>(`/pokemon/${pokemonId}/learnset?generation=${latestGen}&form=${form}`);
     }).then((r) => {
       if (cancelled || !r) return;
       const entries = r.data || [];
@@ -123,7 +123,7 @@ export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelec
     if (searchTimer.current) clearTimeout(searchTimer.current);
     setLoading(true);
     searchTimer.current = setTimeout(() => {
-      unifiedApi<SearchMoveItem[]>(`/moves?q=${encodeURIComponent(query.trim())}&limit=50`).then((r) => {
+      api<SearchMoveItem[]>(`/moves?q=${encodeURIComponent(query.trim())}&limit=50`).then((r) => {
         setSearchResults((r.data || []).map((m) => ({
           value: m.nameZh || String(m.id),
           label: m.nameZh || String(m.id),

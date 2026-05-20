@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { unifiedApi } from "../utils/api";
+import { api } from "../utils/api";
 import { useInfiniteApi } from "../hooks/useInfiniteApi";
 import { TYPE_BG_COLORS, CATEGORY_COLORS } from "@pokemon-localdex/store-types/constants";
 import { typeIconSrc, categoryIconSrc } from "../utils/iconPaths";
@@ -18,7 +18,7 @@ export interface MovesPageProps {
 }
 
 type MoveListItem = {
-  id: number;
+  id: string;
   number?: number;
   nameZh: string;
   description?: string;
@@ -30,7 +30,7 @@ type MoveListItem = {
 };
 
 type MoveDetail = {
-  id: number;
+  id: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -89,10 +89,10 @@ function formatLearnMethods(methods: string[] | undefined): string | null {
 }
 
 export default function MovesPage({ query = "", type = "", category = "", generation = "" }: MovesPageProps) {
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [detailCache, setDetailCache] = useState<Record<number, MoveDetail>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [detailCache, setDetailCache] = useState<Record<string, MoveDetail>>({});
   const pendingExpandRef = useRef<string | null>(parseExpandParam());
-  const detailRequestsRef = useRef<Set<number>>(new Set());
+  const detailRequestsRef = useRef<Set<string>>(new Set());
 
   // Reset expanded when filters change
   useEffect(() => { setExpanded(null); }, [query, type, category, generation]);
@@ -110,10 +110,10 @@ export default function MovesPage({ query = "", type = "", category = "", genera
 
   const { data: moves, total: _total, loading, loadingMore, hasMore, sentinelRef, loadMore } = useInfiniteApi<MoveListItem>(movesPath, { pageSize: 50 });
 
-  const loadMoveDetail = useCallback((id: number) => {
+  const loadMoveDetail = useCallback((id: string) => {
     if (detailCache[id] || detailRequestsRef.current.has(id)) return;
     detailRequestsRef.current.add(id);
-    unifiedApi<MoveDetail>(`/moves/${id}`)
+    api<MoveDetail>(`/moves/${id}`)
       .then((r) => {
         setDetailCache((prev) => ({ ...prev, [id]: r.data }));
       })
@@ -132,7 +132,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
     }
     if (moves.length === 0) return;
 
-    const target = moves.find((m) => String(m.id) === expandId);
+    const target = moves.find((m) => m.id === expandId);
     if (target) {
       pendingExpandRef.current = null;
       setExpanded(target.id);
@@ -159,9 +159,9 @@ export default function MovesPage({ query = "", type = "", category = "", genera
   }, [moves, loading, hasMore, loadingMore, loadMore, loadMoveDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 宝可梦区域展开状态（独立于招式详情的展开）
-  const [pokemonExpanded, setPokemonExpanded] = useState<Record<number, boolean>>({});
+  const [pokemonExpanded, setPokemonExpanded] = useState<Record<string, boolean>>({});
 
-  const toggleExpand = useCallback((id: number) => {
+  const toggleExpand = useCallback((id: string) => {
     if (expanded === id) {
       setExpanded(null);
       return;
@@ -170,7 +170,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
     loadMoveDetail(id);
   }, [expanded, loadMoveDetail]);
 
-  const togglePokemonSection = useCallback((id: number) => {
+  const togglePokemonSection = useCallback((id: string) => {
     setPokemonExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 

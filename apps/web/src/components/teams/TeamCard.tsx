@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { unifiedApi } from "../../utils/api.js";
-import { getPokemonPreviewImage } from "../../utils/helpers.js";
-import { resolveTeamMembers } from "../../utils/teamStorage.js";
-import type { Team, PokemonConfig } from "../../utils/teamStorage.js";
-import type { PokemonConfigDisplay } from "./types.js";
+import { api } from "../../utils/api";
+import { getPokemonPreviewImage } from "../../utils/helpers";
+import { resolveTeamMembers } from "../../utils/teamStorage";
+import type { Team, PokemonConfig } from "../../utils/teamStorage";
+import type { PokemonConfigDisplay } from "./types";
 
 /** resolveTeamMembers 返回的是 PokemonConfig[]，但运行时会附加展示字段 */
 type ResolvedMember = PokemonConfig & Partial<PokemonConfigDisplay>;
@@ -36,7 +36,7 @@ export default function TeamCard({ team, onEdit, onDelete }: TeamCardProps) {
       const pokemonId = String(m.pokemonId);
       imageRequestsRef.current.add(pokemonId);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      unifiedApi<any>(`/pokemon/${m.pokemonId}`).then((r) => {
+      api<any>(`/pokemon/${m.pokemonId}`).then((r) => {
         if (!mountedRef.current) return;
         const img = getPokemonPreviewImage(r.data);
         if (img) {

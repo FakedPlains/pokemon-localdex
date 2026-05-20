@@ -3,7 +3,7 @@ import { LEARN_METHOD_LABELS } from "@pokemon-localdex/store-types/constants";
 import type { PokemonEntry, LearnsetRecord, LearnsetMeta, LearnsetResponse } from "@pokemon-localdex/store-types";
 import type { PokemonDisplayVariant } from "../../utils/helpers";
 import { describeLearnsetEntry } from "../../utils/helpers";
-import { unifiedApi } from "../../utils/api";
+import { api } from "../../utils/api";
 import TypeChip from "../TypeChip";
 
 const PAGE_SIZE = 50;
@@ -101,7 +101,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       params.set("method", method);
     }
     try {
-      const r = await unifiedApi<LearnsetResponse>(`/pokemon/${pokemonId}/learnset?${params}`);
+      const r = await api<LearnsetResponse>(`/pokemon/${pokemonId}/learnset?${params}`);
       // 竞态保护：如果已经有更新的请求发出，丢弃本次结果
       if (rid !== requestIdRef.current) return false;
       const resp = r.data;

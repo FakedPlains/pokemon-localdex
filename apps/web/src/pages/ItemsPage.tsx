@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { unifiedApi } from "../utils/api";
+import { api } from "../utils/api";
 import { useInfiniteApi } from "../hooks/useInfiniteApi";
 import { parseExpandParam } from "../utils/helpers";
 import type { BaseGenerationRecord } from "@pokemon-localdex/store-types";
@@ -12,7 +12,7 @@ export interface ItemsPageProps {
 }
 
 type ItemListItem = {
-  id: number;
+  id: string;
   slug?: string;
   nameZh: string;
   nameEn?: string;
@@ -22,7 +22,7 @@ type ItemListItem = {
 };
 
 type ItemDetail = {
-  id: number;
+  id: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -63,13 +63,13 @@ export default function ItemsPage({ query = "" }: ItemsPageProps) {
     }
     if (items.length === 0) return;
 
-    const target = items.find((it) => it.slug === expandId || String(it.id) === expandId);
+    const target = items.find((it) => it.slug === expandId || it.id === expandId);
     if (target) {
       pendingExpandRef.current = null;
-      const key = String(target.id);
+      const key = target.id;
       setExpanded(key);
       if (!detailCache[key]) {
-        unifiedApi<ItemDetail>(`/items/${key}`).then((r) => {
+        api<ItemDetail>(`/items/${key}`).then((r) => {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
@@ -101,7 +101,7 @@ export default function ItemsPage({ query = "" }: ItemsPageProps) {
     }
     setExpanded(key);
     if (!detailCache[key]) {
-      unifiedApi<ItemDetail>(`/items/${key}`).then((r) => {
+      api<ItemDetail>(`/items/${key}`).then((r) => {
         setDetailCache((prev) => ({ ...prev, [key]: r.data }));
       });
     }
@@ -125,7 +125,7 @@ export default function ItemsPage({ query = "" }: ItemsPageProps) {
 
         <div className="it-list">
           {items.map((item) => {
-            const key = String(item.id);
+            const key = item.id;
             const isExpanded = expanded === key;
             const detail = detailCache[key];
             return (

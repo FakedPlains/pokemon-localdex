@@ -1,9 +1,10 @@
-import { forwardRef } from "react";
+import { forwardRef, useCallback } from "react";
 import PokemonEditor from "../PokemonEditor";
 import PokemonPickerList from "../PokemonPickerList";
-import { getPokemonPreviewImage } from "../../utils/helpers.js";
-import type { PokemonConfigEditState } from "./types.js";
-import type { PokemonConfigDraft } from "../../utils/teamStorage.js";
+import { getPokemonPreviewImage } from "../../utils/helpers";
+import type { PokemonConfigEditState } from "./types";
+import type { PokemonConfigDraft } from "../../utils/teamStorage";
+import type { PokemonSummary } from "@pokemon-localdex/store-types";
 
 export interface PokemonConfigInlineEditorProps {
   className?: string;
@@ -28,8 +29,7 @@ const PokemonConfigInlineEditor = forwardRef<HTMLDivElement, PokemonConfigInline
   onCancel,
   saveLabel,
 }, ref) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleSelectPokemon = (pokemon: any) => {
+  const handleSelectPokemon = (pokemon: PokemonSummary) => {
     const img = getPokemonPreviewImage(pokemon);
     onChange({
       ...config,
@@ -52,6 +52,15 @@ const PokemonConfigInlineEditor = forwardRef<HTMLDivElement, PokemonConfigInline
     });
     onPickerSearchChange("");
   };
+
+  /** 适配 PokemonEditor 的 onChange（PokemonConfigDraft）到父级 onChange（PokemonConfigEditState） */
+  const handleEditorChange = useCallback((updater: PokemonConfigDraft | ((prev: PokemonConfigDraft) => PokemonConfigDraft)) => {
+    if (typeof updater === "function") {
+      onChange((prev) => ({ ...prev, ...updater(prev) }));
+    } else {
+      onChange((prev) => ({ ...prev, ...updater }));
+    }
+  }, [onChange]);
 
   return (
     <div className={className} ref={ref}>
@@ -94,7 +103,7 @@ const PokemonConfigInlineEditor = forwardRef<HTMLDivElement, PokemonConfigInline
       ) : (
         <PokemonEditor
           config={config}
-          onChange={onChange as (updater: PokemonConfigDraft | ((prev: PokemonConfigDraft) => PokemonConfigDraft)) => void}
+          onChange={handleEditorChange}
           onSave={onSave}
           onCancel={onCancel}
           saveLabel={saveLabel}

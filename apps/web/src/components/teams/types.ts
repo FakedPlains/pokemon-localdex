@@ -8,34 +8,30 @@
  */
 
 import type { StatBlock } from "@pokemon-localdex/store-types";
-import type { PokemonConfig, PokemonConfigDraft } from "../../utils/teamStorage.js";
+import type { PokemonConfig, PokemonConfigDraft } from "../../utils/teamStorage";
+
+/** 运行时 UI 展示扩展字段（Display 和 EditState 共享） */
+type PokemonConfigUIFields = {
+  /** 闪光图片 URL（字符串或含 url 字段的对象） */
+  shinyImageUrl?: string | { url?: string };
+  /** 种族值（从 API 获取或缓存，允许 null） */
+  baseStats?: StatBlock | null;
+  /** 招式类型信息缓存（部分字段可选） */
+  _movesInfo?: Record<string, { moveId?: number | null; type?: string; power?: string | number | null; category?: string }>;
+};
 
 /**
  * 运行时扩展的宝可梦配置（包含 UI 展示字段）
  *
  * 基于完整 PokemonConfig，用于 BoxCard/BoxListRow/TeamSlot 等展示组件。
  */
-export type PokemonConfigDisplay = PokemonConfig & {
-  /** 闪光图片 URL（字符串或含 url 字段的对象） */
-  shinyImageUrl?: string | { url?: string };
-  /** 种族值（从 API 获取或缓存，允许 null） */
-  baseStats?: StatBlock | null;
-  /** 招式类型信息缓存（部分字段可选） */
-  _movesInfo?: Record<string, { moveId?: number | null; type?: string; power?: string | number | null; category?: string }>;
-};
+export type PokemonConfigDisplay = PokemonConfig & PokemonConfigUIFields;
 
 /**
  * 编辑态的配置展示类型，字段可以缺失。
  * 用于 PokemonEditor 等编辑组件的 props 和 state。
  */
-export type PokemonConfigEditState = PokemonConfigDraft & {
-  /** 闪光图片 URL（字符串或含 url 字段的对象） */
-  shinyImageUrl?: string | { url?: string };
-  /** 种族值（从 API 获取或缓存，允许 null） */
-  baseStats?: StatBlock | null;
-  /** 招式类型信息缓存（部分字段可选） */
-  _movesInfo?: Record<string, { moveId?: number | null; type?: string; power?: string | number | null; category?: string }>;
-};
+export type PokemonConfigEditState = PokemonConfigDraft & PokemonConfigUIFields;
 
 /** 菜单操作 */
 export interface MenuAction {

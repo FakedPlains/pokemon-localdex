@@ -13,7 +13,6 @@ import type {
   PokemonFormEntry,
   PokemonEntry,
   PokemonSummary,
-  PokemonTableSummary,
   MoveEntry,
   MoveGenerationRecord,
   LearnsetRecord,
@@ -220,14 +219,14 @@ export function createDraftMember(pokemon: DraftablePokemon | undefined): Pokemo
   };
 }
 
-/** 可以传入 PokemonSummary、PokemonEntry、PokemonTableSummary 等包含 image 字段的对象 */
+/** 任何包含 image/images 字段的宝可梦数据对象均满足此约束 */
 export type PokemonWithImage = {
   image?: ImageAsset | string;
   images?: Record<string, ImageAsset | string>;
 };
 
 /** 从宝可梦数据中提取预览图 URL 字符串 */
-export function getPokemonPreviewImage(pokemon: PokemonWithImage | PokemonSummary | PokemonTableSummary | undefined): string | undefined {
+export function getPokemonPreviewImage(pokemon: PokemonWithImage | undefined): string | undefined {
   if (!pokemon) return undefined;
   const resolveUrl = (val: ImageAsset | string | undefined): string | undefined => {
     if (!val) return undefined;
@@ -235,7 +234,7 @@ export function getPokemonPreviewImage(pokemon: PokemonWithImage | PokemonSummar
     if (typeof val === "object" && "url" in val) return val.url;
     return undefined;
   };
-  const images = "images" in pokemon ? (pokemon as PokemonWithImage).images : undefined;
+  const images = "images" in pokemon ? pokemon.images : undefined;
   return resolveUrl(pokemon.image)
     || resolveUrl(images?.["official"])
     || resolveUrl(images?.["sprite"])

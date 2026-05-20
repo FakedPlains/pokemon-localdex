@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PokemonSummary } from "@pokemon-localdex/store-types";
-import { unifiedApi } from "../../utils/api.js";
-import { getPokemonPreviewImage } from "../../utils/helpers.js";
+import { api } from "../../utils/api";
+import { getPokemonPreviewImage } from "../../utils/helpers";
 import TypeChip from "../TypeChip";
 
 //  子组件：简洁宝可梦选择列表（图片 + 名称 + 属性）
@@ -24,7 +24,7 @@ export default function SimplePokemonList({ search, onSelect }: SimplePokemonLis
     try {
       const params = new URLSearchParams({ limit: "40", offset: String(currentOffset) });
       if (query.trim()) params.set("q", query.trim());
-      const r = await unifiedApi<PokemonSummary[]>(`/pokemon?${params.toString()}`);
+      const r = await api<PokemonSummary[]>(`/pokemon?${params.toString()}`);
       const list = r.data || [];
       if (reset) setData(list); else setData((prev) => [...prev, ...list]);
       setHasMore(list.length >= 40);
@@ -58,7 +58,7 @@ export default function SimplePokemonList({ search, onSelect }: SimplePokemonLis
   return (
     <div className="dc-simple-list" ref={listRef}>
       {data.map((p) => {
-        const img = getPokemonPreviewImage(p as Parameters<typeof getPokemonPreviewImage>[0]);
+        const img = getPokemonPreviewImage(p);
         return (
           <button key={p.slug || p.id} className="dc-simple-list-item" onClick={() => onSelect(p)}>
             {img && <img className="dc-simple-list-img" src={img} alt="" referrerPolicy="no-referrer" />}

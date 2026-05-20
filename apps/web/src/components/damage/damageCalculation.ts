@@ -1,17 +1,144 @@
-import { evToSp, resolveMoveGenerationRecord } from "../../utils/helpers.js";
+import type { MoveEntry, PokemonEntry } from "@pokemon-localdex/store-types";
+import type { PokemonConfig } from "../../utils/teamStorage";
+import { evToSp, resolveMoveGenerationRecord } from "../../utils/helpers";
 
-type AnyRecord = Record<string, any>;
+// ══════════════════════════════════════════════
+//  内部类型
+// ══════════════════════════════════════════════
 
-function resolveEvs(member: AnyRecord, isChampions: boolean): Record<string, number> {
-  if (!isChampions) return member.evs || {};
-  if (member.sps && Object.keys(member.sps).length > 0) return member.sps;
-  const evs: Record<string, number> = member.evs || {};
+/** 一侧的战斗状态值（由 useDamageSideState 产出） */
+type DamageSideValues = {
+  curHP: number;
+  status: string;
+  toxicCounter: number;
+  stealthRock: boolean;
+  spikes: number;
+  steelsurge: boolean;
+  reflect: boolean;
+  lightScreen: boolean;
+  auroraVeil: boolean;
+  protect: boolean;
+  helpingHand: boolean;
+  tailwind: boolean;
+  friendGuard: boolean;
+  boost: Record<string, number>;
+  switchingOut: boolean;
+  seeded: boolean;
+  saltCured: boolean;
+  foresight: boolean;
+  flowerGift: boolean;
+  powerTrick: boolean;
+  steelySpirit: boolean;
+  battery: boolean;
+  powerSpot: boolean;
+  isDynamaxed: boolean;
+  alliesFainted: number;
+};
+
+/** 宝可梦配置成员（DamagePage 中 attacker/defender 的形状） */
+type DamageMember = Partial<PokemonConfig> & { statMode?: string };
+
+/** buildPokemonPayload 的参数 */
+type PokemonPayloadInput = {
+  member: DamageMember;
+  detail: PokemonEntry | null;
+  level: number;
+  boosts: Record<string, number>;
+  curHP: number;
+  status: string;
+  toxicCounter: number;
+  teraType: string;
+  isDynamaxed: boolean;
+  alliesFainted: number;
+  isChampions: boolean;
+};
+
+// ══════════════════════════════════════════════
+//  导出类型：buildDamageRequest 的输入
+// ══════════════════════════════════════════════
+
+/** buildDamageRequest 接收的完整计算状态 */
+export type DamageCalcState = {
+  selectedMove: MoveEntry;
+  calcDirection: "atk" | "def";
+  attacker: DamageMember;
+  attackerDetail: PokemonEntry | null;
+  defender: DamageMember;
+  defenderDetail: PokemonEntry | null;
+  generation: string;
+  isChampions: boolean;
+  level: number;
+  // 攻击方招式附加
+  critical: boolean;
+  moveHits: number;
+  useZ: boolean;
+  useMax: boolean;
+  timesUsed: number;
+  timesUsedWithMetronome: number;
+  isStellarFirstUse: boolean;
+  // 防守方招式附加
+  defCritical: boolean;
+  defMoveHits: number;
+  defUseZ: boolean;
+  defUseMax: boolean;
+  defTimesUsed: number;
+  defTimesUsedWithMetronome: number;
+  defIsStellarFirstUse: boolean;
+  // 对战模式与场地
+  battleMode: "singles" | "doubles";
+  weather: string;
+  terrain: string;
+  gravity: boolean;
+  magicRoom: boolean;
+  wonderRoom: boolean;
+  beadsOfRuin: boolean;
+  tabletsOfRuin: boolean;
+  swordOfRuin: boolean;
+  vesselOfRuin: boolean;
+  // 太晶
+  atkTeraType: string;
+  defTeraType: string;
+  // 双方战场状态
+  atkSide: DamageSideValues;
+  defSide: DamageSideValues;
+};
+
+/** buildDamageRequest 返回的 meta 部分 */
+export type DamageCalcMeta = {
+  selectedMove: MoveEntry;
+  generation: string;
+  calcDirection: "atk" | "def";
+  isReverse: boolean;
+  realAttacker: DamageMember;
+  realDefender: DamageMember;
+};
+
+/** API 返回的伤害计算响应 */
+export type DamageApiResponse = {
+  min: number;
+  max: number;
+  average: number;
+  description?: string;
+  damageRolls?: number[];
+  defenderHp?: number;
+  minPercent?: number;
+  maxPercent?: number;
+};
+
+// ══════════════════════════════════════════════
+//  内部辅助函数
+// ══════════════════════════════════════════════
+
+function resolveEvs(member: DamageMember, isChampions: boolean): Record<string, number> {
+  if (!isChampions) return (member.evs as Record<string, number>) || {};
+  if (member.sps && Object.keys(member.sps).length > 0) return member.sps as Record<string, number>;
+  const evs: Record<string, number> = (member.evs as Record<string, number>) || {};
   const converted: Record<string, number> = {};
   for (const key of Object.keys(evs)) converted[key] = evToSp(evs[key]!);
   return converted;
 }
 
-function buildSideState(values: AnyRecord, switchingDirection: "in" | "out") {
+function buildSideState(values: DamageSideValues, switchingDirection: "in" | "out") {
   return {
     isSR: values.stealthRock,
     spikes: values.spikes,
@@ -47,7 +174,7 @@ function buildPokemonPayload({
   isDynamaxed,
   alliesFainted,
   isChampions,
-}: AnyRecord) {
+}: PokemonPayloadInput) {
   return {
     pokemonId: member.pokemonId || "",
     formId: member.formId || "",
@@ -60,7 +187,7 @@ function buildPokemonPayload({
     itemId: member.itemId || "",
     item: member.itemName || "",
     evs: resolveEvs(member, isChampions),
-    ivs: member.ivs || {},
+    ivs: (member.ivs as Record<string, number>) || {},
     boosts: Object.values(boosts).some((v) => v !== 0) ? boosts : undefined,
     curHP: curHP > 0 ? curHP : undefined,
     status: status !== "none" ? status : "",
@@ -71,7 +198,11 @@ function buildPokemonPayload({
   };
 }
 
-export function buildDamageRequest(state: AnyRecord) {
+// ══════════════════════════════════════════════
+//  导出函数
+// ══════════════════════════════════════════════
+
+export function buildDamageRequest(state: DamageCalcState) {
   const isReverse = state.calcDirection === "def";
   const realAttacker = isReverse ? state.defender : state.attacker;
   const realDefender = isReverse ? state.attacker : state.defender;
@@ -120,7 +251,7 @@ export function buildDamageRequest(state: AnyRecord) {
       }),
       move: {
         id: state.selectedMove.id || "",
-        name: state.selectedMove.nameZh || state.selectedMove.slug || "",
+        name: state.selectedMove.nameZh || "",
         isCrit: realCritical,
         hits: realMoveHits > 0 ? realMoveHits : undefined,
         useZ: realUseZ || undefined,
@@ -151,12 +282,12 @@ export function buildDamageRequest(state: AnyRecord) {
       isReverse,
       realAttacker,
       realDefender,
-    },
+    } satisfies DamageCalcMeta,
   };
 }
 
-export function buildDamageResult(data: AnyRecord, meta: AnyRecord) {
-  const record = resolveMoveGenerationRecord(meta.selectedMove, meta.generation);
+export function buildDamageResult(data: DamageApiResponse, meta: DamageCalcMeta) {
+  const record = resolveMoveGenerationRecord(meta.selectedMove, Number(meta.generation));
   const moveType = record?.type || meta.selectedMove.type || "";
   const category = record?.category || meta.selectedMove.category || "physical";
 
@@ -166,7 +297,7 @@ export function buildDamageResult(data: AnyRecord, meta: AnyRecord) {
     average: data.average,
     description: data.description || "",
     damageRolls: data.damageRolls || [],
-    moveName: meta.selectedMove.nameZh || meta.selectedMove.slug || "",
+    moveName: meta.selectedMove.nameZh || "",
     moveType,
     category,
     attackerName: meta.realAttacker.nameZh || (meta.isReverse ? "防守方" : "攻击方"),

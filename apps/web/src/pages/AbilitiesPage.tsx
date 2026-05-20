@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { unifiedApi } from "../utils/api";
+import { api } from "../utils/api";
 import { useInfiniteApi } from "../hooks/useInfiniteApi";
 import { parseExpandParam } from "../utils/helpers";
 import type { BaseGenerationRecord } from "@pokemon-localdex/store-types";
@@ -14,7 +14,7 @@ export interface AbilitiesPageProps {
 }
 
 type AbilityListItem = {
-  id: number;
+  id: string;
   number?: number;
   nameZh: string;
   nameEn?: string;
@@ -22,7 +22,7 @@ type AbilityListItem = {
 };
 
 type AbilityDetail = {
-  id: number;
+  id: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -34,8 +34,8 @@ type AbilityDetail = {
 };
 
 export default function AbilitiesPage({ query = "", generation = "" }: AbilitiesPageProps) {
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [detailCache, setDetailCache] = useState<Record<number, AbilityDetail>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [detailCache, setDetailCache] = useState<Record<string, AbilityDetail>>({});
   const pendingExpandRef = useRef<string | null>(parseExpandParam());
 
   // 构建分页请求路径
@@ -59,14 +59,13 @@ export default function AbilitiesPage({ query = "", generation = "" }: Abilities
     }
     if (abilities.length === 0) return;
 
-    const numId = Number(expandId);
-    const target = abilities.find((a) => a.id === numId || String(a.id) === expandId);
+    const target = abilities.find((a) => a.id === expandId);
     if (target) {
       pendingExpandRef.current = null;
       const key = target.id;
       setExpanded(key);
       if (!detailCache[key]) {
-        unifiedApi<AbilityDetail>(`/abilities/${key}`).then((r) => {
+        api<AbilityDetail>(`/abilities/${key}`).then((r) => {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
@@ -92,22 +91,22 @@ export default function AbilitiesPage({ query = "", generation = "" }: Abilities
   }, [abilities, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 宝可梦区域展开状态（独立于特性详情的展开）
-  const [pokemonExpanded, setPokemonExpanded] = useState<Record<number, boolean>>({});
+  const [pokemonExpanded, setPokemonExpanded] = useState<Record<string, boolean>>({});
 
-  const toggleExpand = useCallback((id: number) => {
+  const toggleExpand = useCallback((id: string) => {
     if (expanded === id) {
       setExpanded(null);
       return;
     }
     setExpanded(id);
     if (!detailCache[id]) {
-      unifiedApi<AbilityDetail>(`/abilities/${id}`).then((r) => {
+      api<AbilityDetail>(`/abilities/${id}`).then((r) => {
         setDetailCache((prev) => ({ ...prev, [id]: r.data }));
       });
     }
   }, [expanded, detailCache]);
 
-  const togglePokemonSection = useCallback((id: number) => {
+  const togglePokemonSection = useCallback((id: string) => {
     setPokemonExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 

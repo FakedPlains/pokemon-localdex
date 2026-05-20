@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { MoveEntry } from "@pokemon-localdex/store-types";
-import { unifiedApi } from "../../utils/api.js";
+import { api } from "../../utils/api";
 
 export type MoveOption = {
   moveId?: number | null;
@@ -35,8 +35,8 @@ function moveInfoFromOption(opt: MoveOption): MoveInfo {
 
 function fetchMoveDetail(name: string, moveId: number | null): Promise<MoveEntry | undefined> {
   const request = moveId
-    ? unifiedApi(`/moves/${moveId}`)
-    : unifiedApi(`/moves?q=${encodeURIComponent(name)}&limit=5`);
+    ? api(`/moves/${moveId}`)
+    : api(`/moves?q=${encodeURIComponent(name)}&limit=5`);
 
   return request.then((r) => {
     const data = r.data as MoveEntry | MoveEntry[];

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import type { StatKey } from "@pokemon-localdex/store-types";
-import { evToSp } from "../../utils/helpers.js";
+import { evToSp } from "../../utils/helpers";
 import { EV_MAX, EV_TOTAL_MAX, SP_TOTAL_MAX, spToEv } from "./damageConstants";
 
 /** Minimum shape the hook needs from a member state */

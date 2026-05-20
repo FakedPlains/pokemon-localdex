@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { unifiedApi } from "../utils/api";
+import { api } from "../utils/api";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
-import type { StatBlock, PokemonEntry, PokemonFormEntry, ItemEntry, LearnsetRecord, LearnsetMeta, LearnsetResponse } from "@pokemon-localdex/store-types";
+import type { StatBlock, PokemonEntry, PokemonFormEntry, ItemEntry, LearnsetMeta, LearnsetResponse } from "@pokemon-localdex/store-types";
 import type { PokemonConfig, PokemonConfigDraft } from "../utils/teamStorage";
 import { createDefaultStats, getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers";
 import StatCalculator from "./StatCalculator";
@@ -38,8 +38,6 @@ export interface PokemonEditorProps {
   saveLabel?: string;
 }
 
-type StatKey = "hp" | "atk" | "def" | "spa" | "spd" | "spe";
-
 /**
  * 宝可梦配置编辑器
  */
@@ -68,7 +66,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     if (!reset && !itemsHasMore) return;
     const offset = reset ? 0 : itemsOffsetRef.current;
     setItemsLoading(true);
-    unifiedApi<ItemEntry[]>(`/items?limit=50&offset=${offset}`).then((r) => {
+    api<ItemEntry[]>(`/items?limit=50&offset=${offset}`).then((r) => {
       const newItems = r.data || [];
       if (reset) {
         setItems(newItems);
@@ -98,7 +96,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     }
     const timer = setTimeout(() => {
       setItemsLoading(true);
-      unifiedApi<ItemEntry[]>(`/items?q=${encodeURIComponent(panelSearch.trim())}&limit=50`).then((r) => {
+      api<ItemEntry[]>(`/items?q=${encodeURIComponent(panelSearch.trim())}&limit=50`).then((r) => {
         setItemSearchResults(r.data || []);
         setItemsLoading(false);
       }).catch(() => { setItemSearchResults([]); setItemsLoading(false); });
@@ -115,7 +113,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     }
     const timer = setTimeout(() => {
       setMovesLoading(true);
-      unifiedApi<Array<{ id: string; nameZh: string; type?: string; category?: string; power?: number | null; accuracy?: number | null; pp?: number | null; description?: string }>>(`/moves?q=${encodeURIComponent(panelSearch.trim())}&limit=50`).then((r) => {
+      api<Array<{ id: string; nameZh: string; type?: string; category?: string; power?: number | null; accuracy?: number | null; pp?: number | null; description?: string }>>(`/moves?q=${encodeURIComponent(panelSearch.trim())}&limit=50`).then((r) => {
         setMoveSearchResults(r.data || []);
         setMovesLoading(false);
       }).catch(() => { setMoveSearchResults([]); setMovesLoading(false); });
@@ -136,7 +134,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     if (!pokemonId) { setPokemonDetail(null); return; }
     let cancelled = false;
     setDetailLoading(true);
-    unifiedApi<PokemonEntry>(`/pokemon/${pokemonId}`).then((r) => {
+    api<PokemonEntry>(`/pokemon/${pokemonId}`).then((r) => {
       if (!cancelled) {
         setPokemonDetail(r.data);
         setDetailLoading(false);
@@ -276,13 +274,13 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
   useEffect(() => {
     if (!pokemonDetail) { setMovesList([]); return; }
     let cancelled = false;
-    unifiedApi<LearnsetMeta>(`/pokemon/${pokemonDetail.id}/learnset/meta`).then((meta) => {
+    api<LearnsetMeta>(`/pokemon/${pokemonDetail.id}/learnset/meta`).then((meta) => {
       if (cancelled) return;
       const gens = meta.data?.generations || [];
       const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
       const formKeys = meta.data?.formKeys || [];
       const form = formKeys[0] || "default";
-      return unifiedApi<LearnsetResponse>(`/pokemon/${pokemonDetail.id}/learnset?generation=${latestGen}&form=${form}`);
+      return api<LearnsetResponse>(`/pokemon/${pokemonDetail.id}/learnset?generation=${latestGen}&form=${form}`);
     }).then((r) => {
       if (cancelled || !r) return;
       const entries = r.data?.moves || [];

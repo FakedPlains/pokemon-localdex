@@ -14,7 +14,7 @@
  * v3 新增：将 abilityId（旧格式为中文特性名）数字化，同时保留 abilityName
  */
 
-import { unifiedApi } from "./api";
+import { api } from "./api";
 import type { PokemonConfig, Team } from "./teamStorage";
 import { isTeamMemberRef } from "./teamStorage";
 
@@ -98,7 +98,7 @@ function readJSON<T>(key: string): T[] {
 async function resolvePokemonId(nameZh: string): Promise<ResolvedId | null> {
   if (!nameZh) return null;
   try {
-    const result = await unifiedApi<MigrationSummary[]>(
+    const result = await api<MigrationSummary[]>(
       `/pokemon?q=${encodeURIComponent(nameZh)}&limit=5`,
     );
     const list = result.data || [];
@@ -119,7 +119,7 @@ async function resolvePokemonId(nameZh: string): Promise<ResolvedId | null> {
 async function resolveItemId(nameZh: string): Promise<ResolvedId | null> {
   if (!nameZh) return null;
   try {
-    const result = await unifiedApi<MigrationSummary[]>(
+    const result = await api<MigrationSummary[]>(
       `/items?q=${encodeURIComponent(nameZh)}&limit=5`,
     );
     const list = result.data || [];
@@ -138,7 +138,7 @@ async function resolveItemId(nameZh: string): Promise<ResolvedId | null> {
 async function resolveAbilityId(nameZh: string): Promise<ResolvedId | null> {
   if (!nameZh) return null;
   try {
-    const result = await unifiedApi<MigrationSummary[]>(
+    const result = await api<MigrationSummary[]>(
       `/abilities?q=${encodeURIComponent(nameZh)}&limit=5`,
     );
     const list = result.data || [];

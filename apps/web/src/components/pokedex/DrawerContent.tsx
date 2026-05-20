@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { PokemonEntry, LearnsetMeta, EvolutionStep } from "@pokemon-localdex/store-types";
 import { resolvePokemonDisplayVariant } from "../../utils/helpers";
 import type { ResolvedForm } from "../../utils/helpers";
-import { unifiedApi } from "../../utils/api";
+import { api } from "../../utils/api";
 import TypeChip from "../TypeChip";
 import WikiLink from "../WikiLink";
 import DrawerImage from "./DrawerImage";
@@ -47,7 +47,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
   useEffect(() => {
     if (tab !== "moves" || learnsetMeta) return;
     let cancelled = false;
-    unifiedApi<LearnsetMeta>(`/pokemon/${pokemonId}/learnset/meta`).then((r) => {
+    api<LearnsetMeta>(`/pokemon/${pokemonId}/learnset/meta`).then((r) => {
       if (!cancelled) setLearnsetMeta(r.data);
     });
     return () => { cancelled = true; };
@@ -58,7 +58,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
     if (tab !== "evolution" || evolutionChain) return;
     let cancelled = false;
     setEvolutionLoading(true);
-    unifiedApi<EvolutionStep[]>(`/pokemon/${pokemonId}/evolution`).then((r) => {
+    api<EvolutionStep[]>(`/pokemon/${pokemonId}/evolution`).then((r) => {
       if (!cancelled) {
         setEvolutionChain(r.data || []);
         setEvolutionLoading(false);

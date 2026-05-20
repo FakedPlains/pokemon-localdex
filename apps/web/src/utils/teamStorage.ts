@@ -142,7 +142,7 @@ export function completePokemonConfig(
     abilityId: draft.abilityId ?? "",
     abilityName: draft.abilityName ?? "",
     nature: draft.nature ?? "认真",
-    moves: draft.moves ?? ["", "", "", ""],
+    moves: padMoves4(draft.moves),
     ivs: draft.ivs ?? { ...DEFAULT_IVS },
     evs: draft.evs ?? { ...DEFAULT_EVS },
     sps: draft.sps,
@@ -186,7 +186,7 @@ function readJSON<T>(key: string, validate?: (item: unknown) => item is T): T[] 
 }
 
 /** 运行时类型守卫：检查一个对象是否是有效的 PokemonConfig */
-function isPokemonConfig(item: unknown): item is PokemonConfig {
+export function isPokemonConfig(item: unknown): item is PokemonConfig {
   if (typeof item !== "object" || item === null) return false;
   const obj = item as Record<string, unknown>;
   return (
@@ -200,7 +200,7 @@ function isPokemonConfig(item: unknown): item is PokemonConfig {
 }
 
 /** 运行时类型守卫：检查一个对象是否是有效的 Team */
-function isTeam(item: unknown): item is Team {
+export function isTeam(item: unknown): item is Team {
   if (typeof item !== "object" || item === null) return false;
   const obj = item as Record<string, unknown>;
   return (

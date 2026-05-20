@@ -3,18 +3,18 @@ import type { Dispatch, SetStateAction } from "react";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import type { ImageAsset, PokemonEntry, PokemonSummary } from "@pokemon-localdex/store-types";
 import { getStatValue, createStatBlock } from "@pokemon-localdex/store-types";
-import type { PokemonConfig } from "../../utils/teamStorage.js";
+import type { PokemonConfig } from "../../utils/teamStorage";
 import {
   calculateFinalStat,
   createDefaultStats,
   createDraftMember,
   evToSp,
   getPokemonPreviewImage,
-} from "../../utils/helpers.js";
-import { unifiedApi } from "../../utils/api.js";
+} from "../../utils/helpers";
+import { api } from "../../utils/api";
 import SearchSelect from "../SearchSelect";
 import TypeChip from "../TypeChip";
-import { getBox, getTeams, resolveTeamMembers } from "../../utils/teamStorage.js";
+import { getBox, getTeams, resolveTeamMembers } from "../../utils/teamStorage";
 import SimplePokemonList from "./SimplePokemonList";
 import SimpleStatEditor from "./SimpleStatEditor";
 import {
@@ -24,8 +24,8 @@ import {
   SP_TOTAL_MAX,
   TERA_TYPE_OPTIONS,
   spToEv,
-} from "./damageConstants.js";
-import type { BoostKey } from "./damageConstants.js";
+} from "./damageConstants";
+import type { BoostKey } from "./damageConstants";
 
 //  子组件：宝可梦配置面板（攻击方/防守方通用）
 // ══════════════════════════════════════════════════════════════
@@ -90,7 +90,7 @@ export default function PokemonConfigPanel({
   const [itemResults, setItemResults] = useState<ItemSearchResult[]>([]);
   const [itemOpen, setItemOpen] = useState(false);
   const itemWrapRef = useRef<HTMLDivElement | null>(null);
-  const img = member.imageUrl || (detail ? getPokemonPreviewImage(detail as Parameters<typeof getPokemonPreviewImage>[0]) : "") || "";
+  const img = member.imageUrl || (detail ? getPokemonPreviewImage(detail) : "") || "";
 
   // detail 加载后：
   // 1. 如果 member 已有 formKey（如从盒子导入），补全 formId 并触发道具绑定
@@ -216,7 +216,7 @@ export default function PokemonConfigPanel({
   useEffect(() => {
     if (!itemQuery.trim()) { setItemResults([]); return; }
     const timer = setTimeout(() => {
-      unifiedApi<ItemSearchResult[]>(`/items?q=${encodeURIComponent(itemQuery.trim())}&limit=20`).then((r) => {
+      api<ItemSearchResult[]>(`/items?q=${encodeURIComponent(itemQuery.trim())}&limit=20`).then((r) => {
         setItemResults(r.data || []);
       }).catch(() => setItemResults([]));
     }, 300);
@@ -233,7 +233,7 @@ export default function PokemonConfigPanel({
   }, []);
 
   const handlePickPokemon = (p: PokemonSummary) => {
-    const pImg = getPokemonPreviewImage(p as Parameters<typeof getPokemonPreviewImage>[0]);
+    const pImg = getPokemonPreviewImage(p);
     onChange({
       ...createDraftMember(undefined),
       pokemonId: String(p.id),

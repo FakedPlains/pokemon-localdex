@@ -2,10 +2,10 @@ import { useMemo } from "react";
 import { STAT_KEYS, STAT_LABELS } from "@pokemon-localdex/store-types/constants";
 import type { StatKey, StatBlock, PokemonEntry } from "@pokemon-localdex/store-types";
 import { getStatValue } from "@pokemon-localdex/store-types";
-import type { PokemonConfigDraft } from "../../utils/teamStorage.js";
-import { calculateFinalStat } from "../../utils/helpers.js";
-import { BOOST_STATS, DEFAULT_BOOSTS, EV_MAX, EV_TOTAL_MAX, IV_MAX, SP_MAX } from "./damageConstants.js";
-import type { BoostKey } from "./damageConstants.js";
+import type { PokemonConfigDraft } from "../../utils/teamStorage";
+import { calculateFinalStat } from "../../utils/helpers";
+import { BOOST_STATS, DEFAULT_BOOSTS, EV_MAX, EV_TOTAL_MAX, IV_MAX, SP_MAX } from "./damageConstants";
+import type { BoostKey } from "./damageConstants";
 
 //  子组件：简化能力值编辑器（无进度条）
 // ══════════════════════════════════════════════════════════════

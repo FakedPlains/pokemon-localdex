@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { unifiedApi } from "../utils/api.js";
+import { api } from "../utils/api";
 
 /** useApi 返回的状态类型 */
 export interface UseApiResult<T> {
@@ -8,35 +8,44 @@ export interface UseApiResult<T> {
   error: Error | null;
 }
 
-/** useApi 的 options 类型（透传给 fetch） */
+/** useApi 的 options 类型 */
 export interface UseApiOptions extends Omit<RequestInit, "signal"> {
-  // 预留：调用方可扩展
+  /** 是否启用请求，默认 true；设为 false 或 path 为 null 时不发请求 */
+  enabled?: boolean;
 }
 
 /**
  * 声明式 API 请求 hook —— 路径变化时自动请求。
  *
- * @param path   API 路径（如 "/pokemon/25"）或可 JSON.stringify 的路径描述
- * @param options  可选的 fetch options；调用方应保持引用稳定或传入可序列化对象
+ * @param path   API 路径（如 "/pokemon/25"），传 null 表示暂不请求
+ * @param options  可选的 fetch options + enabled 控制
  */
 export function useApi<T = unknown>(
-  path: string,
+  path: string | null,
   options?: UseApiOptions
 ): UseApiResult<T> {
+  const { enabled = true, ...fetchOptions } = options ?? {};
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled && path !== null);
   const [error, setError] = useState<Error | null>(null);
 
-  const key = typeof path === "string" ? path : JSON.stringify(path);
-  // 序列化 options 以检测变化（调用方应保持 options 引用稳定，或传入可序列化对象）
-  const optionsKey = options ? JSON.stringify(options) : "";
+  const key = path ?? "";
+  const fetchOptionsKey = Object.keys(fetchOptions).length > 0 ? JSON.stringify(fetchOptions) : "";
 
   useEffect(() => {
+    if (!enabled || path === null) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
+    setData(null);
     setLoading(true);
     setError(null);
 
-    unifiedApi<T>(path, options)
+    api<T>(path, fetchOptions)
       .then((result) => {
         if (!cancelled) {
           setData(result.data);
@@ -51,14 +60,14 @@ export function useApi<T = unknown>(
       });
 
     return () => { cancelled = true; };
-  }, [key, optionsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, fetchOptionsKey, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { data, loading, error };
 }
 
 /** useApiCallback 返回的类型 */
 export interface UseApiCallbackResult<T> {
-  call: (path: string, options?: UseApiOptions) => Promise<T | null>;
+  call: (path: string, options?: Omit<UseApiOptions, "enabled">) => Promise<T | null>;
   loading: boolean;
 }
 
@@ -74,11 +83,11 @@ export function useApiCallback<T = unknown>(): UseApiCallbackResult<T> {
 
   const call = useCallback(async (
     path: string,
-    options?: UseApiOptions
+    options?: Omit<UseApiOptions, "enabled">
   ): Promise<T | null> => {
     setLoading(true);
     try {
-      const result = await unifiedApi<T>(path, options);
+      const result = await api<T>(path, options);
       return result.data;
     } catch {
       return null;

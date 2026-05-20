@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import type { StatBlock } from "@pokemon-localdex/store-types";
-import { unifiedApi } from "../../utils/api.js";
-import { calculateFinalStat, getPokemonPreviewImage } from "../../utils/helpers.js";
-import type { PokemonConfigDisplay } from "./types.js";
+import { api } from "../../utils/api";
+import { calculateFinalStat, getPokemonPreviewImage } from "../../utils/helpers";
+import type { PokemonConfigDisplay } from "./types";
 
 interface FetchedPokemonInfo {
   imageUrl: string;
@@ -59,7 +59,7 @@ export default function BoxListRow({ config, onEdit, onDelete, onDuplicate }: Bo
     if (config.imageUrl || !config.pokemonId) return;
     let cancelled = false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    unifiedApi<any>(`/pokemon/${config.pokemonId}`).then((r) => {
+    api<any>(`/pokemon/${config.pokemonId}`).then((r) => {
       if (cancelled) return;
       const p = r.data;
       const img = getPokemonPreviewImage(p);
@@ -81,7 +81,7 @@ export default function BoxListRow({ config, onEdit, onDelete, onDuplicate }: Bo
     if (config.itemImageUrl || !config.itemId) return;
     let cancelled = false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    unifiedApi<any>(`/items/${config.itemId}`).then((r) => {
+    api<any>(`/items/${config.itemId}`).then((r) => {
       if (cancelled) return;
       const item = r.data;
       if (item?.imageUrl) setFetchedItemImageUrl(item.imageUrl);

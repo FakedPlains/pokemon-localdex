@@ -37,7 +37,7 @@ export default function StatsTab({ detail, display, detailGeneration: _detailGen
 
   // 构建当前宝可梦配置数据
   const buildConfig = useCallback(() => {
-    const img = getPokemonPreviewImage(detail as Parameters<typeof getPokemonPreviewImage>[0]);
+    const img = getPokemonPreviewImage(detail);
     const imageSrc = typeof img === "string" ? img : undefined;
     const resolveImageUrl = (val: ImageAsset | string | undefined): string => {
       if (!val) return "";
