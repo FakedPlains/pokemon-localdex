@@ -2,12 +2,12 @@ import { evToSp, resolveMoveGenerationRecord } from "../../utils/helpers.js";
 
 type AnyRecord = Record<string, any>;
 
-function resolveEvs(member: AnyRecord, isChampions: boolean) {
+function resolveEvs(member: AnyRecord, isChampions: boolean): Record<string, number> {
   if (!isChampions) return member.evs || {};
   if (member.sps && Object.keys(member.sps).length > 0) return member.sps;
-  const evs = member.evs || {};
-  const converted = {};
-  for (const key of Object.keys(evs)) converted[key] = evToSp(evs[key]);
+  const evs: Record<string, number> = member.evs || {};
+  const converted: Record<string, number> = {};
+  for (const key of Object.keys(evs)) converted[key] = evToSp(evs[key]!);
   return converted;
 }
 

@@ -154,7 +154,7 @@ interface NameLookup {
 
 所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。
 
-统一入口是 `apps/web/src/utils/api.js` 中的 `unifiedApi` 对象，**所有页面和 hook 必须通过 `unifiedApi` 调用**。
+统一入口是 `apps/web/src/utils/api.ts` 中的 `unifiedApi` 对象，**所有页面和 hook 必须通过 `unifiedApi` 调用**。
 
 ### 3.3 小程序层（apps/miniprogram）
 
@@ -204,7 +204,7 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 
 ### 4.4 属性颜色
 
-属性颜色定义在 `apps/web/src/utils/constants.js` 的 `TYPE_COLORS` 对象中，小程序端有对应的 `constants.js`。**不要在组件内硬编码颜色值**，统一从常量文件引用。
+属性颜色定义在 `apps/web/src/utils/constants.ts` 的 `TYPE_COLORS` 对象中，小程序端有对应的 `constants.js`。**不要在组件内硬编码颜色值**，统一从常量文件引用。
 
 ### 4.5 公共组件说明
 
@@ -226,63 +226,63 @@ https://wsrv.nl/?url=https%3A%2F%2Fs1.52poke.com%2Fwiki%2Fthumb%2F...
 
 以下组件从多个页面中提取而来，**新页面开发时必须优先使用这些共享组件，不要重复定义**。
 
-**WikiLink** (`components/WikiLink.jsx`) — Wiki 外链图标组件。接受 `url`、`title`（默认 `"Wiki"`）和可选 `className` 属性。当 `url` 为空时不渲染。已在 MovesPage、AbilitiesPage、ItemsPage、PokedexPage 中使用。
+**WikiLink** (`components/WikiLink.tsx`) — Wiki 外链图标组件。接受 `url`、`title`（默认 `"Wiki"`）和可选 `className` 属性。当 `url` 为空时不渲染。已在 MovesPage、AbilitiesPage、ItemsPage、PokedexPage 中使用。
 
-```jsx
-import WikiLink from "../components/WikiLink.jsx";
+```tsx
+import WikiLink from "../components/WikiLink";
 <WikiLink url={detail.source?.url} title="52Poké Wiki" />
 ```
 
-**GenerationTimeline** (`components/GenerationTimeline.jsx`) — 世代变更时间线组件。接受 `generations` 数组（每项包含 `generation`、`description` 等字段）和可选 `title`（默认 `"世代变更"`）。当 `generations` 为空时不渲染。已在 MovesPage、AbilitiesPage、ItemsPage 中使用。
+**GenerationTimeline** (`components/GenerationTimeline.tsx`) — 世代变更时间线组件。接受 `generations` 数组（每项包含 `generation`、`description` 等字段）和可选 `title`（默认 `"世代变更"`）。当 `generations` 为空时不渲染。已在 MovesPage、AbilitiesPage、ItemsPage 中使用。
 
-```jsx
-import GenerationTimeline from "../components/GenerationTimeline.jsx";
+```tsx
+import GenerationTimeline from "../components/GenerationTimeline";
 <GenerationTimeline generations={detail.generations} title="世代变更" />
 ```
 
-**PokemonGrid** (`components/PokemonGrid.jsx`) — 可学习该招式/拥有该特性的宝可梦网格组件。接受 `apiPath`（API 请求路径，如 `/moves/123/pokemon`）和可选 `title`。已在 MovesPage、AbilitiesPage 中使用。
+**PokemonGrid** (`components/PokemonGrid.tsx`) — 可学习该招式/拥有该特性的宝可梦网格组件。接受 `apiPath`（API 请求路径，如 `/moves/123/pokemon`）和可选 `title`。已在 MovesPage、AbilitiesPage 中使用。
 
-```jsx
-import PokemonGrid from "../components/PokemonGrid.jsx";
+```tsx
+import PokemonGrid from "../components/PokemonGrid";
 <PokemonGrid apiPath={`/moves/${moveId}/pokemon`} title="可学习的宝可梦" />
 ```
 
-**Modal** (`components/Modal.jsx`) — 通用弹窗组件，基于 `createPortal` 渲染到 `document.body`。支持 Escape 键关闭、点击遮罩关闭、锁定 body 滚动。接受 `open`、`onClose`、`title`、`headerExtra` 和 `children` 属性。已在 TeamsPage 中使用。
+**Modal** (`components/Modal.tsx`) — 通用弹窗组件，基于 `createPortal` 渲染到 `document.body`。支持 Escape 键关闭、点击遮罩关闭、锁定 body 滚动。接受 `open`、`onClose`、`title`、`headerExtra` 和 `children` 属性。已在 TeamsPage 中使用。
 
-```jsx
-import Modal from "../components/Modal.jsx";
+```tsx
+import Modal from "../components/Modal";
 <Modal open={showModal} onClose={() => setShowModal(false)} title="选择队伍">
   {/* 弹窗内容 */}
 </Modal>
 ```
 
-**ViewToggle** (`components/ViewToggle.jsx`) — 卡片/列表视图切换组件。接受 `mode`（`"card"` 或 `"list"`）和 `onChange` 回调。已在 PokedexPage、TeamsPage 中使用。
+**ViewToggle** (`components/ViewToggle.tsx`) — 卡片/列表视图切换组件。接受 `mode`（`"card"` 或 `"list"`）和 `onChange` 回调。已在 PokedexPage、TeamsPage 中使用。
 
-```jsx
-import ViewToggle from "../components/ViewToggle.jsx";
+```tsx
+import ViewToggle from "../components/ViewToggle";
 <ViewToggle mode={viewMode} onChange={setViewMode} />
 ```
 
 #### 4.5.3 共享工具函数与常量
 
-**`parseExpandParam()`** (`utils/helpers.js`) — 从 URL hash 中解析 `expand` 参数，用于从其他页面跳转后自动展开指定条目。已在 MovesPage、AbilitiesPage、ItemsPage 中使用。
+**`parseExpandParam()`** (`utils/helpers.ts`) — 从 URL hash 中解析 `expand` 参数，用于从其他页面跳转后自动展开指定条目。已在 MovesPage、AbilitiesPage、ItemsPage 中使用。
 
-```jsx
-import { parseExpandParam } from "../utils/helpers.js";
+```tsx
+import { parseExpandParam } from "../utils/helpers";
 const pendingExpandRef = useRef(parseExpandParam());
 ```
 
-**`TYPE_BG_COLORS` / `TYPE_BG_COLORS_CARD`** (`utils/constants.js`) — 属性背景色映射。`TYPE_BG_COLORS` 使用 0.10 透明度（用于名称标签），`TYPE_BG_COLORS_CARD` 使用 0.18 透明度（用于卡片背景）。通过 `makeTypeBgColors(alpha)` 工厂函数生成，避免重复定义。
+**`TYPE_BG_COLORS` / `TYPE_BG_COLORS_CARD`** (`utils/constants.ts`) — 属性背景色映射。`TYPE_BG_COLORS` 使用 0.10 透明度（用于名称标签），`TYPE_BG_COLORS_CARD` 使用 0.18 透明度（用于卡片背景）。通过 `makeTypeBgColors(alpha)` 工厂函数生成，避免重复定义。
 
-```jsx
-import { TYPE_BG_COLORS, TYPE_BG_COLORS_CARD } from "../utils/constants.js";
+```tsx
+import { TYPE_BG_COLORS, TYPE_BG_COLORS_CARD } from "../utils/constants";
 const bgColor = TYPE_BG_COLORS[typeName] || "rgba(0,0,0,0.06)";
 ```
 
-**`typeIconSrc(type)` / `categoryIconSrc(category)`** (`utils/constants.js`) — 属性图标和分类图标的 URL 生成函数。
+**`typeIconSrc(type)` / `categoryIconSrc(category)`** (`utils/constants.ts`) — 属性图标和分类图标的 URL 生成函数。
 
-```jsx
-import { typeIconSrc, categoryIconSrc } from "../utils/constants.js";
+```tsx
+import { typeIconSrc, categoryIconSrc } from "../utils/constants";
 <img src={typeIconSrc("fire")} alt="fire" />
 <img src={categoryIconSrc("physical")} alt="physical" />
 ```
@@ -319,7 +319,7 @@ import { typeIconSrc, categoryIconSrc } from "../utils/constants.js";
 - `abilityId` 存储数字 ID，同时保存 `abilityName` 用于显示。PokemonEditor 的特性选择返回 `{id, name}` 对象，同时写入两个字段
 - 界面显示优先使用 `abilityName`，降级到 `abilityId`：`data.abilityName || data.abilityId`
 
-**数据迁移**：`utils/migrateStorage.js` 提供了旧格式数据的自动迁移（当前版本 v3）。应用启动时（`main.jsx`）会检测并迁移旧数据（中文名 → 数字 ID），包括 pokemonId、itemId 和 abilityId 三个字段。迁移标记为 `localdex_migration_v3`，存储在 localStorage 中防止重复执行。
+**数据迁移**：`utils/migrateStorage.ts` 提供了旧格式数据的自动迁移（当前版本 v3）。应用启动时（`main.tsx`）会检测并迁移旧数据（中文名 → 数字 ID），包括 pokemonId、itemId 和 abilityId 三个字段。迁移标记为 `localdex_migration_v3`，存储在 localStorage 中防止重复执行。
 
 ### 4.7 DamagePage 开发注意事项
 
@@ -361,7 +361,7 @@ DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 
 **入口与打包机制**：
 
-`index.css` 通过 `@import` 汇总所有模块，`main.jsx` 中通过 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 `@import` 解析并合并为单个 CSS 文件，生产环境只产生一次 HTTP 请求。这与将 CSS 放在 `public/` 目录下通过 `<link>` 引入有本质区别——后者的 `@import` 会在运行时逐个发起 HTTP 请求，每个模块一次请求，严重影响首屏性能。
+`index.css` 通过 `@import` 汇总所有模块，`main.tsx` 中通过 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 `@import` 解析并合并为单个 CSS 文件，生产环境只产生一次 HTTP 请求。这与将 CSS 放在 `public/` 目录下通过 `<link>` 引入有本质区别——后者的 `@import` 会在运行时逐个发起 HTTP 请求，每个模块一次请求，严重影响首屏性能。
 
 **开发规范**：
 
@@ -517,14 +517,131 @@ npx taro build --type weapp
 
 全局常量（属性列表、性格列表、招式学习方式等）分别维护在：
 
-- `apps/web/src/utils/constants.js`
+- `apps/web/src/utils/constants.ts`
 - `apps/miniprogram/src/utils/constants.js`
 
 两份文件内容应保持同步。如果需要新增常量，两处都要更新。
 
 ---
 
-## 九、常见问题与解决方案
+## 九、类型安全与运行时校验规范
+
+### 9.1 API 返回值的 ID 类型统一
+
+数据库中的主键是 `INTEGER`，但经过 store 层的 `String(row.id)` 转换后，所有 API 返回的 ID 字段统一为 `string` 类型。前端类型定义必须与此一致。
+
+**权威类型定义**：`packages/store/shared-types` 中的 `MoveEntry.id`、`AbilityEntry.id`、`ItemEntry.id` 等均为 `string`。
+
+**禁止做法**：不得在前端组件中用 `typeof id === "number"` 判断 API 返回的 ID 字段。API 返回的 ID 始终是 `string`，如需转为数字（如传递给期望 `number | null` 的内部函数），使用 `Number(id)` 显式转换：
+
+```typescript
+// ✅ 正确
+moveId: m.id ? Number(m.id) : null
+
+// ❌ 错误（API 返回 string，此条件永远为 false）
+moveId: typeof m.id === "number" ? m.id : null
+```
+
+**组件内部类型**：当组件定义了本地类型（如 `SearchMoveItem`）用于接收 API 数据时，ID 字段类型必须与权威类型一致（`string`），不得写成 `string | number`。
+
+### 9.2 localStorage 运行时类型守卫
+
+从 `localStorage` 读取的 JSON 数据是完全不可信的（用户可能手动编辑、版本升级后格式变化、其他应用写入脏数据）。必须通过运行时类型守卫验证后才能使用。
+
+**守卫强度要求**：
+
+- `isPokemonConfig`：至少验证 `configId`（非空 string）、`pokemonId`（非空 string）、`nameZh`（string）、`level`（number）、`moves`（Array）、`createdAt`（number）
+- `isTeam`：至少验证 `teamId`（非空 string）、`name`（string）、`members`（Array）、`createdAt`（number）
+
+**`readJSON` 函数规范**：
+
+```typescript
+// ✅ 正确：验证 Array.isArray + 可选元素守卫
+function readJSON<T>(key: string, validate?: (item: unknown) => item is T): T[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!Array.isArray(raw)) return [];
+    if (!validate) return raw as T[];
+    return raw.filter(validate);
+  } catch {
+    return [];
+  }
+}
+
+// ❌ 错误：无 Array.isArray 保护，直接 as T[] 强转
+function readJSON<T>(key: string): T[] {
+  return JSON.parse(localStorage.getItem(key) || "[]") as T[];
+}
+```
+
+**适用范围**：所有从 `localStorage`/`sessionStorage` 读取并解析 JSON 的代码路径，包括 `teamStorage.ts`、`migrateStorage.ts`，以及未来新增的本地存储模块。
+
+### 9.3 元组类型的安全构造
+
+当数据结构要求固定长度的元组（如 `moves: [string, string, string, string]`）时，不得使用 `filter(Boolean) as [...]` 强制类型转换，因为 `filter` 的结果长度不确定。
+
+**正确做法**：使用 `padMoves4()` 工具函数（定义在 `teamStorage.ts`）安全构造定长元组：
+
+```typescript
+// ✅ 正确：逐位置检查并填充默认值
+export function padMoves4(moves: unknown): [string, string, string, string] {
+  const arr = Array.isArray(moves) ? moves : [];
+  return [
+    typeof arr[0] === "string" ? arr[0] : "",
+    typeof arr[1] === "string" ? arr[1] : "",
+    typeof arr[2] === "string" ? arr[2] : "",
+    typeof arr[3] === "string" ? arr[3] : "",
+  ];
+}
+
+// ❌ 错误：filter 后强制 cast，运行时可能少于 4 个元素
+moves: (m.moves || []).filter(Boolean) as [string, string, string, string]
+```
+
+**通用原则**：任何需要固定长度数组的场景（`[T, T, T, ...]`），都应通过显式逐位置赋值或 pad 函数构造，不得依赖 `filter`/`slice` + `as` 断言。
+
+### 9.4 工具函数去重与权威定义
+
+项目中的计算公式和转换函数必须有且只有一份权威定义。禁止在多个文件中定义相同逻辑的函数副本。
+
+**当前权威定义位置**：
+
+| 函数 | 权威定义文件 | 用途 |
+|------|-------------|------|
+| `evToSp(ev)` | `utils/helpers.ts` | 经典 EV → Champions SP 转换 |
+| `spToEv(sp)` | `components/damage/damageConstants.ts` | Champions SP → 经典 EV 转换 |
+| `normalizeTypeName(type)` | `utils/helpers.ts` | 属性名标准化（繁简、别名） |
+| `splitTypeNames(type)` | `utils/helpers.ts` | 拆分连写的属性名 |
+| `getNatureMultiplier(nature, stat)` | `utils/helpers.ts` | 性格修正系数 |
+| `padMoves4(moves)` | `utils/teamStorage.ts` | 招式数组→4元组 |
+
+**开发规范**：
+
+- 新增组件需要上述函数时，通过 `import` 从权威位置引入，不得本地重新定义
+- 如果发现某个函数在多处有副本（如 `StatCalculator.tsx` 曾有本地 `evToSp`/`spToEv`），应删除副本并改为从权威位置导入
+- 新增工具函数时，评估是否为通用逻辑：通用的放 `utils/helpers.ts`，领域特定的放对应模块的 constants/utils 文件
+
+### 9.5 PokemonConfig 类型体系
+
+项目中宝可梦配置使用三层类型体系，各有明确用途：
+
+| 类型 | 定义位置 | 用途 | 特点 |
+|------|---------|------|------|
+| `PokemonConfig` | `teamStorage.ts` | 完整配置（持久存储） | 所有必填字段都有值 |
+| `PokemonConfigDraft` | `teamStorage.ts` | 编辑态草稿（部分填充） | `Partial<PokemonConfig> & { pokemonId?; slot? }` |
+| `PokemonConfigDisplay` | `components/teams/types.ts` | 展示态（完整配置 + 展示字段） | `PokemonConfig & { shinyImageUrl?; baseStats?; _movesInfo? }` |
+| `PokemonConfigEditState` | `components/teams/types.ts` | 编辑器态（草稿 + 展示字段） | `PokemonConfigDraft & { shinyImageUrl?; baseStats?; _movesInfo? }` |
+
+**使用规范**：
+
+- 展示组件（BoxCard、BoxListRow、TeamCard）的 props 使用 `PokemonConfig` 或 `PokemonConfigDisplay`（必须有完整数据）
+- 编辑组件（PokemonEditor、PokemonConfigInlineEditor）的 props 使用 `PokemonConfigDraft` 或 `PokemonConfigEditState`（允许部分缺失）
+- 从草稿转为完整配置时，必须调用 `completePokemonConfig(draft)` 补全所有默认值
+- 展示组件接收 `PokemonConfigDraft` 时，对可选字段使用可选链（`config.ivs?.hp`），不得假设字段存在
+
+---
+
+## 十、常见问题与解决方案
 
 ### Q1：本地启动后图鉴页面空白
 
@@ -589,14 +706,14 @@ npm install react@18.3.1 react-dom@18.3.1
 
 ---
 
-## 十、开发流程建议
+## 十一、开发流程建议
 
 ### 新功能开发流程
 
 1. **确认数据是否已有**：先查 SQLite 数据库，确认所需字段是否已被爬虫采集
 2. **如需新字段**：先修改爬虫，重新爬取，再修改 schema 和 store 包
 3. **后端先行**：在 `apps/api` 中添加路由，用 `npm run check:api` 验证
-4. **前端对接**：在 `apps/web/src/utils/api.js` 的 `unifiedApi` 中添加对应方法
+4. **前端对接**：在 `apps/web/src/utils/api.ts` 的 `unifiedApi` 中添加对应方法
 5. **小程序同步**：如果功能需要在小程序中支持，同步修改 `apps/miniprogram/src/utils/api.js`
 
 ### 数据库变更流程

@@ -58,6 +58,9 @@ pokemon-localdex/
 │   │   │   ├── components/   公共组件（TypeChip、CustomSelect、SearchSelect、StatCalculator 等）
 │   │   │   ├── hooks/        数据请求 hook（useApi、useInfiniteApi）
 │   │   │   └── utils/        工具函数（api、constants、helpers、teamStorage、migrateStorage）
+│   │   │       │                 helpers.ts：权威工具函数（evToSp、normalizeTypeName、getNatureMultiplier 等）
+│   │   │       │                 teamStorage.ts：队伍存储 + 类型守卫 + padMoves4 + completePokemonConfig
+│   │   │       └                 migrateStorage.ts：localStorage 迁移（含 Array.isArray 运行时守卫）
 │   │   ├── .env          本地开发环境变量（VITE_DATA_SOURCE 留空）
 │   │   └── vite.config.js  base: "/" 固定，无需条件切换
 │   └── miniprogram/      微信小程序客户端（Taro + React）
@@ -178,6 +181,16 @@ service = "pokemon-localdex-api"
 **数据迁移**：`migrateStorage.js` 提供了从旧格式到新格式的自动迁移逻辑。当前迁移版本为 v3（标记：`localdex_migration_v3`），支持 pokemonId、itemId、abilityId 三个字段的中文名 → 数字 ID 迁移。迁移是异步的、不阻塞渲染、幂等的。
 
 **招式搜索**：DamagePage 中的招式搜索采用按需搜索模式（`onSearch` 回调 + 200ms 防抖），使用独立的 `moveSearching` 状态，不会触发全页面 loading。
+
+**PokemonConfig 类型体系**：前端配置数据分四层——`PokemonConfig`（完整配置，用于持久化和展示组件 props）、`PokemonConfigDraft`（编辑态草稿，Partial，编辑过程中字段可为空）、`PokemonConfigDisplay`（展示态 = Config + 展示字段如 nameZh）、`PokemonConfigEditState`（编辑器态 = Draft + 展示字段）。草稿转完整配置必须调用 `completePokemonConfig(draft)`，不得直接强制类型断言。
+
+**工具函数权威位置**：每个工具函数只允许一份定义，组件使用时必须从权威位置 import：
+
+- `evToSp`、`normalizeTypeName`、`splitTypeNames`、`getNatureMultiplier` → `utils/helpers.ts`
+- `spToEv` → `components/damage/damageConstants.ts`
+- `padMoves4`、`isPokemonConfig`、`isTeam`、`completePokemonConfig` → `utils/teamStorage.ts`
+
+**运行时校验**：从 localStorage 读取 JSON 后必须用 `Array.isArray(raw)` 验证；`isPokemonConfig` 至少检查 `configId`、`pokemonId`（非空 string）、`level`（number）、`moves`（Array）、`createdAt`（number）；`isTeam` 至少检查 `teamId`（非空 string）、`members`（Array）、`createdAt`（number）。固定长度元组（如 `moves: [string,string,string,string]`）不得用 `filter(Boolean) as [...]` 构造，必须使用 `padMoves4(moves)`。
 
 当前包含七个页面：图鉴页（PokedexPage）提供宝可梦列表搜索和详情展示；招式页（MovesPage）提供招式列表和世代差异查看；特性页（AbilitiesPage）提供特性列表和世代差异查看；道具页（ItemsPage）提供道具列表和详情；队伍页（TeamsPage）提供 6 槽队伍编辑器；伤害页（DamagePage）提供完整的伤害计算器，支持性格搜索选择、特性内联选择、道具图片预览、形态切换（自动绑定道具/特性）、天气和场地分段切换、EV↔SP 自动转换等；属性克制表页（TypeChartPage）展示 18 属性相克关系。
 

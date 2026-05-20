@@ -117,7 +117,7 @@ schema/d1-schema.sql
 - 当前 schema 和代码使用 `form_key = "default"` 表示默认形态和默认招式表形态。
 - 少数旧文档可能提到默认形态名为空字符串；动形态逻辑前先确认当前字段语义，不要机械照搬旧描述。
 
-Web 展示层应通过 `apps/web/src/utils/helpers.js` 中的 `resolvePokemonDisplayVariant()` 和相关 helper 解析世代/形态展示数据，不要在页面组件中重复实现形态选择算法。
+Web 展示层应通过 `apps/web/src/utils/helpers.ts` 中的 `resolvePokemonDisplayVariant()` 和相关 helper 解析世代/形态展示数据，不要在页面组件中重复实现形态选择算法。
 
 ## ID 优先规则
 
@@ -185,7 +185,7 @@ calculateDamage(input, lookup)
 
 ## Web 端规则
 
-Web 数据请求必须走 `apps/web/src/utils/api.js` 中的 `api`/`unifiedApi`，路径使用 `/api/...`。
+Web 数据请求必须走 `apps/web/src/utils/api.ts` 中的 `api`/`unifiedApi`，路径使用 `/api/...`。
 
 不要在页面组件里随手写项目数据的原始 `fetch`，除非确有封装无法覆盖的理由。
 
@@ -232,6 +232,25 @@ DamagePage 特别注意：
 - 新增共享常量时，同步维护 `apps/miniprogram/src/utils/constants.js` 和 Web 端常量。
 - 小程序代码不要引入 Node.js 专有模块。
 - 构建产物在 `apps/miniprogram/dist/`，不要提交。
+
+## 类型安全与运行时校验规则
+
+API 返回的 ID 一律为 `string`（store 层 `String(row.id)` 转换）。不得用 `typeof id === "number"` 判断 API 数据的 ID 字段；需要数字时用 `Number(id)` 显式转换。组件本地类型的 ID 字段必须与 `shared-types` 一致（`string`），不得写 `string | number`。
+
+从 localStorage 读取 JSON 必须先 `Array.isArray(raw)` 再使用。`readJSON` 应支持可选的运行时守卫函数过滤无效条目。`isPokemonConfig` 至少验证 `configId`、`pokemonId`（非空 string）+ `level`（number）+ `moves`（Array）+ `createdAt`（number）。`isTeam` 至少验证 `teamId`（非空 string）+ `members`（Array）+ `createdAt`（number）。
+
+固定长度元组（如 `moves: [string,string,string,string]`）不得用 `filter(Boolean) as [...]` 构造。使用 `padMoves4(moves)` 或等价的逐位置赋值函数。
+
+工具函数只能有一份权威定义，不得在多个文件中定义相同逻辑的副本：
+
+- `evToSp` → `utils/helpers.ts`
+- `spToEv` → `components/damage/damageConstants.ts`
+- `normalizeTypeName` / `splitTypeNames` / `getNatureMultiplier` → `utils/helpers.ts`
+- `padMoves4` → `utils/teamStorage.ts`
+
+新组件需要这些函数时从权威位置 import，不得本地重新定义。
+
+PokemonConfig 类型体系分四层：`PokemonConfig`（完整配置）、`PokemonConfigDraft`（编辑态草稿，Partial）、`PokemonConfigDisplay`（展示态 = Config + 展示字段）、`PokemonConfigEditState`（编辑器态 = Draft + 展示字段）。展示组件 props 用 Config/Display，编辑组件 props 用 Draft/EditState。草稿转完整配置必须调用 `completePokemonConfig(draft)`。
 
 ## 资产与生成文件
 
@@ -305,7 +324,7 @@ Cloudflare Pages
 - `worker.ts` 会在同一个 Worker isolate 中缓存 D1 store。
 - `drizzle-queries` 对宝可梦列表的属性、特性、图片、世代、进化链做批量查询，避免逐行查询。
 - `resolvePokemonDisplayVariant()` 是 Web 端形态/世代展示的权威转换函数。
-- `main.jsx` 启动时异步执行 localStorage 迁移，完成后派发 `localdex-migration-done`。
+- `main.tsx` 启动时异步执行 localStorage 迁移，完成后派发 `localdex-migration-done`。
 - 队伍/盒子 localStorage schema 已经是 ID 优先，同时保留中文展示字段。
 - Web 和小程序常量目前存在重复维护；改共享行为时两边都要查。
 - `SafeImage` 会把 52Poké 等外部图片域名代理到 `wsrv.nl`。

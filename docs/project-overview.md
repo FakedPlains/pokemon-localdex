@@ -33,8 +33,8 @@ pokemon-localdex/
 │   │
 │   ├── web/                    React SPA（Vite 构建）
 │   │   ├── src/
-│   │   │   ├── App.jsx         路由入口（hash 路由）
-│   │   │   ├── main.jsx        React 挂载点（含启动时数据迁移 + CSS 入口导入）
+│   │   │   ├── App.tsx         路由入口（hash 路由）
+│   │   │   ├── main.tsx        React 挂载点（含启动时数据迁移 + CSS 入口导入）
 │   │   │   ├── styles/          模块化 CSS（Vite 打包合并）
 │   │   │   │   ├── index.css            入口文件（@import 所有模块）
 │   │   │   │   ├── base.css             CSS 变量、reset、body
@@ -54,33 +54,33 @@ pokemon-localdex/
 │   │   │   │   ├── damage.css           新版伤害计算器（dc- 前缀）
 │   │   │   │   └── type-chart.css       属性克制表
 │   │   │   ├── pages/          七个页面组件
-│   │   │   │   ├── PokedexPage.jsx      图鉴页（列表 + 详情抽屉）
-│   │   │   │   ├── MovesPage.jsx        招式页
-│   │   │   │   ├── AbilitiesPage.jsx    特性页
-│   │   │   │   ├── ItemsPage.jsx        道具页
-│   │   │   │   ├── TeamsPage.jsx        队伍编辑器
-│   │   │   │   ├── DamagePage.jsx       伤害计算器
-│   │   │   │   └── TypeChartPage.jsx    属性克制表
+│   │   │   │   ├── PokedexPage.tsx      图鉴页（列表 + 详情抽屉）
+│   │   │   │   ├── MovesPage.tsx        招式页
+│   │   │   │   ├── AbilitiesPage.tsx    特性页
+│   │   │   │   ├── ItemsPage.tsx        道具页
+│   │   │   │   ├── TeamsPage.tsx        队伍编辑器
+│   │   │   │   ├── DamagePage.tsx       伤害计算器
+│   │   │   │   └── TypeChartPage.tsx    属性克制表
 │   │   │   ├── components/     公共 UI 组件
-│   │   │   │   ├── TypeChip.jsx         属性标签（带颜色）
-│   │   │   │   ├── CustomSelect.jsx     自定义下拉选择框
-│   │   │   │   ├── StatCalculator.jsx   能力值计算器
-│   │   │   │   ├── Loading.jsx          加载状态
-│   │   │   │   ├── Toast.jsx            Toast 通知
-│   │   │   │   ├── SearchSelect.jsx     搜索下拉框（带异步搜索）
-│   │   │   │   ├── MoveSearch.jsx       招式按需搜索组件（200ms 防抖）
-│   │   │   │   ├── PokemonConfigCard.jsx 宝可梦配置卡片
-│   │   │   │   ├── PokemonEditor.jsx    宝可梦编辑器
-│   │   │   │   └── PokemonPickerList.jsx 宝可梦选择列表
+│   │   │   │   ├── TypeChip.tsx         属性标签（带颜色）
+│   │   │   │   ├── CustomSelect.tsx     自定义下拉选择框
+│   │   │   │   ├── StatCalculator.tsx   能力值计算器
+│   │   │   │   ├── Loading.tsx          加载状态
+│   │   │   │   ├── Toast.tsx            Toast 通知
+│   │   │   │   ├── SearchSelect.tsx     搜索下拉框（带异步搜索）
+│   │   │   │   ├── MoveSearch.tsx       招式按需搜索组件（200ms 防抖）
+│   │   │   │   ├── PokemonConfigCard.tsx 宝可梦配置卡片
+│   │   │   │   ├── PokemonEditor.tsx    宝可梦编辑器
+│   │   │   │   └── PokemonPickerList.tsx 宝可梦选择列表
 │   │   │   ├── hooks/
-│   │   │   │   ├── useApi.js            单次请求 hook
-│   │   │   │   └── useInfiniteApi.js    无限滚动分页 hook
+│   │   │   │   ├── useApi.ts            单次请求 hook
+│   │   │   │   └── useInfiniteApi.ts    无限滚动分页 hook
 │   │   │   └── utils/
-│   │   │       ├── api.js               统一 API 入口（unifiedApi / api）
-│   │   │       ├── constants.js         全局常量（属性、性格、招式学习方式等）
-│   │   │       ├── helpers.js           数据转换工具函数
-│   │   │       ├── teamStorage.js       队伍/盒子本地存储（abilityId + abilityName 双字段）
-│   │   │       └── migrateStorage.js    localStorage 数据迁移（v3：中文名→数字ID，含 abilityId）
+│   │   │       ├── api.ts               统一 API 入口（unifiedApi / api）
+│   │   │       ├── constants.ts         全局常量（属性、性格、招式学习方式等）
+│   │   │       ├── helpers.ts           权威工具函数（evToSp、normalizeTypeName、splitTypeNames、getNatureMultiplier、resolvePokemonDisplayVariant）
+│   │   │       ├── teamStorage.ts       队伍/盒子存储 + 类型守卫（isPokemonConfig、isTeam）+ padMoves4 + completePokemonConfig
+│   │   │       └── migrateStorage.ts    localStorage 数据迁移（v3：含 Array.isArray 运行时守卫）
 │   │   ├── public/
 │   │   │   └── assets/
 │   │   │       └── type-icons/          属性图标（PNG）
@@ -214,6 +214,8 @@ React 18 SPA，Vite 构建，使用 **hash 路由**（`#/pokedex`、`#/moves` �
 数据获取通过 `fetch("/api/...")` 统一发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。
 
 核心数据转换函数 `resolvePokemonDisplayVariant()`：根据当前选中的形态和世代，从 API 返回的嵌套数据中解析出正确的属性、种族值、特性和图片。
+
+前端配置数据采用四层类型体系：`PokemonConfig`（完整配置）→ `PokemonConfigDraft`（编辑态草稿，Partial）→ `PokemonConfigDisplay`（展示态）→ `PokemonConfigEditState`（编辑器态）。工具函数保持单一权威定义：`helpers.ts` 集中 `evToSp`、`normalizeTypeName`、`getNatureMultiplier` 等；`teamStorage.ts` 提供 `padMoves4`、`isPokemonConfig`、`isTeam`、`completePokemonConfig`。localStorage 读取必须经过 `Array.isArray` 和字段级类型守卫验证。
 
 ### 3.6 小程序展示层（apps/miniprogram）
 

@@ -5,20 +5,27 @@
  * 两个 store 包均从此处导入并重新导出，保证类型一致。
  */
 
-import { TYPE_ALIASES, TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.js";
+import { TYPE_ALIASES, TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 基础类型
 // ══════════════════════════════════════════════════════════════════════════════
 
+export type StatKey = "hp" | "atk" | "def" | "spa" | "spd" | "spe";
+
 export type StatBlock = {
-  hp: number;
-  atk: number;
-  def: number;
-  spa: number;
-  spd: number;
-  spe: number;
+  [K in StatKey]: number;
 };
+
+/** 类型安全地按 key 读取 StatBlock 中的值 */
+export function getStatValue(stats: StatBlock | Partial<StatBlock> | undefined, key: StatKey): number {
+  return stats?.[key] ?? 0;
+}
+
+/** 构造一个 StatBlock，所有键初始化为指定值 */
+export function createStatBlock(defaultValue: number): StatBlock {
+  return { hp: defaultValue, atk: defaultValue, def: defaultValue, spa: defaultValue, spd: defaultValue, spe: defaultValue };
+}
 
 export type SourceMeta = {
   url: string;
@@ -167,21 +174,29 @@ export type ChampionsSeasonSummary = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 招式
+// 世代记录基础类型（GenerationTimeline 组件使用）
 // ══════════════════════════════════════════════════════════════════════════════
 
-export type MoveGenerationRecord = {
+/** 通用世代记录：GenerationTimeline 组件接受的最小字段集 */
+export type BaseGenerationRecord = {
   generation: number;
   gameVersionCode?: string;
   gameVersionName?: string;
   versionExclusive?: boolean;
+  description: string;
+  notes?: string;
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 招式
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type MoveGenerationRecord = BaseGenerationRecord & {
   type?: string;
   category?: string;
   power?: number;
   accuracy?: number;
   pp?: number;
-  description: string;
-  notes?: string;
 };
 
 export type MoveEntry = {
@@ -206,14 +221,7 @@ export type MoveEntry = {
 // 特性
 // ══════════════════════════════════════════════════════════════════════════════
 
-export type AbilityGenerationRecord = {
-  generation: number;
-  gameVersionCode?: string;
-  gameVersionName?: string;
-  versionExclusive?: boolean;
-  description: string;
-  notes?: string;
-};
+export type AbilityGenerationRecord = BaseGenerationRecord;
 
 export type AbilityEntry = {
   id: string;
@@ -232,14 +240,7 @@ export type AbilityEntry = {
 // 道具
 // ══════════════════════════════════════════════════════════════════════════════
 
-export type ItemGenerationRecord = {
-  generation: number;
-  gameVersionCode?: string;
-  gameVersionName?: string;
-  versionExclusive?: boolean;
-  description: string;
-  notes?: string;
-};
+export type ItemGenerationRecord = BaseGenerationRecord;
 
 export type ItemEntry = {
   id: string;
@@ -282,6 +283,15 @@ export type LearnsetMeta = {
   generations: number[];
   formKeys: string[];
   versionsByGen: Record<number, Array<{ code: string; name: string }>>;
+};
+
+/** /pokemon/:id/learnset API 完整响应（data 层） */
+export type LearnsetResponse = {
+  moves: LearnsetRecord[];
+  formKey: string;
+  gameVersionCode?: string;
+  hasMore?: boolean;
+  methodCounts?: Record<string, number>;
 };
 
 /** getPokemonByMove 返回的宝可梦摘要 */
@@ -430,7 +440,7 @@ export const GAME_VERSION_NAMES = new Map<string, string>(
   GAME_VERSIONS.map(([code, nameZh]) => [code, nameZh])
 );
 
-export * from "./constants.js";
+export * from "./constants.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 共享辅助函数

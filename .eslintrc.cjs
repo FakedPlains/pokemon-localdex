@@ -20,4 +20,26 @@ module.exports = {
   rules: {
     "no-undef": "error",
   },
+  overrides: [
+    {
+      files: ["**/*.ts", "**/*.tsx"],
+      parser: "@typescript-eslint/parser",
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+        ecmaFeatures: {
+          jsx: true,
+        },
+      },
+      plugins: ["@typescript-eslint"],
+      rules: {
+        // TypeScript handles these via the compiler, disable JS equivalents
+        "no-undef": "off",
+        "@typescript-eslint/no-unused-vars": [
+          "warn",
+          { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+        ],
+      },
+    },
+  ],
 };

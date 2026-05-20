@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { DEFAULT_BOOSTS } from "./damageConstants.js";
+import { DEFAULT_BOOSTS } from "./damageConstants";
 
 type DamageSideValues = {
   curHP: number;
