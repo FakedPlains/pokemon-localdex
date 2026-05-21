@@ -12,6 +12,7 @@ import {
   getPokemonPreviewImage,
 } from "../../utils/helpers";
 import { api } from "../../utils/api";
+import type { DataResponse } from "../../utils/apiTypes";
 import SearchSelect from "../SearchSelect";
 import TypeChip from "../TypeChip";
 import { getBox, getTeams, resolveTeamMembers } from "../../utils/teamStorage";
@@ -216,7 +217,7 @@ export default function PokemonConfigPanel({
   useEffect(() => {
     if (!itemQuery.trim()) { setItemResults([]); return; }
     const timer = setTimeout(() => {
-      api<ItemSearchResult[]>(`/items?q=${encodeURIComponent(itemQuery.trim())}&limit=20`).then((r) => {
+      api<DataResponse<ItemSearchResult[]>>(`/items?q=${encodeURIComponent(itemQuery.trim())}&limit=20`).then((r) => {
         setItemResults(r.data || []);
       }).catch(() => setItemResults([]));
     }, 300);

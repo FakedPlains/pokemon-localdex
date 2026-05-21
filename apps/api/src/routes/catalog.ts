@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { RegisterRoutesOptions } from "../route-utils.ts";
-import { numberQuery, paginatedJson } from "../route-utils.ts";
+import { numberQuery, limitQuery, offsetQuery, generationQuery, paginatedJson } from "../route-utils.ts";
 
 export function registerItemRoutes(api: Hono<any>, opts: RegisterRoutesOptions): void {
   const { getStore } = opts;
@@ -9,8 +9,8 @@ export function registerItemRoutes(api: Hono<any>, opts: RegisterRoutesOptions):
     const s = getStore(c);
     const query = c.req.query("q") || undefined;
     const category = c.req.query("category") || undefined;
-    const limit = numberQuery(c, "limit");
-    const offset = numberQuery(c, "offset") ?? 0;
+    const limit = limitQuery(c);
+    const offset = offsetQuery(c);
 
     if (limit !== undefined) {
       const result = await s.listItems({ query, category, limit, offset });
@@ -34,9 +34,9 @@ export function registerMoveRoutes(api: Hono<any>, opts: RegisterRoutesOptions):
     const query = c.req.query("q") || undefined;
     const type = c.req.query("type") || undefined;
     const category = c.req.query("category") || undefined;
-    const generation = numberQuery(c, "generation");
-    const limit = numberQuery(c, "limit");
-    const offset = numberQuery(c, "offset") ?? 0;
+    const generation = generationQuery(c);
+    const limit = limitQuery(c);
+    const offset = offsetQuery(c);
 
     if (limit !== undefined) {
       const result = await s.listMoves({ query, type, category, generation, limit, offset });
@@ -54,8 +54,8 @@ export function registerMoveRoutes(api: Hono<any>, opts: RegisterRoutesOptions):
   api.get("/moves/:id/pokemon", async (c) => {
     const id = Number(c.req.param("id"));
     if (isNaN(id)) return c.json({ data: [] });
-    const limit = numberQuery(c, "limit");
-    const offset = numberQuery(c, "offset") ?? 0;
+    const limit = limitQuery(c);
+    const offset = offsetQuery(c);
     if (limit !== undefined) {
       const result = await getStore(c).getPokemonByMove(id, { limit, offset });
       return paginatedJson(c, result, offset, limit);
@@ -71,9 +71,9 @@ export function registerAbilityRoutes(api: Hono<any>, opts: RegisterRoutesOption
   api.get("/abilities", async (c) => {
     const s = getStore(c);
     const query = c.req.query("q") || undefined;
-    const generation = numberQuery(c, "generation");
-    const limit = numberQuery(c, "limit");
-    const offset = numberQuery(c, "offset") ?? 0;
+    const generation = generationQuery(c);
+    const limit = limitQuery(c);
+    const offset = offsetQuery(c);
 
     if (limit !== undefined) {
       const result = await s.listAbilities({ query, generation, limit, offset });
@@ -91,8 +91,8 @@ export function registerAbilityRoutes(api: Hono<any>, opts: RegisterRoutesOption
   api.get("/abilities/:id/pokemon", async (c) => {
     const id = Number(c.req.param("id"));
     if (isNaN(id)) return c.json({ data: [] });
-    const limit = numberQuery(c, "limit");
-    const offset = numberQuery(c, "offset") ?? 0;
+    const limit = limitQuery(c);
+    const offset = offsetQuery(c);
     if (limit !== undefined) {
       const result = await getStore(c).getPokemonByAbility(id, { limit, offset });
       return paginatedJson(c, result, offset, limit);

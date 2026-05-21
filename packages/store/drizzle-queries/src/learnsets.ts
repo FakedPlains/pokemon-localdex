@@ -1,7 +1,7 @@
 import { eq, and, sql, asc } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { moves, pokemonLearnsets } from "@pokemon-localdex/drizzle-schema";
-import type { LearnsetRecord, LearnsetMeta } from "@pokemon-localdex/store-types";
+import type { LearnsetRecord, LearnsetMeta, LearnsetResult } from "@pokemon-localdex/store-types";
 import { GAME_VERSION_NAMES } from "@pokemon-localdex/store-types";
 
 export async function getLearnsetMetaRows(db: any, pokemonId: number): Promise<LearnsetMeta> {
@@ -47,15 +47,7 @@ export async function getLearnsetMetaRows(db: any, pokemonId: number): Promise<L
 // Pokemon: getPokemonLearnset（支持分页 + 服务端 learnMethod 筛选）
 // ────────────────────────────────────────────────────────────────────────────
 
-export type LearnsetResult = {
-  moves: LearnsetRecord[];
-  formKey: string;
-  gameVersionCode?: string;
-  /** 当传入 limit 时返回，表示是否有更多数据 */
-  hasMore?: boolean;
-  /** 当前 form+gen+version 下各学习方式的全量计数（不受分页和 method 筛选影响） */
-  methodCounts?: Record<string, number>;
-};
+// LearnsetResult 从 @pokemon-localdex/store-types 导入（单一定义源）
 
 export async function getPokemonLearnsetRows(
   db: any,
@@ -65,6 +57,7 @@ export async function getPokemonLearnsetRows(
   gameVersionCode?: string,
   pagination?: { limit?: number; offset?: number },
   learnMethod?: string,
+  query?: string,
 ): Promise<LearnsetResult> {
 
   // ── 公共 gameVersionCode 条件片段 ──
@@ -112,6 +105,11 @@ export async function getPokemonLearnsetRows(
     ];
     if (versionCondition) conditions.push(versionCondition);
     if (extraMethod) conditions.push(eq(pokemonLearnsets.learnMethod, extraMethod));
+    if (query) {
+      // 转义 LIKE 通配符，避免用户输入 % 或 _ 导致意外匹配
+      const escaped = query.replace(/[%_\\]/g, (ch) => `\\${ch}`);
+      conditions.push(sql`${pokemonLearnsets.moveNameZh} LIKE ${"%" + escaped + "%"} ESCAPE '\\'`);
+    }
 
     let q = db
       .select({
@@ -230,7 +228,7 @@ export async function getPokemonLearnsetRows(
 
   return {
     formKey: usedFormKey,
-    gameVersionCode: gameVersionCode ?? null as any,
+    gameVersionCode: gameVersionCode || undefined,
     hasMore,
     methodCounts,
     moves: finalRows.map((r: any) => ({

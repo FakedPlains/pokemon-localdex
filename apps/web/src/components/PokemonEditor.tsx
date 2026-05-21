@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../utils/api";
+import type { DataResponse } from "../utils/apiTypes";
+import { useScrollPagination } from "../hooks/useScrollPagination";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
-import type { StatBlock, PokemonEntry, PokemonFormEntry, ItemEntry, LearnsetMeta, LearnsetResponse } from "@pokemon-localdex/store-types";
+import type { StatBlock, PokemonEntry, PokemonFormEntry, ItemEntry, LearnsetMeta, LearnsetRecord } from "@pokemon-localdex/store-types";
 import type { PokemonConfig, PokemonConfigDraft } from "../utils/teamStorage";
 import { createDefaultStats, getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers";
 import StatCalculator from "./StatCalculator";
@@ -41,6 +43,39 @@ export interface PokemonEditorProps {
 /**
  * 宝可梦配置编辑器
  */
+/** 将 ItemEntry 映射为面板用的 ItemOption */
+const mapItemToOption = (item: ItemEntry): ItemOption | null => {
+  const id = String(item.id);
+  if (!id) return null;
+  return {
+    value: id,
+    label: item.nameZh || item.slug || id,
+    sublabel: item.effectSummary || "",
+    imageUrl: item.imageUrl || "",
+    nameZh: item.nameZh || "",
+  };
+};
+
+/** 将 LearnsetRecord 映射为面板用的 MoveOption */
+const mapLearnsetToMoveOption = (entry: LearnsetRecord): MoveOption | null => {
+  const name = entry.moveNameZh || String(entry.moveId || "");
+  if (!name) return null;
+  return {
+    value: name,
+    label: name,
+    moveId: entry.moveId ?? null,
+    moveType: entry.moveType || "",
+    moveCategory: entry.moveCategory || "",
+    movePower: entry.movePower ?? null,
+    moveAccuracy: entry.moveAccuracy ?? null,
+    movePP: entry.movePP ?? null,
+    moveDescription: entry.moveDescription || "",
+  };
+};
+
+/** MoveOption 去重 key */
+const moveDedupe = (m: MoveOption): string => m.value;
+
 export default function PokemonEditor({ config, onChange, onSave, onCancel, saveLabel }: PokemonEditorProps) {
   const [pokemonDetail, setPokemonDetail] = useState<PokemonEntry | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -48,93 +83,147 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
   const [selectedFormKey, setSelectedFormKey] = useState<string | null>(config.formKey || null);
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const [panelSearch, setPanelSearch] = useState("");
-  const [items, setItems] = useState<ItemEntry[]>([]);
-  const [itemsHasMore, setItemsHasMore] = useState(true);
-  const [itemsLoading, setItemsLoading] = useState(false);
-  const [itemSearchResults, setItemSearchResults] = useState<ItemEntry[] | null>(null);
-  const [moveSearchResults, setMoveSearchResults] = useState<Array<{ id: string; nameZh: string; type?: string; category?: string; power?: number | null; accuracy?: number | null; pp?: number | null; description?: string }> | null>(null);
-  const [movesLoading, setMovesLoading] = useState(false);
-  const itemsOffsetRef = useRef(0);
-  const itemsInitRef = useRef(false);
   const itemListRef = useRef<HTMLDivElement>(null);
   const moveListRef = useRef<HTMLDivElement>(null);
   const pokemonId = config.pokemonId;
 
-  // 道具分页加载（仅在面板打开时触发）
-  const loadItemsPage = useCallback((reset: boolean) => {
-    if (itemsLoading) return;
-    if (!reset && !itemsHasMore) return;
-    const offset = reset ? 0 : itemsOffsetRef.current;
-    setItemsLoading(true);
-    api<ItemEntry[]>(`/items?limit=50&offset=${offset}`).then((r) => {
-      const newItems = r.data || [];
-      if (reset) {
-        setItems(newItems);
-      } else {
-        setItems((prev) => [...prev, ...newItems]);
-      }
-      setItemsHasMore(r.hasMore ?? false);
-      itemsOffsetRef.current = offset + newItems.length;
-      setItemsLoading(false);
-    }).catch(() => { setItemsLoading(false); });
-  }, [itemsLoading, itemsHasMore]);
+  // ── 道具分页（列表 + 搜索共用一个 hook，通过 reset 切换路径） ──
+  const itemsPagination = useScrollPagination<ItemEntry, ItemOption>("/items", {
+    pageSize: 50,
+    mapItem: mapItemToOption,
+  });
+  const itemsInitRef = useRef(false);
+  // 追踪上次搜索值，避免面板初次打开时空搜索 effect 发起重复请求
+  const prevItemSearchRef = useRef("");
 
   // 面板打开时加载首页道具
   useEffect(() => {
     if (activePanel === "item" && !itemsInitRef.current) {
       itemsInitRef.current = true;
-      loadItemsPage(true);
+      prevItemSearchRef.current = "";
+      itemsPagination.reset("/items");
     }
   }, [activePanel]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 道具搜索（防抖，走 API）
+  // 道具搜索（防抖，切换路径）
   useEffect(() => {
     if (activePanel !== "item") return;
-    if (!panelSearch.trim()) {
-      setItemSearchResults(null);
+    const trimmed = panelSearch.trim();
+    if (!trimmed) {
+      // 只有从非空搜索切回空时才恢复全量列表，避免与初始化 reset 重复
+      if (prevItemSearchRef.current) {
+        prevItemSearchRef.current = "";
+        itemsPagination.reset("/items");
+      }
       return;
     }
     const timer = setTimeout(() => {
-      setItemsLoading(true);
-      api<ItemEntry[]>(`/items?q=${encodeURIComponent(panelSearch.trim())}&limit=50`).then((r) => {
-        setItemSearchResults(r.data || []);
-        setItemsLoading(false);
-      }).catch(() => { setItemSearchResults([]); setItemsLoading(false); });
+      prevItemSearchRef.current = trimmed;
+      itemsPagination.reset(`/items?q=${encodeURIComponent(trimmed)}`);
     }, 300);
     return () => clearTimeout(timer);
-  }, [panelSearch, activePanel]);
+  }, [panelSearch, activePanel]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 招式搜索（防抖，走 /moves API）
+  // ── 招式分页（列表 + 搜索共用一个 hook，通过 reset 切换路径） ──
+  const movesPagination = useScrollPagination<LearnsetRecord, MoveOption>(null, {
+    pageSize: 50,
+    extractItems: (data: unknown) => {
+      const d = data as { moves?: unknown[] };
+      return Array.isArray(d?.moves) ? d.moves as LearnsetRecord[] : [];
+    },
+    mapItem: mapLearnsetToMoveOption,
+    dedupeKey: moveDedupe,
+    // 服务端可能 fallback 形态（如超极巨化 -> default），首页返回实际 formKey
+    // 后续追加分页需要使用 fallback 后的 formKey，否则查不到数据
+    // onFirstPage 接收 (responseData, currentPath)，返回修正后的路径
+    onFirstPage: (responseData: unknown, currentPath: string): string | undefined => {
+      const d = responseData as { formKey?: string } | null;
+      if (!d?.formKey) return undefined;
+      const corrected = currentPath.replace(
+        /([?&])form=[^&]*/,
+        `$1form=${encodeURIComponent(d.formKey)}`,
+      );
+      return corrected !== currentPath ? corrected : undefined;
+    },
+  });
+  // learnset 基础路径（pokemonDetail 变化时从 meta 推算世代，形态变化时更新路径）
+  const [learnsetBasePath, setLearnsetBasePath] = useState<string | null>(null);
+  const movesInitRef = useRef(false);
+  const prevMoveSearchRef = useRef("");
+  // 缓存 meta 中的最新世代，避免切换形态时重复请求 meta
+  const learnsetGenRef = useRef<number | null>(null);
+
+  // pokemonDetail 变化时请求 meta 获取世代信息
+  useEffect(() => {
+    if (!pokemonDetail) {
+      learnsetGenRef.current = null;
+      setLearnsetBasePath(null);
+      movesInitRef.current = false;
+      prevMoveSearchRef.current = "";
+      return;
+    }
+    let cancelled = false;
+    learnsetGenRef.current = null;
+    setLearnsetBasePath(null);
+    movesInitRef.current = false;
+    prevMoveSearchRef.current = "";
+    api<DataResponse<LearnsetMeta>>(`/pokemon/${pokemonDetail.id}/learnset/meta`).then((meta) => {
+      if (cancelled) return;
+      const gens = meta.data?.generations || [];
+      const latestGen = (gens.length > 0 ? gens[gens.length - 1] : 9) ?? 9;
+      learnsetGenRef.current = latestGen;
+      const form = selectedFormKey || "default";
+      setLearnsetBasePath(`/pokemon/${pokemonDetail.id}/learnset?generation=${latestGen}&form=${encodeURIComponent(form)}`);
+    }).catch(() => { if (!cancelled) setLearnsetBasePath(null); });
+    return () => { cancelled = true; };
+  }, [pokemonDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 形态切换时更新 learnset 路径（不重新请求 meta）
+  // 服务端会在该形态无独立招式表时自动 fallback 到默认形态
+  useEffect(() => {
+    if (!pokemonDetail || learnsetGenRef.current === null) return;
+    const form = selectedFormKey || "default";
+    const newPath = `/pokemon/${pokemonDetail.id}/learnset?generation=${learnsetGenRef.current}&form=${encodeURIComponent(form)}`;
+    setLearnsetBasePath(newPath);
+    // 形态切换后需要重新加载招式列表
+    movesInitRef.current = false;
+    prevMoveSearchRef.current = "";
+  }, [selectedFormKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 面板打开时加载首页招式（learnsetBasePath 就绪后自动触发）
+  useEffect(() => {
+    if (activePanel?.startsWith("move-") && !movesInitRef.current && learnsetBasePath) {
+      movesInitRef.current = true;
+      prevMoveSearchRef.current = "";
+      movesPagination.reset(learnsetBasePath);
+    }
+  }, [activePanel, learnsetBasePath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 招式搜索（防抖，切换路径加 q 参数）
   useEffect(() => {
     if (!activePanel?.startsWith("move-")) return;
-    if (!panelSearch.trim()) {
-      setMoveSearchResults(null);
+    if (!learnsetBasePath) return;
+    const trimmed = panelSearch.trim();
+    if (!trimmed) {
+      // 只有从非空搜索切回空时才恢复全量列表
+      if (prevMoveSearchRef.current) {
+        prevMoveSearchRef.current = "";
+        movesPagination.reset(learnsetBasePath);
+      }
       return;
     }
     const timer = setTimeout(() => {
-      setMovesLoading(true);
-      api<Array<{ id: string; nameZh: string; type?: string; category?: string; power?: number | null; accuracy?: number | null; pp?: number | null; description?: string }>>(`/moves?q=${encodeURIComponent(panelSearch.trim())}&limit=50`).then((r) => {
-        setMoveSearchResults(r.data || []);
-        setMovesLoading(false);
-      }).catch(() => { setMoveSearchResults([]); setMovesLoading(false); });
+      prevMoveSearchRef.current = trimmed;
+      movesPagination.reset(`${learnsetBasePath}&q=${encodeURIComponent(trimmed)}`);
     }, 300);
     return () => clearTimeout(timer);
-  }, [panelSearch, activePanel]);
-
-  // 道具列表滚动加载更多（仅在非搜索模式下）
-  const handleItemScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (panelSearch.trim()) return;
-    const el = e.currentTarget;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
-      loadItemsPage(false);
-    }
-  }, [loadItemsPage, panelSearch]);
+  }, [panelSearch, activePanel, learnsetBasePath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!pokemonId) { setPokemonDetail(null); return; }
     let cancelled = false;
     setDetailLoading(true);
-    api<PokemonEntry>(`/pokemon/${pokemonId}`).then((r) => {
+    api<DataResponse<PokemonEntry>>(`/pokemon/${pokemonId}`).then((r) => {
       if (!cancelled) {
         setPokemonDetail(r.data);
         setDetailLoading(false);
@@ -270,54 +359,6 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
 
   const allAbilities = useMemo(() => [...abilityGroups.normal, ...abilityGroups.hidden], [abilityGroups]);
 
-  const [movesList, setMovesList] = useState<MoveOption[]>([]);
-  useEffect(() => {
-    if (!pokemonDetail) { setMovesList([]); return; }
-    let cancelled = false;
-    api<LearnsetMeta>(`/pokemon/${pokemonDetail.id}/learnset/meta`).then((meta) => {
-      if (cancelled) return;
-      const gens = meta.data?.generations || [];
-      const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
-      const formKeys = meta.data?.formKeys || [];
-      const form = formKeys[0] || "default";
-      return api<LearnsetResponse>(`/pokemon/${pokemonDetail.id}/learnset?generation=${latestGen}&form=${form}`);
-    }).then((r) => {
-      if (cancelled || !r) return;
-      const entries = r.data?.moves || [];
-      const seen = new Set<string>();
-      const moves: MoveOption[] = [];
-      for (const entry of entries) {
-        const name = entry.moveNameZh || String(entry.moveId || "");
-        if (name && !seen.has(name)) {
-          seen.add(name);
-          moves.push({
-            value: name,
-            label: name,
-            moveId: entry.moveId ?? null,
-            moveType: entry.moveType || "",
-            moveCategory: entry.moveCategory || "",
-            movePower: entry.movePower ?? null,
-            moveAccuracy: entry.moveAccuracy ?? null,
-            movePP: entry.movePP ?? null,
-            moveDescription: entry.moveDescription || "",
-          });
-        }
-      }
-      setMovesList(moves);
-    }).catch(() => { if (!cancelled) setMovesList([]); });
-    return () => { cancelled = true; };
-  }, [pokemonDetail]);
-
-  const itemOptions = useMemo((): ItemOption[] => {
-    return items.map((item) => ({
-      value: String(item.id),
-      label: item.nameZh || item.slug || String(item.id),
-      sublabel: item.effectSummary || "",
-      imageUrl: item.imageUrl || "",
-      nameZh: item.nameZh || "",
-    }));
-  }, [items]);
-
   /* ── 图片（普通 / 闪光） ── */
   const detailImages = currentForm?.images;
   const previewImage = useMemo((): { url: string } | null => {
@@ -384,36 +425,6 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     sps: config.sps || {},
     champNature: config.champNature || config.nature || "认真",
   };
-
-  /* ── 下方面板：搜索过滤 ── */
-  const panelFilteredItems = useMemo((): ItemOption[] => {
-    if (itemSearchResults !== null) {
-      return itemSearchResults.map((item) => ({
-        value: String(item.id),
-        label: item.nameZh || item.slug || String(item.id),
-        sublabel: item.effectSummary || "",
-        imageUrl: item.imageUrl || "",
-        nameZh: item.nameZh || "",
-      }));
-    }
-    return itemOptions;
-  }, [itemOptions, itemSearchResults]);
-
-  const panelFilteredMoves = useMemo((): MoveOption[] => {
-    if (moveSearchResults !== null) {
-      return moveSearchResults.map((m) => ({
-        value: m.nameZh || String(m.id),
-        label: m.nameZh || String(m.id),
-        moveType: m.type || "",
-        moveCategory: m.category || "",
-        movePower: m.power ?? null,
-        moveAccuracy: m.accuracy ?? null,
-        movePP: m.pp ?? null,
-        moveDescription: m.description || "",
-      }));
-    }
-    return movesList;
-  }, [movesList, moveSearchResults]);
 
   // 当前形态是否绑定了道具（锁定道具选择）
   const isItemLocked = Boolean(currentForm?.requiredItem);
@@ -578,7 +589,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
             const moveName = config.moves?.[mi];
             if (moveName) {
               const savedInfo = config._movesInfo?.[moveName];
-              const moveInfo = movesList.find((m) => m.value === moveName);
+              const moveInfo = movesPagination.data.find((m) => m.value === moveName);
               const moveType = savedInfo?.type || moveInfo?.moveType || "";
               const movePower = savedInfo?.power || moveInfo?.movePower;
               return (
@@ -637,8 +648,8 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
         <div className="cfg-bottom-panel">
           {/* 道具面板 */}
           {activePanel === "item" && (
-            <div className="cfg-item-panel-list" ref={itemListRef} onScroll={handleItemScroll}>
-              {panelFilteredItems.map((opt) => (
+            <div className="cfg-item-panel-list" ref={itemListRef} onScroll={itemsPagination.onScroll}>
+              {itemsPagination.data.map((opt) => (
                 <div
                   key={opt.value}
                   className={`cfg-item-panel-row${config.itemId === opt.value ? " cfg-item-panel-row-active" : ""}`}
@@ -653,8 +664,8 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
                   </div>
                 </div>
               ))}
-              {itemsLoading && <div className="cfg-panel-empty">加载中…</div>}
-              {!itemsLoading && panelFilteredItems.length === 0 && <div className="cfg-panel-empty">无匹配结果</div>}
+              {itemsPagination.loading && <div className="cfg-panel-empty">加载中…</div>}
+              {!itemsPagination.loading && itemsPagination.data.length === 0 && <div className="cfg-panel-empty">无匹配结果</div>}
             </div>
           )}
 
@@ -662,7 +673,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
           {activePanel?.startsWith("move-") && (() => {
             const mi = Number(activePanel.split("-")[1]);
             return (
-              <div className="cfg-move-panel-wrap" ref={moveListRef}>
+              <div className="cfg-move-panel-wrap" ref={moveListRef} onScroll={movesPagination.onScroll}>
                 <table className="cfg-move-panel-table">
                   <thead>
                     <tr>
@@ -676,7 +687,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
                     </tr>
                   </thead>
                   <tbody>
-                    {panelFilteredMoves.map((opt) => (
+                    {movesPagination.data.map((opt) => (
                       <tr
                         key={opt.value}
                         className={`cfg-move-panel-row${config.moves?.[mi] === opt.value ? " cfg-move-panel-row-active" : ""}`}
@@ -706,8 +717,8 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
                     ))}
                   </tbody>
                 </table>
-                {movesLoading && <div className="cfg-panel-empty">加载中…</div>}
-                {!movesLoading && panelFilteredMoves.length === 0 && <div className="cfg-panel-empty">{detailLoading ? "加载中…" : "无匹配结果"}</div>}
+                {movesPagination.loading && <div className="cfg-panel-empty">加载中…</div>}
+                {!movesPagination.loading && movesPagination.data.length === 0 && <div className="cfg-panel-empty">{detailLoading ? "加载中…" : "无匹配结果"}</div>}
               </div>
             );
           })()}

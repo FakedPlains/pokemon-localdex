@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PokemonSummary } from "@pokemon-localdex/store-types";
 import { api } from "../../utils/api";
+import type { PaginatedResponse } from "../../utils/apiTypes";
 import { getPokemonPreviewImage } from "../../utils/helpers";
 import TypeChip from "../TypeChip";
 
@@ -24,7 +25,7 @@ export default function SimplePokemonList({ search, onSelect }: SimplePokemonLis
     try {
       const params = new URLSearchParams({ limit: "40", offset: String(currentOffset) });
       if (query.trim()) params.set("q", query.trim());
-      const r = await api<PokemonSummary[]>(`/pokemon?${params.toString()}`);
+      const r = await api<PaginatedResponse<PokemonSummary>>(`/pokemon?${params.toString()}`);
       const list = r.data || [];
       if (reset) setData(list); else setData((prev) => [...prev, ...list]);
       setHasMore(list.length >= 40);

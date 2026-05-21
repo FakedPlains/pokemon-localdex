@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api";
+import type { PaginatedResponse } from "../utils/apiTypes";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import type { StatKey, PokemonSummary } from "@pokemon-localdex/store-types";
 import { getStatValue } from "@pokemon-localdex/store-types";
@@ -34,7 +35,7 @@ export default function PokemonPickerList({ search = "", onSelect }: PokemonPick
     try {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(currentOffset) });
       if (query.trim()) params.set("q", query.trim());
-      const r = await api<PokemonSummary[]>(`/pokemon?${params.toString()}`);
+      const r = await api<PaginatedResponse<PokemonSummary>>(`/pokemon?${params.toString()}`);
       const list = r.data || [];
       if (reset) {
         setAllData(list);

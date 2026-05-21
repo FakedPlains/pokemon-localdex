@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api";
+import type { DataResponse } from "../utils/apiTypes";
 import { useInfiniteApi } from "../hooks/useInfiniteApi";
 import { TYPE_BG_COLORS, CATEGORY_COLORS } from "@pokemon-localdex/store-types/constants";
 import { typeIconSrc, categoryIconSrc } from "../utils/iconPaths";
@@ -113,7 +114,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
   const loadMoveDetail = useCallback((id: string) => {
     if (detailCache[id] || detailRequestsRef.current.has(id)) return;
     detailRequestsRef.current.add(id);
-    api<MoveDetail>(`/moves/${id}`)
+    api<DataResponse<MoveDetail>>(`/moves/${id}`)
       .then((r) => {
         setDetailCache((prev) => ({ ...prev, [id]: r.data }));
       })

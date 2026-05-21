@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import type { StatBlock } from "@pokemon-localdex/store-types";
 import { api } from "../../utils/api";
+import type { DataResponse } from "../../utils/apiTypes";
+import type { PokemonEntry, ItemEntry } from "@pokemon-localdex/store-types";
 import { calculateFinalStat, getPokemonPreviewImage } from "../../utils/helpers";
 import type { PokemonConfigDisplay } from "./types";
 
@@ -58,13 +60,12 @@ export default function BoxListRow({ config, onEdit, onDelete, onDuplicate }: Bo
   useEffect(() => {
     if (config.imageUrl || !config.pokemonId) return;
     let cancelled = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    api<any>(`/pokemon/${config.pokemonId}`).then((r) => {
+    api<DataResponse<PokemonEntry>>(`/pokemon/${config.pokemonId}`).then((r) => {
       if (cancelled) return;
       const p = r.data;
       const img = getPokemonPreviewImage(p);
-      const shinyObj = p?.forms?.[0]?.images?.shiny || p?.images?.shiny;
-      const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
+      const shinyAsset = p?.forms?.[0]?.images?.shiny || p?.shinyImage;
+      const shinyUrl = shinyAsset?.url || "";
       const baseStats: StatBlock | null = p?.forms?.[0]?.baseStats || p?.baseStats || null;
       setFetchedInfo({
         imageUrl: img || "",
@@ -80,8 +81,7 @@ export default function BoxListRow({ config, onEdit, onDelete, onDuplicate }: Bo
   useEffect(() => {
     if (config.itemImageUrl || !config.itemId) return;
     let cancelled = false;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    api<any>(`/items/${config.itemId}`).then((r) => {
+    api<DataResponse<ItemEntry>>(`/items/${config.itemId}`).then((r) => {
       if (cancelled) return;
       const item = r.data;
       if (item?.imageUrl) setFetchedItemImageUrl(item.imageUrl);

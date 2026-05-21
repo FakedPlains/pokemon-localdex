@@ -45,6 +45,18 @@ API 启用了全局 CORS，允许任意来源访问。
 
 注意：`total` 字段只在 store 返回了计数时才包含在响应中。部分接口（如 `/pokemon/:id/learnset`）使用 `limit+1` 策略判断 `hasMore`，不执行额外的 COUNT 查询，因此不返回 `total`。客户端应依赖 `hasMore` 而非 `total` 来判断是否还有更多数据。
 
+### 参数校验
+
+API 对通用查询参数进行服务端校验和 clamp（定义在 `apps/api/src/route-utils.ts`）：
+
+| 辅助函数 | 校验规则 | 说明 |
+|----------|---------|------|
+| `limitQuery(c, max=200)` | clamp 到 `[1, max]` 并取整；非有效数字返回 `undefined` | 传入后启用分页模式 |
+| `offsetQuery(c)` | clamp 到 `>= 0` 并取整；缺失或无效时默认 0 | 偏移量 |
+| `generationQuery(c)` | 取整后确保 `>= 1`；不设上限（兼容 Champions 等未来扩展世代） | 世代筛选 |
+
+客户端传入超出范围的值不会报错，而是被静默修正为合法值。例如 `limit=-5` 会被修正为 `1`，`limit=999` 修正为 `200`，`generation=0` 被视为无效参数丢弃。
+
 
 ## 宝可梦
 
@@ -130,7 +142,21 @@ GET /api/pokemon/2?seasonId=1
 | offset | number | 0 | 偏移量 |
 | method | string | — | 学习方式筛选（如 "level-up"、"tm"、"egg" 等） |
 
-返回数据按学习方式和排序编号排序。响应中还包含实际使用的 `formKey` 和 `gameVersionCode`。分页时使用 `limit+1` 策略返回 `hasMore`，不返回 `total`。首次请求（offset=0）额外返回 `methodCounts` 对象，包含当前 form+gen+version 下各学习方式的全量计数。
+返回数据按学习方式和排序编号排序。响应结构为嵌套对象：
+
+```json
+{
+  "data": {
+    "moves": [...],          // 招式数组
+    "formKey": "default",    // 实际使用的形态标识
+    "gameVersionCode": "SV", // 实际使用的游戏版本（可选）
+    "methodCounts": { "level-up": 30, "tm": 50, ... }  // 仅首页返回
+  },
+  "hasMore": true
+}
+```
+
+注意 `data` 是对象而非数组：招式列表在 `data.moves`，元数据（`formKey`、`gameVersionCode`、`methodCounts`）与 `moves` 同级。分页时使用 `limit+1` 策略返回 `hasMore`，不返回 `total`。`methodCounts` 仅在首次请求（offset=0）时返回，包含当前 form+gen+version 下各学习方式的全量计数。
 
 示例：
 
@@ -140,6 +166,8 @@ GET /api/pokemon/25/learnset?generation=9&version=SV
 ```
 
 小程序端对应函数：`fetchPokemonLearnset(pokemonId, generation, formKey, gameVersionCode, { limit, offset, method })`。支持形态回退逻辑：如果指定形态无数据，依次尝试 `default` 形态和该世代的第一个可用形态。形态回退和 `methodCounts` 仅在首次请求（offset=0）时执行，追加请求直接查询数据。
+
+**客户端解析注意**：由于 `data` 是对象，客户端读取招式列表时必须使用 `response.data.moves`，而不是直接将 `response.data` 当作数组。`formKey` 和 `methodCounts` 分别通过 `response.data.formKey` 和 `response.data.methodCounts` 获取。
 
 ### GET /pokemon/:id/learnset/meta
 

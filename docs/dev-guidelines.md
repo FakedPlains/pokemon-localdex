@@ -150,6 +150,8 @@ interface NameLookup {
 
 本地开发使用 SQLite，生产环境使用 Cloudflare D1。`app.ts` 和 `worker.ts` 分别初始化各自的 store 实例，然后通过 `routes.ts` 的 `registerRoutes()` 函数统一注册路由。**不要在路由处理函数内部做数据源判断**，所有切换逻辑集中在 `getStore` 实现中。
 
+**参数校验**：路由层使用 `route-utils.ts` 中的辅助函数（`limitQuery`、`offsetQuery`、`generationQuery`）统一校验查询参数。新增路由时必须通过这些函数读取分页和世代参数，不要在路由内重新 `Number(c.req.query(...))` 手动转换。`generationQuery` 不设硬编码上限以兼容 Champions 系统的扩展世代编号。
+
 ### 3.2 Web 层（apps/web）
 
 所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。
@@ -173,11 +175,14 @@ defineConstants: {
 
 ### 4.1 数据请求 Hook
 
-Web 端提供三个请求 hook，位于 `apps/web/src/hooks/`：
+Web 端提供四个请求 hook，位于 `apps/web/src/hooks/`：
 
 - **`useApi<T>(path | null, options?)`**：声明式单次请求。path 变化自动重新请求，传 `null` 或 `enabled: false` 跳过请求。返回 `{ data, loading, error }`。
 - **`useInfiniteApi<T>(basePath, options?)`**：无限滚动分页。自动拼接 offset/limit，通过 IntersectionObserver 哨兵元素触发加载更多。支持 `enabled` 开关。返回 `{ data, total, loading, loadingMore, hasMore, error, sentinelRef, loadMore, reset }`。
+- **`useScrollPagination<T, R>(initialPath, options?)`**：轻量滚动分页。为固定高度内嵌面板 + `onScroll` 事件设计，不依赖 IntersectionObserver，不在 mount 时自动请求，需调用 `reset(path)` 触发首次加载。支持 `extractItems`（从嵌套响应中提取数组）、`mapItem`（数据映射）、`dedupeKey`（去重）和 `onFirstPage`（首页响应回调，可修正后续分页路径）。内部使用同步 `loadingRef` 防止滚动事件连续触发重复请求。返回 `{ data, loading, hasMore, loadMore, reset, onScroll }`。
 - **`useApiCallback<T>()`**：命令式手动触发。适用于事件驱动的请求（如 POST 提交、按钮触发的搜索）。返回 `{ call, loading }`。
+
+**useScrollPagination 的 `onFirstPage` 回调**：部分 API（如 learnset）会在服务端执行形态回退，首页响应中的 `formKey` 可能与请求参数不同。`onFirstPage` 回调在首页加载完成后调用，接收 `(responseData, currentPath)` 参数，可返回修正后的路径字符串用于后续分页请求（如将 form 参数替换为服务端实际使用的形态），返回 `void` 则不修正。
 
 新组件优先使用以上 hook。仅在 hook 无法覆盖的场景（链式调用、自定义缓存、搜索防抖、批量并发）下才直接使用 `api()`。
 

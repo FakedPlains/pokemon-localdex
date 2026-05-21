@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LEARN_METHOD_LABELS } from "@pokemon-localdex/store-types/constants";
-import type { PokemonEntry, LearnsetRecord, LearnsetMeta, LearnsetResponse } from "@pokemon-localdex/store-types";
+import type { PokemonEntry, LearnsetRecord, LearnsetMeta } from "@pokemon-localdex/store-types";
 import type { PokemonDisplayVariant } from "../../utils/helpers";
 import { describeLearnsetEntry } from "../../utils/helpers";
 import { api } from "../../utils/api";
+import type { LearnsetResponse } from "../../utils/apiTypes";
 import TypeChip from "../TypeChip";
 
 const PAGE_SIZE = 50;
@@ -26,7 +27,6 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
-  const [learnsetFormKey, setLearnsetFormKey] = useState<string | null>(null);
   const [methodFilter, setMethodFilter] = useState("");
   const [selectedVersionRaw, setSelectedVersion] = useState<string | null>(null);
   const [versionGenRef, setVersionGenRef] = useState<number | null>(null);
@@ -104,17 +104,16 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       const r = await api<LearnsetResponse>(`/pokemon/${pokemonId}/learnset?${params}`);
       // 竞态保护：如果已经有更新的请求发出，丢弃本次结果
       if (rid !== requestIdRef.current) return false;
-      const resp = r.data;
-      const moves = resp.moves || [];
-      const more = resp.hasMore ?? false;
-      const fk = resp.formKey || activeFormKey;
+      // 标准 { data, hasMore } 结构，data 内含 moves/formKey/methodCounts
+      const moves = Array.isArray(r.data.moves) ? r.data.moves : [];
+      const more = r.hasMore ?? false;
+      const fk = r.data.formKey || activeFormKey;
 
       if (isInitial) {
         setAllMoves(moves);
         resolvedFormKeyRef.current = fk;
-        setLearnsetFormKey(fk);
         // methodCounts 来自服务端，是当前 form+gen+version 的全量计数（不受 method 筛选影响）
-        const mc = resp.methodCounts;
+        const mc = r.data.methodCounts;
         if (mc) setMethodCounts(mc);
       } else {
         setAllMoves((prev) => [...prev, ...moves]);
@@ -138,7 +137,6 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       prevPokemonIdRef.current = pokemonId;
       setSelectedVersion(null);
       setVersionGenRef(null);
-      setLearnsetFormKey(null);
       resolvedFormKeyRef.current = null;
     }
     // 无论哪个维度变化，都重置招式筛选为"全部"
@@ -190,8 +188,6 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
   }, [hasMore, loadingMore, initialLoading, handleLoadMore]);
 
   const totalCount = Object.values(methodCounts).reduce((s, c) => s + c, 0);
-
-  const isFallback = learnsetFormKey && learnsetFormKey !== activeFormKey;
 
   return (
     <div className="tab-moves">
@@ -252,13 +248,6 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
               </button>
             ))}
         </div>
-      )}
-
-      {/* Fallback hint */}
-      {isFallback && (
-        <p className="muted" style={{ margin: "0 0 8px", fontStyle: "italic" }}>
-          当前形态无独立招式数据，显示的是默认形态的招式表。
-        </p>
       )}
 
       <div style={{ position: "relative" }}>

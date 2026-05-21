@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../utils/api";
+import type { DataResponse } from "../utils/apiTypes";
 
 /** useApi 返回的状态类型 */
 export interface UseApiResult<T> {
@@ -16,6 +17,8 @@ export interface UseApiOptions extends Omit<RequestInit, "signal"> {
 
 /**
  * 声明式 API 请求 hook —— 路径变化时自动请求。
+ *
+ * 假设后端返回 `{ data: T }` 结构，自动解包 data 字段。
  *
  * @param path   API 路径（如 "/pokemon/25"），传 null 表示暂不请求
  * @param options  可选的 fetch options + enabled 控制
@@ -45,7 +48,7 @@ export function useApi<T = unknown>(
     setLoading(true);
     setError(null);
 
-    api<T>(path, fetchOptions)
+    api<DataResponse<T>>(path, fetchOptions)
       .then((result) => {
         if (!cancelled) {
           setData(result.data);
@@ -74,6 +77,8 @@ export interface UseApiCallbackResult<T> {
 /**
  * 命令式 API 调用 hook —— 手动触发请求。
  *
+ * 假设后端返回 `{ data: T }` 结构，自动解包 data 字段。
+ *
  * @example
  * const { call, loading } = useApiCallback<PokemonDetail>();
  * const detail = await call("/pokemon/25");
@@ -87,7 +92,7 @@ export function useApiCallback<T = unknown>(): UseApiCallbackResult<T> {
   ): Promise<T | null> => {
     setLoading(true);
     try {
-      const result = await api<T>(path, options);
+      const result = await api<DataResponse<T>>(path, options);
       return result.data;
     } catch {
       return null;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api";
+import type { DataResponse } from "../utils/apiTypes";
 import { useInfiniteApi } from "../hooks/useInfiniteApi";
 import { parseExpandParam } from "../utils/helpers";
 import type { BaseGenerationRecord } from "@pokemon-localdex/store-types";
@@ -65,7 +66,7 @@ export default function AbilitiesPage({ query = "", generation = "" }: Abilities
       const key = target.id;
       setExpanded(key);
       if (!detailCache[key]) {
-        api<AbilityDetail>(`/abilities/${key}`).then((r) => {
+        api<DataResponse<AbilityDetail>>(`/abilities/${key}`).then((r) => {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
@@ -100,7 +101,7 @@ export default function AbilitiesPage({ query = "", generation = "" }: Abilities
     }
     setExpanded(id);
     if (!detailCache[id]) {
-      api<AbilityDetail>(`/abilities/${id}`).then((r) => {
+      api<DataResponse<AbilityDetail>>(`/abilities/${id}`).then((r) => {
         setDetailCache((prev) => ({ ...prev, [id]: r.data }));
       });
     }

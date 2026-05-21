@@ -4,6 +4,7 @@ import type { PokemonEntry, LearnsetMeta, EvolutionStep } from "@pokemon-localde
 import { resolvePokemonDisplayVariant } from "../../utils/helpers";
 import type { ResolvedForm } from "../../utils/helpers";
 import { api } from "../../utils/api";
+import type { DataResponse } from "../../utils/apiTypes";
 import TypeChip from "../TypeChip";
 import WikiLink from "../WikiLink";
 import DrawerImage from "./DrawerImage";
@@ -47,7 +48,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
   useEffect(() => {
     if (tab !== "moves" || learnsetMeta) return;
     let cancelled = false;
-    api<LearnsetMeta>(`/pokemon/${pokemonId}/learnset/meta`).then((r) => {
+    api<DataResponse<LearnsetMeta>>(`/pokemon/${pokemonId}/learnset/meta`).then((r) => {
       if (!cancelled) setLearnsetMeta(r.data);
     });
     return () => { cancelled = true; };
@@ -58,7 +59,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
     if (tab !== "evolution" || evolutionChain) return;
     let cancelled = false;
     setEvolutionLoading(true);
-    api<EvolutionStep[]>(`/pokemon/${pokemonId}/evolution`).then((r) => {
+    api<DataResponse<EvolutionStep[]>>(`/pokemon/${pokemonId}/evolution`).then((r) => {
       if (!cancelled) {
         setEvolutionChain(r.data || []);
         setEvolutionLoading(false);

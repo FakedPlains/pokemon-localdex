@@ -15,6 +15,7 @@
  */
 
 import { api } from "./api";
+import type { PaginatedResponse } from "./apiTypes";
 import type { PokemonConfig, Team } from "./teamStorage";
 import { isTeamMemberRef } from "./teamStorage";
 
@@ -98,7 +99,7 @@ function readJSON<T>(key: string): T[] {
 async function resolvePokemonId(nameZh: string): Promise<ResolvedId | null> {
   if (!nameZh) return null;
   try {
-    const result = await api<MigrationSummary[]>(
+    const result = await api<PaginatedResponse<MigrationSummary>>(
       `/pokemon?q=${encodeURIComponent(nameZh)}&limit=5`,
     );
     const list = result.data || [];
@@ -119,7 +120,7 @@ async function resolvePokemonId(nameZh: string): Promise<ResolvedId | null> {
 async function resolveItemId(nameZh: string): Promise<ResolvedId | null> {
   if (!nameZh) return null;
   try {
-    const result = await api<MigrationSummary[]>(
+    const result = await api<PaginatedResponse<MigrationSummary>>(
       `/items?q=${encodeURIComponent(nameZh)}&limit=5`,
     );
     const list = result.data || [];
@@ -138,7 +139,7 @@ async function resolveItemId(nameZh: string): Promise<ResolvedId | null> {
 async function resolveAbilityId(nameZh: string): Promise<ResolvedId | null> {
   if (!nameZh) return null;
   try {
-    const result = await api<MigrationSummary[]>(
+    const result = await api<PaginatedResponse<MigrationSummary>>(
       `/abilities?q=${encodeURIComponent(nameZh)}&limit=5`,
     );
     const list = result.data || [];

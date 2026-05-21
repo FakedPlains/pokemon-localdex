@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { MoveOption } from "./useDamageMoves";
 import { api } from "../../utils/api";
+import type { DataResponse, LearnsetResponse, PaginatedResponse } from "../../utils/apiTypes";
+import type { LearnsetMeta } from "@pokemon-localdex/store-types";
 
 //  子组件：招式槽位面板（4个招式，样式与盒子一致）
 // ══════════════════════════════════════════════════════════════
@@ -80,16 +82,16 @@ export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelec
     if (editingSlot === null || !pokemonId || learnsetLoaded) return;
     let cancelled = false;
     setLoading(true);
-    api<{ generations: number[]; formKeys: string[] }>(`/pokemon/${pokemonId}/learnset/meta`).then((meta) => {
+    api<DataResponse<LearnsetMeta>>(`/pokemon/${pokemonId}/learnset/meta`).then((meta) => {
       if (cancelled) return;
       const gens = meta.data?.generations || [];
       const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
       const formKeys = meta.data?.formKeys || [];
       const form = formKeys[0] || "default";
-      return api<LearnsetEntry[]>(`/pokemon/${pokemonId}/learnset?generation=${latestGen}&form=${form}`);
+      return api<LearnsetResponse>(`/pokemon/${pokemonId}/learnset?generation=${latestGen}&form=${form}`);
     }).then((r) => {
       if (cancelled || !r) return;
-      const entries = r.data || [];
+      const entries = r.data?.moves || [];
       const seen = new Set<string>();
       const list: LearnsetItem[] = [];
       for (const entry of entries) {
@@ -123,7 +125,7 @@ export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelec
     if (searchTimer.current) clearTimeout(searchTimer.current);
     setLoading(true);
     searchTimer.current = setTimeout(() => {
-      api<SearchMoveItem[]>(`/moves?q=${encodeURIComponent(query.trim())}&limit=50`).then((r) => {
+      api<PaginatedResponse<SearchMoveItem>>(`/moves?q=${encodeURIComponent(query.trim())}&limit=50`).then((r) => {
         setSearchResults((r.data || []).map((m) => ({
           value: m.nameZh || String(m.id),
           label: m.nameZh || String(m.id),

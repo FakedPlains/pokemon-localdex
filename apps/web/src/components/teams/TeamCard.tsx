@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../utils/api";
+import type { DataResponse } from "../../utils/apiTypes";
+import type { PokemonEntry } from "@pokemon-localdex/store-types";
 import { getPokemonPreviewImage } from "../../utils/helpers";
 import { resolveTeamMembers } from "../../utils/teamStorage";
 import type { Team, PokemonConfig } from "../../utils/teamStorage";
@@ -35,8 +37,7 @@ export default function TeamCard({ team, onEdit, onDelete }: TeamCardProps) {
     missing.forEach((m) => {
       const pokemonId = String(m.pokemonId);
       imageRequestsRef.current.add(pokemonId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      api<any>(`/pokemon/${m.pokemonId}`).then((r) => {
+      api<DataResponse<PokemonEntry>>(`/pokemon/${m.pokemonId}`).then((r) => {
         if (!mountedRef.current) return;
         const img = getPokemonPreviewImage(r.data);
         if (img) {

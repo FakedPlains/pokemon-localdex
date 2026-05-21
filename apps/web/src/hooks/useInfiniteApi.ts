@@ -1,12 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../utils/api";
-
-/** 分页 API 响应的约定结构 */
-export interface PaginatedResponse<T> {
-  data: T[];
-  total?: number;
-  hasMore?: boolean;
-}
+import type { PaginatedResponse } from "../utils/apiTypes";
 
 /** useInfiniteApi 的配置项 */
 export interface UseInfiniteApiOptions {
@@ -43,6 +37,8 @@ export interface UseInfiniteApiResult<T> {
 /**
  * 瀑布流分页 hook —— 基于 offset/limit 的无限滚动加载。
  *
+ * 假设后端返回 `{ data: T[], total?, hasMore? }` 分页结构。
+ *
  * @param basePath  API 路径（不含分页参数），如 "/pokemon?q=皮卡丘&type=电"
  * @param options   配置项
  */
@@ -77,7 +73,7 @@ export function useInfiniteApi<T = unknown>(
     setError(null);
 
     try {
-      const result = await api<T[]>(buildUrl(offset));
+      const result = await api<PaginatedResponse<T>>(buildUrl(offset));
       if (id !== fetchIdRef.current) return; // 竞态丢弃
 
       const newItems = result.data ?? [];

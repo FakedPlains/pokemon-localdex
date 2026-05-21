@@ -151,7 +151,7 @@ API 层基于 Hono 框架，提供统一的 RESTful 查询入口。根据运行�
 
 **Worker 模式**（`worker.ts` 入口）：在 Cloudflare Workers 运行时中执行，使用 D1 binding 通过 `d1-store` 查询数据。Hono 的 `app.fetch()` 适配 Workers 的 `fetch` handler 接口。
 
-核心职责包括：提供宝可梦、招式、特性、道具的查询接口（支持分页）；提供伤害计算接口；在本地生产模式下同时托管 React SPA 的静态资源。路由定义集中在 `routes.ts` 中，`app.ts` 和 `worker.ts` 只需传入各自的 `getStore` 实现即可共享全部路由逻辑。
+核心职责包括：提供宝可梦、招式、特性、道具的查询接口（支持分页）；提供伤害计算接口；在本地生产模式下同时托管 React SPA 的静态资源。路由定义集中在 `routes.ts` 中，`app.ts` 和 `worker.ts` 只需传入各自的 `getStore` 实现即可共享全部路由逻辑。通用查询参数通过 `route-utils.ts` 统一校验（`limitQuery` clamp 到 [1, 200]，`offsetQuery` 确保 >= 0，`generationQuery` 确保 >= 1 且不设上限以兼容 Champions 扩展世代）。
 
 API 同时挂载在根路径 `/` 和 `/api` 前缀下：Vite 开发模式下前端通过 proxy 把 `/api/xxx` 转发为 `/xxx`；Cloudflare Pages 生产模式下 Pages Functions 捕获 `/api/*` 并通过 Service Binding 转发到 Worker。
 
@@ -170,7 +170,7 @@ service = "pokemon-localdex-api"
 
 展示层是一个 React SPA，由 Vite 构建。样式采用模块化 CSS 架构，所有样式文件位于 `src/styles/` 目录下，按页面/功能拆分为 16 个独立模块，通过 `index.css` 统一汇总，再由 `main.jsx` 中的 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 CSS 合并、压缩为单个文件，生产环境零额外 HTTP 请求。前端通过 `VITE_DATA_SOURCE` 环境变量决定数据获取方式。
 
-所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。
+所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。数据请求封装为四个 hook：`useApi`（声明式单次请求）、`useInfiniteApi`（IntersectionObserver 驱动的无限滚动）、`useScrollPagination`（onScroll 驱动的内嵌面板分页）和 `useApiCallback`（命令式手动触发）。其中 `useScrollPagination` 支持 `onFirstPage` 回调（首页响应后修正后续分页路径，适用于服务端形态回退场景）和同步 `loadingRef` 守卫（防止连续 scroll 事件在 React state 更新前重复触发请求）。
 
 **Vite base 路径**：固定为 `"/"`，Cloudflare Pages 在根路径提供服务，无需子路径前缀。
 

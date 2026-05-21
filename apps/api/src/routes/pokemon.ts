@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import type { RegisterRoutesOptions } from "../route-utils.ts";
-import { numberQuery, paginatedJson, pokemonListQuery } from "../route-utils.ts";
+import { numberQuery, limitQuery, offsetQuery, generationQuery, paginatedJson, pokemonListQuery } from "../route-utils.ts";
 
 export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOptions): void {
   const { getStore } = opts;
@@ -76,23 +76,25 @@ export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOption
     const s = getStore(c);
     const entry = await s.getPokemonIdentity(c.req.param("id"));
     if (!entry) return c.json({ error: "Pokemon not found" }, 404);
-    const generation = numberQuery(c, "generation") ?? 9;
+    const generation = generationQuery(c) ?? 9;
     const formKey = c.req.query("form") || "default";
     const gameVersion = c.req.query("version");
     const learnMethod = c.req.query("method") || undefined;
-    const limit = numberQuery(c, "limit");
-    const offset = numberQuery(c, "offset") ?? 0;
+    const query = c.req.query("q") || undefined;
+    const limit = limitQuery(c);
+    const offset = offsetQuery(c);
     const pagination = limit !== undefined ? { limit, offset } : undefined;
-    const result = await s.getPokemonLearnset(entry.id, generation, formKey, gameVersion, pagination, learnMethod);
-    const body: Record<string, unknown> = {
-      data: result.moves,
+    const result = await s.getPokemonLearnset(entry.id, generation, formKey, gameVersion, pagination, learnMethod, query);
+    const data: Record<string, unknown> = {
+      moves: result.moves,
       pokemonId: entry.id,
       generation,
       formKey: result.formKey,
       gameVersionCode: result.gameVersionCode,
     };
     // methodCounts 仅在首次请求（offset=0）时返回，追加加载时省略以减少负载
-    if (result.methodCounts) body.methodCounts = result.methodCounts;
+    if (result.methodCounts) data.methodCounts = result.methodCounts;
+    const body: Record<string, unknown> = { data };
     if (pagination) {
       body.hasMore = result.hasMore ?? false;
       body.offset = offset;

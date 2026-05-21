@@ -20,6 +20,7 @@ import type {
   ItemEntry,
   LearnsetRecord,
   LearnsetMeta,
+  LearnsetResult,
   PokemonByMoveSummary,
   PokemonByAbilitySummary,
   PaginatedResult,
@@ -151,16 +152,17 @@ export class DrizzleStore implements IStore {
   // Pokemon: getPokemonLearnset
   // ────────────────────────────────────────────────────────────────────────────
 
-async getPokemonLearnset(
-pokemonId: number,
-generation: number,
-formKey = "default",
-gameVersionCode?: string,
-pagination?: PaginationParams,
-learnMethod?: string,
-): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string; hasMore?: boolean; methodCounts?: Record<string, number> }> {
-return getPokemonLearnsetRows(this.db, pokemonId, generation, formKey, gameVersionCode, pagination, learnMethod);
-}
+  async getPokemonLearnset(
+    pokemonId: number,
+    generation: number,
+    formKey = "default",
+    gameVersionCode?: string,
+    pagination?: PaginationParams,
+    learnMethod?: string,
+    query?: string,
+  ): Promise<LearnsetResult> {
+    return getPokemonLearnsetRows(this.db, pokemonId, generation, formKey, gameVersionCode, pagination, learnMethod, query);
+  }
 
   // ────────────────────────────────────────────────────────────────────────────
   // Moves: listMoves

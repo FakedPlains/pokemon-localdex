@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api";
+import type { DataResponse } from "../utils/apiTypes";
 import { useToast } from "../components/Toast";
 import { GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import { createDraftMember } from "../utils/helpers";
@@ -157,7 +158,7 @@ export default function DamagePage(_props: DamagePageProps) {
         defSide: defenderSide.values,
       });
 
-      const calcResult = await api<DamageApiResponse>("/battle/damage", {
+      const calcResult = await api<DataResponse<DamageApiResponse>>("/battle/damage", {
         method: "POST",
         body: JSON.stringify(payload),
       });

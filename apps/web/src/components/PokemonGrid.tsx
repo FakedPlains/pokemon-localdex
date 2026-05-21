@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../utils/api";
+import type { PaginatedResponse } from "../utils/apiTypes";
 import { TYPE_BG_COLORS_CARD } from "@pokemon-localdex/store-types/constants";
 import type { PokemonByMoveSummary, PokemonByAbilitySummary } from "@pokemon-localdex/store-types";
 import { typeIconSrc } from "../utils/iconPaths";
@@ -33,7 +34,7 @@ export default function PokemonGrid({ apiPath, emptyText = "暂无数据", label
 
   const fetchPage = useCallback((newOffset: number) => {
     setLoading(true);
-    api<PokemonGridItem[]>(`${apiPath}?limit=${POKEMON_PAGE_SIZE}&offset=${newOffset}`)
+    api<PaginatedResponse<PokemonGridItem>>(`${apiPath}?limit=${POKEMON_PAGE_SIZE}&offset=${newOffset}`)
       .then((r) => {
         setPokemon(r.data || []);
         setHasMore(r.hasMore ?? false);

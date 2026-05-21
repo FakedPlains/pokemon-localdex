@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { api } from "../utils/api";
+import type { DataResponse } from "../utils/apiTypes";
 import { useInfiniteApi } from "../hooks/useInfiniteApi";
 import { parseExpandParam } from "../utils/helpers";
 import type { BaseGenerationRecord } from "@pokemon-localdex/store-types";
@@ -69,7 +70,7 @@ export default function ItemsPage({ query = "" }: ItemsPageProps) {
       const key = target.id;
       setExpanded(key);
       if (!detailCache[key]) {
-        api<ItemDetail>(`/items/${key}`).then((r) => {
+        api<DataResponse<ItemDetail>>(`/items/${key}`).then((r) => {
           setDetailCache((prev) => ({ ...prev, [key]: r.data }));
         });
       }
@@ -101,7 +102,7 @@ export default function ItemsPage({ query = "" }: ItemsPageProps) {
     }
     setExpanded(key);
     if (!detailCache[key]) {
-      api<ItemDetail>(`/items/${key}`).then((r) => {
+      api<DataResponse<ItemDetail>>(`/items/${key}`).then((r) => {
         setDetailCache((prev) => ({ ...prev, [key]: r.data }));
       });
     }

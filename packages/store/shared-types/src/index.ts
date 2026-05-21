@@ -275,6 +275,15 @@ export type LearnsetRecord = {
   moveDescription?: string;
 };
 
+/** Store 层 getPokemonLearnset 返回值 */
+export type LearnsetResult = {
+  moves: LearnsetRecord[];
+  formKey: string;
+  gameVersionCode?: string;
+  hasMore?: boolean;
+  methodCounts?: Record<string, number>;
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 招式表 Meta / 宝可梦反查摘要
 // ══════════════════════════════════════════════════════════════════════════════
@@ -283,15 +292,6 @@ export type LearnsetMeta = {
   generations: number[];
   formKeys: string[];
   versionsByGen: Record<number, Array<{ code: string; name: string }>>;
-};
-
-/** /pokemon/:id/learnset API 完整响应（data 层） */
-export type LearnsetResponse = {
-  moves: LearnsetRecord[];
-  formKey: string;
-  gameVersionCode?: string;
-  hasMore?: boolean;
-  methodCounts?: Record<string, number>;
 };
 
 /** getPokemonByMove 返回的宝可梦摘要 */
@@ -372,7 +372,7 @@ export interface IStore {
   getPokemonGenerations(pokemonId: number): Promise<number[]>;
   getPokemonIdentity(idOrSlug: string): Promise<PokemonIdentity | undefined>;
   getLearnsetMeta(pokemonId: number): Promise<LearnsetMeta>;
-  getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string, pagination?: PaginationParams, learnMethod?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string; hasMore?: boolean; methodCounts?: Record<string, number> }>;
+  getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string, pagination?: PaginationParams, learnMethod?: string, query?: string): Promise<LearnsetResult>;
 
   // Champions
   listChampionsSeasons(): Promise<ChampionsSeasonSummary[]>;

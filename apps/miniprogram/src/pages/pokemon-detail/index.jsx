@@ -322,15 +322,17 @@ export default function PokemonDetailPage() {
       })
       // 竞态保护：如果已经有更新的请求发出，丢弃本次结果
       if (rid !== movesRequestIdRef.current) return false
-      const moves = r.data || []
+      // 后端返回 { data: { moves, formKey, methodCounts, ... }, hasMore }
+      const payload = r.data || {}
+      const moves = payload.moves || []
       const hasMore = r.hasMore ?? false
 
       if (isInitial) {
         setLearnsetData(moves)
-        resolvedFormKeyRef.current = r.formKey || formKey
-        setLearnsetFormKey(r.formKey || formKey)
+        resolvedFormKeyRef.current = payload.formKey || formKey
+        setLearnsetFormKey(payload.formKey || formKey)
         // methodCounts 来自服务端，是当前 form+gen+version 的全量计数
-        if (r.methodCounts) setMethodCounts(r.methodCounts)
+        if (payload.methodCounts) setMethodCounts(payload.methodCounts)
       } else {
         setLearnsetData(prev => [...prev, ...moves])
       }
