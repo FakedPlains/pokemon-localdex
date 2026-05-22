@@ -10,7 +10,8 @@
  */
 
 import { calculate, Pokemon, Move, Field } from "@fakedplains/smogon-calc";
-import type { GenerationNum } from "@fakedplains/smogon-calc/dist/data/interface";
+import type { GenerationNum, Weather, Terrain, StatsTable as IStatsTable } from "@fakedplains/smogon-calc/dist/data/interface";
+import type { State } from "@fakedplains/smogon-calc/dist/state";
 import { NATURE_ZH_TO_EN, TYPE_ZH_TO_EN } from "@pokemon-localdex/store-types/constants";
 
 import type {
@@ -37,7 +38,7 @@ export { NATURE_ZH_TO_EN, TYPE_ZH_TO_EN } from "@pokemon-localdex/store-types/co
 // 常量映射
 // ══════════════════════════════════════════════════════════════════════════════
 
-export const WEATHER_MAP: Record<string, string | undefined> = {
+export const WEATHER_MAP: Record<string, Weather | undefined> = {
   none: undefined,
   sun: "Sun",
   rain: "Rain",
@@ -49,7 +50,7 @@ export const WEATHER_MAP: Record<string, string | undefined> = {
   strongWinds: "Strong Winds",      // Mega 裂空座 德尔塔气流
 };
 
-export const TERRAIN_MAP: Record<string, string | undefined> = {
+export const TERRAIN_MAP: Record<string, Terrain | undefined> = {
   none: undefined,
   electric: "Electric",
   grassy: "Grassy",
@@ -138,7 +139,14 @@ export async function calculateDamage(
   const gen = input.generation as GenerationNum;
 
   // ── 通用宝可梦构建器 ──
-  function buildPokemonOpts(poke: typeof input.attacker, nameEn: string, abilityEn: string | undefined, itemEn: string | undefined) {
+  type PokemonOptions = Partial<State.Pokemon> & {
+    curHP?: number;
+    ivs?: Partial<IStatsTable> & { spc?: number };
+    evs?: Partial<IStatsTable> & { spc?: number };
+    boosts?: Partial<IStatsTable> & { spc?: number };
+  };
+
+  function buildPokemonOpts(poke: typeof input.attacker, _nameEn: string, abilityEn: string | undefined, itemEn: string | undefined): PokemonOptions {
     const teraType = poke.teraType
       ? (TYPE_ZH_TO_EN[poke.teraType] || poke.teraType)
       : undefined;
@@ -154,7 +162,7 @@ export async function calculateDamage(
       ).filter(Boolean) as [string, string?];
     }
 
-    const opts: Record<string, any> = {
+    const opts: PokemonOptions = {
       level: poke.level || 50,
       nature: natureZhToEn(poke.nature || "认真"),
       ability: abilityEn || undefined,
@@ -175,9 +183,10 @@ export async function calculateDamage(
 
     // 种族值/属性覆盖
     if (poke.overrides?.baseStats || overrideTypes) {
-      opts.overrides = {};
-      if (poke.overrides?.baseStats) opts.overrides.baseStats = poke.overrides.baseStats;
-      if (overrideTypes) opts.overrides.types = overrideTypes;
+      const overrides: Partial<{ baseStats: Partial<IStatsTable>; types: [string, string?] }> = {};
+      if (poke.overrides?.baseStats) overrides.baseStats = poke.overrides.baseStats;
+      if (overrideTypes) overrides.types = overrideTypes;
+      opts.overrides = overrides as PokemonOptions["overrides"];
     }
 
     return opts;
@@ -185,16 +194,22 @@ export async function calculateDamage(
 
   // ── 构建攻击方 ──
   const attacker = new Pokemon(gen, names.atkNameEn,
-    buildPokemonOpts(input.attacker, names.atkNameEn, names.atkAbilityEn, names.atkItemEn) as any
+    buildPokemonOpts(input.attacker, names.atkNameEn, names.atkAbilityEn, names.atkItemEn)
   );
 
   // ── 构建防守方 ──
   const defender = new Pokemon(gen, names.defNameEn,
-    buildPokemonOpts(input.defender, names.defNameEn, names.defAbilityEn, names.defItemEn) as any
+    buildPokemonOpts(input.defender, names.defNameEn, names.defAbilityEn, names.defItemEn)
   );
 
   // ── 构建招式 ──
-  const moveOpts: Record<string, any> = {
+  type MoveOptions = Partial<State.Move> & {
+    ability?: string;
+    item?: string;
+    species?: string;
+  };
+
+  const moveOpts: MoveOptions = {
     ability: names.atkAbilityEn || undefined,
     item: names.atkItemEn || undefined,
     isCrit: input.move.isCrit || false,
@@ -209,10 +224,11 @@ export async function calculateDamage(
   // 招式属性覆盖
   if (input.move.overrides) {
     const mo = input.move.overrides;
-    moveOpts.overrides = {};
-    if (mo.basePower !== undefined) moveOpts.overrides.basePower = mo.basePower;
-    if (mo.type) moveOpts.overrides.type = TYPE_ZH_TO_EN[mo.type] || mo.type;
-    if (mo.category) moveOpts.overrides.category = mo.category;
+    const overrides: Record<string, unknown> = {};
+    if (mo.basePower !== undefined) overrides.basePower = mo.basePower;
+    if (mo.type) overrides.type = TYPE_ZH_TO_EN[mo.type] || mo.type;
+    if (mo.category) overrides.category = mo.category;
+    moveOpts.overrides = overrides as MoveOptions["overrides"];
   }
   const move = new Move(gen, names.moveNameEn, moveOpts);
 
@@ -220,8 +236,8 @@ export async function calculateDamage(
   const fieldInput = input.field || {};
   const field = new Field({
     gameType: fieldInput.gameType === "doubles" ? "Doubles" : "Singles",
-    weather: WEATHER_MAP[fieldInput.weather || "none"] as any,
-    terrain: TERRAIN_MAP[fieldInput.terrain || "none"] as any,
+    weather: WEATHER_MAP[fieldInput.weather || "none"],
+    terrain: TERRAIN_MAP[fieldInput.terrain || "none"],
     isGravity: fieldInput.isGravity || false,
     isMagicRoom: fieldInput.isMagicRoom || false,
     isWonderRoom: fieldInput.isWonderRoom || false,

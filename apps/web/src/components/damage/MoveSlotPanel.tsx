@@ -7,17 +7,6 @@ import type { LearnsetMeta } from "@pokemon-localdex/store-types";
 //  子组件：招式槽位面板（4个招式，样式与盒子一致）
 // ══════════════════════════════════════════════════════════════
 
-type LearnsetEntry = {
-  moveId?: number;
-  moveNameZh?: string;
-  moveType?: string;
-  moveCategory?: string;
-  movePower?: number | null;
-  moveAccuracy?: number | null;
-  movePP?: number | null;
-  moveDescription?: string;
-};
-
 type LearnsetItem = {
   value: string;
   label: string;

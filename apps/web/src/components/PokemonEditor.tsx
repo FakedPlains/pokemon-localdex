@@ -87,11 +87,23 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
   const moveListRef = useRef<HTMLDivElement>(null);
   const pokemonId = config.pokemonId;
 
+  // Stable refs for values used in effects but not intended as triggers
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const configRef = useRef(config);
+  configRef.current = config;
+  const pokemonDetailRef = useRef(pokemonDetail);
+  pokemonDetailRef.current = pokemonDetail;
+  const selectedFormKeyRef = useRef(selectedFormKey);
+  selectedFormKeyRef.current = selectedFormKey;
+
   // ── 道具分页（列表 + 搜索共用一个 hook，通过 reset 切换路径） ──
   const itemsPagination = useScrollPagination<ItemEntry, ItemOption>("/items", {
     pageSize: 50,
     mapItem: mapItemToOption,
   });
+  const itemsResetRef = useRef(itemsPagination.reset);
+  itemsResetRef.current = itemsPagination.reset;
   const itemsInitRef = useRef(false);
   // 追踪上次搜索值，避免面板初次打开时空搜索 effect 发起重复请求
   const prevItemSearchRef = useRef("");
@@ -101,9 +113,9 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     if (activePanel === "item" && !itemsInitRef.current) {
       itemsInitRef.current = true;
       prevItemSearchRef.current = "";
-      itemsPagination.reset("/items");
+      itemsResetRef.current("/items");
     }
-  }, [activePanel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activePanel]);
 
   // 道具搜索（防抖，切换路径）
   useEffect(() => {
@@ -113,16 +125,16 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       // 只有从非空搜索切回空时才恢复全量列表，避免与初始化 reset 重复
       if (prevItemSearchRef.current) {
         prevItemSearchRef.current = "";
-        itemsPagination.reset("/items");
+        itemsResetRef.current("/items");
       }
       return;
     }
     const timer = setTimeout(() => {
       prevItemSearchRef.current = trimmed;
-      itemsPagination.reset(`/items?q=${encodeURIComponent(trimmed)}`);
+      itemsResetRef.current(`/items?q=${encodeURIComponent(trimmed)}`);
     }, 300);
     return () => clearTimeout(timer);
-  }, [panelSearch, activePanel]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [panelSearch, activePanel]);
 
   // ── 招式分页（列表 + 搜索共用一个 hook，通过 reset 切换路径） ──
   const movesPagination = useScrollPagination<LearnsetRecord, MoveOption>(null, {
@@ -146,6 +158,8 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       return corrected !== currentPath ? corrected : undefined;
     },
   });
+  const movesResetRef = useRef(movesPagination.reset);
+  movesResetRef.current = movesPagination.reset;
   // learnset 基础路径（pokemonDetail 变化时从 meta 推算世代，形态变化时更新路径）
   const [learnsetBasePath, setLearnsetBasePath] = useState<string | null>(null);
   const movesInitRef = useRef(false);
@@ -172,32 +186,33 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       const gens = meta.data?.generations || [];
       const latestGen = (gens.length > 0 ? gens[gens.length - 1] : 9) ?? 9;
       learnsetGenRef.current = latestGen;
-      const form = selectedFormKey || "default";
+      const form = selectedFormKeyRef.current || "default";
       setLearnsetBasePath(`/pokemon/${pokemonDetail.id}/learnset?generation=${latestGen}&form=${encodeURIComponent(form)}`);
     }).catch(() => { if (!cancelled) setLearnsetBasePath(null); });
     return () => { cancelled = true; };
-  }, [pokemonDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pokemonDetail]);
 
   // 形态切换时更新 learnset 路径（不重新请求 meta）
   // 服务端会在该形态无独立招式表时自动 fallback 到默认形态
   useEffect(() => {
-    if (!pokemonDetail || learnsetGenRef.current === null) return;
+    const detail = pokemonDetailRef.current;
+    if (!detail || learnsetGenRef.current === null) return;
     const form = selectedFormKey || "default";
-    const newPath = `/pokemon/${pokemonDetail.id}/learnset?generation=${learnsetGenRef.current}&form=${encodeURIComponent(form)}`;
+    const newPath = `/pokemon/${detail.id}/learnset?generation=${learnsetGenRef.current}&form=${encodeURIComponent(form)}`;
     setLearnsetBasePath(newPath);
     // 形态切换后需要重新加载招式列表
     movesInitRef.current = false;
     prevMoveSearchRef.current = "";
-  }, [selectedFormKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedFormKey]);
 
   // 面板打开时加载首页招式（learnsetBasePath 就绪后自动触发）
   useEffect(() => {
     if (activePanel?.startsWith("move-") && !movesInitRef.current && learnsetBasePath) {
       movesInitRef.current = true;
       prevMoveSearchRef.current = "";
-      movesPagination.reset(learnsetBasePath);
+      movesResetRef.current(learnsetBasePath);
     }
-  }, [activePanel, learnsetBasePath]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activePanel, learnsetBasePath]);
 
   // 招式搜索（防抖，切换路径加 q 参数）
   useEffect(() => {
@@ -208,16 +223,16 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       // 只有从非空搜索切回空时才恢复全量列表
       if (prevMoveSearchRef.current) {
         prevMoveSearchRef.current = "";
-        movesPagination.reset(learnsetBasePath);
+        movesResetRef.current(learnsetBasePath);
       }
       return;
     }
     const timer = setTimeout(() => {
       prevMoveSearchRef.current = trimmed;
-      movesPagination.reset(`${learnsetBasePath}&q=${encodeURIComponent(trimmed)}`);
+      movesResetRef.current(`${learnsetBasePath}&q=${encodeURIComponent(trimmed)}`);
     }, 300);
     return () => clearTimeout(timer);
-  }, [panelSearch, activePanel, learnsetBasePath]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [panelSearch, activePanel, learnsetBasePath]);
 
   useEffect(() => {
     if (!pokemonId) { setPokemonDetail(null); return; }
@@ -229,7 +244,8 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
         setDetailLoading(false);
         // 如果 config 中已有 formKey，使用它；否则默认选中第一个形态
         const forms = r.data?.forms || [];
-        const initialFormKey = config.formKey || (forms[0]?.formKey ?? "default");
+        const cfg = configRef.current;
+        const initialFormKey = cfg.formKey || (forms[0]?.formKey ?? "default");
         setSelectedFormKey(initialFormKey);
         // 根据选中的形态保存闪光图片 URL 和 baseStats 到 config
         const selectedForm = forms.find((f) => f.formKey === initialFormKey) || forms[0];
@@ -239,11 +255,11 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
         const detailBaseStats = selectedForm?.baseStats || r.data?.baseStats;
         const updates: Partial<PokemonConfig> = {};
         // 补全 formId（从盒子导入时可能只有 formKey 没有 formId）
-        if (!config.formId && selectedForm?.id) updates.formId = String(selectedForm.id);
-        if (shinyUrl && !config.shinyImageUrl) updates.shinyImageUrl = shinyUrl;
-        if (detailBaseStats && !config.baseStats) updates.baseStats = detailBaseStats;
+        if (!cfg.formId && selectedForm?.id) updates.formId = String(selectedForm.id);
+        if (shinyUrl && !cfg.shinyImageUrl) updates.shinyImageUrl = shinyUrl;
+        if (detailBaseStats && !cfg.baseStats) updates.baseStats = detailBaseStats;
         // 默认选中第一个特性
-        if (!config.abilityId) {
+        if (!cfg.abilityId) {
           const formAbilities = selectedForm?.abilities || [];
           const normalAbilities = formAbilities.filter((ab) => !ab.isHidden);
           const firstAbility = normalAbilities[0] || formAbilities[0];
@@ -259,14 +275,14 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
           }
         }
         if (Object.keys(updates).length > 0) {
-          onChange((prev): PokemonConfigDraft => ({ ...prev, ...updates }));
+          onChangeRef.current((prev): PokemonConfigDraft => ({ ...prev, ...updates }));
         }
       }
     }).catch(() => {
       if (!cancelled) { setPokemonDetail(null); setDetailLoading(false); }
     });
     return () => { cancelled = true; };
-  }, [pokemonId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pokemonId]);
 
   /* ── 当前选中的形态 ── */
   const currentForm = useMemo((): PokemonFormEntry | null => {

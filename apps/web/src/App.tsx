@@ -82,7 +82,7 @@ export default function App() {
   const initialPokemonIdRef = useRef<string | null>(initialPokemonId);
 
   // Shared team draft state (lifted from TeamsPage so DamagePage can import from it)
-  const [teamDraft, setTeamDraft] = useState<{
+  const [teamDraft, _setTeamDraft] = useState<{
     id: string;
     name: string;
     format: string;

@@ -55,3 +55,6 @@ apps/miniprogram/dist/
 
 # CatPaw local config
 .catpaw/
+
+# Claude Code local prototypes
+.claude/

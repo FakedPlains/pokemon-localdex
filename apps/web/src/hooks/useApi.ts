@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../utils/api";
 import type { DataResponse } from "../utils/apiTypes";
 
@@ -32,7 +32,11 @@ export function useApi<T = unknown>(
   const [loading, setLoading] = useState(enabled && path !== null);
   const [error, setError] = useState<Error | null>(null);
 
-  const key = path ?? "";
+  // 使用 ref 保存最新的 fetchOptions，避免 effect 依赖不稳定对象引用
+  const fetchOptionsRef = useRef(fetchOptions);
+  fetchOptionsRef.current = fetchOptions;
+
+  // 通过序列化 key 控制 effect 是否重新执行
   const fetchOptionsKey = Object.keys(fetchOptions).length > 0 ? JSON.stringify(fetchOptions) : "";
 
   useEffect(() => {
@@ -48,7 +52,7 @@ export function useApi<T = unknown>(
     setLoading(true);
     setError(null);
 
-    api<DataResponse<T>>(path, fetchOptions)
+    api<DataResponse<T>>(path, fetchOptionsRef.current)
       .then((result) => {
         if (!cancelled) {
           setData(result.data);
@@ -63,7 +67,7 @@ export function useApi<T = unknown>(
       });
 
     return () => { cancelled = true; };
-  }, [key, fetchOptionsKey, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [path, fetchOptionsKey, enabled]);
 
   return { data, loading, error };
 }

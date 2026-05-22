@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { api } from "../utils/api";
 import type { DataResponse, LearnsetResponse, PaginatedResponse, MoveSearchItem } from "../utils/apiTypes";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
-import type { StatBlock, PokemonEntry, ItemEntry, LearnsetMeta, LearnsetRecord } from "@pokemon-localdex/store-types";
+import type { StatBlock, PokemonEntry, ItemEntry, LearnsetMeta } from "@pokemon-localdex/store-types";
 import type { PokemonConfigDraft } from "../utils/teamStorage";
 import { getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers";
 
