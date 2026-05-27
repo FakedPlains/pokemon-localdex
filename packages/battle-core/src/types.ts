@@ -25,7 +25,6 @@ export type PokemonCalcInput = {
   pokemonId?: string | number;  // 宝可梦数据库 ID（优先）
   formId?: string | number;     // 形态数据库 ID（优先）
   name?: string;                // 宝可梦中文名（fallback）
-  formKey?: string;             // 形态 key（fallback，如 "超级喷火龙x"）
   level?: number;               // 等级，默认 50
   nature?: string;              // 性格中文名，默认 "认真"
   abilityId?: string | number;  // 特性数据库 ID（优先）
@@ -142,16 +141,15 @@ export interface ResolvedNames {
  * battle-core 的 resolveNames() 通过此接口与 store 解耦。
  */
 export interface NameLookup {
-  /**
-   * 解析宝可梦英文名。
-   * 查询优先级由 store 实现决定（通常：formId > pokemonId+formKey > nameZh）。
-   */
-  pokemonNameEn(opts: {
-    pokemonId?: string | number;
-    formId?: string | number;
-    formKey?: string;
-    name?: string;
-  }): Promise<string | undefined>;
+/**
+* 解析宝可梦英文名。
+* 查询优先级由 store 实现决定（通常：formId > pokemonId 默认形态 > nameZh）。
+*/
+pokemonNameEn(opts: {
+  pokemonId?: string | number;
+  formId?: string | number;
+  name?: string;
+}): Promise<string | undefined>;
 
   /**
    * 解析实体（招式/特性/道具）英文名。

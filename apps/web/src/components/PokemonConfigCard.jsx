@@ -74,9 +74,11 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
         if (cancelled) return;
         const gens = meta.data?.generations || [];
         const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
-        const formKeys = meta.data?.formKeys || [];
-        const form = formKeys[0] || "default";
-        return unifiedApi(`/pokemon/${pokemonId}/learnset?generation=${latestGen}&form=${form}`);
+        const metaForms = meta.data?.forms || [];
+        // 用 formId 精确匹配，否则选择默认形态
+        const matchedForm = (data.formId && metaForms.find(f => f.formId === Number(data.formId))) || metaForms.find(f => f.isDefault) || metaForms[0];
+        const formIdParam = matchedForm?.formId ? `&formId=${matchedForm.formId}` : "";
+        return unifiedApi(`/pokemon/${pokemonId}/learnset?generation=${latestGen}${formIdParam}`);
       });
     }).then(async (r) => {
       if (cancelled || !r) return;

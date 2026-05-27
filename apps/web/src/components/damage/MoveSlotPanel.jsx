@@ -4,7 +4,7 @@ import { unifiedApi } from "../../utils/api.js";
 //  子组件：招式槽位面板（4个招式，样式与盒子一致）
 // ══════════════════════════════════════════════════════════════
 
-export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelectSlot, onSetMove, pokemonId, generation }) {
+export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelectSlot, onSetMove, pokemonId, generation, formId }) {
   const [editingSlot, setEditingSlot] = useState(null);
   const [query, setQuery] = useState("");
   const [learnset, setLearnset] = useState([]);
@@ -14,15 +14,17 @@ export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelec
   const wrapRef = useRef(null);
   const searchTimer = useRef(null);
   const learnsetPokemonRef = useRef(null);
+  const learnsetFormRef = useRef(null);
 
-  // pokemonId 变化时重置 learnset 缓存标记
+  // pokemonId 或 formId 变化时重置 learnset 缓存标记
   useEffect(() => {
-    if (pokemonId !== learnsetPokemonRef.current) {
+    if (pokemonId !== learnsetPokemonRef.current || formId !== learnsetFormRef.current) {
       setLearnset([]);
       setLearnsetLoaded(false);
       learnsetPokemonRef.current = pokemonId;
+      learnsetFormRef.current = formId;
     }
-  }, [pokemonId]);
+  }, [pokemonId, formId]);
 
   // 懒加载：仅在打开编辑面板且尚未加载时请求 learnset
   useEffect(() => {
@@ -33,9 +35,12 @@ export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelec
       if (cancelled) return;
       const gens = meta.data?.generations || [];
       const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
-      const formKeys = meta.data?.formKeys || [];
-      const form = formKeys[0] || "default";
-      return unifiedApi(`/pokemon/${pokemonId}/learnset?generation=${latestGen}&form=${form}`);
+      const metaForms = meta.data?.forms || [];
+      // 优先使用传入的 formId 精确匹配，否则选择默认形态
+      const matchedForm = (formId && metaForms.find(f => f.formId === Number(formId))) || metaForms.find(f => f.isDefault) || metaForms[0];
+      const resolvedFormId = matchedForm?.formId;
+      const formIdParam = resolvedFormId ? `&formId=${resolvedFormId}` : "";
+      return unifiedApi(`/pokemon/${pokemonId}/learnset?generation=${latestGen}${formIdParam}`);
     }).then((r) => {
       if (cancelled || !r) return;
       const entries = r.data || [];
@@ -63,7 +68,7 @@ export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelec
       setLoading(false);
     }).catch(() => { if (!cancelled) { setLearnset([]); setLearnsetLoaded(true); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [editingSlot, pokemonId, learnsetLoaded]);
+  }, [editingSlot, pokemonId, formId, learnsetLoaded]);
 
   // 搜索招式（防抖，走 /moves API）
   useEffect(() => {

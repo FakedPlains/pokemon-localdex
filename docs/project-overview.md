@@ -389,7 +389,7 @@ Web 端使用 `@vitejs/plugin-react@5.2.0`（不得使用 v6.x，v6.x 要求 Rea
 - **主实体表**：`pokemon`、`moves`、`abilities`、`items`
 - **形态相关表**：`pokemon_forms`、`pokemon_form_stats`、`pokemon_form_types`、`pokemon_form_abilities`、`pokemon_form_images`
 - **世代记录表**：`move_generation_records`、`ability_generation_records`
-- **关联表**：`evolution_chains`、`pokemon_learnsets`、`pokemon_generation_regions`
+- **关联表**：`evolution_chains`、`pokemon_moves`
 
 核心设计原则：**形态优先**——宝可梦的属性、种族值、特性、图片均挂在 `pokemon_forms` 下，而非主表。形态子表使用 `generation_start` / `generation_end` 表示世代范围，支持跨世代数据变化。
 

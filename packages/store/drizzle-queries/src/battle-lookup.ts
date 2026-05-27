@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { abilities, items, moves, pokemon, pokemonForms } from "@pokemon-localdex/drizzle-schema";
 
 export async function pokemonNameEnRow(
@@ -6,10 +6,10 @@ export async function pokemonNameEnRow(
   opts: {
     pokemonId?: string | number;
     formId?: string | number;
-    formKey?: string;
     name?: string;
   },
 ): Promise<string | undefined> {
+  // 优先级 1：formId 精确查询
   if (opts.formId) {
     const rows = await db
       .select({ nameEn: pokemonForms.nameEn })
@@ -19,27 +19,7 @@ export async function pokemonNameEnRow(
     if (rows[0]?.nameEn) return String(rows[0].nameEn);
   }
 
-  if (opts.pokemonId && opts.formKey && opts.formKey !== "default") {
-    const rows = await db
-      .select({ nameEn: pokemonForms.nameEn })
-      .from(pokemonForms)
-      .where(and(
-        eq(pokemonForms.pokemonId, Number(opts.pokemonId)),
-        eq(pokemonForms.formKey, opts.formKey),
-      ))
-      .limit(1);
-    if (rows[0]?.nameEn) return String(rows[0].nameEn);
-  }
-
-  if (opts.formKey && opts.formKey !== "default") {
-    const rows = await db
-      .select({ nameEn: pokemonForms.nameEn })
-      .from(pokemonForms)
-      .where(eq(pokemonForms.formKey, opts.formKey))
-      .limit(1);
-    if (rows[0]?.nameEn) return String(rows[0].nameEn);
-  }
-
+  // 优先级 2：pokemonId 默认形态
   if (opts.pokemonId) {
     const formRows = await db
       .select({ nameEn: pokemonForms.nameEn })
@@ -56,11 +36,12 @@ export async function pokemonNameEnRow(
     if (pkRows[0]?.nameEn) return String(pkRows[0].nameEn);
   }
 
+  // 优先级 3：中文名 fallback
   if (opts.name) {
     const formRows = await db
       .select({ nameEn: pokemonForms.nameEn })
       .from(pokemonForms)
-      .where(eq(pokemonForms.nameZh, opts.name))
+      .where(or(eq(pokemonForms.nameZh, opts.name), eq(pokemonForms.displayNameZh, opts.name)))
       .limit(1);
     if (formRows[0]?.nameEn) return String(formRows[0].nameEn);
 

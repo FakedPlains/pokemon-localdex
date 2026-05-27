@@ -69,8 +69,9 @@ export async function getPokemonEvolutionChainRows(db: any, pokemonId: number): 
       .select({
         formId: pokemonForms.id,
         pokemonId: pokemonForms.pokemonId,
-        formKey: pokemonForms.formKey,
+        formType: pokemonForms.formType,
         nameZh: pokemonForms.nameZh,
+        displayNameZh: pokemonForms.displayNameZh,
         isDefault: pokemonForms.isDefault,
       })
       .from(pokemonForms)
@@ -78,15 +79,15 @@ export async function getPokemonEvolutionChainRows(db: any, pokemonId: number): 
   }
 
   // 按 pokemonId 分组
-  const formsByPokemon = new Map<number, Array<{ formId: number; formKey: string; nameZh: string; isDefault: number }>>();
+  const formsByPokemon = new Map<number, Array<{ formId: number; formType: string; nameZh: string; isDefault: number }>>();
   const allFormIds: number[] = [];
   for (const r of formRows) {
     const pid = Number(r.pokemonId);
     if (!formsByPokemon.has(pid)) formsByPokemon.set(pid, []);
     formsByPokemon.get(pid)!.push({
       formId: Number(r.formId),
-      formKey: String(r.formKey),
-      nameZh: String(r.nameZh),
+      formType: String(r.formType),
+      nameZh: r.displayNameZh ? String(r.displayNameZh) : String(r.nameZh),
       isDefault: Number(r.isDefault),
     });
     allFormIds.push(Number(r.formId));
@@ -148,7 +149,7 @@ export async function getPokemonEvolutionChainRows(db: any, pokemonId: number): 
   /** 根据 formId 直接解析图片、属性、形态名；无 formId 时 fallback 到默认形态 */
   function resolveFormData(pid: number, formId: number | undefined) {
     const forms = formsByPokemon.get(pid) || [];
-    let matched: { formId: number; formKey: string; nameZh: string; isDefault: number } | undefined;
+    let matched: { formId: number; formType: string; nameZh: string; isDefault: number } | undefined;
 
     if (formId) {
       matched = forms.find((f) => f.formId === formId);

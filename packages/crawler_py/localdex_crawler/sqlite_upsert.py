@@ -1,13 +1,206 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
+import re
 import sqlite3
+import unicodedata
 from urllib.parse import quote
 
 from .fetcher import RawPage
+from .form_name_resolver import resolve_form_name_en
 from .html_tools import ParsedPokemonAbilities
-from .utils import normalize_type_name, slugify
+from .utils import normalize_type_name
+
+
+_FORM_RULES_PATH = Path(__file__).with_name("form_name_rules.json")
+
+
+@lru_cache(maxsize=1)
+def _form_type_keywords() -> dict:
+    with _FORM_RULES_PATH.open("r", encoding="utf-8") as f:
+        return json.load(f)["formTypeKeywords"]
+
+
+def _normalize_identifier(value: str | None) -> str:
+    text = unicodedata.normalize("NFKC", value or "").replace("’", "'").replace("‘", "'").replace("`", "'").strip().lower()
+    text = re.sub(r"[（）()・·･\s　_]+", "-", text)
+    text = re.sub(r"-+", "-", text).strip("-")
+    return text
+
+
+def _normalize_form_match(value: str | None, species_name: str | None = None) -> str:
+    text = unicodedata.normalize("NFKC", value or "").lower()
+    species = unicodedata.normalize("NFKC", species_name or "").lower()
+    if species:
+        text = text.replace(species, "")
+    text = re.sub(r"[（）()・·･\s　\-_]", "", text)
+    for suffix in ("的样子", "样子", "形态", "形態"):
+        text = text.replace(suffix, "")
+    return text
+
+
+def _infer_form_type_from_label(value: str | None) -> str | None:
+    """根据 formTypeKeywords 规则从中文标签推断 formType。"""
+    text = unicodedata.normalize("NFKC", value or "").strip()
+    if not text:
+        return None
+
+    kw = _form_type_keywords()
+    mega_re = re.compile("|".join(re.escape(p) for p in kw["megaPatterns"]), re.IGNORECASE)
+    gmax_re = re.compile("|".join(re.escape(p) for p in kw["gmaxPatterns"]), re.IGNORECASE)
+    has_mega = bool(mega_re.search(text))
+    has_gmax = bool(gmax_re.search(text))
+
+    # Posture keywords
+    for rule in kw["postures"]:
+        if rule["keyword"] in text:
+            return f"{rule['value']}-mega" if has_mega else rule["value"]
+
+    # Simple keyword rules
+    for rule in kw["simple"]:
+        matched = any(k in text for k in rule["keywords"]) or (
+            "exactMatch" in rule and text == rule["exactMatch"]
+        )
+        if matched:
+            if rule.get("gmaxValue") and has_gmax:
+                return rule["gmaxValue"]
+            cond_kw = rule.get("conditionalKeyword")
+            if cond_kw and cond_kw in text:
+                return rule["conditionalValue"]
+            if rule.get("megaValue") and has_mega:
+                return rule["megaValue"]
+            return rule["value"]
+
+    # Region keywords
+    for rule in kw["regions"]:
+        if rule["keyword"] in text:
+            return rule["value"]
+
+    # Gmax fallback
+    if has_gmax:
+        return "gmax"
+
+    # Mega fallback with X/Y suffix
+    if has_mega:
+        if re.search(r"[xXＸ]$", text):
+            return "mega-x"
+        if re.search(r"[yYＹ]$", text):
+            return "mega-y"
+        return "mega"
+
+    return None
+
+
+def _derive_form_type(
+    species_name_en: str | None,
+    form_name_en: str | None,
+    fallback_label: str | None,
+    is_default: bool = False,
+) -> str:
+    if is_default:
+        return "default"
+
+    species = unicodedata.normalize("NFKC", species_name_en or "").strip()
+    form_name = unicodedata.normalize("NFKC", form_name_en or "").strip()
+    species_compare = species.replace("’", "'").replace("‘", "'").replace("`", "'")
+    form_name_compare = form_name.replace("’", "'").replace("‘", "'").replace("`", "'")
+    if species_compare and form_name_compare and form_name_compare != species_compare:
+        prefix = f"{species_compare}-"
+        if form_name_compare.startswith(prefix):
+            suffix = _normalize_identifier(form_name_compare[len(prefix):])
+            if suffix:
+                return suffix
+        normalized = _normalize_identifier(form_name_compare)
+        if normalized:
+            return normalized
+
+    inferred = _infer_form_type_from_label(fallback_label)
+    if inferred:
+        return inferred
+
+    fallback = _normalize_identifier(fallback_label)
+    return fallback or "alternate"
+
+
+def _derive_form_category(form_type: str, fallback_category: str | None = None) -> str:
+    normalized = _normalize_identifier(form_type)
+    if normalized == "default":
+        return "default"
+    if normalized.startswith("mega") or normalized.endswith("-mega"):
+        return "mega"
+    if normalized in ("gmax", "gigantamax") or normalized.endswith("-gmax"):
+        return "gigantamax"
+    for region in ("alola", "galar", "hisui", "paldea"):
+        if normalized.startswith(region):
+            return f"regional-{region}"
+    return _normalize_identifier(fallback_category) or "alternate"
+
+
+REGION_ZH_BY_FORM_TYPE = {
+    "alola": "阿罗拉",
+    "galar": "伽勒尔",
+    "hisui": "洗翠",
+    "paldea": "帕底亚",
+}
+
+
+def _strip_wrapping_parens(value: str) -> str:
+    text = value.strip()
+    if len(text) >= 2 and text[0] in "(（" and text[-1] in ")）":
+        return text[1:-1].strip()
+    return text
+
+
+def _canonical_form_name_zh(
+    species_name_zh: str | None,
+    display_name_zh: str | None,
+    form_type: str | None,
+    form_category: str | None,
+    is_default: bool = False,
+) -> str:
+    species = unicodedata.normalize("NFKC", species_name_zh or "").strip()
+    display = unicodedata.normalize("NFKC", display_name_zh or species).strip()
+    if is_default or not species or not display or display == species:
+        return species or display
+    if display.startswith(f"{species}(") and display.endswith(")"):
+        return display
+
+    normalized_type = _normalize_identifier(form_type)
+    normalized_category = _normalize_identifier(form_category)
+    region_zh = None
+    for prefix, label in REGION_ZH_BY_FORM_TYPE.items():
+        if normalized_type.startswith(prefix) or normalized_category == f"regional-{prefix}":
+            region_zh = label
+            break
+
+    if region_zh:
+        if display.startswith(f"{region_zh}{species}"):
+            rest = _strip_wrapping_parens(display[len(region_zh) + len(species):])
+            suffix = f"{region_zh}的样子"
+            if rest:
+                suffix += f"・{rest.lstrip('・·･')}"
+            return f"{species}({suffix})"
+        if display.startswith(f"{region_zh}的样子"):
+            rest = _strip_wrapping_parens(display[len(f"{region_zh}的样子"):]).lstrip("・·･")
+            suffix = f"{region_zh}的样子"
+            if rest:
+                suffix += f"・{rest}"
+            return f"{species}({suffix})"
+        if display.startswith(region_zh):
+            rest = _strip_wrapping_parens(display[len(region_zh):]).lstrip("・·･")
+            suffix = f"{region_zh}的样子"
+            if rest:
+                suffix += f"・{rest}"
+            return f"{species}({suffix})"
+
+    if display.startswith(species):
+        rest = _strip_wrapping_parens(display[len(species):])
+        return f"{species}({rest})" if rest else species
+
+    return f"{species}({display})"
 
 
 @dataclass(frozen=True)
@@ -69,14 +262,13 @@ def clear_pokemon(conn: sqlite3.Connection) -> int:
     """清除所有宝可梦数据（含所有关联子表）。"""
     with conn:
         count = conn.execute("SELECT COUNT(*) FROM pokemon").fetchone()[0]
-        conn.execute("DELETE FROM pokemon_learnsets")
+        conn.execute("DELETE FROM pokemon_moves")
         conn.execute("DELETE FROM evolution_chains")
         conn.execute("DELETE FROM pokemon_form_images")
         conn.execute("DELETE FROM pokemon_form_abilities")
         conn.execute("DELETE FROM pokemon_form_types")
         conn.execute("DELETE FROM pokemon_form_stats")
         conn.execute("DELETE FROM pokemon_forms")
-        conn.execute("DELETE FROM pokemon_generation_regions")
         conn.execute("DELETE FROM pokemon")
     return count
 
@@ -127,8 +319,7 @@ def select_pokemon(
         params.append(end_dex)
     if names:
         placeholders = ",".join("?" for _ in names)
-        clauses.append(f"(name_zh IN ({placeholders}) OR slug IN ({placeholders}))")
-        params.extend(names)
+        clauses.append(f"name_zh IN ({placeholders})")
         params.extend(names)
 
     sql = "SELECT id, dex_number, name_zh, source_url FROM pokemon"
@@ -168,11 +359,10 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
     写入宝可梦主表 + 形态 + 形态属性/特性/种族值/图片 + 世代可用性。
     payload 由 normalize_pokemon_detail_page() 生成。
     """
-    slug = payload["slug"]
     with conn:
         row = conn.execute(
-            "SELECT id FROM pokemon WHERE slug = ? OR dex_number = ?",
-            (slug, payload["dex_number"]),
+            "SELECT id FROM pokemon WHERE dex_number = ?",
+            (payload["dex_number"],),
         ).fetchone()
         if row:
             pokemon_id = int(row["id"])
@@ -180,7 +370,7 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
             conn.execute(
                 """
                 UPDATE pokemon
-                SET slug = ?, name_zh = ?, name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
+                SET name_zh = ?, name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
                     category = COALESCE(?, category),
                     height_m = COALESCE(?, height_m), weight_kg = COALESCE(?, weight_kg),
                     introduced_generation = COALESCE(?, introduced_generation),
@@ -189,7 +379,6 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
                 WHERE id = ?
                 """,
                 (
-                    slug,
                     payload["name_zh"],
                     payload.get("name_ja"),
                     payload.get("name_en"),
@@ -208,14 +397,13 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
             result = conn.execute(
                 """
                 INSERT INTO pokemon
-                  (dex_number, slug, name_zh, name_ja, name_en, category,
+                  (dex_number, name_zh, name_ja, name_en, category,
                    height_m, weight_kg,
                    introduced_generation, source_url, source_title, source_fetched_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     payload["dex_number"],
-                    slug,
                     payload["name_zh"],
                     payload.get("name_ja"),
                     payload.get("name_en"),
@@ -233,9 +421,6 @@ def upsert_pokemon_detail(conn: sqlite3.Connection, payload: dict) -> int:
         # 写入形态及其关联数据
         _upsert_pokemon_forms(conn, pokemon_id, payload)
 
-        # 写入世代可用性
-        _upsert_generation_regions(conn, pokemon_id, payload)
-
     return pokemon_id
 
 
@@ -247,6 +432,21 @@ def _upsert_pokemon_forms(conn: sqlite3.Connection, pokemon_id: int, payload: di
     - pokemon_form_types: 每个世代变体一组记录
     - pokemon_form_abilities: 每个世代变体一组记录
     """
+    # 读取已有的 name_en，重爬时保护已解析的英文名
+    # 同时按 form_type 和 display_name_zh 建索引，因为 payload 中的 form_type
+    # 是 slugify(中文名)，与 DB 中经 _derive_form_type 后的值不同
+    existing_name_en_map: dict[str, str] = {}
+    for row in conn.execute(
+        "SELECT form_type, name_en, display_name_zh FROM pokemon_forms WHERE pokemon_id = ?",
+        (pokemon_id,),
+    ).fetchall():
+        ft, ne, dz = row[0], row[1], row[2]
+        if ne:
+            if ft:
+                existing_name_en_map[ft] = ne
+            if dz:
+                existing_name_en_map[dz] = ne
+
     # 清除旧的形态数据（级联删除子表）
     conn.execute("DELETE FROM pokemon_forms WHERE pokemon_id = ?", (pokemon_id,))
 
@@ -254,9 +454,10 @@ def _upsert_pokemon_forms(conn: sqlite3.Connection, pokemon_id: int, payload: di
     if not forms:
         # 没有显式形态数据，创建一个默认形态
         forms = [{
-            "form_key": "default",
             "name_zh": payload["name_zh"],
+            "name_en": payload.get("name_en"),
             "form_type": "default",
+            "form_category": "default",
             "is_default": True,
             "sort_order": 0,
             "primary_type": payload.get("primary_type"),
@@ -268,18 +469,55 @@ def _upsert_pokemon_forms(conn: sqlite3.Connection, pokemon_id: int, payload: di
         }]
 
     for form in forms:
+        is_default = bool(form.get("is_default"))
+        display_name_zh = form["name_zh"]
+        # 优先使用 payload 中的 name_en（默认形态），否则从数据库已有值中恢复
+        # 查找顺序：display_name_zh（精确匹配）→ payload form_type（slugify 值）→ 空
+        existing_en = (
+            form.get("name_en")
+            or existing_name_en_map.get(display_name_zh, "")
+            or existing_name_en_map.get(form.get("form_type") or "", "")
+            or ""
+        )
+        form_name_en = resolve_form_name_en(
+            payload.get("name_en"),
+            display_name_zh or form.get("form_type"),
+            is_default=is_default,
+            existing_name_en=existing_en,
+            form_type=form.get("form_type"),
+            form_category=form.get("form_category"),
+        )
+        form_type = _derive_form_type(
+            payload.get("name_en"),
+            form_name_en,
+            form.get("name_zh") or form.get("form_type"),
+            is_default,
+        )
+        form_category = _derive_form_category(
+            form_type,
+            form.get("form_category") or form.get("form_type"),
+        )
+        canonical_name_zh = _canonical_form_name_zh(
+            payload.get("name_zh"),
+            display_name_zh,
+            form_type,
+            form_category,
+            is_default,
+        )
         result = conn.execute(
             """
             INSERT INTO pokemon_forms
-              (pokemon_id, form_key, name_zh, form_type, is_default, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?)
+              (pokemon_id, form_type, form_category, name_zh, display_name_zh, name_en, is_default, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 pokemon_id,
-                form.get("form_key") or "default",
-                form["name_zh"],
-                form.get("form_type") or "default",
-                1 if form.get("is_default") else 0,
+                form_type,
+                form_category,
+                canonical_name_zh,
+                display_name_zh,
+                form_name_en,
+                1 if is_default else 0,
                 form.get("sort_order", 0),
             ),
         )
@@ -374,32 +612,6 @@ def _upsert_pokemon_forms(conn: sqlite3.Connection, pokemon_id: int, payload: di
                     """,
                     (form_id, kind, image["url"], image.get("alt")),
                 )
-
-
-def _upsert_generation_regions(conn: sqlite3.Connection, pokemon_id: int, payload: dict) -> None:
-    """写入世代可用性。"""
-    conn.execute("DELETE FROM pokemon_generation_regions WHERE pokemon_id = ?", (pokemon_id,))
-    for record in payload.get("generation_availability") or []:
-        generation = int(record["generation"])
-        for region in record.get("regions") or []:
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO pokemon_generation_regions
-                  (pokemon_id, generation, region, regional_dex_number)
-                VALUES (?, ?, ?, ?)
-                """,
-                (pokemon_id, generation, region.get("region"), region.get("dex_number")),
-            )
-        if not record.get("regions"):
-            # 即使没有地区记录，也要记录世代可用性
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO pokemon_generation_regions
-                  (pokemon_id, generation, region, regional_dex_number)
-                VALUES (?, ?, NULL, NULL)
-                """,
-                (pokemon_id, generation),
-            )
 
 
 def _lookup_ability_id(conn: sqlite3.Connection, name: str) -> int | None:
@@ -513,22 +725,22 @@ def generate_form_change_chains(
         各类型生成的记录数统计字典。
     """
     # 查询所有有非默认形态的宝可梦（排除地区形态，它们已有独立进化链）
-    EXCLUDED_FORM_TYPES = ("default", "regional-alola", "regional-galar",
-                           "regional-hisui", "regional-paldea", "terastal")
+    EXCLUDED_FORM_CATEGORIES = ("default", "regional-alola", "regional-galar",
+                                "regional-hisui", "regional-paldea", "terastal")
 
     rows = conn.execute(
         """
-        SELECT pf.id AS form_id, pf.pokemon_id, pf.name_zh AS form_name,
-               pf.form_type, pf.required_item_id,
+        SELECT pf.id AS form_id, pf.pokemon_id, COALESCE(pf.display_name_zh, pf.name_zh) AS form_name,
+               pf.form_type, pf.form_category, pf.required_item_id,
                p.name_zh AS pokemon_name,
                i.name_zh AS item_name
         FROM pokemon_forms pf
         JOIN pokemon p ON pf.pokemon_id = p.id
         LEFT JOIN items i ON pf.required_item_id = i.id
-        WHERE pf.is_default = 0 AND pf.form_type NOT IN (?, ?, ?, ?, ?, ?)
+        WHERE pf.is_default = 0 AND pf.form_category NOT IN (?, ?, ?, ?, ?, ?)
         ORDER BY pf.pokemon_id, pf.sort_order
         """,
-        EXCLUDED_FORM_TYPES,
+        EXCLUDED_FORM_CATEGORIES,
     ).fetchall()
 
     if not rows:
@@ -570,12 +782,13 @@ def generate_form_change_chains(
         pokemon_id = int(r["pokemon_id"])
         form_id = int(r["form_id"])
         form_type = r["form_type"]
+        form_category = r["form_category"]
         form_name = r["form_name"]
         pokemon_name = r["pokemon_name"]
         item_name = r["item_name"]
 
         # 推断 evolution_method 和 condition
-        method = _classify_form_change_method(form_type, form_name, pokemon_name)
+        method = _classify_form_change_method(form_category, form_name, pokemon_name)
         if method is None:
             continue  # 跳过不属于形态变化链的形态（如外观差异）
 
@@ -699,7 +912,7 @@ def _lookup_form_id_by_name(
 
     匹配策略：
     1. 如果 form_name 为空或 pokemon_id 为 None → 返回 None（默认形态由查询层推断）
-    2. form_key 精确匹配
+    2. form_type / name_zh 精确匹配
     3. name_zh 包含 form_name 去掉"的样子"后的前缀（如"阿罗拉"）
     4. 只有一个非默认形态时取该形态
     5. fallback 到默认形态
@@ -708,27 +921,31 @@ def _lookup_form_id_by_name(
         return None
 
     rows = conn.execute(
-        "SELECT id, form_key, name_zh, is_default FROM pokemon_forms WHERE pokemon_id = ?",
+        "SELECT id, form_type, name_zh, display_name_zh, is_default FROM pokemon_forms WHERE pokemon_id = ?",
         (pokemon_id,),
     ).fetchall()
     if not rows:
         return None
 
-    # 1. form_key 精确匹配
+    # 1. form_type / name_zh 精确匹配
     for r in rows:
-        if r["form_key"] == form_name:
+        if r["form_type"] == form_name or r["name_zh"] == form_name or r["display_name_zh"] == form_name:
             return int(r["id"])
 
     # 2. 地区前缀模糊匹配
     prefix = form_name.replace("的样子", "")
     if prefix and prefix != form_name:
         for r in rows:
-            if not r["is_default"] and prefix in (r["name_zh"] or ""):
+            if not r["is_default"] and (
+                prefix in (r["name_zh"] or "") or prefix in (r["display_name_zh"] or "")
+            ):
                 return int(r["id"])
 
     # 3. 直接在 name_zh 中搜索
     for r in rows:
-        if not r["is_default"] and form_name in (r["name_zh"] or ""):
+        if not r["is_default"] and (
+            form_name in (r["name_zh"] or "") or form_name in (r["display_name_zh"] or "")
+        ):
             return int(r["id"])
 
     # 4. 只有一个非默认形态时取它
@@ -777,10 +994,10 @@ def upsert_pokemon_abilities(
             # 如果没有默认形态，创建一个
             result = conn.execute(
                 """
-                INSERT INTO pokemon_forms (pokemon_id, form_key, name_zh, form_type, is_default, sort_order)
-                VALUES (?, 'default', ?, 'default', 1, 0)
+                INSERT INTO pokemon_forms (pokemon_id, form_type, form_category, name_zh, display_name_zh, is_default, sort_order)
+                VALUES (?, 'default', 'default', ?, ?, 1, 0)
                 """,
-                (pokemon.id, pokemon.name_zh),
+                (pokemon.id, pokemon.name_zh, pokemon.name_zh),
             )
             form_id = int(result.lastrowid)
         else:
@@ -824,67 +1041,200 @@ def upsert_pokemon_abilities(
 
 
 # ---------------------------------------------------------------------------
-# Learnset upsert (new pokemon_learnsets table)
+# Learnset upsert (pokemon_moves table)
 # ---------------------------------------------------------------------------
 
-def upsert_pokemon_learnset(
+DEFAULT_LEARNSET_LABELS = {
+    "",
+    "default",
+    "一般",
+    "一般形态",
+    "通常形态",
+    "普通形态",
+    "草木蓑衣",
+    "百战勇者",
+    "惩戒胡帕",
+}
+
+
+def _default_form_id(conn: sqlite3.Connection, pokemon_id: int) -> int | None:
+    row = conn.execute(
+        "SELECT id FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 LIMIT 1",
+        (pokemon_id,),
+    ).fetchone()
+    if row:
+        return int(row["id"])
+    row = conn.execute(
+        "SELECT id FROM pokemon_forms WHERE pokemon_id = ? ORDER BY sort_order, id LIMIT 1",
+        (pokemon_id,),
+    ).fetchone()
+    return int(row["id"]) if row else None
+
+
+def _resolve_learnset_form_id(
+    conn: sqlite3.Connection,
+    pokemon_id: int,
+    source_label: str | None,
+) -> int | None:
+    pokemon_row = conn.execute(
+        "SELECT name_zh FROM pokemon WHERE id = ?",
+        (pokemon_id,),
+    ).fetchone()
+    species_name = pokemon_row["name_zh"] if pokemon_row else None
+    rows = conn.execute(
+        """
+        SELECT id, form_type, form_category, name_zh, display_name_zh, name_en, is_default
+        FROM pokemon_forms
+        WHERE pokemon_id = ?
+        ORDER BY is_default DESC, sort_order, id
+        """,
+        (pokemon_id,),
+    ).fetchall()
+    if not rows:
+        return None
+
+    default_id = _default_form_id(conn, pokemon_id)
+    label = unicodedata.normalize("NFKC", source_label or "").strip()
+    if label in DEFAULT_LEARNSET_LABELS or (species_name and label == species_name):
+        return default_id
+
+    normalized = _normalize_identifier(label)
+    for row in rows:
+        if (
+            _normalize_identifier(row["form_type"]) == normalized
+            or _normalize_identifier(row["name_zh"]) == normalized
+            or _normalize_identifier(row["display_name_zh"]) == normalized
+            or _normalize_identifier(row["name_en"]) == normalized
+        ):
+            return int(row["id"])
+
+    for zh_region, type_prefix in (
+        ("阿罗拉", "alola"),
+        ("伽勒尔", "galar"),
+        ("洗翠", "hisui"),
+        ("帕底亚", "paldea"),
+    ):
+        if zh_region in label:
+            for row in rows:
+                if (
+                    _normalize_identifier(row["form_type"]).startswith(type_prefix)
+                    or zh_region in (row["name_zh"] or "")
+                    or zh_region in (row["display_name_zh"] or "")
+                ):
+                    return int(row["id"])
+
+    compact = _normalize_form_match(label, species_name)
+    if compact:
+        for row in rows:
+            if row["is_default"]:
+                continue
+            zh = _normalize_form_match(row["name_zh"], species_name)
+            display_zh = _normalize_form_match(row["display_name_zh"], species_name)
+            form_type = _normalize_form_match(row["form_type"], species_name)
+            if (
+                zh == compact
+                or display_zh == compact
+                or (zh and (zh in compact or compact in zh))
+                or (display_zh and (display_zh in compact or compact in display_zh))
+                or form_type == compact
+            ):
+                return int(row["id"])
+
+    return default_id
+
+
+def _learnset_signature(move_list: list[dict]) -> tuple:
+    return tuple(sorted(
+        (
+            record.get("move_name_zh") or "",
+            record.get("learn_method") or "",
+            record.get("level") if record.get("level") is not None else -1,
+            record.get("game_version_code") or "",
+            record.get("tm_number") or "",
+            record.get("notes") or "",
+        )
+        for record in move_list
+    ))
+
+
+def upsert_pokemon_moves(
     conn: sqlite3.Connection,
     pokemon_id: int,
     generation: int,
-    move_list: list[dict],
-    form_key: str = "default",
+    form_learnsets: dict[str, list[dict]],
 ) -> int:
-    """写入宝可梦招式学习列表到 pokemon_learnsets 表。
+    """写入宝可梦招式学习列表到 pokemon_moves 表。
 
-    move_list 格式::
+    form_learnsets 格式::
 
-        [
-            {"move_name_zh": "...", "learn_method": "level-up", "level": 5,
-             "game_version_code": "SV", "tm_number": None, "notes": None},
-            ...
-        ]
+        {
+            "default": [
+                {"move_name_zh": "...", "learn_method": "level-up", "level": 5,
+                 "game_version_code": "SV", "tm_number": None, "notes": None},
+                ...
+            ],
+            "阿罗拉的样子": [...],
+        }
+
+    非默认形态的招式表与默认形态完全一致时不重复写入，查询层会回退到默认形态。
     """
     with conn:
-        # 清除该宝可梦在该世代 + 形态的旧招式
+        default_id = _default_form_id(conn, pokemon_id)
+        resolved: list[tuple[str, int, list[dict]]] = []
+        for source_label, move_list in form_learnsets.items():
+            form_id = _resolve_learnset_form_id(conn, pokemon_id, source_label)
+            if form_id is None:
+                continue
+            resolved.append((source_label, form_id, move_list))
+
+        if not resolved:
+            return 0
+
+        default_records = next((moves for _, form_id, moves in resolved if form_id == default_id), None)
+        default_signature = _learnset_signature(default_records) if default_records is not None else None
+
+        # 清除该宝可梦该世代旧招式；本次页面代表该世代所有解析到的形态。
         conn.execute(
-            "DELETE FROM pokemon_learnsets WHERE pokemon_id = ? AND generation = ? AND form_key = ?",
-            (pokemon_id, generation, form_key),
+            "DELETE FROM pokemon_moves WHERE pokemon_id = ? AND generation = ?",
+            (pokemon_id, generation),
         )
-        # 确保所有招式存在并写入招式学习记录
-        for sort_order, record in enumerate(move_list, start=1):
-            move_name = record["move_name_zh"]
-            ensure_move(conn, move_name)
-            move_id = _lookup_move_id(conn, move_name)
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO pokemon_learnsets
-                  (pokemon_id, form_key, move_id, move_name_zh, generation,
-                   game_version_code, learn_method, level, tm_number, sort_order, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    pokemon_id,
-                    form_key,
-                    move_id,
-                    move_name,
-                    generation,
-                    record.get("game_version_code"),
-                    record.get("learn_method"),
-                    record.get("level"),
-                    record.get("tm_number"),
-                    sort_order,
-                    record.get("notes"),
-                ),
-            )
-    return len(move_list)
 
+        inserted = 0
+        for _source_label, form_id, move_list in resolved:
+            if (
+                default_signature is not None
+                and default_id is not None
+                and form_id != default_id
+                and _learnset_signature(move_list) == default_signature
+            ):
+                continue
 
-def _lookup_move_id(conn: sqlite3.Connection, name: str) -> int | None:
-    """查找招式 ID。"""
-    if not name:
-        return None
-    row = conn.execute("SELECT id FROM moves WHERE name_zh = ?", (name,)).fetchone()
-    return int(row["id"]) if row else None
+            for sort_order, record in enumerate(move_list, start=1):
+                move_name = record["move_name_zh"]
+                move_id = ensure_move(conn, move_name)
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO pokemon_moves
+                      (pokemon_id, form_id, move_id, move_name_zh, generation,
+                       game_version_code, learn_method, level, tm_number, sort_order, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        pokemon_id,
+                        form_id,
+                        move_id,
+                        move_name,
+                        generation,
+                        record.get("game_version_code"),
+                        record.get("learn_method"),
+                        record.get("level"),
+                        record.get("tm_number"),
+                        sort_order,
+                        record.get("notes"),
+                    ),
+                )
+                inserted += 1
+    return inserted
 
 
 # ---------------------------------------------------------------------------
@@ -1091,18 +1441,17 @@ def upsert_ability_detail(conn: sqlite3.Connection, payload: dict) -> int:
 
 
 def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
-    slug = payload.get("slug") or slugify(payload["name_zh"])
     introduced_gen = payload.get("introduced_generation")
     if isinstance(introduced_gen, str):
         introduced_gen = int(introduced_gen) if introduced_gen.isdigit() else None
     with conn:
-        row = conn.execute("SELECT id FROM items WHERE slug = ? OR name_zh = ?", (slug, payload["name_zh"])).fetchone()
+        row = conn.execute("SELECT id FROM items WHERE name_zh = ?", (payload["name_zh"],)).fetchone()
         if row:
             item_id = int(row["id"])
             conn.execute(
                 """
                 UPDATE items
-                SET slug = ?, name_zh = ?, name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
+                SET name_zh = ?, name_ja = COALESCE(?, name_ja), name_en = COALESCE(?, name_en),
                     category = COALESCE(?, category), effect_summary = COALESCE(?, effect_summary),
                     effect_detail = COALESCE(?, effect_detail),
                     introduced_generation = COALESCE(?, introduced_generation),
@@ -1112,7 +1461,6 @@ def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
                 WHERE id = ?
                 """,
                 (
-                    payload.get("slug") or slugify(payload["name_zh"]),
                     payload["name_zh"],
                     payload.get("name_ja"),
                     payload.get("name_en"),
@@ -1131,13 +1479,12 @@ def upsert_item_detail(conn: sqlite3.Connection, payload: dict) -> int:
             result = conn.execute(
                 """
                 INSERT INTO items
-                  (slug, name_zh, name_ja, name_en, category, effect_summary,
+                  (name_zh, name_ja, name_en, category, effect_summary,
                    effect_detail, introduced_generation, image_url,
                    source_url, source_title, source_fetched_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    slug,
                     payload["name_zh"],
                     payload.get("name_ja"),
                     payload.get("name_en"),
@@ -1204,7 +1551,7 @@ def upsert_champions_data(conn: sqlite3.Connection, payload: dict) -> dict[str, 
         for item in champion_items:
             if not item.is_battle_item:
                 continue
-            item_id = _lookup_item_id(conn, item.name_zh, item.slug)
+            item_id = _lookup_item_id(conn, item.name_zh)
             if item_id is None or item_id in seen_item_ids:
                 continue
             item_ids.append((item_id, item.sort_order))
@@ -1285,7 +1632,6 @@ def _ensure_champions_schema(conn: sqlite3.Connection) -> None:
           msp_code TEXT NOT NULL,
           form_code TEXT,
           name_zh TEXT NOT NULL,
-          form_key TEXT,
           sort_order INTEGER NOT NULL DEFAULT 0,
           UNIQUE (regulation_id, msp_code, name_zh)
         );
@@ -1368,13 +1714,13 @@ def _replace_champions_regulation_pokemon(conn: sqlite3.Connection, regulation_i
     conn.execute("DELETE FROM champions_regulation_pokemon WHERE regulation_id = ?", (regulation_id,))
     for entry in pokemon_entries:
         pokemon_id = _lookup_pokemon_id(conn, entry.dex_number, entry.name_zh)
-        form_id = _lookup_form_id(conn, pokemon_id, entry.name_zh, entry.form_key)
+        form_id = _lookup_form_id(conn, pokemon_id, entry.name_zh, entry.form_code)
         conn.execute(
             """
             INSERT INTO champions_regulation_pokemon
               (regulation_id, pokemon_id, form_id, dex_number, msp_code, form_code,
-               name_zh, form_key, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               name_zh, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 regulation_id,
@@ -1384,7 +1730,6 @@ def _replace_champions_regulation_pokemon(conn: sqlite3.Connection, regulation_i
                 entry.msp_code,
                 entry.form_code,
                 entry.name_zh,
-                entry.form_key,
                 entry.sort_order,
             ),
         )
@@ -1451,32 +1796,92 @@ def _lookup_pokemon_id(conn: sqlite3.Connection, dex_number: int | None, name_zh
     return int(row["id"]) if row else None
 
 
-def _lookup_form_id(conn: sqlite3.Connection, pokemon_id: int | None, name_zh: str, form_key: str | None) -> int | None:
+def _champions_form_code_to_form_type(form_code: str | None, name_zh: str | None = None) -> str | None:
+    code = unicodedata.normalize("NFKC", form_code or "").upper()
+    if not code:
+        return None
+    label = unicodedata.normalize("NFKC", name_zh or "")
+    if "阿罗拉" in label or code == "A":
+        return "alola"
+    if "伽勒尔" in label or code == "G":
+        return "galar"
+    if "洗翠" in label:
+        return "hisui"
+    if "帕底亚" in label:
+        if "斗战种" in label or code == "PC":
+            return "paldea-combat"
+        if "火炽种" in label or code == "PB":
+            return "paldea-blaze"
+        if "水澜种" in label or code == "PA":
+            return "paldea-aqua"
+        return "paldea"
+    known = {
+        "E": "eternal",
+        "MN": "midnight",
+        "D": "dusk",
+        "S": "small",
+        "L": "large",
+        "XL": "super",
+        "F": "f",
+    }
+    return known.get(code)
+
+
+def _lookup_form_id(conn: sqlite3.Connection, pokemon_id: int | None, name_zh: str, form_code: str | None) -> int | None:
     if pokemon_id is None:
         return None
     pokemon_row = conn.execute("SELECT name_zh FROM pokemon WHERE id = ?", (pokemon_id,)).fetchone()
+    default_form = conn.execute(
+        "SELECT id FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 LIMIT 1",
+        (pokemon_id,),
+    ).fetchone()
+    default_id = int(default_form["id"]) if default_form else None
+    if not form_code and pokemon_row:
+        return default_id
     if pokemon_row and pokemon_row["name_zh"] == name_zh:
-        row = conn.execute(
-            "SELECT id FROM pokemon_forms WHERE pokemon_id = ? AND is_default = 1 LIMIT 1",
-            (pokemon_id,),
-        ).fetchone()
-        if row:
-            return int(row["id"])
+        return default_id
+
+    normalized_name = unicodedata.normalize("NFKC", name_zh or "").strip()
     row = conn.execute(
         """
         SELECT id FROM pokemon_forms
-        WHERE pokemon_id = ? AND (name_zh = ? OR form_key = ?)
+        WHERE pokemon_id = ?
+          AND (
+            name_zh = ?
+            OR display_name_zh = ?
+            OR form_type = ?
+          )
         LIMIT 1
         """,
-        (pokemon_id, name_zh, form_key),
+        (pokemon_id, normalized_name, normalized_name, _champions_form_code_to_form_type(form_code, normalized_name) or form_code),
     ).fetchone()
-    return int(row["id"]) if row else None
+    if row:
+        return int(row["id"])
+
+    matched = _resolve_learnset_form_id(conn, pokemon_id, normalized_name)
+    if matched and matched != default_id:
+        return matched
+
+    form_type = _champions_form_code_to_form_type(form_code, normalized_name)
+    if form_type:
+        row = conn.execute(
+            """
+            SELECT id FROM pokemon_forms
+            WHERE pokemon_id = ? AND form_type = ?
+            LIMIT 1
+            """,
+            (pokemon_id, form_type),
+        ).fetchone()
+        if row:
+            return int(row["id"])
+
+    return default_id
 
 
-def _lookup_item_id(conn: sqlite3.Connection, name_zh: str, slug: str | None) -> int | None:
+def _lookup_item_id(conn: sqlite3.Connection, name_zh: str) -> int | None:
     row = conn.execute(
-        "SELECT id FROM items WHERE name_zh = ? OR slug = ? LIMIT 1",
-        (name_zh, slug or slugify(name_zh)),
+        "SELECT id FROM items WHERE name_zh = ? LIMIT 1",
+        (name_zh,),
     ).fetchone()
     return int(row["id"]) if row else None
 

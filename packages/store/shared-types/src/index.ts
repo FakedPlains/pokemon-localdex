@@ -56,9 +56,16 @@ export type FormAbilityVariant = {
 
 export type PokemonFormEntry = {
   id: number;
+  /** Legacy API alias for formType; kept so older UI/localStorage can still render. */
   formKey: string;
-  nameZh: string;
   formType: string;
+  formCategory: string;
+  /** Canonical full Chinese form name, aligned with Champions availability names. */
+  canonicalNameZh?: string;
+  /** Human-facing form label used by Pokemon detail UI. */
+  displayNameZh?: string;
+  nameZh: string;
+  nameEn?: string;
   isDefault: boolean;
   sortOrder: number;
   primaryType?: string;
@@ -67,7 +74,7 @@ export type PokemonFormEntry = {
   baseStats?: StatBlock;
   images: Record<string, ImageAsset>;
   /** 该形态必须携带的道具（如 Mega 石、原始宝珠等），为 null/undefined 表示无绑定 */
-  requiredItem?: { id: string; nameZh: string; slug: string; imageUrl?: string };
+  requiredItem?: { id: string; nameZh: string; imageUrl?: string };
   /** Generation-specific stat variants (when stats changed across generations) */
   statVariants?: FormStatVariant[];
   /** Generation-specific type variants (when types changed across generations) */
@@ -105,7 +112,6 @@ export type EvolutionStep = {
 export type PokemonSummary = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -116,13 +122,11 @@ export type PokemonSummary = {
   baseStats?: StatBlock;
   image?: ImageAsset;
   shinyImage?: ImageAsset;
-  generations: number[];
 };
 
 export type PokemonCardSummary = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
   nameEn?: string;
   primaryType?: string;
@@ -148,7 +152,6 @@ export type PokemonEntry = PokemonSummary & {
 export type PokemonIdentity = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
 };
 
@@ -243,7 +246,6 @@ export type ItemGenerationRecord = {
 
 export type ItemEntry = {
   id: string;
-  slug: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -274,13 +276,40 @@ export type LearnsetRecord = {
   moveDescription?: string;
 };
 
+export type LearnsetFormMeta = {
+  formId: number;
+  formType: string;
+  formCategory: string;
+  canonicalNameZh?: string;
+  displayNameZh?: string;
+  nameZh: string;
+  nameEn?: string;
+  isDefault: boolean;
+  hasOwnMovesByGeneration?: Record<number, boolean>;
+};
+
+export type LearnsetQueryOptions = {
+  formId?: number;
+  gameVersionCode?: string;
+};
+
+export type LearnsetResult = {
+  moves: LearnsetRecord[];
+  formId: number;
+  effectiveFormId: number;
+  usesDefaultLearnset: boolean;
+  gameVersionCode?: string;
+  hasMore?: boolean;
+  methodCounts?: Record<string, number>;
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 招式表 Meta / 宝可梦反查摘要
 // ══════════════════════════════════════════════════════════════════════════════
 
 export type LearnsetMeta = {
   generations: number[];
-  formKeys: string[];
+  forms: LearnsetFormMeta[];
   versionsByGen: Record<number, Array<{ code: string; name: string }>>;
 };
 
@@ -288,7 +317,6 @@ export type LearnsetMeta = {
 export type PokemonByMoveSummary = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -302,7 +330,6 @@ export type PokemonByMoveSummary = {
 export type PokemonByAbilitySummary = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -356,20 +383,25 @@ export interface IStore {
     sort?: PokemonListSortKey;
     order?: SortOrder;
   } & PaginationParams): Promise<PokemonTableSummary[] | PaginatedResult<PokemonTableSummary>>;
-  getPokemon(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<PokemonEntry | undefined>;
-  getPokemonSummary(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<Omit<PokemonEntry, "evolutionChain" | "generations"> | undefined>;
+  getPokemon(idOrName: string, filters?: { championsSeasonId?: number }): Promise<PokemonEntry | undefined>;
+  getPokemonSummary(idOrName: string, filters?: { championsSeasonId?: number }): Promise<Omit<PokemonEntry, "evolutionChain"> | undefined>;
   getPokemonEvolution(pokemonId: number): Promise<EvolutionStep[]>;
-  getPokemonGenerations(pokemonId: number): Promise<number[]>;
-  getPokemonIdentity(idOrSlug: string): Promise<PokemonIdentity | undefined>;
+  getPokemonIdentity(idOrName: string): Promise<PokemonIdentity | undefined>;
   getLearnsetMeta(pokemonId: number): Promise<LearnsetMeta>;
-  getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string, pagination?: PaginationParams, learnMethod?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string; hasMore?: boolean; methodCounts?: Record<string, number> }>;
+  getPokemonLearnset(
+    pokemonId: number,
+    generation: number,
+    options?: LearnsetQueryOptions,
+    pagination?: PaginationParams,
+    learnMethod?: string,
+  ): Promise<LearnsetResult>;
 
   // Champions
   listChampionsSeasons(): Promise<ChampionsSeasonSummary[]>;
 
   // Moves
   listMoves(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams): Promise<MoveEntry[] | PaginatedResult<MoveEntry>>;
-  getMove(idOrSlug: string): Promise<MoveEntry | undefined>;
+  getMove(idOrName: string): Promise<MoveEntry | undefined>;
   getPokemonByMove(moveId: number, pagination?: PaginationParams): Promise<PokemonByMoveSummary[] | PaginatedResult<PokemonByMoveSummary>>;
 
   // Abilities
@@ -379,13 +411,12 @@ export interface IStore {
 
   // Items
   listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;
-  getItem(idOrSlug: string): Promise<ItemEntry | undefined>;
+  getItem(idOrName: string): Promise<ItemEntry | undefined>;
 
   // Battle: 原子名称查询（供 battle-core 的 resolveNames 编排使用）
   pokemonNameEn(opts: {
     pokemonId?: string | number;
     formId?: string | number;
-    formKey?: string;
     name?: string;
   }): Promise<string | undefined>;
 

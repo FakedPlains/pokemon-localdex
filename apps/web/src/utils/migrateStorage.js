@@ -9,16 +9,17 @@
  * 3. 迁移成功后就地更新 localStorage 数据并标记已迁移
  * 4. 标记保留在 localStorage 中，防止重复执行（一次性操作）
  *
- * 迁移标记：localdex_migration_v3（存在则表示已迁移，无需再次执行）
+ * 迁移标记：localdex_migration_v4（存在则表示已迁移，无需再次执行）
  *
  * v3 新增：将 abilityId（旧格式为中文特性名）数字化，同时保留 abilityName
+ * v4 新增：为已有 pokemonId 但缺少 formId 的成员补全 formId
  */
 
 import { unifiedApi } from "./api.js";
 
 const BOX_KEY = "localdex_box";
 const TEAMS_KEY = "localdex_teams";
-const MIGRATION_FLAG = "localdex_migration_v3";
+const MIGRATION_FLAG = "localdex_migration_v4";
 
 /**
  * 判断一个 ID 值是否为旧格式（非纯数字，即中文名称）
@@ -45,20 +46,22 @@ function needsMigration() {
     return false;
   }
 
-  // 检查 box 中是否有旧格式 ID
+  // 检查 box 中是否有旧格式 ID 或缺少 formId
   for (const config of box) {
     if (isLegacyId(config.pokemonId) || isLegacyId(config.itemId) || isLegacyId(config.abilityId)) {
       return true;
     }
+    if (needsFormIdMigration(config)) return true;
   }
 
-  // 检查 teams 中内联成员是否有旧格式 ID
+  // 检查 teams 中内联成员是否有旧格式 ID 或缺少 formId
   for (const team of teams) {
     for (const member of team.members || []) {
       if (member.configId) continue; // 引用 box 的成员不需要单独检查
       if (isLegacyId(member.pokemonId) || isLegacyId(member.itemId) || isLegacyId(member.abilityId)) {
         return true;
       }
+      if (needsFormIdMigration(member)) return true;
     }
   }
 
@@ -76,6 +79,19 @@ function readJSON(key) {
 }
 
 /**
+ * 判断一个成员是否需要 formId 迁移（v4）
+ * 条件：有数字 pokemonId 但没有 formId
+ */
+function needsFormIdMigration(config) {
+  if (!config.pokemonId) return false;
+  // pokemonId 必须是数字格式（已迁移过）
+  if (!/^\d+$/.test(String(config.pokemonId).trim())) return false;
+  // 已有 formId 则不需要迁移
+  if (config.formId && /^\d+$/.test(String(config.formId).trim())) return false;
+  return true;
+}
+
+/**
  * 通过名称查询宝可梦的数字 ID
  * @returns {{ id: string, nameZh: string } | null}
  */
@@ -85,7 +101,7 @@ async function resolvePokemonId(nameZh) {
     const result = await unifiedApi(`/pokemon?q=${encodeURIComponent(nameZh)}&limit=5`);
     const list = result.data || [];
     // 精确匹配名称
-    const exact = list.find((p) => p.nameZh === nameZh || p.slug === nameZh);
+    const exact = list.find((p) => p.nameZh === nameZh);
     if (exact) return { id: String(exact.id), nameZh: exact.nameZh };
     // 模糊匹配第一个结果
     if (list.length > 0) return { id: String(list[0].id), nameZh: list[0].nameZh };
@@ -104,7 +120,7 @@ async function resolveItemId(nameZh) {
   try {
     const result = await unifiedApi(`/items?q=${encodeURIComponent(nameZh)}&limit=5`);
     const list = result.data || [];
-    const exact = list.find((item) => item.nameZh === nameZh || item.slug === nameZh);
+    const exact = list.find((item) => item.nameZh === nameZh);
     if (exact) return { id: String(exact.id), nameZh: exact.nameZh };
     if (list.length > 0) return { id: String(list[0].id), nameZh: list[0].nameZh };
     return null;
@@ -122,10 +138,54 @@ async function resolveAbilityId(nameZh) {
   try {
     const result = await unifiedApi(`/abilities?q=${encodeURIComponent(nameZh)}&limit=5`);
     const list = result.data || [];
-    const exact = list.find((a) => a.nameZh === nameZh || a.slug === nameZh);
+    const exact = list.find((a) => a.nameZh === nameZh);
     if (exact) return { id: String(exact.id), nameZh: exact.nameZh };
     if (list.length > 0) return { id: String(list[0].id), nameZh: list[0].nameZh };
     return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 通过 pokemonId 和 formKey 解析 formId
+ *
+ * 匹配策略（按优先级）：
+ * 1. formKey/formType 精确匹配
+ * 2. nameZh/displayNameZh/canonicalNameZh 精确匹配（兼容旧 slug 形 formKey 为中文名的情况）
+ * 3. 大小写不敏感匹配（如 "超级喷火龙x" vs "超级喷火龙X"）
+ * 4. 回退到默认形态
+ *
+ * @returns {string | null}
+ */
+async function resolveFormId(pokemonId, formKey) {
+  if (!pokemonId) return null;
+  try {
+    const result = await unifiedApi(`/pokemon/${pokemonId}`);
+    const forms = result.data?.forms || [];
+    if (forms.length === 0) return null;
+    if (formKey) {
+      // 1. 精确匹配 formKey / formType
+      const byKey = forms.find((f) => f.formKey === formKey || f.formType === formKey);
+      if (byKey?.id) return String(byKey.id);
+      // 2. 精确匹配中文名（旧 localStorage 可能存的是中文形态名 slug）
+      const byName = forms.find((f) =>
+        f.nameZh === formKey || f.displayNameZh === formKey || f.canonicalNameZh === formKey
+      );
+      if (byName?.id) return String(byName.id);
+      // 3. 大小写不敏感匹配（如 "超级喷火龙x" vs "超级喷火龙X"）
+      const lowerKey = formKey.toLowerCase();
+      const byLower = forms.find((f) =>
+        (f.formKey || "").toLowerCase() === lowerKey ||
+        (f.formType || "").toLowerCase() === lowerKey ||
+        (f.nameZh || "").toLowerCase() === lowerKey ||
+        (f.displayNameZh || "").toLowerCase() === lowerKey
+      );
+      if (byLower?.id) return String(byLower.id);
+    }
+    // 没有 formKey 或匹配失败，使用默认形态
+    const defaultForm = forms.find((f) => f.isDefault) || forms[0];
+    return defaultForm?.id ? String(defaultForm.id) : null;
   } catch {
     return null;
   }
@@ -171,6 +231,15 @@ async function migrateConfig(config) {
     } else {
       // 解析失败时仍保留为 abilityName 字段
       if (!config.abilityName) config.abilityName = config.abilityId;
+    }
+  }
+
+  // 迁移 formId（v4：补全缺失的 formId）
+  if (needsFormIdMigration(config)) {
+    const formId = await resolveFormId(config.pokemonId, config.formKey);
+    if (formId) {
+      config.formId = formId;
+      changed = true;
     }
   }
 

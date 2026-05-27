@@ -18,7 +18,6 @@
     "check:api": "node --enable-source-maps apps/api/src/smoke.ts",
     "check:sqlite": "node --enable-source-maps packages/store/sqlite-store/src/demo.ts",
     "check:damage": "node --enable-source-maps packages/battle-core/src/smoke.ts",
-    "db:ensure": "node --enable-source-maps packages/store/sqlite-store/src/import-db.ts",
     "d1:create": "wrangler d1 create pokemon-localdex-d1",
     "d1:migrate": "wrangler d1 execute pokemon-localdex-d1 --file=schema/d1-schema.sql",
     "d1:migrate:remote": "wrangler d1 execute pokemon-localdex-d1 --remote --file=schema/d1-schema.sql",

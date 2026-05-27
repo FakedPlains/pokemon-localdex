@@ -51,7 +51,6 @@ function buildPokemonPayload({
   return {
     pokemonId: member.pokemonId || "",
     formId: member.formId || "",
-    formKey: member.formKey || "",
     name: member.nameZh || detail?.nameZh || "",
     level: Number(level || 50),
     nature: member.nature || "认真",
@@ -120,7 +119,7 @@ export function buildDamageRequest(state: AnyRecord) {
       }),
       move: {
         id: state.selectedMove.id || "",
-        name: state.selectedMove.nameZh || state.selectedMove.slug || "",
+        name: state.selectedMove.nameZh || "",
         isCrit: realCritical,
         hits: realMoveHits > 0 ? realMoveHits : undefined,
         useZ: realUseZ || undefined,
@@ -166,7 +165,7 @@ export function buildDamageResult(data: AnyRecord, meta: AnyRecord) {
     average: data.average,
     description: data.description || "",
     damageRolls: data.damageRolls || [],
-    moveName: meta.selectedMove.nameZh || meta.selectedMove.slug || "",
+    moveName: meta.selectedMove.nameZh || "",
     moveType,
     category,
     attackerName: meta.realAttacker.nameZh || (meta.isReverse ? "防守方" : "攻击方"),

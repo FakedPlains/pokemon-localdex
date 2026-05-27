@@ -42,7 +42,7 @@ class PokemonSeed:
 def parse_pokemon_list_page(html: str) -> list[PokemonSeed]:
     text = normalize_text(html)
     seeds: list[PokemonSeed] = []
-    pattern = re.compile(r"#(\d{4})\s+([^\s#]+)\s+([^\s#]+)\s+([A-Za-z0-9.'♀♂\- :]+)")
+    pattern = re.compile(r"#(\d{4})\s+([^\s#]+)\s+([^\s#]+)\s+([A-Za-zÀ-ÖØ-öø-ÿ0-9.'’♀♂\- :]+)")
     for match in pattern.finditer(text):
         generations = _collect_generations_around(match.start(), text)
         name_zh = match.group(2).strip()
@@ -79,9 +79,10 @@ def normalize_pokemon_detail_page(page: RawPage, seed: PokemonSeed) -> dict:
 
     # 默认形态（一条记录，可能有多个世代版本的种族值）
     default_form: dict = {
-        "form_key": "default",
         "name_zh": seed.name_zh,
+        "name_en": seed.name_en,
         "form_type": "default",
+        "form_category": "default",
         "is_default": True,
         "sort_order": 0,
         "primary_type": types[0] if types else None,
@@ -108,13 +109,13 @@ def normalize_pokemon_detail_page(page: RawPage, seed: PokemonSeed) -> dict:
         # 跳过与默认形态完全同名的形态
         if form_name == seed.name_zh:
             continue
-        form_key = slugify(form_name)
-        form_type = _classify_form_type(form_name)
+        form_type = slugify(form_name)
+        form_category = _classify_form_category(form_name)
 
         form_entry: dict = {
-            "form_key": form_key,
             "name_zh": form_name,
             "form_type": form_type,
+            "form_category": form_category,
             "is_default": False,
             "sort_order": sort_order,
             "primary_type": raw_form.get("primary_type"),
@@ -139,7 +140,6 @@ def normalize_pokemon_detail_page(page: RawPage, seed: PokemonSeed) -> dict:
 
     return {
         "dex_number": seed.dex_number,
-        "slug": slugify(seed.name_zh),
         "name_zh": seed.name_zh,
         "name_ja": seed.name_ja,
         "name_en": seed.name_en,
@@ -161,8 +161,8 @@ def normalize_pokemon_detail_page(page: RawPage, seed: PokemonSeed) -> dict:
     }
 
 
-def _classify_form_type(name_zh: str) -> str:
-    """根据形态名称推断形态类型。"""
+def _classify_form_category(name_zh: str) -> str:
+    """根据形态名称推断形态大类。"""
     if "超级" in name_zh:
         return "mega"
     if "超极巨" in name_zh:
@@ -181,7 +181,7 @@ def _classify_form_type(name_zh: str) -> str:
 
 
 def parse_learnset_page(page: RawPage, generation: int) -> dict[str, list[dict]]:
-    """解析招式表页面，返回按 form_key 分组的招式列表。
+    """解析招式表页面，返回按来源形态标签分组的招式列表。
 
     返回格式::
 
@@ -194,7 +194,7 @@ def parse_learnset_page(page: RawPage, generation: int) -> dict[str, list[dict]]
             "骑白马的样子": [...],
         }
 
-    每个 form_key 对应一个完整的招式列表（策略 A：每个形态完整存储）。
+    每个来源形态标签对应一个完整的招式列表；写库时会映射到 pokemon_forms.id。
     如果页面没有多形态切换，则只有 "default" 一个 key。
     """
     soup = BeautifulSoup(page.html or "", "html.parser")
@@ -1887,7 +1887,7 @@ def _form_hints(name_zh: str) -> tuple[list[str], list[str]]:
       Go/Gu = Gorging/Gulping (古月鸟吞食)
       L = Low Key (低调), NF = No-ice Face (解冻头)
       HM = Hangry Mode (空腹花纹), Sc = School (鱼群)
-      Pa/Po/Se = Pa'u/Pom-Pom/Sensu (花舞鸟风格)
+      Po/Pa/Se = Pom-Pom/Pa'u/Sensu (花舞鸟风格)
       F = Family of Four (四只家庭), Th = Three-Segment (三节形态)
       R = Roaming (徒步形态), H = Hero (全能形态)
     """
@@ -2120,13 +2120,13 @@ def _form_hints(name_zh: str) -> tuple[list[str], list[str]]:
         hints.extend(["c", "complete"])
         anti_hints.extend(["t"])
 
-    # ── 花舞鸟风格：Pa = Pa'u (啪滋啪滋), Po = Pom-Pom (呼拉呼拉), Se = Sensu (轻盈轻盈) ──
+    # ── 花舞鸟风格：Po = Pom-Pom (啪滋啪滋), Pa = Pa'u (呼拉呼拉), Se = Sensu (轻盈轻盈) ──
     if "啪滋啪滋" in name_zh:
-        hints.extend(["pa"])
-        anti_hints.extend(["po", "se"])
-    elif "呼拉呼拉" in name_zh:
         hints.extend(["po"])
         anti_hints.extend(["pa", "se"])
+    elif "呼拉呼拉" in name_zh:
+        hints.extend(["pa"])
+        anti_hints.extend(["po", "se"])
     elif "轻盈轻盈" in name_zh:
         hints.extend(["se"])
         anti_hints.extend(["pa", "po"])

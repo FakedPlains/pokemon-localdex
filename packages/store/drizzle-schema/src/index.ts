@@ -23,7 +23,6 @@ import { sql } from "drizzle-orm";
 export const pokemon = sqliteTable("pokemon", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   dexNumber: integer("dex_number").notNull(),
-  slug: text("slug").notNull().unique(),
   nameZh: text("name_zh").notNull(),
   nameJa: text("name_ja"),
   nameEn: text("name_en"),
@@ -47,15 +46,16 @@ export const pokemon = sqliteTable("pokemon", {
 export const pokemonForms = sqliteTable("pokemon_forms", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   pokemonId: integer("pokemon_id").notNull().references(() => pokemon.id, { onDelete: "cascade" }),
-  formKey: text("form_key").notNull(),
+  formType: text("form_type").notNull(),
+  formCategory: text("form_category").notNull().default("default"),
   nameZh: text("name_zh").notNull(),
-  formType: text("form_type").notNull().default("default"),
+  displayNameZh: text("display_name_zh"),
+  nameEn: text("name_en"),
   isDefault: integer("is_default").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
   requiredItemId: integer("required_item_id").references(() => items.id, { onDelete: "set null" }),
-  nameEn: text("name_en"),
 }, (table) => [
-  uniqueIndex("uq_forms_pokemon_key").on(table.pokemonId, table.formKey),
+  uniqueIndex("uq_forms_pokemon_type").on(table.pokemonId, table.formType),
   index("idx_forms_pokemon").on(table.pokemonId),
   index("idx_forms_default").on(table.pokemonId, table.isDefault),
 ]);
@@ -141,28 +141,13 @@ export const evolutionChains = sqliteTable("evolution_chains", {
 ]);
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 宝可梦世代可用性
+// 宝可梦可学招式
 // ══════════════════════════════════════════════════════════════════════════════
 
-export const pokemonGenerationRegions = sqliteTable("pokemon_generation_regions", {
+export const pokemonMoves = sqliteTable("pokemon_moves", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   pokemonId: integer("pokemon_id").notNull().references(() => pokemon.id, { onDelete: "cascade" }),
-  generation: integer("generation").notNull(),
-  region: text("region"),
-  regionalDexNumber: text("regional_dex_number"),
-}, (table) => [
-  uniqueIndex("uq_gen_regions").on(table.pokemonId, table.generation, table.region),
-  index("idx_regions_pokemon").on(table.pokemonId),
-]);
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 招式学习
-// ══════════════════════════════════════════════════════════════════════════════
-
-export const pokemonLearnsets = sqliteTable("pokemon_learnsets", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  pokemonId: integer("pokemon_id").notNull().references(() => pokemon.id, { onDelete: "cascade" }),
-  formKey: text("form_key").notNull().default("default"),
+  formId: integer("form_id").notNull().references(() => pokemonForms.id, { onDelete: "cascade" }),
   moveId: integer("move_id").references(() => moves.id),
   moveNameZh: text("move_name_zh").notNull(),
   generation: integer("generation").notNull(),
@@ -173,21 +158,25 @@ export const pokemonLearnsets = sqliteTable("pokemon_learnsets", {
   sortOrder: integer("sort_order").notNull().default(0),
   notes: text("notes"),
 }, (table) => [
-  uniqueIndex("uq_learnsets").on(
-    table.pokemonId, table.formKey, table.moveNameZh,
-    table.generation, table.gameVersionCode, table.learnMethod, table.level,
+  uniqueIndex("uq_pokemon_moves").on(
+    table.formId,
+    table.moveNameZh,
+    table.generation,
+    sql`COALESCE(${table.gameVersionCode}, '')`,
+    table.learnMethod,
+    sql`COALESCE(${table.level}, -1)`,
+    sql`COALESCE(${table.tmNumber}, '')`,
   ),
-  index("idx_learnsets_pokemon").on(table.pokemonId, table.formKey),
-  index("idx_learnsets_pokemon_gen").on(table.pokemonId, table.generation),
-  index("idx_learnsets_lookup").on(
+  index("idx_pokemon_moves_lookup").on(
     table.pokemonId,
     table.generation,
-    table.formKey,
+    table.formId,
     table.gameVersionCode,
     table.learnMethod,
     table.sortOrder,
   ),
-  index("idx_learnsets_move").on(table.moveId),
+  index("idx_pokemon_moves_form_gen").on(table.formId, table.generation),
+  index("idx_pokemon_moves_move").on(table.moveId),
 ]);
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -271,7 +260,6 @@ export const abilityGenerationRecords = sqliteTable("ability_generation_records"
 
 export const items = sqliteTable("items", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  slug: text("slug").notNull().unique(),
   nameZh: text("name_zh").notNull(),
   nameJa: text("name_ja"),
   nameEn: text("name_en"),
@@ -343,7 +331,6 @@ export const championsRegulationPokemon = sqliteTable("champions_regulation_poke
   mspCode: text("msp_code").notNull(),
   formCode: text("form_code"),
   nameZh: text("name_zh").notNull(),
-  formKey: text("form_key"),
   sortOrder: integer("sort_order").notNull().default(0),
 }, (table) => [
   uniqueIndex("uq_champions_regulation_pokemon").on(table.regulationId, table.mspCode, table.nameZh),

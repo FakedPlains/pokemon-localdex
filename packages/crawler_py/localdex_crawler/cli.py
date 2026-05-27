@@ -20,6 +20,13 @@ from .champions import (
 )
 from .config import CrawlerPaths
 from .fetcher import PageFetcher, PageNotFoundError
+from .form_items import (
+    apply_form_item_bindings,
+    bindings_to_json,
+    bindings_to_sql,
+    collect_form_item_bindings,
+    extract_all_form_item_bindings,
+)
 from .html_tools import parse_pokemon_abilities
 from .pokemon import (
     build_learnset_page_url,
@@ -50,7 +57,7 @@ from .sqlite_upsert import (
     upsert_move_detail,
     upsert_pokemon_abilities,
     upsert_pokemon_detail,
-    upsert_pokemon_learnset,
+    upsert_pokemon_moves,
 )
 from .utils import ABILITY_LIST_URL, ITEM_LIST_URL, MOVE_LIST_URL, POKEMON_LIST_URL, build_move_page_url, slugify
 
@@ -79,6 +86,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     form_changes = subparsers.add_parser("form-changes", help="Generate form change chains (mega, gigantamax, fusion, etc.) from existing form data.")
     add_runtime_flags(form_changes)
 
+    form_items = subparsers.add_parser("form-items", help="Extract and write form required-item bindings.")
+    add_runtime_flags(form_items)
+    form_items.add_argument("--output", choices=["summary", "json", "sql"], default="summary")
+
     learnsets = subparsers.add_parser("learnsets", help="Crawl Pokemon generation learnsets.")
     add_runtime_flags(learnsets)
     add_pokemon_filters(learnsets)
@@ -92,6 +103,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     catalog.add_argument("--ability-limit", type=int)
     catalog.add_argument("--item-limit", type=int)
     catalog.add_argument("--name", action="append", default=[], help="Catalog Chinese name filter.")
+    add_catalog_range_filters(catalog)
 
     champions = subparsers.add_parser("champions", help="Crawl Pokemon Champions seasons, regulations, Pokemon, and items.")
     add_runtime_flags(champions)
@@ -110,6 +122,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     # Backward-compatible default from the first Python extraction step.
     add_pokemon_filters(parser)
     return parser.parse_args(argv)
+
+
+def add_catalog_range_filters(parser: argparse.ArgumentParser) -> None:
+    """为 catalog 子命令添加编号范围筛选参数。"""
+    parser.add_argument("--start-number", type=int, help="Start number for moves/abilities (inclusive).")
+    parser.add_argument("--end-number", type=int, help="End number for moves/abilities (inclusive).")
 
 
 def add_pokemon_filters(parser: argparse.ArgumentParser) -> None:
@@ -147,6 +165,8 @@ def main(argv: list[str] | None = None) -> int:
         return crawl_evolution(conn, fetcher, args)
     if command == "form-changes":
         return crawl_form_changes(conn, args)
+    if command == "form-items":
+        return crawl_form_items(conn, fetcher, args)
     if command == "learnsets":
         return crawl_learnsets(conn, fetcher, args)
     if command == "champions":
@@ -186,6 +206,7 @@ def crawl_catalog(conn, fetcher: PageFetcher, args) -> int:
     if getattr(args, "moves", True):
         page = fetcher.load_or_fetch("move-list", MOVE_LIST_URL)
         seeds = filter_by_name(parse_move_list_page(page.html), name_filters)
+        seeds = filter_by_number_range(seeds, args)
         if getattr(args, "move_limit", None) is not None:
             seeds = seeds[: args.move_limit]
         for seed in seeds:
@@ -203,6 +224,7 @@ def crawl_catalog(conn, fetcher: PageFetcher, args) -> int:
     if getattr(args, "abilities", True):
         page = fetcher.load_or_fetch("ability-list", ABILITY_LIST_URL)
         seeds = filter_by_name(parse_ability_list_page(page.html), name_filters)
+        seeds = filter_by_number_range(seeds, args)
         if getattr(args, "ability_limit", None) is not None:
             seeds = seeds[: args.ability_limit]
         for seed in seeds:
@@ -265,6 +287,8 @@ def crawl_pokemon(conn, fetcher: PageFetcher, args) -> int:
         updated += 1
         print(f"[updated] pokemon #{seed.dex_number:04d} {seed.name_zh}")
     print(f"Pokemon finished. matched={len(seeds)} updated={updated} dryRun={args.dry_run}")
+    if not args.dry_run:
+        crawl_form_items(conn, fetcher, args)
     return 0
 
 
@@ -374,12 +398,45 @@ def crawl_form_changes(conn, args) -> int:
     return 0
 
 
+def crawl_form_items(conn, fetcher: PageFetcher, args) -> int:
+    """刷新 pokemon_forms.required_item_id。
+
+    主爬虫和手动修复命令共用同一套提取、推导和写库逻辑。
+    """
+    dry_run = getattr(args, "dry_run", False)
+    output = getattr(args, "output", "summary")
+    bindings = extract_all_form_item_bindings(fetcher=fetcher, raw_dir=getattr(args, "raw_dir", None))
+    output_bindings = collect_form_item_bindings(conn, bindings, include_derived=True)
+
+    if output == "json":
+        print(bindings_to_json(output_bindings))
+    elif output == "sql":
+        print(bindings_to_sql(output_bindings))
+
+    result = apply_form_item_bindings(conn, bindings, dry_run=dry_run, include_derived=True)
+    missing_items = len(result["missing_items"])
+    missing_forms = len(result["missing_forms"])
+    print(
+        "Form items finished. "
+        f"bindings={result['bindings']} derived={result['derived']} matched={result['matched']} "
+        f"updated={result['updated']} unchanged={result['unchanged']} "
+        f"missingItems={missing_items} missingForms={missing_forms} dryRun={dry_run}"
+    )
+    if missing_items:
+        examples = ", ".join(item["itemNameZh"] for item in result["missing_items"][:5])
+        print(f"[warn] Missing item examples: {examples}")
+    if missing_forms:
+        examples = ", ".join(f"{item['pokemonNameZh']} - {item['formNameZh']}" for item in result["missing_forms"][:5])
+        print(f"[warn] Missing form examples: {examples}")
+    return 0
+
+
 def crawl_learnsets(conn, fetcher: PageFetcher, args) -> int:
     clean = getattr(args, "clean", False)
     if clean and not args.dry_run:
-        conn.execute("DELETE FROM pokemon_learnsets")
+        conn.execute("DELETE FROM pokemon_moves")
         conn.commit()
-        print("[clean] Cleared pokemon_learnsets.")
+        print("[clean] Cleared pokemon_moves.")
     seeds = selected_pokemon_seeds(fetcher, args)
     generations_filter = parse_generations(args.generations)
     updated = 0
@@ -388,7 +445,7 @@ def crawl_learnsets(conn, fetcher: PageFetcher, args) -> int:
     errors = 0
     total_seeds = len(seeds)
     for idx, seed in enumerate(seeds, 1):
-        row = conn.execute("SELECT id FROM pokemon WHERE slug = ? OR dex_number = ?", (slugify(seed.name_zh), seed.dex_number)).fetchone()
+        row = conn.execute("SELECT id FROM pokemon WHERE dex_number = ? OR name_zh = ?", (seed.dex_number, seed.name_zh)).fetchone()
         if not row and not args.dry_run:
             try:
                 detail = fetcher.load_or_fetch(pokemon_cache_key(seed.dex_number), seed.detail_url)
@@ -425,8 +482,7 @@ def crawl_learnsets(conn, fetcher: PageFetcher, args) -> int:
                 forms_info = ", ".join(f"{k}={len(v)}" for k, v in form_learnsets.items())
                 print(f"[{idx}/{total_seeds}] dry-run #{seed.dex_number:04d} {seed.name_zh} gen{generation}: {total_moves} moves ({forms_info})")
             else:
-                for form_key, move_list in form_learnsets.items():
-                    entries += upsert_pokemon_learnset(conn, pokemon_id, generation, move_list, form_key)
+                entries += upsert_pokemon_moves(conn, pokemon_id, generation, form_learnsets)
                 updated += 1
                 forms_info = ", ".join(f"{k}={len(v)}" for k, v in form_learnsets.items())
                 print(f"[{idx}/{total_seeds}] #{seed.dex_number:04d} {seed.name_zh} gen{generation}: {total_moves} moves ({forms_info})")
@@ -542,6 +598,27 @@ def filter_by_name(seeds, names: list[str]):
     if not names:
         return seeds
     return [seed for seed in seeds if seed.name_zh in names]
+
+
+def filter_by_number_range(seeds, args):
+    """按编号范围筛选 seeds（适用于 MoveSeed/AbilitySeed 等有 number 字段的对象）。"""
+    start = getattr(args, "start_number", None)
+    end = getattr(args, "end_number", None)
+    if start is None and end is None:
+        return seeds
+    result = []
+    for seed in seeds:
+        num = getattr(seed, "number", None)
+        if num is None or num == 0:
+            # 没有编号的 seed 不受范围筛选影响（如道具）
+            result.append(seed)
+            continue
+        if start is not None and num < start:
+            continue
+        if end is not None and num > end:
+            continue
+        result.append(seed)
+    return result
 
 
 if __name__ == "__main__":

@@ -6,8 +6,7 @@
  * 查询逻辑全部委托给 @pokemon-localdex/drizzle-queries（DrizzleStore），
  * 本模块只负责：
  *   1. 数据库文件管理（路径、打开、关闭）
- *   2. Schema 迁移（ensureSchema / migrateSchema / resetSchema）
- *   3. 创建 Drizzle 实例并包装为 IStore
+ *   2. 创建 Drizzle 实例并包装为 IStore
  */
 
 
@@ -44,9 +43,6 @@ export type {
 export {
   normalizeTypeName,
   splitTypeNames,
-  typeLegacyId,
-  GENERATIONS,
-  GAME_VERSIONS,
   GAME_VERSION_NAMES,
   TYPE_NAMES,
   TYPE_ALIASES,
@@ -61,8 +57,6 @@ import { createDrizzleStore } from "@pokemon-localdex/drizzle-queries";
 import type { IStore } from "@pokemon-localdex/store-types";
 import { hasDatabaseFile, openDatabase } from "./database.ts";
 export { getDatabasePath, hasDatabaseFile, openDatabase } from "./database.ts";
-
-export { ensureSchema, migrateSchema, resetSchema } from "./schema.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 数据检测

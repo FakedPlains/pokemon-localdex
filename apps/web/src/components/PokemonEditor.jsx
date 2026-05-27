@@ -219,7 +219,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     };
     // 形态绑定道具：自动设置/清除道具
     if (form.requiredItem) {
-      updates.itemId = form.requiredItem.id ? String(form.requiredItem.id) : (form.requiredItem.slug || "");
+      updates.itemId = form.requiredItem.id ? String(form.requiredItem.id) : "";
       updates.itemName = form.requiredItem.nameZh || "";
       updates.itemImageUrl = form.requiredItem.imageUrl || "";
     } else {
@@ -261,9 +261,11 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       if (cancelled) return;
       const gens = meta.data?.generations || [];
       const latestGen = gens.length > 0 ? gens[gens.length - 1] : 9;
-      const formKeys = meta.data?.formKeys || [];
-      const form = formKeys[0] || "default";
-      return unifiedApi(`/pokemon/${pokemonDetail.id}/learnset?generation=${latestGen}&form=${form}`);
+      const metaForms = meta.data?.forms || [];
+      // 用 formId 精确匹配当前形态，否则选择默认形态
+      const matchedForm = (currentForm?.id && metaForms.find(f => f.formId === Number(currentForm.id))) || metaForms.find(f => f.isDefault) || metaForms[0];
+      const formIdParam = matchedForm?.formId ? `&formId=${matchedForm.formId}` : "";
+      return unifiedApi(`/pokemon/${pokemonDetail.id}/learnset?generation=${latestGen}${formIdParam}`);
     }).then((r) => {
       if (cancelled || !r) return;
       const entries = r.data || [];
@@ -289,12 +291,12 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       setMovesList(moves);
     }).catch(() => { if (!cancelled) setMovesList([]); });
     return () => { cancelled = true; };
-  }, [pokemonDetail]);
+  }, [pokemonDetail, currentForm]);
 
   const itemOptions = useMemo(() => {
     return items.map((item) => ({
       value: String(item.id),
-      label: item.nameZh || item.slug || String(item.id),
+      label: item.nameZh || String(item.id),
       sublabel: item.effectSummary || "",
       imageUrl: item.imageUrl || "",
       nameZh: item.nameZh || "",
@@ -370,7 +372,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       // 搜索模式：使用 API 返回的结果
       return itemSearchResults.map((item) => ({
         value: String(item.id),
-        label: item.nameZh || item.slug || String(item.id),
+        label: item.nameZh || String(item.id),
         sublabel: item.effectSummary || "",
         imageUrl: item.imageUrl || "",
         nameZh: item.nameZh || "",

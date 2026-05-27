@@ -30,7 +30,6 @@ test("converts classic EV investment to Champions SP", () => {
 test("resolves generation-specific form data for display", () => {
   const detail = {
     nameZh: "测试兽",
-    generations: [1, 2],
     abilities: ["普通特性"],
     hiddenAbility: "隐藏特性",
     baseStats: { hp: 1, atk: 1, def: 1, spa: 1, spd: 1, spe: 1 },

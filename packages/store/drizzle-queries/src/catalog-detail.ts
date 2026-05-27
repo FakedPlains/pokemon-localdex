@@ -5,7 +5,7 @@ import {
   pokemonFormTypes,
   pokemonFormImages,
   pokemonFormAbilities,
-  pokemonLearnsets,
+  pokemonMoves,
   moves,
   moveGenerationRecords,
   abilities,
@@ -90,7 +90,6 @@ async function hydrateItemRow(db: any, row: any): Promise<ItemEntry> {
 
   return {
     id: String(row.id),
-    slug: String(row.slug),
     nameZh: String(row.nameZh),
     nameJa: row.nameJa ? String(row.nameJa) : undefined,
     nameEn: row.nameEn ? String(row.nameEn) : undefined,
@@ -142,7 +141,6 @@ async function hydratePokemonReferenceRows(db: any, rows: any[], includeLearnMet
     const result: Record<string, unknown> = {
       id: Number(row.id),
       dexNumber: Number(row.dexNumber),
-      slug: String(row.slug),
       nameZh: String(row.nameZh),
       nameJa: row.nameJa ? String(row.nameJa) : undefined,
       nameEn: row.nameEn ? String(row.nameEn) : undefined,
@@ -160,11 +158,11 @@ async function hydratePokemonReferenceRows(db: any, rows: any[], includeLearnMet
   });
 }
 
-export async function getMoveRow(db: any, idOrSlug: string): Promise<MoveEntry | undefined> {
+export async function getMoveRow(db: any, idOrName: string): Promise<MoveEntry | undefined> {
   const rows = await db
     .select()
     .from(moves)
-    .where(or(eq(moves.id, Number(idOrSlug) || 0), eq(moves.nameZh, idOrSlug)))
+    .where(or(eq(moves.id, Number(idOrName) || 0), eq(moves.nameZh, idOrName)))
     .limit(1);
 
   return rows[0] ? hydrateMoveRow(db, rows[0]) : undefined;
@@ -176,21 +174,20 @@ export async function getPokemonByMoveRows(
   pagination?: { limit?: number; offset?: number },
 ): Promise<PokemonByMoveSummary[] | PaginatedResult<PokemonByMoveSummary>> {
   const usePagination = pagination?.limit !== undefined;
-  const baseWhere = eq(pokemonLearnsets.moveId, moveId);
+  const baseWhere = eq(pokemonMoves.moveId, moveId);
 
   let query = db
     .select({
       id: pokemon.id,
       dexNumber: pokemon.dexNumber,
-      slug: pokemon.slug,
       nameZh: pokemon.nameZh,
       nameJa: pokemon.nameJa,
       nameEn: pokemon.nameEn,
       formId: pokemonForms.id,
-      learnMethods: sql<string>`GROUP_CONCAT(DISTINCT ${pokemonLearnsets.learnMethod})`,
+      learnMethods: sql<string>`GROUP_CONCAT(DISTINCT ${pokemonMoves.learnMethod})`,
     })
-    .from(pokemonLearnsets)
-    .innerJoin(pokemon, eq(pokemon.id, pokemonLearnsets.pokemonId))
+    .from(pokemonMoves)
+    .innerJoin(pokemon, eq(pokemon.id, pokemonMoves.pokemonId))
     .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
     .where(baseWhere)
     .groupBy(pokemon.id)
@@ -233,7 +230,6 @@ export async function getPokemonByAbilityRows(
     .selectDistinct({
       id: pokemon.id,
       dexNumber: pokemon.dexNumber,
-      slug: pokemon.slug,
       nameZh: pokemon.nameZh,
       nameJa: pokemon.nameJa,
       nameEn: pokemon.nameEn,
@@ -261,15 +257,14 @@ export async function getPokemonByAbilityRows(
   return usePagination ? { items: entries, hasMore } : entries;
 }
 
-export async function getItemRow(db: any, idOrSlug: string): Promise<ItemEntry | undefined> {
+export async function getItemRow(db: any, idOrName: string): Promise<ItemEntry | undefined> {
   const rows = await db
     .select()
     .from(items)
     .where(
       or(
-        eq(items.id, Number(idOrSlug) || 0),
-        eq(items.slug, idOrSlug),
-        eq(items.nameZh, idOrSlug),
+        eq(items.id, Number(idOrName) || 0),
+        eq(items.nameZh, idOrName),
       ),
     )
     .limit(1);

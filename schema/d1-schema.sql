@@ -1,6 +1,6 @@
 -- ============================================================
 -- Pokemon LocalDex — Cloudflare D1 Schema
--- 与 packages/sqlite-store/src/index.ts 中的 ensureSchema() 保持同步
+-- 与 packages/store/drizzle-schema/src/index.ts 保持同步
 -- D1 使用 SQLite 语法，直接兼容
 -- ============================================================
 
@@ -12,7 +12,6 @@ PRAGMA foreign_keys = OFF;
 CREATE TABLE IF NOT EXISTS pokemon (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   dex_number INTEGER NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
   name_zh TEXT NOT NULL,
   name_ja TEXT,
   name_en TEXT,
@@ -31,14 +30,15 @@ CREATE TABLE IF NOT EXISTS pokemon (
 CREATE TABLE IF NOT EXISTS pokemon_forms (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-  form_key TEXT NOT NULL,
+  form_type TEXT NOT NULL,
+  form_category TEXT NOT NULL DEFAULT 'default',
   name_zh TEXT NOT NULL,
-  form_type TEXT NOT NULL DEFAULT 'default',
+  display_name_zh TEXT,
+  name_en TEXT,
   is_default INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   required_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
-  name_en TEXT,
-  UNIQUE (pokemon_id, form_key)
+  UNIQUE (pokemon_id, form_type)
 );
 
 CREATE TABLE IF NOT EXISTS pokemon_form_stats (
@@ -106,24 +106,12 @@ CREATE TABLE IF NOT EXISTS evolution_chains (
 );
 
 -- ============================================================
--- 宝可梦世代可用性
+-- 宝可梦可学招式
 -- ============================================================
-CREATE TABLE IF NOT EXISTS pokemon_generation_regions (
+CREATE TABLE IF NOT EXISTS pokemon_moves (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-  generation INTEGER NOT NULL,
-  region TEXT,
-  regional_dex_number TEXT,
-  UNIQUE (pokemon_id, generation, region)
-);
-
--- ============================================================
--- 招式学习
--- ============================================================
-CREATE TABLE IF NOT EXISTS pokemon_learnsets (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-  form_key TEXT NOT NULL DEFAULT 'default',
+  form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
   move_id INTEGER REFERENCES moves(id),
   move_name_zh TEXT NOT NULL,
   generation INTEGER NOT NULL,
@@ -132,8 +120,7 @@ CREATE TABLE IF NOT EXISTS pokemon_learnsets (
   level INTEGER,
   tm_number TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  notes TEXT,
-  UNIQUE (pokemon_id, form_key, move_name_zh, generation, game_version_code, learn_method, level)
+  notes TEXT
 );
 
 -- ============================================================
@@ -204,7 +191,6 @@ CREATE TABLE IF NOT EXISTS ability_generation_records (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  slug TEXT NOT NULL UNIQUE,
   name_zh TEXT NOT NULL,
   name_ja TEXT,
   name_en TEXT,
@@ -269,7 +255,6 @@ CREATE TABLE IF NOT EXISTS champions_regulation_pokemon (
   msp_code TEXT NOT NULL,
   form_code TEXT,
   name_zh TEXT NOT NULL,
-  form_key TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   UNIQUE (regulation_id, msp_code, name_zh)
 );
@@ -287,7 +272,6 @@ CREATE TABLE IF NOT EXISTS champions_regulation_items (
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_pokemon_dex ON pokemon(dex_number);
 CREATE INDEX IF NOT EXISTS idx_pokemon_name ON pokemon(name_zh);
-CREATE INDEX IF NOT EXISTS idx_pokemon_slug ON pokemon(slug);
 CREATE INDEX IF NOT EXISTS idx_pokemon_introduced_generation ON pokemon(introduced_generation);
 
 CREATE INDEX IF NOT EXISTS idx_forms_pokemon ON pokemon_forms(pokemon_id);
@@ -304,12 +288,18 @@ CREATE INDEX IF NOT EXISTS idx_evo_chain ON evolution_chains(chain_id);
 CREATE INDEX IF NOT EXISTS idx_evo_to ON evolution_chains(to_pokemon_id);
 CREATE INDEX IF NOT EXISTS idx_evo_from ON evolution_chains(from_pokemon_id);
 
-CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon ON pokemon_learnsets(pokemon_id, form_key);
-CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon_gen ON pokemon_learnsets(pokemon_id, generation);
-CREATE INDEX IF NOT EXISTS idx_learnsets_lookup ON pokemon_learnsets(pokemon_id, generation, form_key, game_version_code, learn_method, sort_order);
-CREATE INDEX IF NOT EXISTS idx_learnsets_move ON pokemon_learnsets(move_id);
-
-CREATE INDEX IF NOT EXISTS idx_regions_pokemon ON pokemon_generation_regions(pokemon_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_pokemon_moves ON pokemon_moves(
+  form_id,
+  move_name_zh,
+  generation,
+  COALESCE(game_version_code, ''),
+  learn_method,
+  COALESCE(level, -1),
+  COALESCE(tm_number, '')
+);
+CREATE INDEX IF NOT EXISTS idx_pokemon_moves_lookup ON pokemon_moves(pokemon_id, generation, form_id, game_version_code, learn_method, sort_order);
+CREATE INDEX IF NOT EXISTS idx_pokemon_moves_form_gen ON pokemon_moves(form_id, generation);
+CREATE INDEX IF NOT EXISTS idx_pokemon_moves_move ON pokemon_moves(move_id);
 
 CREATE INDEX IF NOT EXISTS idx_moves_name_zh ON moves(name_zh);
 CREATE INDEX IF NOT EXISTS idx_moves_type ON moves(type_name);

@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { migrateOldSchema } from "./migrations.ts";
 
 const ROOT = resolve(import.meta.dirname, "../../../../");
 
@@ -22,14 +21,7 @@ function ensureDbDir() {
 export function getDatabasePath() { return resolveDatabasePath(); }
 export function hasDatabaseFile() { return existsSync(resolveDatabasePath()); }
 
-let _migrationDone = false;
-
 export function openDatabase() {
   ensureDbDir();
-  const db = new DatabaseSync(resolveDatabasePath(), { timeout: 3000 });
-  if (!_migrationDone) {
-    _migrationDone = true;
-    migrateOldSchema(db);
-  }
-  return db;
+  return new DatabaseSync(resolveDatabasePath(), { timeout: 3000 });
 }

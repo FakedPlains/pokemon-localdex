@@ -58,7 +58,6 @@ function hydrateAbilitySummary(row: any): AbilityEntry {
 function hydrateItemSummary(row: any): ItemEntry {
   return {
     id: String(row.id),
-    slug: String(row.slug),
     nameZh: String(row.nameZh),
     nameJa: row.nameJa ? String(row.nameJa) : undefined,
     nameEn: row.nameEn ? String(row.nameEn) : undefined,
@@ -183,7 +182,6 @@ export async function listItemRows(
         like(items.nameZh, v),
         like(items.nameJa, v),
         like(items.nameEn, v),
-        like(items.slug, v),
         like(items.effectSummary, v),
       )!,
     );

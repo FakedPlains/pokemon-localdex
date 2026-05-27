@@ -45,10 +45,6 @@ export function splitTypeNames(type) {
   return result;
 }
 
-export function hasType(typeValue, expectedType) {
-  return splitTypeNames(typeValue).includes(expectedType);
-}
-
 export function getTypeChips(type) {
   if (!type) return [];
   return [...new Set(splitTypeNames(type))];
@@ -123,13 +119,6 @@ export function calculateSpeedLine(baseSpe, level = 50) {
   };
 }
 
-export function buildDerivedStats(member, detail) {
-  if (!detail?.baseStats) return undefined;
-  return Object.fromEntries(
-    STAT_KEYS.map((key) => [key, calculateFinalStat(member, detail, key)])
-  );
-}
-
 export function createDefaultStats(kind) {
   return Object.fromEntries(
     STAT_KEYS.map((key) => [key, kind === "iv" ? 31 : 0])
@@ -172,85 +161,6 @@ export function resolveMoveGenerationRecord(move, generation) {
   if (exact) return exact;
   const previous = [...records].reverse().find((r) => r.generation <= target);
   return previous || records[records.length - 1];
-}
-
-export function resolvePokemonGenerationRecord(pokemon, generation) {
-  // Legacy: generationRecords no longer exist in form-centric API.
-  // Return undefined — callers should use forms[] instead.
-  return undefined;
-}
-
-export function getPokemonLearnsetEntries(pokemon, generation) {
-  const record = resolvePokemonGenerationRecord(pokemon, generation);
-  if (record?.learnset?.length) return record.learnset;
-  if (record?.moveIds?.length) return record.moveIds.map((moveId) => ({ moveId }));
-  if (pokemon?.moveIds?.length) return pokemon.moveIds.map((moveId) => ({ moveId }));
-  return [];
-}
-
-export function sortLearnsetEntries(entries) {
-  const methodOrder = { "level-up": 1, evolution: 2, tm: 3, hm: 4, tutor: 5, egg: 6, event: 7, other: 8 };
-  return [...entries].sort((a, b) => {
-    const am = methodOrder[a.learnMethod] || 99;
-    const bm = methodOrder[b.learnMethod] || 99;
-    if (am !== bm) return am - bm;
-    const al = a.level ?? 999;
-    const bl = b.level ?? 999;
-    if (al !== bl) return al - bl;
-    return String(a.moveNameZh || a.moveId || "").localeCompare(String(b.moveNameZh || b.moveId || ""), "zh-Hans-CN");
-  });
-}
-
-export function buildMoveLookup(allMoves = []) {
-  const lookup = new Map();
-  for (const move of allMoves) {
-    for (const key of [move.id, move.slug, move.nameZh, move.nameEn, move.nameJa].filter(Boolean)) {
-      lookup.set(String(key), move);
-    }
-  }
-  return lookup;
-}
-
-export function resolveLearnsetMove(entry, moveLookup) {
-  return moveLookup.get(String(entry.moveId || "")) ||
-    moveLookup.get(String(entry.moveNameZh || "")) ||
-    undefined;
-}
-
-export function buildEvolutionFamilies(pokemonList) {
-  const families = new Map();
-
-  function toEvolutionMember(pokemon) {
-    return {
-      id: pokemon.id,
-      dexNumber: pokemon.dexNumber,
-      slug: pokemon.slug,
-      nameZh: pokemon.nameZh,
-      nameEn: pokemon.nameEn,
-      primaryType: pokemon.primaryType,
-      secondaryType: pokemon.secondaryType,
-      stageLabel: "未进化",
-      image: getPokemonPreviewImage(pokemon)
-    };
-  }
-
-  for (const pokemon of pokemonList) {
-    const chain = Array.isArray(pokemon.evolutionChain) && pokemon.evolutionChain.length > 0
-      ? pokemon.evolutionChain
-      : [toEvolutionMember(pokemon)];
-    const key = chain.map((m) => m.id || m.slug || m.nameZh).join("|");
-
-    if (!families.has(key)) {
-      families.set(key, { key, chain, matches: [] });
-    }
-    families.get(key).matches.push(pokemon);
-  }
-
-  return [...families.values()].sort((a, b) => {
-    const ad = Math.min(...a.chain.map((m) => Number(m.dexNumber || 9999)));
-    const bd = Math.min(...b.chain.map((m) => Number(m.dexNumber || 9999)));
-    return ad - bd;
-  });
 }
 
 /**
@@ -416,19 +326,4 @@ export function resolvePokemonDisplayVariant(detail, detailGeneration, detailFor
     hiddenAbilityText,
     abilitiesDetailed
   };
-}
-
-export function getLearnableDamageMoves(pokemon, allMoves, generation) {
-  const learnsetEntries = getPokemonLearnsetEntries(pokemon, generation);
-  if (!pokemon || learnsetEntries.length === 0) {
-    return { moves: allMoves, learnsetEntries: [] };
-  }
-
-  const moveIds = new Set(
-    learnsetEntries.flatMap((entry) => [entry.moveId, entry.moveNameZh]).filter(Boolean)
-  );
-  const moves = allMoves.filter((move) =>
-    moveIds.has(move.id) || moveIds.has(move.slug) || moveIds.has(move.nameZh)
-  );
-  return { moves, learnsetEntries };
 }

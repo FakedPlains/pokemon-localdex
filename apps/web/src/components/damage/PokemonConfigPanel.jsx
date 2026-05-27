@@ -42,7 +42,7 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
         const updates = { formId: matchedForm.id || "", formKey: matchedForm.formKey };
         // 自动绑定形态道具
         if (matchedForm.requiredItem) {
-          updates.itemId = matchedForm.requiredItem.id ? String(matchedForm.requiredItem.id) : (matchedForm.requiredItem.slug || "");
+          updates.itemId = matchedForm.requiredItem.id ? String(matchedForm.requiredItem.id) : "";
           updates.itemName = matchedForm.requiredItem.nameZh || "";
           updates.itemImageUrl = matchedForm.requiredItem.imageUrl || "";
         }
@@ -97,7 +97,7 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
     };
     // 形态绑定道具：自动设置/清除道具
     if (form.requiredItem) {
-      updates.itemId = form.requiredItem.id ? String(form.requiredItem.id) : (form.requiredItem.slug || "");
+      updates.itemId = form.requiredItem.id ? String(form.requiredItem.id) : "";
       updates.itemName = form.requiredItem.nameZh || "";
       updates.itemImageUrl = form.requiredItem.imageUrl || "";
     } else {
@@ -462,7 +462,7 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
                           }}
                         >
                           {item.imageUrl && <img className="dc-item-option-img" src={item.imageUrl} alt="" referrerPolicy="no-referrer" />}
-                          <span>{item.nameZh || item.slug}</span>
+                          <span>{item.nameZh || ""}</span>
                         </button>
                       ))}
                     </div>

@@ -81,6 +81,7 @@ npx taro build --type weapp --watch
 - 请求 52Poké 页面时优先使用 `variant=zh-hans` 获取简体中文，OpenCC 只作为补充兜底。
 - 保留 NFKC 标准化、空白清理和摘要清理逻辑。
 - 写库使用 upsert 语义；需要更新的记录不要用 `INSERT OR IGNORE`。
+- `_upsert_pokemon_forms` 对 `name_en` 字段有保护机制：如果数据库中已有非空 `name_en`，而本次 payload 的 `name_en` 为空或 None，则保留数据库现有值不覆盖。这防止了因 `form_name_rules.json` 规则不完整而意外清空已有的英文名。
 - 新增数据类型时，同步增加解析模块、CLI 子命令、schema、upsert/clear 函数和文档。
 - `data/raw/` 等页面缓存默认不提交。
 
@@ -114,7 +115,9 @@ schema/d1-schema.sql
 - 宝可梦属性、种族值、特性、图片挂在 `pokemon_forms` 及其子表下，而不是只放在 `pokemon` 主表。
 - 世代差异用 `generation_start` 和 `generation_end` 表达；`generation_end IS NULL` 表示持续有效。
 - 查询某世代数据时使用 `generation_start <= gen AND (generation_end IS NULL OR generation_end >= gen)`。
-- 当前 schema 和代码使用 `form_key = "default"` 表示默认形态和默认招式表形态。
+- 当前 schema 和代码使用 `form_type = "default"` 表示默认形态。`form_key` 是 `form_type` 的别名（保留用于旧 UI/localStorage 兼容）。
+- `form_type` 是形态的稳定标识（如 `mega-x`、`alola`、`gmax`），由 `form_name_rules.json` 中的 `formTypeKeywords` 规则从中文形态名推导。默认形态的 `form_type = "default"`。该推导仅在爬虫写入时执行一次，运行时代码不再做模式匹配。
+- `formTypeKeywords` 规则文件由 Python 爬虫和 JS 端（`scripts/fill-form-names.mjs`）共享，修改时需同步验证两端行为。
 - 少数旧文档可能提到默认形态名为空字符串；动形态逻辑前先确认当前字段语义，不要机械照搬旧描述。
 
 Web 展示层应通过 `apps/web/src/utils/helpers.js` 中的 `resolvePokemonDisplayVariant()` 和相关 helper 解析世代/形态展示数据，不要在页面组件中重复实现形态选择算法。
@@ -125,7 +128,7 @@ Web 展示层应通过 `apps/web/src/utils/helpers.js` 中的 `resolvePokemonDis
 
 查询优先级：
 
-- 宝可梦形态：`formId` -> `pokemonId + formKey` -> `formKey` -> `pokemonId` 默认形态 -> 中文名 fallback。
+- 宝可梦形态：`formId` -> `pokemonId` 默认形态 -> 中文名 fallback。
 - 招式/特性/道具：`id` -> 中文名 fallback。
 
 前端 state 和 localStorage 应同时保存 ID 与展示名：
@@ -163,7 +166,7 @@ Cloudflare Workers 的请求持续时间包含代码执行和等待 D1/网络 I/
 - 避免 D1 N+1 查询。分页列表不得对每条记录再单独查子表；需要附加数据时使用 `IN (...)` 批量查询或拆到详情接口。
 - 只需要数字 ID/基础身份时，不要调用完整详情查询。宝可梦招式表、meta 等只需定位宝可梦的路径应使用轻量身份查询，例如 `getPokemonIdentity()`。
 - 所有高频只读 GET 接口优先设置 `Cache-Control`，Worker 端可使用 `caches.default` 缓存。资料库数据低频更新时，允许短浏览器缓存和较长边缘缓存；数据导入或 schema 变更后通过重新部署、版本化 URL 或等待 TTL 处理缓存刷新。
-- 每次新增筛选、排序、关联查询，都同步评估 `schema/d1-schema.sql` 和 `packages/store/drizzle-schema/src/index.ts` 是否需要组合索引。常见查询路径应优先服务 `pokemon_learnsets`、形态子表、图片、特性反查和列表排序。
+- 每次新增筛选、排序、关联查询，都同步评估 `schema/d1-schema.sql` 和 `packages/store/drizzle-schema/src/index.ts` 是否需要组合索引。常见查询路径应优先服务 `pokemon_moves`、形态子表、图片、特性反查和列表排序。
 - Cloudflare Worker 应启用 Smart Placement；如果主要用户区域和 D1 primary 距离较远，优先检查 D1 data location。只读请求量大时评估 D1 read replication，并在代码路径中确认是否使用 Sessions API。
 - 性能改动需要验证查询计划或至少说明预期查询轮次变化。目标是把常见首屏列表接口控制在少量 D1 查询和小响应体内。
 
@@ -221,6 +224,8 @@ DamagePage 特别注意：
 - 天气和场地分段按钮是 toggle 行为：再次点击当前选项会清空。
 - 道具图片预览使用现有 flex 布局，不要用绝对定位覆盖输入框。
 - 招式搜索保持按需搜索和防抖，不要预加载全部招式列表。
+- 招式表形态选择使用 `learnset/meta` 返回的 `forms: LearnsetFormMeta[]` 数组（包含 `formId`、`formType`、`formCategory`、`nameZh`、`isDefault`、`hasOwnMovesByGeneration` 等），不要使用已废弃的 `formKeys` 字段。
+- 请求招式表数据时使用 `formId` 查询参数（对应 `pokemon_forms.id`）。旧的 `formType`、`form` 参数已移除，服务端不再做字符串模式匹配。
 
 ## 小程序规则
 
@@ -305,7 +310,8 @@ Cloudflare Pages
 - `worker.ts` 会在同一个 Worker isolate 中缓存 D1 store。
 - `drizzle-queries` 对宝可梦列表的属性、特性、图片、世代、进化链做批量查询，避免逐行查询。
 - `resolvePokemonDisplayVariant()` 是 Web 端形态/世代展示的权威转换函数。
-- `main.jsx` 启动时异步执行 localStorage 迁移，完成后派发 `localdex-migration-done`。
+- `main.jsx` 启动时异步执行 localStorage 迁移（当前版本 v4），完成后派发 `localdex-migration-done`。
+- v4 迁移新增 `resolveFormId()` 多级匹配：精确 formKey/formType 匹配 -> nameZh/displayNameZh/canonicalNameZh 匹配 -> 大小写不敏感匹配 -> 回退默认形态。这解决了旧 slug 形中文 formKey（如"超级喷火龙x"）无法匹配新 formType（如"mega-x"）的问题。
 - 队伍/盒子 localStorage schema 已经是 ID 优先，同时保留中文展示字段。
 - Web 和小程序常量目前存在重复维护；改共享行为时两边都要查。
 - `SafeImage` 会把 52Poké 等外部图片域名代理到 `wsrv.nl`。

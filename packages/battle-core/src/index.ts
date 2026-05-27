@@ -31,13 +31,12 @@ export type {
   NameLookup,
 } from "./types.ts";
 
-export { NATURE_ZH_TO_EN, TYPE_ZH_TO_EN } from "@pokemon-localdex/store-types/constants";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 常量映射
 // ══════════════════════════════════════════════════════════════════════════════
 
-export const WEATHER_MAP: Record<string, string | undefined> = {
+const WEATHER_MAP: Record<string, string | undefined> = {
   none: undefined,
   sun: "Sun",
   rain: "Rain",
@@ -49,7 +48,7 @@ export const WEATHER_MAP: Record<string, string | undefined> = {
   strongWinds: "Strong Winds",      // Mega 裂空座 德尔塔气流
 };
 
-export const TERRAIN_MAP: Record<string, string | undefined> = {
+const TERRAIN_MAP: Record<string, string | undefined> = {
   none: undefined,
   electric: "Electric",
   grassy: "Grassy",
@@ -57,7 +56,7 @@ export const TERRAIN_MAP: Record<string, string | undefined> = {
   psychic: "Psychic",
 };
 
-export const STATUS_MAP: Record<string, string> = {
+const STATUS_MAP: Record<string, string> = {
   burn: "brn",
   paralysis: "par",
   poison: "psn",
@@ -76,7 +75,7 @@ export const STATUS_MAP: Record<string, string> = {
 // 工具函数
 // ══════════════════════════════════════════════════════════════════════════════
 
-export function natureZhToEn(natureZh: string): string {
+function natureZhToEn(natureZh: string): string {
   return NATURE_ZH_TO_EN[natureZh] || "Serious";
 }
 

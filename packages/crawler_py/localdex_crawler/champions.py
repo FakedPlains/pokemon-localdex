@@ -10,7 +10,6 @@ from .fetcher import RawPage
 from .utils import (
     clean_inline_text,
     normalize_media_url,
-    slugify,
     to_absolute_url,
     to_simplified,
     unique_by_key,
@@ -37,7 +36,6 @@ class ChampionsPokemonAvailability:
     dex_number: int | None
     form_code: str | None
     name_zh: str
-    form_key: str
     sort_order: int
 
 
@@ -56,7 +54,6 @@ class ChampionsRegulation:
 
 @dataclass(frozen=True)
 class ChampionsItem:
-    slug: str
     name_zh: str
     name_ja: str | None
     name_en: str | None
@@ -192,7 +189,6 @@ def parse_champions_items_page(html: str) -> list[ChampionsItem]:
             detail_url = to_absolute_url(str(anchor.get("href"))) if anchor and anchor.get("href") else None
             items.append(
                 ChampionsItem(
-                    slug=slugify(name),
                     name_zh=name,
                     name_ja=_cell_text(cells[ja_idx]) if ja_idx is not None and len(cells) > ja_idx else None,
                     name_en=_cell_text(cells[en_idx]) if en_idx is not None and len(cells) > en_idx else None,
@@ -205,7 +201,7 @@ def parse_champions_items_page(html: str) -> list[ChampionsItem]:
                 )
             )
             sort_order += 1
-    return unique_by_key(items, lambda item: item.slug)
+    return unique_by_key(items, lambda item: item.name_zh)
 
 
 def _parse_regulation_fields(table: Tag) -> dict[str, str]:
@@ -260,7 +256,6 @@ def _parse_msp_entries(value: str | None) -> list[ChampionsPokemonAvailability]:
                 dex_number=dex_number,
                 form_code=form_code,
                 name_zh=name,
-                form_key=slugify(name),
                 sort_order=sort_order,
             )
         )

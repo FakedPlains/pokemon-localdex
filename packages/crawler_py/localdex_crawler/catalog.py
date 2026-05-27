@@ -564,7 +564,6 @@ def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
     raw_image_url = _pick_item_image(page.html, seed)
     image_url = normalize_media_url(raw_image_url) if raw_image_url else None
     return {
-        "slug": slugify(seed.name_zh),
         "name_zh": seed.name_zh,
         "name_ja": name_ja or seed.name_ja,
         "name_en": name_en or seed.name_en,
