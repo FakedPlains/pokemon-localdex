@@ -163,7 +163,7 @@ export function buildDamageResult(data: AnyRecord, meta: AnyRecord) {
     min: data.min,
     max: data.max,
     average: data.average,
-    description: data.description || "",
+    description: data.descriptionZh || data.description || "",
     damageRolls: data.damageRolls || [],
     moveName: meta.selectedMove.nameZh || "",
     moveType,
@@ -174,5 +174,6 @@ export function buildDamageResult(data: AnyRecord, meta: AnyRecord) {
     minPercent: data.minPercent || 0,
     maxPercent: data.maxPercent || 0,
     direction: meta.calcDirection,
+    breakdown: data.breakdown || null,
   };
 }

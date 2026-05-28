@@ -107,6 +107,33 @@ export type DamageCalcInput = {
   };
 };
 
+/**
+ * 伤害因素的影响方向
+ */
+export type FactorEffect = "boost" | "reduce" | "neutral";
+
+/**
+ * 单个伤害因素
+ */
+export type DamageFactor = {
+  name: string;        // 因素名称（中文）
+  effect: FactorEffect; // 影响方向
+  value?: string;      // 可选的具体数值描述（如 "×2"、"×0.5"）
+  category: "type" | "stab" | "weather" | "terrain" | "ability" | "item" | "field" | "status" | "critical";
+};
+
+/**
+ * 伤害分解明细
+ */
+export type DamageBreakdown = {
+  /** 属性克制倍率（如 0.25, 0.5, 1, 2, 4） */
+  typeEffectiveness: number;
+  /** 是否有本属性加成（STAB） */
+  stab: boolean;
+  /** 参与计算的所有因素列表 */
+  factors: DamageFactor[];
+};
+
 export type DamageCalcResult = {
   min: number;
   max: number;
@@ -114,8 +141,10 @@ export type DamageCalcResult = {
   minPercent: number;
   maxPercent: number;
   defenderHp: number;
-  description: string;      // @smogon/calc 生成的完整描述
+  description: string;      // @smogon/calc 生成的完整英文描述
+  descriptionZh: string;    // 中文版本的总结描述
   damageRolls: number[];    // 所有 16 个乱数伤害值
+  breakdown: DamageBreakdown; // 伤害组成部分分解
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -141,15 +170,15 @@ export interface ResolvedNames {
  * battle-core 的 resolveNames() 通过此接口与 store 解耦。
  */
 export interface NameLookup {
-/**
-* 解析宝可梦英文名。
-* 查询优先级由 store 实现决定（通常：formId > pokemonId 默认形态 > nameZh）。
-*/
-pokemonNameEn(opts: {
-  pokemonId?: string | number;
-  formId?: string | number;
-  name?: string;
-}): Promise<string | undefined>;
+  /**
+   * 解析宝可梦英文名。
+   * 查询优先级由 store 实现决定（通常：formId > pokemonId 默认形态 > nameZh）。
+   */
+  pokemonNameEn(opts: {
+    pokemonId?: string | number;
+    formId?: string | number;
+    name?: string;
+  }): Promise<string | undefined>;
 
   /**
    * 解析实体（招式/特性/道具）英文名。
@@ -160,4 +189,26 @@ pokemonNameEn(opts: {
     id?: string | number,
     nameZh?: string,
   ): Promise<string | undefined>;
+
+  /**
+   * 查询特性/道具在伤害计算中的倍率修正值。
+   * 返回结构体包含 value（倍率）、effectType（效果类型 ID）、affectedStat（受影响能力值 ID）。
+   * 可选方法 — 未实现时 breakdown 不显示具体倍率。
+   */
+  getDamageModifier?(
+    kind: "ability" | "item",
+    id?: string | number,
+    nameZh?: string,
+    generation?: number,
+  ): Promise<DamageModifierInfo | undefined>;
+}
+
+/** getDamageModifier 返回的结构体 */
+export interface DamageModifierInfo {
+  /** 倍率值，如 1.3、2 */
+  value: number;
+  /** 效果类型 ID（101=能力值倍率, 201=威力倍率, 202=最终伤害倍率） */
+  effectType: number;
+  /** 受影响的能力值 ID（2=攻击, 3=防御, 4=特攻 等），仅 effectType=101 时有意义 */
+  affectedStat?: number;
 }

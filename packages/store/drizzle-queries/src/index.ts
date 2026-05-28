@@ -28,6 +28,12 @@ import type {
   PaginationParams,
   IStore,
 } from "@pokemon-localdex/store-types";
+import type {
+  AbilityBattleEffect,
+  ItemBattleEffect,
+  MoveBattleEffect,
+  MoveFlag,
+} from "@pokemon-localdex/store-types/battle-effects";
 
 import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 
@@ -46,7 +52,14 @@ import {
   getPokemonByAbilityRows,
   getPokemonByMoveRows,
 } from "./catalog-detail.ts";
-import { entityNameEnRow, pokemonNameEnRow } from "./battle-lookup.ts";
+import { entityNameEnRow, pokemonNameEnRow, getDamageModifierRow } from "./battle-lookup.ts";
+import {
+  getAbilityBattleEffectRows,
+  getItemBattleEffectRows,
+  getMoveBattleEffectRows,
+  getMoveFlagRows,
+  getMoveFlagsBatch,
+} from "./battle-effects.ts";
 import {
   listPokemonCardRows,
   listPokemonTableRows,
@@ -223,6 +236,30 @@ export class DrizzleStore implements IStore {
   }
 
   // ────────────────────────────────────────────────────────────────────────────
+  // Battle: 结构化效果查询
+  // ────────────────────────────────────────────────────────────────────────────
+
+  async getAbilityBattleEffects(abilityId: number, generation?: number): Promise<AbilityBattleEffect[]> {
+    return getAbilityBattleEffectRows(this.db, abilityId, generation);
+  }
+
+  async getItemBattleEffects(itemId: number, generation?: number): Promise<ItemBattleEffect[]> {
+    return getItemBattleEffectRows(this.db, itemId, generation);
+  }
+
+  async getMoveBattleEffects(moveId: number, generation?: number): Promise<MoveBattleEffect[]> {
+    return getMoveBattleEffectRows(this.db, moveId, generation);
+  }
+
+  async getMoveFlags(moveId: number): Promise<MoveFlag[]> {
+    return getMoveFlagRows(this.db, moveId);
+  }
+
+  async getMoveFlagsBatch(moveIds: number[]): Promise<Map<number, MoveFlag[]>> {
+    return getMoveFlagsBatch(this.db, moveIds);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
   // Battle: 原子名称查询（供 battle-core 的 resolveNames 使用）
   // ────────────────────────────────────────────────────────────────────────────
 
@@ -248,6 +285,19 @@ export class DrizzleStore implements IStore {
     nameZh?: string,
   ): Promise<string | undefined> {
     return entityNameEnRow(this.db, kind, id, nameZh);
+  }
+
+  /**
+   * 查询特性/道具在伤害计算中的倍率修正值。
+   * 返回结构体包含 value、effectType、affectedStat。
+   */
+  async getDamageModifier(
+    kind: "ability" | "item",
+    id?: string | number,
+    nameZh?: string,
+    generation?: number,
+  ) {
+    return getDamageModifierRow(this.db, kind, id, nameZh, generation);
   }
 }
 

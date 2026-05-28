@@ -1,5 +1,51 @@
 import TypeChip from "../TypeChip.jsx";
 
+/** 因素类别对应的图标/标签 */
+const CATEGORY_LABELS = {
+  type: "属性",
+  stab: "本属性",
+  weather: "天气",
+  terrain: "场地",
+  ability: "特性",
+  item: "道具",
+  field: "场地效果",
+  status: "状态",
+  critical: "暴击",
+};
+
+function FactorChip({ factor }) {
+  const effectClass = factor.effect === "boost"
+    ? "dc-factor-boost"
+    : factor.effect === "reduce"
+      ? "dc-factor-reduce"
+      : "dc-factor-neutral";
+
+  return (
+    <span className={`dc-factor-chip ${effectClass}`} title={factor.value || ""}>
+      <span className="dc-factor-category">{CATEGORY_LABELS[factor.category] || factor.category}</span>
+      <span className="dc-factor-name">{factor.name}</span>
+      {factor.value && <span className="dc-factor-value">{factor.value}</span>}
+    </span>
+  );
+}
+
+function BreakdownSection({ breakdown }) {
+  if (!breakdown || !breakdown.factors || breakdown.factors.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="dc-breakdown">
+      <div className="dc-breakdown-header">伤害因素</div>
+      <div className="dc-breakdown-factors">
+        {breakdown.factors.map((factor, idx) => (
+          <FactorChip key={`${factor.category}-${factor.name}-${idx}`} factor={factor} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DamageResultPanel({ result, calculating }) {
   return (
     <div className="dc-result-section">
@@ -29,9 +75,10 @@ export default function DamageResultPanel({ result, calculating }) {
           </div>
           {result.defHp > 0 && (
             <div className="dc-result-percent">
-              {((result.min / result.defHp) * 100).toFixed(1)}% - {((result.max / result.defHp) * 100).toFixed(1)}% HP
+              {result.minPercent}% - {result.maxPercent}% HP
             </div>
           )}
+          <BreakdownSection breakdown={result.breakdown} />
           {result.description && (
             <div className="dc-result-desc"><code>{result.description}</code></div>
           )}

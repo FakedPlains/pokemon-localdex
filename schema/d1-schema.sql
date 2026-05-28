@@ -216,6 +216,82 @@ CREATE TABLE IF NOT EXISTS item_generation_records (
 );
 
 -- ============================================================
+-- 战斗效果结构化数据
+-- 所有枚举字段存储整数，映射见 shared-types/src/battle-effects.ts
+-- ============================================================
+
+-- 招式标签（接触/声音/拳类等）
+-- 一对多：一个招式可带多个标签
+CREATE TABLE IF NOT EXISTS move_flags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
+  flag INTEGER NOT NULL,           -- MOVE_FLAG 枚举值
+  UNIQUE (move_id, flag)
+);
+
+-- 特性战斗效果
+CREATE TABLE IF NOT EXISTS ability_battle_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ability_id INTEGER NOT NULL REFERENCES abilities(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,    -- EFFECT_TYPE 枚举
+  trigger INTEGER NOT NULL DEFAULT 1,  -- TRIGGER 枚举, 1=ALWAYS
+  target INTEGER NOT NULL DEFAULT 1,   -- TARGET 枚举, 1=SELF
+  modifier_type INTEGER NOT NULL,  -- MODIFIER_TYPE 枚举
+  modifier_value REAL,             -- 倍率/等级数等主数值
+  affected_stat INTEGER,           -- BATTLE_STAT 枚举
+  affected_type INTEGER,           -- 属性 ID（TYPE_DEFS 的 id）
+  affected_move_flag INTEGER,      -- MOVE_FLAG 枚举
+  affected_move_category INTEGER,  -- MOVE_CATEGORY 枚举 (1=物理,2=特殊,3=变化)
+  params TEXT,                     -- JSON 扩展参数
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,          -- NULL = 当前仍有效
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+-- 道具战斗效果
+CREATE TABLE IF NOT EXISTS item_battle_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,
+  trigger INTEGER NOT NULL DEFAULT 1,
+  target INTEGER NOT NULL DEFAULT 1,
+  modifier_type INTEGER NOT NULL,
+  modifier_value REAL,
+  affected_stat INTEGER,
+  affected_type INTEGER,
+  affected_move_flag INTEGER,
+  affected_move_category INTEGER,
+  params TEXT,
+  consumable INTEGER NOT NULL DEFAULT 0,   -- 是否消耗品
+  species_restriction TEXT,                -- JSON 数组，限定宝可梦
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+-- 招式战斗效果（反作用力、多段、特殊公式等）
+CREATE TABLE IF NOT EXISTS move_battle_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,
+  trigger INTEGER NOT NULL DEFAULT 7,  -- TRIGGER 枚举, 7=ON_ATTACK
+  target INTEGER NOT NULL DEFAULT 2,   -- TARGET 枚举, 2=OPPONENT
+  modifier_type INTEGER NOT NULL,
+  modifier_value REAL,
+  affected_stat INTEGER,
+  affected_type INTEGER,
+  affected_move_flag INTEGER,
+  affected_move_category INTEGER,
+  params TEXT,
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+-- ============================================================
 -- Pokémon Champions 赛季 / 赛制 / 可用池
 -- ============================================================
 CREATE TABLE IF NOT EXISTS champions_regulations (
@@ -314,5 +390,15 @@ CREATE INDEX IF NOT EXISTS idx_champions_seasons_regulation ON champions_seasons
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_regulation ON champions_regulation_pokemon(regulation_id);
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_pokemon ON champions_regulation_pokemon(pokemon_id);
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_items_regulation ON champions_regulation_items(regulation_id);
+
+CREATE INDEX IF NOT EXISTS idx_move_flags_move ON move_flags(move_id);
+CREATE INDEX IF NOT EXISTS idx_move_flags_flag ON move_flags(flag);
+CREATE INDEX IF NOT EXISTS idx_abe_ability ON ability_battle_effects(ability_id);
+CREATE INDEX IF NOT EXISTS idx_abe_effect_type ON ability_battle_effects(effect_type);
+CREATE INDEX IF NOT EXISTS idx_abe_trigger ON ability_battle_effects(trigger);
+CREATE INDEX IF NOT EXISTS idx_ibe_item ON item_battle_effects(item_id);
+CREATE INDEX IF NOT EXISTS idx_ibe_effect_type ON item_battle_effects(effect_type);
+CREATE INDEX IF NOT EXISTS idx_mbe_move ON move_battle_effects(move_id);
+CREATE INDEX IF NOT EXISTS idx_mbe_effect_type ON move_battle_effects(effect_type);
 
 PRAGMA foreign_keys = ON;

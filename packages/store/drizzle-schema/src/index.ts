@@ -289,6 +289,89 @@ export const itemGenerationRecords = sqliteTable("item_generation_records", {
 ]);
 
 // ══════════════════════════════════════════════════════════════════════════════
+// 战斗效果结构化数据
+// ══════════════════════════════════════════════════════════════════════════════
+
+export const moveFlags = sqliteTable("move_flags", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  moveId: integer("move_id").notNull().references(() => moves.id, { onDelete: "cascade" }),
+  flag: integer("flag").notNull(),
+}, (table) => [
+  uniqueIndex("uq_move_flags").on(table.moveId, table.flag),
+  index("idx_move_flags_move").on(table.moveId),
+  index("idx_move_flags_flag").on(table.flag),
+]);
+
+export const abilityBattleEffects = sqliteTable("ability_battle_effects", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  abilityId: integer("ability_id").notNull().references(() => abilities.id, { onDelete: "cascade" }),
+  effectType: integer("effect_type").notNull(),
+  trigger: integer("trigger").notNull().default(1),
+  target: integer("target").notNull().default(1),
+  modifierType: integer("modifier_type").notNull(),
+  modifierValue: real("modifier_value"),
+  affectedStat: integer("affected_stat"),
+  affectedType: integer("affected_type"),
+  affectedMoveFlag: integer("affected_move_flag"),
+  affectedMoveCategory: integer("affected_move_category"),
+  params: text("params"),
+  generationStart: integer("generation_start").notNull().default(1),
+  generationEnd: integer("generation_end"),
+  priority: integer("priority").notNull().default(0),
+  note: text("note"),
+}, (table) => [
+  index("idx_abe_ability").on(table.abilityId),
+  index("idx_abe_effect_type").on(table.effectType),
+  index("idx_abe_trigger").on(table.trigger),
+]);
+
+export const itemBattleEffects = sqliteTable("item_battle_effects", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  itemId: integer("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
+  effectType: integer("effect_type").notNull(),
+  trigger: integer("trigger").notNull().default(1),
+  target: integer("target").notNull().default(1),
+  modifierType: integer("modifier_type").notNull(),
+  modifierValue: real("modifier_value"),
+  affectedStat: integer("affected_stat"),
+  affectedType: integer("affected_type"),
+  affectedMoveFlag: integer("affected_move_flag"),
+  affectedMoveCategory: integer("affected_move_category"),
+  params: text("params"),
+  consumable: integer("consumable").notNull().default(0),
+  speciesRestriction: text("species_restriction"),
+  generationStart: integer("generation_start").notNull().default(1),
+  generationEnd: integer("generation_end"),
+  priority: integer("priority").notNull().default(0),
+  note: text("note"),
+}, (table) => [
+  index("idx_ibe_item").on(table.itemId),
+  index("idx_ibe_effect_type").on(table.effectType),
+]);
+
+export const moveBattleEffects = sqliteTable("move_battle_effects", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  moveId: integer("move_id").notNull().references(() => moves.id, { onDelete: "cascade" }),
+  effectType: integer("effect_type").notNull(),
+  trigger: integer("trigger").notNull().default(7),
+  target: integer("target").notNull().default(2),
+  modifierType: integer("modifier_type").notNull(),
+  modifierValue: real("modifier_value"),
+  affectedStat: integer("affected_stat"),
+  affectedType: integer("affected_type"),
+  affectedMoveFlag: integer("affected_move_flag"),
+  affectedMoveCategory: integer("affected_move_category"),
+  params: text("params"),
+  generationStart: integer("generation_start").notNull().default(1),
+  generationEnd: integer("generation_end"),
+  priority: integer("priority").notNull().default(0),
+  note: text("note"),
+}, (table) => [
+  index("idx_mbe_move").on(table.moveId),
+  index("idx_mbe_effect_type").on(table.effectType),
+]);
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Pokémon Champions 赛季 / 赛制 / 可用池
 // ══════════════════════════════════════════════════════════════════════════════
 

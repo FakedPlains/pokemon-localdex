@@ -45,7 +45,6 @@ export {
   splitTypeNames,
   GAME_VERSION_NAMES,
   TYPE_NAMES,
-  TYPE_ALIASES,
   statBlockFromRow,
   sourceFromRow,
 } from "@pokemon-localdex/store-types";

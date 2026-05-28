@@ -5,7 +5,7 @@
  * 两个 store 包均从此处导入并重新导出，保证类型一致。
  */
 
-import { TYPE_ALIASES, TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.js";
+import { TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 基础类型
@@ -413,6 +413,13 @@ export interface IStore {
   listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;
   getItem(idOrName: string): Promise<ItemEntry | undefined>;
 
+  // Battle: 结构化效果查询
+  getAbilityBattleEffects(abilityId: number, generation?: number): Promise<import("./battle-effects.ts").AbilityBattleEffect[]>;
+  getItemBattleEffects(itemId: number, generation?: number): Promise<import("./battle-effects.ts").ItemBattleEffect[]>;
+  getMoveBattleEffects(moveId: number, generation?: number): Promise<import("./battle-effects.ts").MoveBattleEffect[]>;
+  getMoveFlags(moveId: number): Promise<import("./battle-effects.ts").MoveFlag[]>;
+  getMoveFlagsBatch(moveIds: number[]): Promise<Map<number, import("./battle-effects.ts").MoveFlag[]>>;
+
   // Battle: 原子名称查询（供 battle-core 的 resolveNames 编排使用）
   pokemonNameEn(opts: {
     pokemonId?: string | number;
@@ -425,43 +432,18 @@ export interface IStore {
     id?: string | number,
     nameZh?: string,
   ): Promise<string | undefined>;
+
+  // Battle: 伤害倍率查询（供 battle-core breakdown 展示使用）
+  getDamageModifier?(
+    kind: "ability" | "item",
+    id?: string | number,
+    nameZh?: string,
+    generation?: number,
+  ): Promise<{ value: number; effectType: number; affectedStat?: number } | undefined>;
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 共享常量
-// ══════════════════════════════════════════════════════════════════════════════
-
-export const GENERATIONS = [
-  [1, "第一世代", "Generation I"],
-  [2, "第二世代", "Generation II"],
-  [3, "第三世代", "Generation III"],
-  [4, "第四世代", "Generation IV"],
-  [5, "第五世代", "Generation V"],
-  [6, "第六世代", "Generation VI"],
-  [7, "第七世代", "Generation VII"],
-  [8, "第八世代", "Generation VIII"],
-  [9, "第九世代", "Generation IX"],
-  [99, "Champions", "Champions"],
-] as const;
-
-export const GAME_VERSIONS: Array<[string, string, number]> = [
-  ["RG", "红/绿", 1], ["B", "蓝", 1], ["Y", "黄", 1],
-  ["GS", "金/银", 2], ["C", "水晶", 2],
-  ["RS", "红宝石/蓝宝石", 3], ["E", "绿宝石", 3], ["FRLG", "火红/叶绿", 3],
-  ["DP", "钻石/珍珠", 4], ["Pt", "白金", 4], ["HGSS", "心金/魂银", 4],
-  ["BW", "黑/白", 5], ["B2W2", "黑2/白2", 5],
-  ["XY", "X/Y", 6], ["ORAS", "欧米伽红宝石/阿尔法蓝宝石", 6],
-  ["SM", "太阳/月亮", 7], ["USUM", "究极之日/究极之月", 7], ["LPLE", "Let's Go 皮卡丘/伊布", 7],
-  ["SWSH", "剑/盾", 8], ["SWSHE", "剑/盾 铠之孤岛+冠之雪原", 8], ["BDSP", "晶灿钻石/明亮珍珠", 8], ["LA", "传说 阿尔宙斯", 8],
-  ["SV", "朱/紫", 9], ["SVT", "朱/紫 零之秘宝", 9], ["ZA", "传说 Z-A", 9],
-  ["CHAMP", "冠军", 99],
-];
-
-export const GAME_VERSION_NAMES = new Map<string, string>(
-  GAME_VERSIONS.map(([code, nameZh]) => [code, nameZh])
-);
-
-export * from "./constants.js";
+export * from "./constants.ts";
+export * from "./battle-effects.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 共享辅助函数
@@ -484,7 +466,7 @@ export function splitTypeNames(type: string | undefined): string[] {
   const compact = normalized.replace(/\s+/g, "");
   const result: string[] = [];
   let rest = compact;
-  const candidates = [...TYPE_OPTIONS.map((typeOption) => typeOption.nameZh), ...Object.keys(TYPE_ALIASES)].sort((a, b) => b.length - a.length);
+  const candidates = TYPE_OPTIONS.map((typeOption) => typeOption.nameZh).sort((a, b) => b.length - a.length);
   while (rest) {
     const match = candidates.find((c) => rest.startsWith(c));
     if (!match) break;

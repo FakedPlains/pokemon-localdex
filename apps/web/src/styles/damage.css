@@ -1442,6 +1442,73 @@ gap: 3px;
   word-break: break-all;
 }
 
+/* ── 伤害因素分解 ── */
+.dc-breakdown {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.dc-breakdown-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.dc-breakdown-factors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dc-factor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.dc-factor-boost {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.25);
+  color: #2e7d32;
+}
+
+.dc-factor-reduce {
+  background: rgba(244, 67, 54, 0.08);
+  border: 1px solid rgba(244, 67, 54, 0.2);
+  color: #c62828;
+}
+
+.dc-factor-neutral {
+  background: rgba(158, 158, 158, 0.08);
+  border: 1px solid rgba(158, 158, 158, 0.2);
+  color: #616161;
+}
+
+.dc-factor-category {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.dc-factor-name {
+  font-weight: 600;
+}
+
+.dc-factor-value {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
 .dc-result-empty {
   padding: 24px 16px;
   text-align: center;

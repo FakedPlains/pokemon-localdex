@@ -1,6 +1,5 @@
 import {
   TYPE_OPTIONS,
-  TYPE_ALIASES,
   NATURE_EFFECTS,
   STAT_KEYS,
   LEARN_METHOD_LABELS,
@@ -33,7 +32,7 @@ export function splitTypeNames(type) {
 
   const result = [];
   let remaining = normalized;
-  const candidates = [...TYPE_OPTIONS.map((typeOption) => typeOption.nameZh), ...Object.keys(TYPE_ALIASES)]
+  const candidates = TYPE_OPTIONS.map((typeOption) => typeOption.nameZh)
     .sort((a, b) => b.length - a.length);
 
   while (remaining) {

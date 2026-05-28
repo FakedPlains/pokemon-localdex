@@ -44,6 +44,13 @@ const config = {
     prebundle: { enable: false }
   },
   mini: {
+    compile: {
+      include: [
+        // monorepo 共享包导出原始 .ts，需要纳入 Taro 编译
+        (modulePath) => modulePath.includes('@pokemon-localdex/store-types') ||
+                        modulePath.includes('packages/store/shared-types'),
+      ],
+    },
     postcss: {
       pxtransform: {
         enable: true,

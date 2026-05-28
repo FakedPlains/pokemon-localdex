@@ -24,16 +24,6 @@ ITEM_LIST_URL = "https://wiki.52poke.com/wiki/%E9%81%93%E5%85%B7%E5%88%97%E8%A1%
 MOVE_LIST_URL = "https://wiki.52poke.com/wiki/%E6%8B%9B%E5%BC%8F%E5%88%97%E8%A1%A8"
 ABILITY_LIST_URL = "https://wiki.52poke.com/wiki/%E7%89%B9%E6%80%A7%E5%88%97%E8%A1%A8"
 
-TYPE_ALIASES = {
-    "電": "电",
-    "飛行": "飞行",
-    "蟲": "虫",
-    "龍": "龙",
-    "惡": "恶",
-    "鋼": "钢",
-    "格鬥": "格斗",
-    "幽靈": "幽灵",
-}
 POKEMON_TYPES = {
     "一般", "火", "水", "电", "草", "冰", "格斗", "毒", "地面",
     "飞行", "超能力", "虫", "岩石", "幽灵", "龙", "恶", "钢", "妖精",
@@ -164,7 +154,7 @@ def clean_summary(value: str | None, max_length: int = 700) -> str | None:
 
 def normalize_type_name(value: str | None) -> str | None:
     text = clean_inline_text(value)
-    return TYPE_ALIASES.get(text, text) or None
+    return text or None
 
 
 def normalize_category(value: str | None) -> str | None:

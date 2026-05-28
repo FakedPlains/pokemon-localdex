@@ -96,9 +96,11 @@ export default function KoResultPanel({ mode, attackResults, defenseResults, mov
             </tr>
           </thead>
           <tbody>
-            {allRows.map(({ item, groupMeta }, idx) => (
-              <KoTableRow key={idx} item={item} mode={mode} colorClass={groupMeta.colorClass} />
-            ))}
+            {allRows.map(({ item, groupMeta }, idx) => {
+              const pk = mode === "attack" ? (item as AttackResultItem).target : (item as DefenseResultItem).source;
+              const rowKey = `${pk?.pokemonId || idx}-${(item as any).moveName || idx}`;
+              return <KoTableRow key={rowKey} item={item} mode={mode} colorClass={groupMeta.colorClass} />;
+            })}
           </tbody>
         </table>
       </div>
