@@ -32,6 +32,7 @@ const entityNames: Record<string, Record<string, string>> = {
   item: {
     命玉: "Life Orb",
     突击背心: "Assault Vest",
+    烛火果: "Occa Berry",
   },
 };
 
@@ -324,6 +325,25 @@ assert(typeFactor13?.effect === "boost", "Weather Ball in sun is super effective
 const weatherFactor13 = result13.breakdown?.factors.find(f => f.category === "weather");
 assert(weatherFactor13 != null, "weather boost present for Weather Ball in sun");
 assert(weatherFactor13?.effect === "boost", "sun boosts fire-type Weather Ball");
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Test 14: 减伤树果 — 防守方携带减伤树果展示 ×0.5 倍率
+// ══════════════════════════════════════════════════════════════════════════════
+
+console.log("Test 14: 减伤树果（烛火果 ×0.5）");
+const result14 = await calculateDamage({
+  generation: 9,
+  attacker: { name: "喷火龙", level: 50 },
+  defender: { name: "妙蛙种子", level: 50, item: "烛火果" },  // Occa Berry: 火属性减伤
+  move: { name: "火焰放射" },
+}, basicLookup);
+
+const berryFactor14 = result14.breakdown?.factors.find(
+  f => f.category === "item" && f.name === "烛火果"
+);
+assert(berryFactor14 != null, "resist berry factor present");
+assert(berryFactor14?.effect === "reduce", "resist berry effect is reduce");
+assert(berryFactor14?.value === "×0.5", "resist berry shows ×0.5 multiplier");
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 结果汇总

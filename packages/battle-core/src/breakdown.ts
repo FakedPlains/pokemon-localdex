@@ -33,6 +33,28 @@ import {
   HELPING_HAND_MULTIPLIER,
 } from "./helpers.ts";
 
+// ── 减伤树果：英文名 → 抵抗的属性（英文） ──
+const BERRY_RESIST_TYPE: Record<string, string> = {
+  "Chilan Berry": "Normal",
+  "Occa Berry": "Fire",
+  "Passho Berry": "Water",
+  "Wacan Berry": "Electric",
+  "Rindo Berry": "Grass",
+  "Yache Berry": "Ice",
+  "Chople Berry": "Fighting",
+  "Kebia Berry": "Poison",
+  "Shuca Berry": "Ground",
+  "Coba Berry": "Flying",
+  "Payapa Berry": "Psychic",
+  "Tanga Berry": "Bug",
+  "Charti Berry": "Rock",
+  "Kasib Berry": "Ghost",
+  "Haban Berry": "Dragon",
+  "Colbur Berry": "Dark",
+  "Babiri Berry": "Steel",
+  "Roseli Berry": "Fairy",
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // buildBreakdown
 // ══════════════════════════════════════════════════════════════════════════════
@@ -168,12 +190,25 @@ export async function buildBreakdown(
 
   // 8. 防守方道具
   if (rawDesc.defenderItem) {
-    pushModifierFactor(factors, defItemMod, {
-      name: input.defender.item || rawDesc.defenderItem,
-      defaultEffect: "reduce",
-      category: "item",
-      side: "defender",
-    });
+    const berryResistType = BERRY_RESIST_TYPE[rawDesc.defenderItem];
+    if (berryResistType) {
+      // 减伤树果：固定 ×0.5，成熟特性下 ×0.25
+      const hasRipen = rawDesc.defenderAbility === "Ripen";
+      const berryValue = hasRipen ? "×0.25" : "×0.5";
+      factors.push({
+        name: input.defender.item || rawDesc.defenderItem,
+        effect: "reduce",
+        value: berryValue,
+        category: "item",
+      });
+    } else {
+      pushModifierFactor(factors, defItemMod, {
+        name: input.defender.item || rawDesc.defenderItem,
+        defaultEffect: "reduce",
+        category: "item",
+        side: "defender",
+      });
+    }
   }
 
   // 9. 烧伤
