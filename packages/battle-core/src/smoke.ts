@@ -22,6 +22,7 @@ const entityNames: Record<string, Record<string, string>> = {
     飞叶快刀: "Razor Leaf",
     龙爪: "Dragon Claw",
     水流喷射: "Aqua Jet",
+    气象球: "Weather Ball",
   },
   ability: {
     硬爪: "Tough Claws",
@@ -301,6 +302,28 @@ const result12d = await calculateDamage({
 const screenDoubles = result12d.breakdown?.factors.find(f => f.name === "光墙");
 assert(screenDoubles != null, "光墙 factor present in doubles");
 assert(screenDoubles?.value === "×0.67", "光墙 doubles value is ×0.67");
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Test 13: 天气球变属性 — 晴天下气象球应为火属性
+// ══════════════════════════════════════════════════════════════════════════════
+
+console.log("Test 13: 天气球变属性（晴天→火属性）");
+const result13 = await calculateDamage({
+  generation: 9,
+  attacker: { name: "皮卡丘", level: 50 },
+  defender: { name: "妙蛙种子", level: 50 },  // 草/毒，火克草
+  move: { name: "气象球" },  // Weather Ball
+  field: { weather: "sun" },
+}, basicLookup);
+
+// 晴天下气象球变为火属性，对草系应该效果拔群
+const typeFactor13 = result13.breakdown?.factors.find(f => f.category === "type");
+assert(typeFactor13 != null, "type factor exists (Weather Ball → Fire vs Grass)");
+assert(typeFactor13?.effect === "boost", "Weather Ball in sun is super effective vs Grass");
+// 天气加成（晴天+火招）也应该出现
+const weatherFactor13 = result13.breakdown?.factors.find(f => f.category === "weather");
+assert(weatherFactor13 != null, "weather boost present for Weather Ball in sun");
+assert(weatherFactor13?.effect === "boost", "sun boosts fire-type Weather Ball");
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 结果汇总

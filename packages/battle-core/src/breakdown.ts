@@ -48,7 +48,8 @@ export async function buildBreakdown(
   const factors: DamageFactor[] = [];
 
   // 1. 属性克制
-  const moveType = move.type;
+  // rawDesc.moveType 是计算引擎处理天气球、自然之力等变属性招式后的实际属性
+  const moveType = rawDesc.moveType || move.type;
   const defenderTypes = result.defender.teraType && result.defender.teraType !== "Stellar"
     ? [result.defender.teraType]
     : result.defender.types.filter(Boolean);
