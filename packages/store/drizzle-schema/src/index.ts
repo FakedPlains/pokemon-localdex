@@ -372,6 +372,90 @@ export const moveBattleEffects = sqliteTable("move_battle_effects", {
 ]);
 
 // ══════════════════════════════════════════════════════════════════════════════
+// 场地效果（天气、场地、异常状态等）
+// ══════════════════════════════════════════════════════════════════════════════
+
+export const fieldEffects = sqliteTable("field_effects", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  kind: integer("kind").notNull(),
+  key: text("key").notNull(),
+  nameZh: text("name_zh").notNull(),
+  nameEn: text("name_en"),
+  nameJa: text("name_ja"),
+  description: text("description"),
+  introducedGeneration: integer("introduced_generation"),
+  maxTurns: integer("max_turns"),
+  maxLayers: integer("max_layers"),
+  sourceUrl: text("source_url"),
+  sourceTitle: text("source_title"),
+  sourceFetchedAt: text("source_fetched_at"),
+}, (table) => [
+  uniqueIndex("uq_field_effects_kind_key").on(table.kind, table.key),
+  index("idx_fe_kind").on(table.kind),
+  index("idx_fe_key").on(table.key),
+  index("idx_fe_name_zh").on(table.nameZh),
+]);
+
+export const fieldEffectModifiers = sqliteTable("field_effect_modifiers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  fieldEffectId: integer("field_effect_id").notNull().references(() => fieldEffects.id, { onDelete: "cascade" }),
+  effectType: integer("effect_type").notNull(),
+  trigger: integer("trigger").notNull().default(1),
+  target: integer("target").notNull().default(7),
+  modifierType: integer("modifier_type").notNull(),
+  modifierValue: real("modifier_value"),
+  affectedStat: integer("affected_stat"),
+  affectedType: integer("affected_type"),
+  affectedMoveFlag: integer("affected_move_flag"),
+  affectedMoveCategory: integer("affected_move_category"),
+  conditionKey: text("condition_key"),
+  params: text("params"),
+  generationStart: integer("generation_start").notNull().default(1),
+  generationEnd: integer("generation_end"),
+  priority: integer("priority").notNull().default(0),
+  note: text("note"),
+}, (table) => [
+  index("idx_fem_field_effect").on(table.fieldEffectId),
+  index("idx_fem_effect_type").on(table.effectType),
+]);
+
+export const fieldEffectGenerationRecords = sqliteTable("field_effect_generation_records", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  fieldEffectId: integer("field_effect_id").notNull().references(() => fieldEffects.id, { onDelete: "cascade" }),
+  generation: integer("generation").notNull(),
+  gameVersionCode: text("game_version_code"),
+  description: text("description"),
+  notes: text("notes"),
+  versionExclusive: integer("version_exclusive").notNull().default(0),
+}, (table) => [
+  uniqueIndex("uq_field_effect_gen").on(table.fieldEffectId, table.generation, sql`COALESCE(${table.gameVersionCode}, '')`),
+  index("idx_fegr_field_effect").on(table.fieldEffectId),
+]);
+
+export const fieldEffectSources = sqliteTable("field_effect_sources", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  fieldEffectId: integer("field_effect_id").notNull().references(() => fieldEffects.id, { onDelete: "cascade" }),
+  sourceType: integer("source_type").notNull(),
+  sourceId: integer("source_id").notNull(),
+  triggerMethod: integer("trigger_method").notNull().default(2),
+  layers: integer("layers"),
+  turnsOverride: integer("turns_override"),
+  conditionKey: text("condition_key"),
+  probability: real("probability"),
+  generationStart: integer("generation_start").notNull().default(1),
+  generationEnd: integer("generation_end"),
+  note: text("note"),
+}, (table) => [
+  uniqueIndex("uq_field_effect_sources").on(
+    table.fieldEffectId, table.sourceType, table.sourceId, table.triggerMethod,
+    sql`COALESCE(${table.conditionKey}, '')`,
+  ),
+  index("idx_fes_field_effect").on(table.fieldEffectId),
+  index("idx_fes_source").on(table.sourceType, table.sourceId),
+  index("idx_fes_source_type").on(table.sourceType),
+]);
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Pokémon Champions 赛季 / 赛制 / 可用池
 // ══════════════════════════════════════════════════════════════════════════════
 

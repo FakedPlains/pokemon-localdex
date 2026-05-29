@@ -11,6 +11,7 @@ const TeamsPage = lazy(() => import("./pages/TeamsPage.jsx"));
 const DamagePage = lazy(() => import("./pages/DamagePage.jsx"));
 const TypeChartPage = lazy(() => import("./pages/TypeChartPage.jsx"));
 const KoAnalysisPage = lazy(() => import("./pages/KoAnalysisPage.tsx"));
+const FieldEffectsPage = lazy(() => import("./pages/FieldEffectsPage.jsx"));
 
 const NAV_ITEMS = [
   { key: "pokedex", label: "图鉴", hash: "#/pokedex" },
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { key: "teams", label: "队伍", hash: "#/teams" },
   { key: "damage", label: "伤害", hash: "#/damage" },
   { key: "ko", label: "KO分析", hash: "#/ko" },
+  { key: "field-effects", label: "场地", hash: "#/field-effects" },
   { key: "typechart", label: "克制表", hash: "#/typechart" }
 ];
 
@@ -175,6 +177,8 @@ export default function App() {
         return <DamagePage teamDraft={teamDraft} />;
       case "ko":
         return <KoAnalysisPage />;
+      case "field-effects":
+        return <FieldEffectsPage />;
       case "typechart":
         return <TypeChartPage />;
       default:

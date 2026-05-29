@@ -349,6 +349,125 @@ export type PaginationParams = { offset?: number; limit?: number };
 export type PaginatedResult<T> = { items: T[]; total?: number; hasMore: boolean };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// 战斗效果记录类型（对应数据库行）
+// ══════════════════════════════════════════════════════════════════════════════
+
+import type {
+  EffectType,
+  Trigger,
+  Target,
+  ModifierType,
+  BattleStat,
+  MoveFlag,
+  MoveCategory,
+  FieldEffectKind,
+} from "./battle-effects.ts";
+
+export type BattleEffectRow = {
+  id: number;
+  entityId: number;
+  effectType: EffectType;
+  trigger: Trigger;
+  target: Target;
+  modifierType: ModifierType;
+  modifierValue: number | null;
+  affectedStat: BattleStat | null;
+  affectedType: number | null;       // 属性 ID（复用 TYPE_DEFS 的 id）
+  affectedMoveFlag: MoveFlag | null;
+  affectedMoveCategory: MoveCategory | null;
+  params: string | null;             // JSON 扩展参数
+  generationStart: number;
+  generationEnd: number | null;
+  priority: number;
+  note: string | null;
+};
+
+export type AbilityBattleEffect = BattleEffectRow & { abilityId: number };
+export type ItemBattleEffect = BattleEffectRow & {
+  itemId: number;
+  consumable: boolean;
+  speciesRestriction: string | null;  // JSON 数组
+};
+export type MoveBattleEffect = BattleEffectRow & { moveId: number };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 场地效果类型（对应 field_effects / field_effect_modifiers / field_effect_generation_records）
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** 场地效果主实体（天气/场地/异常状态/场侧/全场） */
+export type FieldEffectEntry = {
+  id: number;
+  kind: FieldEffectKind;
+  key: string;
+  nameZh: string;
+  nameEn?: string;
+  nameJa?: string;
+  description?: string;
+  introducedGeneration?: number;
+  maxTurns?: number;
+  maxLayers?: number;
+  source?: { url: string; title: string; fetchedAt: string };
+};
+
+/** 场地效果对战修正记录 */
+export type FieldEffectModifier = {
+  id: number;
+  fieldEffectId: number;
+  effectType: EffectType;
+  trigger: Trigger;
+  target: Target;
+  modifierType: ModifierType;
+  modifierValue: number | null;
+  affectedStat: BattleStat | null;
+  affectedType: number | null;
+  affectedMoveFlag: MoveFlag | null;
+  affectedMoveCategory: MoveCategory | null;
+  conditionKey: string | null;
+  params: string | null;
+  generationStart: number;
+  generationEnd: number | null;
+  priority: number;
+  note: string | null;
+};
+
+/** 场地效果世代差异记录 */
+export type FieldEffectGenerationRecord = {
+  generation: number;
+  gameVersionCode?: string;
+  versionExclusive?: boolean;
+  description?: string;
+  notes?: string;
+};
+
+/** 场地效果来源记录（含关联实体名称） */
+export type FieldEffectSourceRow = {
+  id: number;
+  fieldEffectId: number;
+  sourceType: FieldEffectSourceType;
+  sourceId: number;
+  sourceName: string | null;
+  triggerMethod: FieldEffectTriggerMethod;
+  layers: number | null;
+  turnsOverride: number | null;
+  conditionKey: string | null;
+  probability: number | null;
+  generationStart: number;
+  generationEnd: number | null;
+  note: string | null;
+};
+
+/** 场地效果详情（列表/详情 API 返回） */
+export type FieldEffectDetail = FieldEffectEntry & {
+  modifiers: FieldEffectModifier[];
+  generations: FieldEffectGenerationRecord[];
+};
+
+/** 场地效果完整详情（含来源关联） */
+export type FieldEffectFullDetail = FieldEffectDetail & {
+  sources: FieldEffectSourceRow[];
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Store 统一接口（sqlite-store 和 d1-store 共同实现）
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -413,12 +532,16 @@ export interface IStore {
   listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;
   getItem(idOrName: string): Promise<ItemEntry | undefined>;
 
+  // Field Effects
+  listFieldEffects(filters?: { kind?: number }): Promise<FieldEffectEntry[]>;
+  getFieldEffect(id: number): Promise<FieldEffectFullDetail | undefined>;
+
   // Battle: 结构化效果查询
-  getAbilityBattleEffects(abilityId: number, generation?: number): Promise<import("./battle-effects.ts").AbilityBattleEffect[]>;
-  getItemBattleEffects(itemId: number, generation?: number): Promise<import("./battle-effects.ts").ItemBattleEffect[]>;
-  getMoveBattleEffects(moveId: number, generation?: number): Promise<import("./battle-effects.ts").MoveBattleEffect[]>;
-  getMoveFlags(moveId: number): Promise<import("./battle-effects.ts").MoveFlag[]>;
-  getMoveFlagsBatch(moveIds: number[]): Promise<Map<number, import("./battle-effects.ts").MoveFlag[]>>;
+  getAbilityBattleEffects(abilityId: number, generation?: number): Promise<AbilityBattleEffect[]>;
+  getItemBattleEffects(itemId: number, generation?: number): Promise<ItemBattleEffect[]>;
+  getMoveBattleEffects(moveId: number, generation?: number): Promise<MoveBattleEffect[]>;
+  getMoveFlags(moveId: number): Promise<MoveFlag[]>;
+  getMoveFlagsBatch(moveIds: number[]): Promise<Map<number, MoveFlag[]>>;
 
   // Battle: 原子名称查询（供 battle-core 的 resolveNames 编排使用）
   pokemonNameEn(opts: {

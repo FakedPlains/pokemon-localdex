@@ -18,6 +18,16 @@ from .champions import (
     CHAMPIONS_SEASONS_URL,
     normalize_champions_pages,
 )
+from .field_effects import (
+    ALL_FIELD_EFFECT_SEEDS,
+    KIND_FIELD,
+    KIND_SIDE,
+    KIND_STATUS,
+    KIND_TERRAIN,
+    KIND_WEATHER,
+    build_field_effect_page_url,
+    normalize_field_effect_detail_page,
+)
 from .config import CrawlerPaths
 from .fetcher import PageFetcher, PageNotFoundError
 from .form_items import (
@@ -43,6 +53,7 @@ from .sqlite_upsert import (
     clear_abilities,
     clear_all,
     clear_champions,
+    clear_field_effects,
     clear_items,
     clear_moves,
     clear_pokemon,
@@ -53,6 +64,7 @@ from .sqlite_upsert import (
     upsert_ability_detail,
     upsert_champions_data,
     upsert_evolution_chains,
+    upsert_field_effect_detail,
     upsert_item_detail,
     upsert_move_detail,
     upsert_pokemon_abilities,
@@ -107,6 +119,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     champions = subparsers.add_parser("champions", help="Crawl Pokemon Champions seasons, regulations, Pokemon, and items.")
     add_runtime_flags(champions)
+
+    field_effects_parser = subparsers.add_parser("field-effects", help="Crawl field effects (weather, terrain, status, etc.) from Wiki.")
+    add_runtime_flags(field_effects_parser)
+    field_effects_parser.add_argument("--kind", choices=["weather", "terrain", "status", "side", "field"], help="Only crawl a specific kind.")
+    field_effects_parser.add_argument("--name", action="append", default=[], help="Only crawl specific effects by Chinese name.")
 
     all_parser = subparsers.add_parser("all", help="Crawl catalog, Pokemon details, learnsets, and Champions data.")
     add_runtime_flags(all_parser)
@@ -171,6 +188,8 @@ def main(argv: list[str] | None = None) -> int:
         return crawl_learnsets(conn, fetcher, args)
     if command == "champions":
         return crawl_champions(conn, fetcher, args)
+    if command == "field-effects":
+        return crawl_field_effects(conn, fetcher, args)
     if command == "all":
         clean = getattr(args, "clean", False)
         if clean and not args.dry_run:
@@ -183,7 +202,8 @@ def main(argv: list[str] | None = None) -> int:
         evolution_result = crawl_evolution(conn, fetcher, args)
         learnset_result = crawl_learnsets(conn, fetcher, args)
         champions_result = crawl_champions(conn, fetcher, args) if getattr(args, "champions", True) else 0
-        return catalog_result or pokemon_result or evolution_result or learnset_result or champions_result
+        field_effects_result = crawl_field_effects(conn, fetcher, args)
+        return catalog_result or pokemon_result or evolution_result or learnset_result or champions_result or field_effects_result
     raise ValueError(f"Unsupported command: {command}")
 
 
@@ -296,9 +316,23 @@ def crawl_pokemon_abilities(conn, fetcher: PageFetcher, args) -> int:
     clean = getattr(args, "clean", False)
     if clean and not args.dry_run:
         # pokemon-abilities 只清除特性关联数据，不清除宝可梦主表
-        conn.execute("DELETE FROM pokemon_form_abilities")
-        conn.commit()
-        print("[clean] Cleared pokemon_form_abilities table.")
+        conn.executescript("""
+            DROP TABLE IF EXISTS pokemon_form_abilities;
+            CREATE TABLE IF NOT EXISTS pokemon_form_abilities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+                ability_id INTEGER REFERENCES abilities(id),
+                ability_name_zh TEXT NOT NULL,
+                slot INTEGER NOT NULL,
+                is_hidden INTEGER NOT NULL DEFAULT 0,
+                generation_start INTEGER,
+                generation_end INTEGER,
+                UNIQUE (form_id, slot, generation_start)
+            );
+            CREATE INDEX IF NOT EXISTS idx_form_abilities_form ON pokemon_form_abilities(form_id);
+            CREATE INDEX IF NOT EXISTS idx_form_abilities_ability ON pokemon_form_abilities(ability_id, form_id);
+        """)
+        print("[clean] Rebuilt pokemon_form_abilities table.")
     names = parse_name_filters(args.pokemon)
     rows = select_pokemon(
         conn,
@@ -339,9 +373,28 @@ def crawl_evolution(conn, fetcher: PageFetcher, args) -> int:
     """
     clean = getattr(args, "clean", False)
     if clean and not args.dry_run:
-        conn.execute("DELETE FROM evolution_chains")
-        conn.commit()
-        print("[clean] Cleared evolution_chains table.")
+        conn.executescript("""
+            DROP TABLE IF EXISTS evolution_chains;
+            CREATE TABLE IF NOT EXISTS evolution_chains (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chain_id INTEGER NOT NULL,
+                from_pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE CASCADE,
+                to_pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+                from_form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
+                to_form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
+                stage INTEGER NOT NULL DEFAULT 0,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                evolution_method TEXT,
+                evolution_condition TEXT,
+                evolution_item TEXT,
+                evolution_level INTEGER,
+                notes TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_evo_chain ON evolution_chains(chain_id);
+            CREATE INDEX IF NOT EXISTS idx_evo_to ON evolution_chains(to_pokemon_id);
+            CREATE INDEX IF NOT EXISTS idx_evo_from ON evolution_chains(from_pokemon_id);
+        """)
+        print("[clean] Rebuilt evolution_chains table.")
 
     names = parse_name_filters(args.pokemon)
     rows = select_pokemon(
@@ -434,9 +487,32 @@ def crawl_form_items(conn, fetcher: PageFetcher, args) -> int:
 def crawl_learnsets(conn, fetcher: PageFetcher, args) -> int:
     clean = getattr(args, "clean", False)
     if clean and not args.dry_run:
-        conn.execute("DELETE FROM pokemon_moves")
-        conn.commit()
-        print("[clean] Cleared pokemon_moves.")
+        conn.executescript("""
+            DROP TABLE IF EXISTS pokemon_moves;
+            CREATE TABLE IF NOT EXISTS pokemon_moves (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
+                form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
+                move_id INTEGER REFERENCES moves(id),
+                move_name_zh TEXT NOT NULL,
+                generation INTEGER NOT NULL,
+                game_version_code TEXT,
+                learn_method TEXT NOT NULL,
+                level INTEGER,
+                tm_number TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                notes TEXT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_pokemon_moves ON pokemon_moves(
+                form_id, move_name_zh, generation,
+                COALESCE(game_version_code, ''),
+                learn_method, COALESCE(level, -1), COALESCE(tm_number, '')
+            );
+            CREATE INDEX IF NOT EXISTS idx_pokemon_moves_lookup ON pokemon_moves(pokemon_id, generation, form_id, game_version_code, learn_method, sort_order);
+            CREATE INDEX IF NOT EXISTS idx_pokemon_moves_form_gen ON pokemon_moves(form_id, generation);
+            CREATE INDEX IF NOT EXISTS idx_pokemon_moves_move ON pokemon_moves(move_id);
+        """)
+        print("[clean] Rebuilt pokemon_moves table.")
     seeds = selected_pokemon_seeds(fetcher, args)
     generations_filter = parse_generations(args.generations)
     updated = 0
@@ -536,6 +612,69 @@ def crawl_champions(conn, fetcher: PageFetcher, args) -> int:
         f"seasons={len(seasons)} regulations={len(regulations)} "
         f"pokemon={pokemon_count} items={len(items)} battleItems={battle_item_count} "
         f"{linked_info}dryRun={args.dry_run}"
+    )
+    return 0
+
+
+def crawl_field_effects(conn, fetcher: PageFetcher, args) -> int:
+    """爬取场地效果（天气、地形、状态、屏障、气场）。"""
+    clean = getattr(args, "clean", False)
+    dry_run = getattr(args, "dry_run", False)
+
+    if clean and not dry_run:
+        n = clear_field_effects(conn)
+        print(f"[clean] Deleted {n} field_effects rows.")
+
+    # 筛选 seeds
+    seeds = list(ALL_FIELD_EFFECT_SEEDS)
+    kind_filter = getattr(args, "kind", None)
+    name_filters = parse_name_filters(getattr(args, "name", []))
+
+    KIND_MAP = {"weather": KIND_WEATHER, "terrain": KIND_TERRAIN, "status": KIND_STATUS, "side": KIND_SIDE, "field": KIND_FIELD}
+    if kind_filter:
+        kind_int = KIND_MAP[kind_filter]
+        seeds = [s for s in seeds if s.kind == kind_int]
+    if name_filters:
+        seeds = [s for s in seeds if s.name_zh in name_filters]
+
+    updated = 0
+    errors = 0
+    total = len(seeds)
+
+    for idx, seed in enumerate(seeds, 1):
+        url = build_field_effect_page_url(seed)
+        cache_name = f"field-effect-{seed.kind}-{slugify(seed.name_zh)}"
+        try:
+            page = fetcher.load_or_fetch(cache_name, url)
+        except PageNotFoundError:
+            print(f"[{idx}/{total}] SKIP {seed.kind}/{seed.name_zh}: page not found")
+            errors += 1
+            continue
+        except Exception as e:
+            print(f"[{idx}/{total}] ERROR {seed.kind}/{seed.name_zh}: {e}")
+            errors += 1
+            continue
+
+        payload = normalize_field_effect_detail_page(page, seed)
+        gen_count = len(payload.get("generations") or [])
+        desc_len = len(payload.get("description") or "")
+
+        if dry_run:
+            print(
+                f"[{idx}/{total}] dry-run {seed.kind}/{seed.name_zh}: "
+                f"desc={desc_len}chars gen_changes={gen_count}"
+            )
+        else:
+            upsert_field_effect_detail(conn, payload)
+            print(
+                f"[{idx}/{total}] updated {seed.kind}/{seed.name_zh}: "
+                f"desc={desc_len}chars gen_changes={gen_count}"
+            )
+            updated += 1
+
+    print(
+        f"Field effects finished. total={total} updated={updated} "
+        f"errors={errors} dryRun={dry_run}"
     )
     return 0
 

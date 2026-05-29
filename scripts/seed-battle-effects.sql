@@ -4,10 +4,88 @@
 -- Enum reference: packages/store/shared-types/src/battle-effects.ts
 -- ==========================================================================
 
-DELETE FROM move_battle_effects;
-DELETE FROM item_battle_effects;
-DELETE FROM ability_battle_effects;
-DELETE FROM move_flags;
+-- Drop and recreate tables (faster than DELETE for full reseed)
+DROP TABLE IF EXISTS move_battle_effects;
+DROP TABLE IF EXISTS item_battle_effects;
+DROP TABLE IF EXISTS ability_battle_effects;
+DROP TABLE IF EXISTS move_flags;
+
+CREATE TABLE IF NOT EXISTS move_flags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
+  flag INTEGER NOT NULL,
+  UNIQUE (move_id, flag)
+);
+
+CREATE TABLE IF NOT EXISTS ability_battle_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ability_id INTEGER NOT NULL REFERENCES abilities(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,
+  trigger INTEGER NOT NULL DEFAULT 1,
+  target INTEGER NOT NULL DEFAULT 1,
+  modifier_type INTEGER NOT NULL,
+  modifier_value REAL,
+  affected_stat INTEGER,
+  affected_type INTEGER,
+  affected_move_flag INTEGER,
+  affected_move_category INTEGER,
+  params TEXT,
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+CREATE TABLE IF NOT EXISTS item_battle_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,
+  trigger INTEGER NOT NULL DEFAULT 1,
+  target INTEGER NOT NULL DEFAULT 1,
+  modifier_type INTEGER NOT NULL,
+  modifier_value REAL,
+  affected_stat INTEGER,
+  affected_type INTEGER,
+  affected_move_flag INTEGER,
+  affected_move_category INTEGER,
+  params TEXT,
+  consumable INTEGER NOT NULL DEFAULT 0,
+  species_restriction TEXT,
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+CREATE TABLE IF NOT EXISTS move_battle_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,
+  trigger INTEGER NOT NULL DEFAULT 7,
+  target INTEGER NOT NULL DEFAULT 2,
+  modifier_type INTEGER NOT NULL,
+  modifier_value REAL,
+  affected_stat INTEGER,
+  affected_type INTEGER,
+  affected_move_flag INTEGER,
+  affected_move_category INTEGER,
+  params TEXT,
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+-- Recreate indexes
+CREATE INDEX IF NOT EXISTS idx_move_flags_move ON move_flags(move_id);
+CREATE INDEX IF NOT EXISTS idx_move_flags_flag ON move_flags(flag);
+CREATE INDEX IF NOT EXISTS idx_abe_ability ON ability_battle_effects(ability_id);
+CREATE INDEX IF NOT EXISTS idx_abe_effect_type ON ability_battle_effects(effect_type);
+CREATE INDEX IF NOT EXISTS idx_abe_trigger ON ability_battle_effects(trigger);
+CREATE INDEX IF NOT EXISTS idx_ibe_item ON item_battle_effects(item_id);
+CREATE INDEX IF NOT EXISTS idx_ibe_effect_type ON item_battle_effects(effect_type);
+CREATE INDEX IF NOT EXISTS idx_mbe_move ON move_battle_effects(move_id);
+CREATE INDEX IF NOT EXISTS idx_mbe_effect_type ON move_battle_effects(effect_type);
 
 -- ==========================================================================
 -- PART 1: ability_battle_effects

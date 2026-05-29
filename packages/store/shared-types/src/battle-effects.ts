@@ -208,32 +208,51 @@ export type Weather = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type Terrain = 1 | 2 | 3 | 4;
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 战斗效果记录类型（对应数据库行）
+// field_effect_kind — 场地效果大类
 // ══════════════════════════════════════════════════════════════════════════════
 
-export type BattleEffectRow = {
-  id: number;
-  entityId: number;
-  effectType: EffectType;
-  trigger: Trigger;
-  target: Target;
-  modifierType: ModifierType;
-  modifierValue: number | null;
-  affectedStat: BattleStat | null;
-  affectedType: number | null;       // 属性 ID（复用 TYPE_DEFS 的 id）
-  affectedMoveFlag: MoveFlag | null;
-  affectedMoveCategory: MoveCategory | null;
-  params: string | null;             // JSON 扩展参数
-  generationStart: number;
-  generationEnd: number | null;
-  priority: number;
-  note: string | null;
-};
+const FIELD_EFFECT_KIND_DEFS = [
+  { id: 1, key: "WEATHER", label: "天气" },
+  { id: 2, key: "TERRAIN", label: "场地" },
+  { id: 3, key: "STATUS", label: "异常状态" },
+  { id: 4, key: "SIDE", label: "场侧效果" },
+  { id: 5, key: "FIELD", label: "全场效果" },
+] as const;
 
-export type AbilityBattleEffect = BattleEffectRow & { abilityId: number };
-export type ItemBattleEffect = BattleEffectRow & {
-  itemId: number;
-  consumable: boolean;
-  speciesRestriction: string | null;  // JSON 数组
-};
-export type MoveBattleEffect = BattleEffectRow & { moveId: number };
+export const FIELD_EFFECT_KIND = buildEnum(FIELD_EFFECT_KIND_DEFS);
+export type FieldEffectKind = typeof FIELD_EFFECT_KIND_DEFS[number]["id"];
+export const FIELD_EFFECT_KIND_LABELS: Record<number, string> = buildLabels(FIELD_EFFECT_KIND_DEFS);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// field_effect_source_type — 场地效果来源类型
+// ══════════════════════════════════════════════════════════════════════════════
+
+const FIELD_EFFECT_SOURCE_TYPE_DEFS = [
+  { id: 1, key: "ABILITY", label: "特性" },
+  { id: 2, key: "MOVE", label: "招式" },
+  { id: 3, key: "ITEM", label: "道具" },
+] as const;
+
+export const FIELD_EFFECT_SOURCE_TYPE = buildEnum(FIELD_EFFECT_SOURCE_TYPE_DEFS);
+export type FieldEffectSourceType = typeof FIELD_EFFECT_SOURCE_TYPE_DEFS[number]["id"];
+export const FIELD_EFFECT_SOURCE_TYPE_LABELS: Record<number, string> = buildLabels(FIELD_EFFECT_SOURCE_TYPE_DEFS);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// field_effect_trigger_method — 场地效果触发方式
+// ══════════════════════════════════════════════════════════════════════════════
+
+const FIELD_EFFECT_TRIGGER_METHOD_DEFS = [
+  { id: 1, key: "SET_ON_SWITCH_IN", label: "登场时设置" },
+  { id: 2, key: "SET_ON_USE", label: "使用时设置" },
+  { id: 3, key: "SET_ON_HIT", label: "命中时附带" },
+  { id: 4, key: "SET_ON_CONTACT", label: "接触时附带" },
+  { id: 5, key: "EXTEND_DURATION", label: "延长持续" },
+  { id: 6, key: "MAINTAIN", label: "维持/增强" },
+  { id: 7, key: "REMOVE", label: "移除效果" },
+  { id: 8, key: "PREVENT", label: "阻止施加" },
+] as const;
+
+export const FIELD_EFFECT_TRIGGER_METHOD = buildEnum(FIELD_EFFECT_TRIGGER_METHOD_DEFS);
+export type FieldEffectTriggerMethod = typeof FIELD_EFFECT_TRIGGER_METHOD_DEFS[number]["id"];
+export const FIELD_EFFECT_TRIGGER_METHOD_LABELS: Record<number, string> = buildLabels(FIELD_EFFECT_TRIGGER_METHOD_DEFS);
+

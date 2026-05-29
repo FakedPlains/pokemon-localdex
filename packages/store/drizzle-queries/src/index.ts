@@ -26,6 +26,8 @@ import type {
   PokemonByAbilitySummary,
   PaginatedResult,
   PaginationParams,
+  FieldEffectEntry,
+  FieldEffectFullDetail,
   IStore,
 } from "@pokemon-localdex/store-types";
 import type {
@@ -81,6 +83,10 @@ import {
   getPokemonEvolutionRow,
   type PokemonSummaryResult,
 } from "./pokemon-detail.ts";
+import {
+  listFieldEffectRows,
+  getFieldEffectRow,
+} from "./field-effects.query.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DrizzleStore — 实现 IStore 接口
@@ -233,6 +239,18 @@ export class DrizzleStore implements IStore {
 
   async getItem(idOrName: string): Promise<ItemEntry | undefined> {
     return getItemRow(this.db, idOrName);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Field Effects
+  // ────────────────────────────────────────────────────────────────────────────
+
+  async listFieldEffects(filters?: { kind?: number }): Promise<FieldEffectEntry[]> {
+    return listFieldEffectRows(this.db, filters);
+  }
+
+  async getFieldEffect(id: number): Promise<FieldEffectFullDetail | undefined> {
+    return getFieldEffectRow(this.db, id);
   }
 
   // ────────────────────────────────────────────────────────────────────────────

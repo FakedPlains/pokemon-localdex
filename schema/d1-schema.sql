@@ -292,6 +292,89 @@ CREATE TABLE IF NOT EXISTS move_battle_effects (
 );
 
 -- ============================================================
+-- 场地效果（天气、场地、异常状态等）— 主实体表 + 效果明细 + 世代记录
+-- ============================================================
+
+-- 效果类型枚举（field_effect_kind）：
+--   1 = weather    天气
+--   2 = terrain    场地
+--   3 = status     异常状态（烧伤/麻痹/中毒等）
+--   4 = side       场侧效果（反射壁/光墙/撒菱等）
+--   5 = field      全场效果（重力/戏法空间/魔法空间等）
+
+-- 主实体表：每种天气/场地/异常状态一条记录
+CREATE TABLE IF NOT EXISTS field_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind INTEGER NOT NULL,                 -- 效果大类 (1~5)
+  key TEXT NOT NULL,                     -- 程序内标识，如 "sun"、"electric"、"burn"、"reflect"
+  name_zh TEXT NOT NULL,                 -- 中文名，如 "晴天"、"电气场地"、"烧伤"
+  name_en TEXT,                          -- 英文名，如 "Sunny"、"Electric Terrain"、"Burn"
+  name_ja TEXT,                          -- 日文名
+  description TEXT,                      -- 当前最新世代的效果描述
+  introduced_generation INTEGER,         -- 初登场世代
+  max_turns INTEGER,                     -- 默认最大持续回合数（NULL = 无固定回合限制）
+  max_layers INTEGER,                    -- 最大叠加层数（如撒菱 3 层；NULL = 不可叠加）
+  source_url TEXT,
+  source_title TEXT,
+  source_fetched_at TEXT,
+  UNIQUE (kind, key)
+);
+
+-- 效果对战明细表：存储该效果对伤害计算的具体数值影响
+-- 结构复用 ability/item/move_battle_effects 的枚举体系
+CREATE TABLE IF NOT EXISTS field_effect_modifiers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  field_effect_id INTEGER NOT NULL REFERENCES field_effects(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,          -- EFFECT_TYPE 枚举（如 201=威力倍率, 101=能力值倍率）
+  trigger INTEGER NOT NULL DEFAULT 1,    -- TRIGGER 枚举
+  target INTEGER NOT NULL DEFAULT 7,     -- TARGET 枚举, 7=FIELD 全场
+  modifier_type INTEGER NOT NULL,        -- MODIFIER_TYPE 枚举
+  modifier_value REAL,                   -- 倍率/数值
+  affected_stat INTEGER,                 -- BATTLE_STAT 枚举
+  affected_type INTEGER,                 -- 属性 ID（TYPE_DEFS 的 id）
+  affected_move_flag INTEGER,            -- MOVE_FLAG 枚举
+  affected_move_category INTEGER,        -- MOVE_CATEGORY 枚举
+  condition_key TEXT,                    -- 额外条件标识（如 "grounded" 表示仅接地）
+  params TEXT,                           -- JSON 扩展参数
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,                -- NULL = 当前仍有效
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+-- 世代差异记录：记录效果在不同世代的描述/规则变化
+CREATE TABLE IF NOT EXISTS field_effect_generation_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  field_effect_id INTEGER NOT NULL REFERENCES field_effects(id) ON DELETE CASCADE,
+  generation INTEGER NOT NULL,
+  game_version_code TEXT,
+  description TEXT,                      -- 该世代的效果描述
+  notes TEXT,                            -- 备注（如"第五世代前为冰雹而非雪"）
+  version_exclusive INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (field_effect_id, generation, COALESCE(game_version_code, ''))
+);
+
+-- 场地效果来源关联表：记录哪些特性/招式/道具能触发或维持某个场地效果
+-- source_type: 1=ability, 2=move, 3=item
+-- trigger_method: 1=登场设置, 2=使用设置, 3=命中附带, 4=接触附带,
+--                 5=延长持续, 6=维持/增强, 7=移除, 8=阻止
+CREATE TABLE IF NOT EXISTS field_effect_sources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  field_effect_id INTEGER NOT NULL REFERENCES field_effects(id) ON DELETE CASCADE,
+  source_type INTEGER NOT NULL,           -- 来源大类：1=ability, 2=move, 3=item
+  source_id INTEGER NOT NULL,             -- abilities.id / moves.id / items.id
+  trigger_method INTEGER NOT NULL DEFAULT 2,  -- 触发方式枚举
+  layers INTEGER,                         -- 每次触发叠加层数（NULL=不适用）
+  turns_override INTEGER,                 -- 回合数覆盖（延长道具等；NULL=使用默认）
+  condition_key TEXT,                     -- 附加触发条件标识
+  probability REAL,                       -- 触发概率（NULL或1.0=必定触发）
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,                 -- NULL = 当前仍有效
+  note TEXT,
+  UNIQUE (field_effect_id, source_type, source_id, trigger_method, COALESCE(condition_key, ''))
+);
+
+-- ============================================================
 -- Pokémon Champions 赛季 / 赛制 / 可用池
 -- ============================================================
 CREATE TABLE IF NOT EXISTS champions_regulations (
@@ -400,5 +483,15 @@ CREATE INDEX IF NOT EXISTS idx_ibe_item ON item_battle_effects(item_id);
 CREATE INDEX IF NOT EXISTS idx_ibe_effect_type ON item_battle_effects(effect_type);
 CREATE INDEX IF NOT EXISTS idx_mbe_move ON move_battle_effects(move_id);
 CREATE INDEX IF NOT EXISTS idx_mbe_effect_type ON move_battle_effects(effect_type);
+
+CREATE INDEX IF NOT EXISTS idx_fe_kind ON field_effects(kind);
+CREATE INDEX IF NOT EXISTS idx_fe_key ON field_effects(key);
+CREATE INDEX IF NOT EXISTS idx_fe_name_zh ON field_effects(name_zh);
+CREATE INDEX IF NOT EXISTS idx_fem_field_effect ON field_effect_modifiers(field_effect_id);
+CREATE INDEX IF NOT EXISTS idx_fem_effect_type ON field_effect_modifiers(effect_type);
+CREATE INDEX IF NOT EXISTS idx_fegr_field_effect ON field_effect_generation_records(field_effect_id);
+CREATE INDEX IF NOT EXISTS idx_fes_field_effect ON field_effect_sources(field_effect_id);
+CREATE INDEX IF NOT EXISTS idx_fes_source ON field_effect_sources(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_fes_source_type ON field_effect_sources(source_type);
 
 PRAGMA foreign_keys = ON;
