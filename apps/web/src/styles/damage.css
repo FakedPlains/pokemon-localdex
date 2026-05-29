@@ -902,7 +902,7 @@ gap: 3px;
 
 .dc-stat-header-row {
   display: grid;
-  grid-template-columns: 2.5fr 2fr 2.5fr 3fr 2.5fr 4.5fr;
+  grid-template-columns: 2.5fr 2fr 2.5fr 3fr 2.2fr 2.5fr 4.5fr;
   gap: 6px;
   padding: 4px 0;
   font-size: 10px;
@@ -914,7 +914,7 @@ gap: 3px;
 
 .dc-stat-row {
   display: grid;
-  grid-template-columns: 2.5fr 2fr 2.5fr 3fr 2.5fr 4.5fr;
+  grid-template-columns: 2.5fr 2fr 2.5fr 3fr 2.2fr 2.5fr 4.5fr;
   gap: 6px;
   align-items: center;
   padding: 3px 0;
@@ -923,7 +923,7 @@ gap: 3px;
 /* Champions mode: no IV column, adjust grid */
 .dc-stat-champions .dc-stat-header-row,
 .dc-stat-champions .dc-stat-row {
-  grid-template-columns: 2.5fr 2fr 3fr 2.5fr 4.5fr;
+  grid-template-columns: 2.5fr 2fr 3fr 2.2fr 2.5fr 4.5fr;
 }
 
 .dc-stat-col-label {
@@ -947,6 +947,31 @@ gap: 3px;
 
 .dc-stat-na {
   color: var(--muted);
+}
+
+/* ── 性格加成指示器 ── */
+.dc-stat-col-nature {
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.dc-nature-up {
+  color: #c0392b;
+}
+
+.dc-nature-down {
+  color: #2980b9;
+}
+
+.dc-nature-neutral {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.dc-stat-full {
+  color: #27ae60;
+  font-weight: 600;
 }
 
 .dc-stat-input {
