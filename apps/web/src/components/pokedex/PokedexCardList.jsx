@@ -35,8 +35,8 @@ export default function PokedexCardList({
                 ? <img src={image.url} alt={image.alt || member.nameZh} referrerPolicy="no-referrer" loading="lazy" />
                 : <span className="dex-card-placeholder">?</span>}
             </div>
+            <span className="dex-item-dex">#{String(member.dexNumber || "?").padStart(4, "0")}</span>
             <div className="dex-item-info">
-              <span className="dex-item-dex">#{String(member.dexNumber || "?").padStart(4, "0")}</span>
               <strong className="dex-item-name">{member.nameZh}</strong>
               <span className="dex-item-en">{member.nameEn || ""}</span>
             </div>

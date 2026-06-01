@@ -7,7 +7,7 @@ import {
 import type { ChampionsSeasonSummary } from "@pokemon-localdex/store-types";
 
 export type ChampionRegulationPokemonRow = {
-  formId?: number;
+  formId: number;
   nameZh: string;
 };
 
@@ -62,7 +62,7 @@ export async function championRegulationPokemonRows(
     ));
 
   return rows.map((item: any) => ({
-    formId: item.formId != null ? Number(item.formId) : undefined,
+    formId: Number(item.formId),
     nameZh: String(item.nameZh),
   }));
 }

@@ -5,7 +5,7 @@
  * 两个 store 包均从此处导入并重新导出，保证类型一致。
  */
 
-import { TYPE_ALIASES, TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.js";
+import { TYPE_OPTIONS, typeIdToName, typeNameToId } from "./constants.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 基础类型
@@ -56,9 +56,16 @@ export type FormAbilityVariant = {
 
 export type PokemonFormEntry = {
   id: number;
+  /** Legacy API alias for formType; kept so older UI/localStorage can still render. */
   formKey: string;
-  nameZh: string;
   formType: string;
+  formCategory: string;
+  /** Canonical full Chinese form name, aligned with Champions availability names. */
+  canonicalNameZh?: string;
+  /** Human-facing form label used by Pokemon detail UI. */
+  displayNameZh?: string;
+  nameZh: string;
+  nameEn?: string;
   isDefault: boolean;
   sortOrder: number;
   primaryType?: string;
@@ -67,7 +74,7 @@ export type PokemonFormEntry = {
   baseStats?: StatBlock;
   images: Record<string, ImageAsset>;
   /** 该形态必须携带的道具（如 Mega 石、原始宝珠等），为 null/undefined 表示无绑定 */
-  requiredItem?: { id: string; nameZh: string; slug: string; imageUrl?: string };
+  requiredItem?: { id: string; nameZh: string; imageUrl?: string };
   /** Generation-specific stat variants (when stats changed across generations) */
   statVariants?: FormStatVariant[];
   /** Generation-specific type variants (when types changed across generations) */
@@ -83,10 +90,12 @@ export type PokemonFormEntry = {
 export type EvolutionStep = {
   fromPokemonId?: number;
   fromNameZh?: string;
-  fromFormKey?: string;
+  fromFormId?: number;
   toPokemonId: number;
   toNameZh: string;
-  toFormKey?: string;
+  toFormId?: number;
+  /** 形态的中文展示名（如"阿罗拉拉达"），仅非默认形态时有值 */
+  toFormName?: string;
   stage: number;
   method?: string;
   condition?: string;
@@ -103,7 +112,6 @@ export type EvolutionStep = {
 export type PokemonSummary = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -114,13 +122,11 @@ export type PokemonSummary = {
   baseStats?: StatBlock;
   image?: ImageAsset;
   shinyImage?: ImageAsset;
-  generations: number[];
 };
 
 export type PokemonCardSummary = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
   nameEn?: string;
   primaryType?: string;
@@ -146,7 +152,6 @@ export type PokemonEntry = PokemonSummary & {
 export type PokemonIdentity = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
 };
 
@@ -241,7 +246,6 @@ export type ItemGenerationRecord = {
 
 export type ItemEntry = {
   id: string;
-  slug: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -272,13 +276,40 @@ export type LearnsetRecord = {
   moveDescription?: string;
 };
 
+export type LearnsetFormMeta = {
+  formId: number;
+  formType: string;
+  formCategory: string;
+  canonicalNameZh?: string;
+  displayNameZh?: string;
+  nameZh: string;
+  nameEn?: string;
+  isDefault: boolean;
+  hasOwnMovesByGeneration?: Record<number, boolean>;
+};
+
+export type LearnsetQueryOptions = {
+  formId?: number;
+  gameVersionCode?: string;
+};
+
+export type LearnsetResult = {
+  moves: LearnsetRecord[];
+  formId: number;
+  effectiveFormId: number;
+  usesDefaultLearnset: boolean;
+  gameVersionCode?: string;
+  hasMore?: boolean;
+  methodCounts?: Record<string, number>;
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 招式表 Meta / 宝可梦反查摘要
 // ══════════════════════════════════════════════════════════════════════════════
 
 export type LearnsetMeta = {
   generations: number[];
-  formKeys: string[];
+  forms: LearnsetFormMeta[];
   versionsByGen: Record<number, Array<{ code: string; name: string }>>;
 };
 
@@ -286,7 +317,6 @@ export type LearnsetMeta = {
 export type PokemonByMoveSummary = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -300,7 +330,6 @@ export type PokemonByMoveSummary = {
 export type PokemonByAbilitySummary = {
   id: number;
   dexNumber: number;
-  slug: string;
   nameZh: string;
   nameJa?: string;
   nameEn?: string;
@@ -318,6 +347,125 @@ export type SortOrder = "asc" | "desc";
 export type PokemonListSortKey = "speed";
 export type PaginationParams = { offset?: number; limit?: number };
 export type PaginatedResult<T> = { items: T[]; total?: number; hasMore: boolean };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 战斗效果记录类型（对应数据库行）
+// ══════════════════════════════════════════════════════════════════════════════
+
+import type {
+  EffectType,
+  Trigger,
+  Target,
+  ModifierType,
+  BattleStat,
+  MoveFlag,
+  MoveCategory,
+  FieldEffectKind,
+} from "./battle-effects.ts";
+
+export type BattleEffectRow = {
+  id: number;
+  entityId: number;
+  effectType: EffectType;
+  trigger: Trigger;
+  target: Target;
+  modifierType: ModifierType;
+  modifierValue: number | null;
+  affectedStat: BattleStat | null;
+  affectedType: number | null;       // 属性 ID（复用 TYPE_DEFS 的 id）
+  affectedMoveFlag: MoveFlag | null;
+  affectedMoveCategory: MoveCategory | null;
+  params: string | null;             // JSON 扩展参数
+  generationStart: number;
+  generationEnd: number | null;
+  priority: number;
+  note: string | null;
+};
+
+export type AbilityBattleEffect = BattleEffectRow & { abilityId: number };
+export type ItemBattleEffect = BattleEffectRow & {
+  itemId: number;
+  consumable: boolean;
+  speciesRestriction: string | null;  // JSON 数组
+};
+export type MoveBattleEffect = BattleEffectRow & { moveId: number };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 场地效果类型（对应 field_effects / field_effect_modifiers / field_effect_generation_records）
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** 场地效果主实体（天气/场地/异常状态/场侧/全场） */
+export type FieldEffectEntry = {
+  id: number;
+  kind: FieldEffectKind;
+  key: string;
+  nameZh: string;
+  nameEn?: string;
+  nameJa?: string;
+  description?: string;
+  introducedGeneration?: number;
+  maxTurns?: number;
+  maxLayers?: number;
+  source?: { url: string; title: string; fetchedAt: string };
+};
+
+/** 场地效果对战修正记录 */
+export type FieldEffectModifier = {
+  id: number;
+  fieldEffectId: number;
+  effectType: EffectType;
+  trigger: Trigger;
+  target: Target;
+  modifierType: ModifierType;
+  modifierValue: number | null;
+  affectedStat: BattleStat | null;
+  affectedType: number | null;
+  affectedMoveFlag: MoveFlag | null;
+  affectedMoveCategory: MoveCategory | null;
+  conditionKey: string | null;
+  params: string | null;
+  generationStart: number;
+  generationEnd: number | null;
+  priority: number;
+  note: string | null;
+};
+
+/** 场地效果世代差异记录 */
+export type FieldEffectGenerationRecord = {
+  generation: number;
+  gameVersionCode?: string;
+  versionExclusive?: boolean;
+  description?: string;
+  notes?: string;
+};
+
+/** 场地效果来源记录（含关联实体名称） */
+export type FieldEffectSourceRow = {
+  id: number;
+  fieldEffectId: number;
+  sourceType: FieldEffectSourceType;
+  sourceId: number;
+  sourceName: string | null;
+  triggerMethod: FieldEffectTriggerMethod;
+  layers: number | null;
+  turnsOverride: number | null;
+  conditionKey: string | null;
+  probability: number | null;
+  generationStart: number;
+  generationEnd: number | null;
+  note: string | null;
+};
+
+/** 场地效果详情（列表/详情 API 返回） */
+export type FieldEffectDetail = FieldEffectEntry & {
+  modifiers: FieldEffectModifier[];
+  generations: FieldEffectGenerationRecord[];
+};
+
+/** 场地效果完整详情（含来源关联） */
+export type FieldEffectFullDetail = FieldEffectDetail & {
+  sources: FieldEffectSourceRow[];
+};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Store 统一接口（sqlite-store 和 d1-store 共同实现）
@@ -354,20 +502,25 @@ export interface IStore {
     sort?: PokemonListSortKey;
     order?: SortOrder;
   } & PaginationParams): Promise<PokemonTableSummary[] | PaginatedResult<PokemonTableSummary>>;
-  getPokemon(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<PokemonEntry | undefined>;
-  getPokemonSummary(idOrSlug: string, filters?: { championsSeasonId?: number }): Promise<Omit<PokemonEntry, "evolutionChain" | "generations"> | undefined>;
+  getPokemon(idOrName: string, filters?: { championsSeasonId?: number }): Promise<PokemonEntry | undefined>;
+  getPokemonSummary(idOrName: string, filters?: { championsSeasonId?: number }): Promise<Omit<PokemonEntry, "evolutionChain"> | undefined>;
   getPokemonEvolution(pokemonId: number): Promise<EvolutionStep[]>;
-  getPokemonGenerations(pokemonId: number): Promise<number[]>;
-  getPokemonIdentity(idOrSlug: string): Promise<PokemonIdentity | undefined>;
+  getPokemonIdentity(idOrName: string): Promise<PokemonIdentity | undefined>;
   getLearnsetMeta(pokemonId: number): Promise<LearnsetMeta>;
-  getPokemonLearnset(pokemonId: number, generation: number, formKey?: string, gameVersionCode?: string, pagination?: PaginationParams, learnMethod?: string): Promise<{ moves: LearnsetRecord[]; formKey: string; gameVersionCode?: string; hasMore?: boolean; methodCounts?: Record<string, number> }>;
+  getPokemonLearnset(
+    pokemonId: number,
+    generation: number,
+    options?: LearnsetQueryOptions,
+    pagination?: PaginationParams,
+    learnMethod?: string,
+  ): Promise<LearnsetResult>;
 
   // Champions
   listChampionsSeasons(): Promise<ChampionsSeasonSummary[]>;
 
   // Moves
   listMoves(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams): Promise<MoveEntry[] | PaginatedResult<MoveEntry>>;
-  getMove(idOrSlug: string): Promise<MoveEntry | undefined>;
+  getMove(idOrName: string): Promise<MoveEntry | undefined>;
   getPokemonByMove(moveId: number, pagination?: PaginationParams): Promise<PokemonByMoveSummary[] | PaginatedResult<PokemonByMoveSummary>>;
 
   // Abilities
@@ -377,13 +530,23 @@ export interface IStore {
 
   // Items
   listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;
-  getItem(idOrSlug: string): Promise<ItemEntry | undefined>;
+  getItem(idOrName: string): Promise<ItemEntry | undefined>;
+
+  // Field Effects
+  listFieldEffects(filters?: { kind?: number }): Promise<FieldEffectEntry[]>;
+  getFieldEffect(id: number): Promise<FieldEffectFullDetail | undefined>;
+
+  // Battle: 结构化效果查询
+  getAbilityBattleEffects(abilityId: number, generation?: number): Promise<AbilityBattleEffect[]>;
+  getItemBattleEffects(itemId: number, generation?: number): Promise<ItemBattleEffect[]>;
+  getMoveBattleEffects(moveId: number, generation?: number): Promise<MoveBattleEffect[]>;
+  getMoveFlags(moveId: number): Promise<MoveFlag[]>;
+  getMoveFlagsBatch(moveIds: number[]): Promise<Map<number, MoveFlag[]>>;
 
   // Battle: 原子名称查询（供 battle-core 的 resolveNames 编排使用）
   pokemonNameEn(opts: {
     pokemonId?: string | number;
     formId?: string | number;
-    formKey?: string;
     name?: string;
   }): Promise<string | undefined>;
 
@@ -392,43 +555,18 @@ export interface IStore {
     id?: string | number,
     nameZh?: string,
   ): Promise<string | undefined>;
+
+  // Battle: 伤害倍率查询（供 battle-core breakdown 展示使用）
+  getDamageModifier?(
+    kind: "ability" | "item",
+    id?: string | number,
+    nameZh?: string,
+    generation?: number,
+  ): Promise<{ value: number; effectType: number; affectedStat?: number } | undefined>;
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 共享常量
-// ══════════════════════════════════════════════════════════════════════════════
-
-export const GENERATIONS = [
-  [1, "第一世代", "Generation I"],
-  [2, "第二世代", "Generation II"],
-  [3, "第三世代", "Generation III"],
-  [4, "第四世代", "Generation IV"],
-  [5, "第五世代", "Generation V"],
-  [6, "第六世代", "Generation VI"],
-  [7, "第七世代", "Generation VII"],
-  [8, "第八世代", "Generation VIII"],
-  [9, "第九世代", "Generation IX"],
-  [99, "Champions", "Champions"],
-] as const;
-
-export const GAME_VERSIONS: Array<[string, string, number]> = [
-  ["RG", "红/绿", 1], ["B", "蓝", 1], ["Y", "黄", 1],
-  ["GS", "金/银", 2], ["C", "水晶", 2],
-  ["RS", "红宝石/蓝宝石", 3], ["E", "绿宝石", 3], ["FRLG", "火红/叶绿", 3],
-  ["DP", "钻石/珍珠", 4], ["Pt", "白金", 4], ["HGSS", "心金/魂银", 4],
-  ["BW", "黑/白", 5], ["B2W2", "黑2/白2", 5],
-  ["XY", "X/Y", 6], ["ORAS", "欧米伽红宝石/阿尔法蓝宝石", 6],
-  ["SM", "太阳/月亮", 7], ["USUM", "究极之日/究极之月", 7], ["LPLE", "Let's Go 皮卡丘/伊布", 7],
-  ["SWSH", "剑/盾", 8], ["SWSHE", "剑/盾 铠之孤岛+冠之雪原", 8], ["BDSP", "晶灿钻石/明亮珍珠", 8], ["LA", "传说 阿尔宙斯", 8],
-  ["SV", "朱/紫", 9], ["SVT", "朱/紫 零之秘宝", 9], ["ZA", "传说 Z-A", 9],
-  ["CHAMP", "冠军", 99],
-];
-
-export const GAME_VERSION_NAMES = new Map<string, string>(
-  GAME_VERSIONS.map(([code, nameZh]) => [code, nameZh])
-);
-
-export * from "./constants.js";
+export * from "./constants.ts";
+export * from "./battle-effects.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 共享辅助函数
@@ -451,7 +589,7 @@ export function splitTypeNames(type: string | undefined): string[] {
   const compact = normalized.replace(/\s+/g, "");
   const result: string[] = [];
   let rest = compact;
-  const candidates = [...TYPE_OPTIONS.map((typeOption) => typeOption.nameZh), ...Object.keys(TYPE_ALIASES)].sort((a, b) => b.length - a.length);
+  const candidates = TYPE_OPTIONS.map((typeOption) => typeOption.nameZh).sort((a, b) => b.length - a.length);
   while (rest) {
     const match = candidates.find((c) => rest.startsWith(c));
     if (!match) break;

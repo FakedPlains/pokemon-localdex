@@ -54,9 +54,9 @@ export default function SimplePokemonList({ search, onSelect }) {
       {data.map((p) => {
         const img = getPokemonPreviewImage(p);
         return (
-          <button key={p.slug || p.id} className="dc-simple-list-item" onClick={() => onSelect(p)}>
+          <button key={p.id} className="dc-simple-list-item" onClick={() => onSelect(p)}>
             {img?.url && <img className="dc-simple-list-img" src={img.url} alt="" referrerPolicy="no-referrer" />}
-            <span className="dc-simple-list-name">{p.nameZh || p.slug}</span>
+            <span className="dc-simple-list-name">{p.nameZh || ""}</span>
             <span className="dc-simple-list-types">
               {p.primaryType && <TypeChip type={p.primaryType} size="xs" />}
               {p.secondaryType && <TypeChip type={p.secondaryType} size="xs" />}

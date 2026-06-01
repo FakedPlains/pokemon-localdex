@@ -4,7 +4,7 @@
 
 Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlite` 存储所有结构化数据。数据库由 Python 爬虫创建和写入，由 Node.js API 层只读查询。
 
-所有主表的主键使用 `INTEGER PRIMARY KEY AUTOINCREMENT`，外键关系使用自增整数 ID。API 查询兼容数字 ID、`slug` 和中文名多种方式。
+所有主表的主键使用 `INTEGER PRIMARY KEY AUTOINCREMENT`，外键关系使用自增整数 ID。API 查询兼容数字 ID 和中文名多种方式。
 
 ## 表结构总览
 
@@ -18,7 +18,6 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 |------|------|------|
 | id | INTEGER PK | 自增主键 |
 | dex_number | INTEGER | 全国图鉴编号 |
-| slug | TEXT UNIQUE | URL 友好标识 |
 | name_zh | TEXT | 中文名 |
 | name_ja | TEXT | 日文名 |
 | name_en | TEXT | 英文名 |
@@ -30,7 +29,7 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 | source_title | TEXT | 来源页面标题 |
 | source_fetched_at | TEXT | 抓取时间 |
 
-索引：`dex_number`、`name_zh`、`slug`。
+索引：`dex_number`、`name_zh`。
 
 **moves** — 招式表。
 
@@ -73,7 +72,6 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 |------|------|------|
 | id | INTEGER PK | 自增主键 |
 | legacy_id | TEXT UNIQUE | 旧版标识 |
-| slug | TEXT | URL 友好标识 |
 | name_zh | TEXT | 中文名 |
 | name_ja | TEXT | 日文名 |
 | name_en | TEXT | 英文名 |
@@ -92,13 +90,16 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 |------|------|------|
 | id | INTEGER PK | 自增主键 |
 | pokemon_id | INTEGER FK | 关联 pokemon.id |
-| form_key | TEXT | 形态标识（如 `default`、`超级进化`） |
-| name_zh | TEXT | 形态中文名 |
-| form_type | TEXT | 形态类型（default/mega/gmax/regional 等） |
+| form_type | TEXT | 同一宝可梦内稳定形态标识，默认形态为 `default`；优先由英文名相对物种英文名的前/后缀推导，如 `mega-x`、`alola` |
+| form_category | TEXT | 形态大类，如 `default`、`mega`、`gigantamax`、`regional-alola`、`alternate` |
+| name_zh | TEXT | 规范形态中文全名，与 Champions 可用池格式一致，如 `雷丘(阿罗拉的样子)` |
+| display_name_zh | TEXT | 宝可梦详情中展示的形态名，保存爬虫原始展示名，如 `阿罗拉雷丘` |
+| name_en | TEXT | 形态英文名，由爬虫按共享规则填充为可与对战计算库对应的 canonical 物种名 |
 | is_default | INTEGER | 是否为默认形态 |
 | sort_order | INTEGER | 排序序号 |
+| required_item_id | INTEGER FK | 形态必需道具，如 Mega 石 |
 
-唯一约束：`(pokemon_id, form_key)`。
+唯一约束：`(pokemon_id, form_type)`。
 
 **pokemon_form_stats** — 形态种族值表，支持世代范围。当某个形态的种族值在不同世代有变化时（如皮可西在第六世代特攻从 85 变为 95），会有多条记录，通过 `generation_start` 和 `generation_end` 区分。
 
@@ -172,20 +173,20 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 | chain_id | INTEGER | 进化链编号（同一进化链共享） |
 | from_pokemon_id | INTEGER FK | 进化前宝可梦（NULL 表示链起点） |
 | to_pokemon_id | INTEGER FK | 进化后宝可梦 |
-| from_form_key | TEXT | 进化前形态 |
-| to_form_key | TEXT | 进化后形态 |
+| from_form_id | INTEGER FK | 进化前形态 ID（关联 pokemon_forms.id） |
+| to_form_id | INTEGER FK | 进化后形态 ID（关联 pokemon_forms.id） |
 | stage | INTEGER | 进化阶段（0=基础，1=一阶，2=二阶） |
 | evolution_method | TEXT | 进化方式 |
 | evolution_condition | TEXT | 进化条件 |
 | evolution_item | TEXT | 进化道具 |
 | evolution_level | INTEGER | 进化等级 |
 
-**pokemon_learnsets** — 宝可梦可学招式表，按世代和学习方式记录。
+**pokemon_moves** — 宝可梦可学招式表，按形态、世代、版本和学习方式记录。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | pokemon_id | INTEGER FK | 关联 pokemon.id |
-| form_key | TEXT | 形态标识 |
+| form_id | INTEGER FK | 关联 pokemon_forms.id |
 | move_id | INTEGER FK | 关联 moves.id |
 | move_name_zh | TEXT | 招式中文名 |
 | generation | INTEGER | 世代编号 |
@@ -194,16 +195,7 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 | level | INTEGER | 学习等级（仅升级学习） |
 | tm_number | TEXT | 招式学习器编号 |
 
-唯一约束：`(pokemon_id, form_key, move_name_zh, generation, game_version_code, learn_method, level)`。
-
-**pokemon_generation_regions** — 宝可梦地区图鉴编号。
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| pokemon_id | INTEGER FK | 关联 pokemon.id |
-| generation | INTEGER | 世代编号 |
-| region | TEXT | 地区名称 |
-| regional_dex_number | TEXT | 地区图鉴编号 |
+唯一索引：`(form_id, move_name_zh, generation, game_version_code, learn_method, level, tm_number)`（NULL 通过表达式归一化）。如果非默认形态与默认形态的招式表完全一致，只存默认形态记录；查询指定形态无自有记录时会回退到默认形态。
 
 ### Champions 专用表
 
@@ -237,12 +229,11 @@ Champions 数据来自 52Poké 的 `赛季（Champions）`、`赛制（Champions
 |------|------|------|
 | regulation_id | INTEGER FK | 关联 champions_regulations.id |
 | pokemon_id | INTEGER FK | 可选关联 pokemon.id |
-| form_id | INTEGER FK | 可选关联 pokemon_forms.id |
+| form_id | INTEGER FK | 关联 pokemon_forms.id；爬虫会用 `msp_code/name_zh/form_code` 解析到具体形态 |
 | dex_number | INTEGER | 全国图鉴编号 |
 | msp_code | TEXT | 52Poké `data-msp` 形态代码 |
 | form_code | TEXT | `msp_code` 的形态后缀 |
 | name_zh | TEXT | Champions 可用形态显示名 |
-| form_key | TEXT | 形态显示名 slug |
 | sort_order | INTEGER | 源页面顺序 |
 
 **champions_regulation_items** — 每个赛制可使用的主系列道具池。
@@ -263,10 +254,10 @@ erDiagram
     pokemon_forms ||--o{ pokemon_form_abilities : "has abilities"
     pokemon_forms ||--o{ pokemon_form_images : "has images"
     pokemon ||--o{ evolution_chains : "evolves"
-    pokemon ||--o{ pokemon_learnsets : "learns"
-    pokemon ||--o{ pokemon_generation_regions : "appears in"
+    pokemon ||--o{ pokemon_moves : "learns"
+    pokemon_forms ||--o{ pokemon_moves : "learns as form"
     moves ||--o{ move_generation_records : "changes across"
-    moves ||--o{ pokemon_learnsets : "learned by"
+    moves ||--o{ pokemon_moves : "learned by"
     abilities ||--o{ ability_generation_records : "changes across"
     abilities ||--o{ pokemon_form_abilities : "possessed by"
     champions_regulations ||--o{ champions_seasons : "used by"
@@ -283,4 +274,4 @@ erDiagram
 
 **世代范围**：形态子表（stats/types/abilities）使用 `generation_start` 和 `generation_end` 表示生效范围，而非为每个世代创建一条记录。这样既节省空间，又能方便地查询"第 N 世代时这个形态的种族值是多少"。
 
-**冗余中文名**：`pokemon_form_abilities.ability_name_zh` 和 `pokemon_learnsets.move_name_zh` 冗余存储了中文名。这是因为爬虫解析时可能还没有对应的 abilities/moves 记录（采集顺序不固定），冗余字段保证数据完整性，同时也简化了查询。
+**冗余中文名**：`pokemon_form_abilities.ability_name_zh` 和 `pokemon_moves.move_name_zh` 冗余存储了中文名。这是因为爬虫解析时可能还没有对应的 abilities/moves 记录（采集顺序不固定），冗余字段保证数据完整性，同时也简化了查询。

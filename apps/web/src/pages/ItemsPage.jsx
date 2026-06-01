@@ -24,7 +24,7 @@ export default function ItemsPage({ query = "" }) {
 
   const { data: items, total, loading, loadingMore, hasMore, sentinelRef, loadMore } = useInfiniteApi(itemsPath, { pageSize: 50 });
 
-  // Auto-expand item from URL hash param (e.g. #/items?expand=some-slug)
+  // Auto-expand item from URL hash param (e.g. #/items?expand=123)
   useEffect(() => {
     const expandId = pendingExpandRef.current;
     if (!expandId || loading) return;
@@ -34,7 +34,7 @@ export default function ItemsPage({ query = "" }) {
     }
     if (items.length === 0) return;
 
-    const target = items.find((it) => it.slug === expandId || String(it.id) === expandId);
+    const target = items.find((it) => String(it.id) === expandId || it.nameZh === expandId);
     if (target) {
       pendingExpandRef.current = null;
       const key = String(target.id);

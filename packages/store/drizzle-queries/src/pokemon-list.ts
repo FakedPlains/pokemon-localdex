@@ -38,7 +38,6 @@ function buildPokemonListWhere(filters?: PokemonListFilters): SQL | undefined {
         like(pokemon.nameZh, v),
         like(pokemon.nameJa, v),
         like(pokemon.nameEn, v),
-        like(pokemon.slug, v),
         like(sql`CAST(${pokemon.dexNumber} AS TEXT)`, v),
       )!,
     );
@@ -102,7 +101,6 @@ export async function listPokemonCardRows(
     .select({
       id: pokemon.id,
       dexNumber: pokemon.dexNumber,
-      slug: pokemon.slug,
       nameZh: pokemon.nameZh,
       nameEn: pokemon.nameEn,
       formId: pokemonForms.id,
@@ -168,7 +166,6 @@ export async function listPokemonCardRows(
     return {
       id: Number(row.id),
       dexNumber: Number(row.dexNumber),
-      slug: String(row.slug),
       nameZh: String(row.nameZh),
       nameEn: row.nameEn ? String(row.nameEn) : undefined,
       primaryType: types[0],
@@ -191,7 +188,6 @@ export async function listPokemonTableRows(
     .select({
       id: pokemon.id,
       dexNumber: pokemon.dexNumber,
-      slug: pokemon.slug,
       nameZh: pokemon.nameZh,
       nameEn: pokemon.nameEn,
       formId: pokemonForms.id,
@@ -277,7 +273,6 @@ export async function listPokemonTableRows(
     return {
       id: Number(row.id),
       dexNumber: Number(row.dexNumber),
-      slug: String(row.slug),
       nameZh: String(row.nameZh),
       nameEn: row.nameEn ? String(row.nameEn) : undefined,
       primaryType: types[0],

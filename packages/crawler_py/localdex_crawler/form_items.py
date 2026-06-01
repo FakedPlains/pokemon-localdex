@@ -1,5 +1,5 @@
 """
-形态绑定道具 — 爬虫自动提取模块
+形态绑定道具 — 爬虫自动提取与写库模块
 
 从 52poke wiki 的 Mega 进化、原始回归等页面自动提取形态-道具绑定关系。
 也支持从单个宝可梦页面中提取（如果页面包含相关信息）。
@@ -10,25 +10,26 @@
 3. 从道具分类页面（如 "进化石" 分类）补充遗漏
 4. 从单个宝可梦页面的形态描述中提取（备用）
 
-⚠️ 注意：本模块仅提取数据并输出映射关系，不会自动写入数据库。
-需要配合 migrate-form-required-items.ts 或手动执行 SQL 来写入。
-
 使用方式：
-    python -m localdex_crawler.form_items [--output json|sql] [--fetch]
+    python -m localdex_crawler.form_items [--output summary|json|sql] [--execute]
 """
 
 from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
+import sqlite3
+import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup
 
+from .config import CrawlerPaths
 from .fetcher import PageFetcher, RawPage
-from .utils import to_simplified, clean_inline_text
+from .text import to_simplified, clean_inline_text
+from .upsert.base import connect
 
 
 @dataclass
@@ -39,6 +40,43 @@ class FormItemBinding:
     item_name_zh: str
     form_type: str  # mega, primal, drive, plate, memory, etc.
     source: str = ""  # 数据来源页面 URL
+
+
+MEGA_FORMS_WITHOUT_REQUIRED_ITEM = {
+    ("烈空坐", "超级烈空坐"),
+}
+
+
+def _text_key(value: str | None) -> str:
+    text = to_simplified(unicodedata.normalize("NFKC", value or ""))
+    text = re.sub(r"\s+", "", text)
+    return text.lower()
+
+
+def _binding_to_dict(binding: FormItemBinding) -> dict[str, str]:
+    return {
+        "pokemonNameZh": binding.pokemon_name_zh,
+        "formNameZh": binding.form_name_zh,
+        "itemNameZh": binding.item_name_zh,
+        "formType": binding.form_type,
+        "source": binding.source,
+    }
+
+
+def _dedupe_bindings(bindings: list[FormItemBinding]) -> list[FormItemBinding]:
+    seen: set[tuple[str, str, str]] = set()
+    result: list[FormItemBinding] = []
+    for binding in bindings:
+        key = (
+            _text_key(binding.pokemon_name_zh),
+            _text_key(binding.form_name_zh),
+            _text_key(binding.item_name_zh),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(binding)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════
@@ -177,7 +215,7 @@ def extract_primal_bindings(html: str, source_url: str = "") -> list[FormItemBin
         bindings.append(FormItemBinding(
             pokemon_name_zh="固拉多",
             form_name_zh="原始固拉多",
-            item_name_zh="深红色宝珠",
+            item_name_zh="朱红色宝珠",
             form_type="primal",
             source=source_url,
         ))
@@ -324,6 +362,189 @@ def extract_all_form_item_bindings(
     return all_bindings
 
 
+def derive_form_item_bindings_from_db(conn: sqlite3.Connection) -> list[FormItemBinding]:
+    """从当前 pokemon_forms/items 形态结构推导可确定的绑定关系。
+
+    Wiki 汇总页能覆盖官方 Mega/原始回归等关系；数据库中已经存在的扩展 Mega
+    形态也遵循“宝可梦名 + 进化石 + X/Y/Z 后缀”的命名规则，因此在写库阶段统一推导，
+    避免再维护一份一次性静态迁移表。
+    """
+    rows = conn.execute(
+        """
+        SELECT
+          p.name_zh AS pokemon_name_zh,
+          pf.name_zh AS form_name_zh,
+          pf.display_name_zh AS display_name_zh,
+          pf.form_type AS form_type,
+          pf.form_category AS form_category
+        FROM pokemon_forms pf
+        JOIN pokemon p ON p.id = pf.pokemon_id
+        WHERE pf.is_default = 0
+        ORDER BY p.dex_number, pf.sort_order, pf.id
+        """
+    ).fetchall()
+
+    bindings: list[FormItemBinding] = []
+    for row in rows:
+        pokemon_name = str(row["pokemon_name_zh"])
+        form_name = str(row["display_name_zh"] or row["form_name_zh"])
+        form_type = str(row["form_type"] or "")
+        form_category = str(row["form_category"] or "")
+
+        item_name = _derive_required_item_name(pokemon_name, form_name, form_type, form_category)
+        if not item_name:
+            continue
+        bindings.append(
+            FormItemBinding(
+                pokemon_name_zh=pokemon_name,
+                form_name_zh=form_name,
+                item_name_zh=item_name,
+                form_type=form_type or form_category or "alternate",
+                source="database:pokemon_forms",
+            )
+        )
+
+    return bindings
+
+
+def _derive_required_item_name(
+    pokemon_name_zh: str,
+    form_name_zh: str,
+    form_type: str,
+    form_category: str,
+) -> str | None:
+    normalized_type = unicodedata.normalize("NFKC", form_type or "").lower()
+    normalized_category = unicodedata.normalize("NFKC", form_category or "").lower()
+    normalized_form = unicodedata.normalize("NFKC", form_name_zh or "")
+
+    if (pokemon_name_zh, form_name_zh) in MEGA_FORMS_WITHOUT_REQUIRED_ITEM:
+        return None
+
+    is_mega = (
+        normalized_category == "mega"
+        or "mega" in normalized_type
+        or normalized_form.startswith("超级")
+    )
+    if is_mega:
+        suffix = ""
+        if normalized_type.endswith("-x") or normalized_form.endswith("X"):
+            suffix = "Ｘ"
+        elif normalized_type.endswith("-y") or normalized_form.endswith("Y"):
+            suffix = "Ｙ"
+        elif normalized_type.endswith("-z") or normalized_form.endswith("Z"):
+            suffix = "Ｚ"
+        return f"{pokemon_name_zh}进化石{suffix}"
+
+    is_primal = normalized_type == "primal" or normalized_form.startswith("原始")
+    if is_primal and pokemon_name_zh == "盖欧卡":
+        return "靛蓝色宝珠"
+    if is_primal and pokemon_name_zh == "固拉多":
+        return "朱红色宝珠"
+
+    return None
+
+
+def apply_form_item_bindings(
+    conn: sqlite3.Connection,
+    bindings: list[FormItemBinding],
+    *,
+    dry_run: bool = False,
+    include_derived: bool = True,
+) -> dict[str, Any]:
+    """将形态-道具绑定写入 pokemon_forms.required_item_id。
+
+    手动修复命令和主爬虫都调用这个函数，保证匹配、推导和更新规则一致。
+    """
+    all_bindings = collect_form_item_bindings(conn, bindings, include_derived=include_derived)
+    derived_count = len(derive_form_item_bindings_from_db(conn)) if include_derived else 0
+
+    item_rows = conn.execute("SELECT id, name_zh FROM items").fetchall()
+    item_by_name = {_text_key(str(row["name_zh"])): int(row["id"]) for row in item_rows}
+
+    form_rows = conn.execute(
+        """
+        SELECT
+          pf.id,
+          pf.name_zh AS form_name_zh,
+          pf.display_name_zh AS display_name_zh,
+          pf.required_item_id,
+          p.name_zh AS pokemon_name_zh
+        FROM pokemon_forms pf
+        JOIN pokemon p ON p.id = pf.pokemon_id
+        """
+    ).fetchall()
+    form_by_name: dict[tuple[str, str], list[sqlite3.Row]] = {}
+    for row in form_rows:
+        key = (_text_key(str(row["pokemon_name_zh"])), _text_key(str(row["form_name_zh"])))
+        form_by_name.setdefault(key, []).append(row)
+        if row["display_name_zh"]:
+            display_key = (_text_key(str(row["pokemon_name_zh"])), _text_key(str(row["display_name_zh"])))
+            form_by_name.setdefault(display_key, []).append(row)
+
+    result: dict[str, Any] = {
+        "bindings": len(all_bindings),
+        "derived": derived_count,
+        "matched": 0,
+        "updated": 0,
+        "unchanged": 0,
+        "dryRun": dry_run,
+        "missing_items": [],
+        "missing_forms": [],
+    }
+
+    with conn:
+        for binding in all_bindings:
+            item_id = item_by_name.get(_text_key(binding.item_name_zh))
+            if item_id is None:
+                result["missing_items"].append(_binding_to_dict(binding))
+                continue
+
+            form_key = (_text_key(binding.pokemon_name_zh), _text_key(binding.form_name_zh))
+            form_matches = form_by_name.get(form_key) or []
+            if not form_matches:
+                result["missing_forms"].append(_binding_to_dict(binding))
+                continue
+
+            form = form_matches[0]
+            result["matched"] += 1
+            if form["required_item_id"] == item_id:
+                result["unchanged"] += 1
+                continue
+            if dry_run:
+                continue
+            conn.execute(
+                "UPDATE pokemon_forms SET required_item_id = ? WHERE id = ?",
+                (item_id, int(form["id"])),
+            )
+            result["updated"] += 1
+
+    return result
+
+
+def collect_form_item_bindings(
+    conn: sqlite3.Connection,
+    bindings: list[FormItemBinding],
+    *,
+    include_derived: bool = True,
+) -> list[FormItemBinding]:
+    all_bindings: list[FormItemBinding] = []
+    if include_derived:
+        all_bindings.extend(derive_form_item_bindings_from_db(conn))
+    all_bindings.extend(bindings)
+    return _dedupe_bindings(all_bindings)
+
+
+def extract_and_apply_form_item_bindings(
+    conn: sqlite3.Connection,
+    *,
+    fetcher: PageFetcher | None = None,
+    raw_dir: Path | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    bindings = extract_all_form_item_bindings(fetcher=fetcher, raw_dir=raw_dir)
+    return apply_form_item_bindings(conn, bindings, dry_run=dry_run, include_derived=True)
+
+
 # ══════════════════════════════════════════════════════════════
 # 输出格式
 # ══════════════════════════════════════════════════════════════
@@ -331,19 +552,14 @@ def extract_all_form_item_bindings(
 def bindings_to_json(bindings: list[FormItemBinding]) -> str:
     """将绑定关系输出为 JSON 格式。"""
     return json.dumps(
-        [
-            {
-                "pokemonNameZh": b.pokemon_name_zh,
-                "formNameZh": b.form_name_zh,
-                "itemNameZh": b.item_name_zh,
-                "formType": b.form_type,
-                "source": b.source,
-            }
-            for b in bindings
-        ],
+        [_binding_to_dict(binding) for binding in bindings],
         ensure_ascii=False,
         indent=2,
     )
+
+
+def _sql_quote(value: str) -> str:
+    return value.replace("'", "''")
 
 
 def bindings_to_sql(bindings: list[FormItemBinding]) -> str:
@@ -355,12 +571,16 @@ def bindings_to_sql(bindings: list[FormItemBinding]) -> str:
     ]
 
     for b in bindings:
+        item_name = _sql_quote(b.item_name_zh)
+        pokemon_name = _sql_quote(b.pokemon_name_zh)
+        form_name = _sql_quote(b.form_name_zh)
         lines.append(
             f"UPDATE pokemon_forms SET required_item_id = "
-            f"(SELECT id FROM items WHERE name_zh = '{b.item_name_zh}' LIMIT 1) "
+            f"(SELECT id FROM items WHERE name_zh = '{item_name}' LIMIT 1) "
             f"WHERE id = (SELECT pf.id FROM pokemon_forms pf "
             f"JOIN pokemon p ON p.id = pf.pokemon_id "
-            f"WHERE p.name_zh = '{b.pokemon_name_zh}' AND pf.name_zh = '{b.form_name_zh}' LIMIT 1);"
+            f"WHERE p.name_zh = '{pokemon_name}' "
+            f"AND (pf.name_zh = '{form_name}' OR pf.display_name_zh = '{form_name}') LIMIT 1);"
         )
 
     lines.append("")
@@ -373,28 +593,41 @@ def bindings_to_sql(bindings: list[FormItemBinding]) -> str:
 # ══════════════════════════════════════════════════════════════
 
 def main():
-    """CLI 入口：提取形态-道具绑定关系并输出。"""
+    """CLI 入口：提取形态-道具绑定关系，可输出或写库。"""
     import argparse
 
+    paths = CrawlerPaths()
     parser = argparse.ArgumentParser(description="从 wiki 页面提取形态-道具绑定关系")
-    parser.add_argument("--output", choices=["json", "sql"], default="json", help="输出格式")
-    parser.add_argument("--fetch", action="store_true", help="从网络获取页面（否则仅使用缓存）")
-    parser.add_argument("--raw-dir", type=Path, default=Path("raw_pages"), help="原始页面缓存目录")
+    parser.add_argument("--db-path", type=Path, default=paths.default_db_path, help="SQLite 数据库路径")
+    parser.add_argument("--raw-dir", type=Path, default=paths.default_raw_dir, help="原始页面缓存目录")
+    parser.add_argument("--output", choices=["summary", "json", "sql"], default="summary", help="输出格式")
+    parser.add_argument("--execute", action="store_true", help="写入 pokemon_forms.required_item_id")
+    parser.add_argument("--dry-run", action="store_true", help="演练写库匹配，不修改数据库")
+    parser.add_argument("--refresh-raw", action="store_true", help="强制重新获取页面")
     args = parser.parse_args()
 
-    fetcher = None
-    if args.fetch:
-        fetcher = PageFetcher(raw_dir=args.raw_dir, refresh_raw=True)
+    fetcher = PageFetcher(raw_dir=args.raw_dir, refresh_raw=args.refresh_raw)
 
-    print("🔍 提取形态-道具绑定关系...\n")
+    print("Extracting form required-item bindings...\n")
     bindings = extract_all_form_item_bindings(fetcher=fetcher, raw_dir=args.raw_dir)
 
-    print(f"\n📊 共提取到 {len(bindings)} 条绑定关系\n")
+    conn = connect(args.db_path)
+    all_bindings = collect_form_item_bindings(conn, bindings, include_derived=True)
+
+    print(f"\nExtracted {len(bindings)} wiki bindings; total with derived bindings: {len(all_bindings)}\n")
 
     if args.output == "json":
-        print(bindings_to_json(bindings))
+        print(bindings_to_json(all_bindings))
+    elif args.output == "sql":
+        print(bindings_to_sql(all_bindings))
     else:
-        print(bindings_to_sql(bindings))
+        dry_run = args.dry_run or not args.execute
+        result = apply_form_item_bindings(conn, bindings, dry_run=dry_run, include_derived=True)
+        mode = "dry-run" if dry_run else "updated"
+        print(f"[{mode}] form items: {result}")
+        if dry_run:
+            print("Run with --execute to write required_item_id.")
+    conn.close()
 
 
 if __name__ == "__main__":

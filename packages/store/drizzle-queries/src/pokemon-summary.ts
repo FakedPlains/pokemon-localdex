@@ -40,7 +40,6 @@ export async function listPokemonRows(
         like(pokemon.nameZh, v),
         like(pokemon.nameJa, v),
         like(pokemon.nameEn, v),
-        like(pokemon.slug, v),
         like(sql`CAST(${pokemon.dexNumber} AS TEXT)`, v),
       )!,
     );
@@ -95,7 +94,6 @@ export async function listPokemonRows(
     .select({
       id: pokemon.id,
       dexNumber: pokemon.dexNumber,
-      slug: pokemon.slug,
       nameZh: pokemon.nameZh,
       nameJa: pokemon.nameJa,
       nameEn: pokemon.nameEn,
@@ -197,7 +195,6 @@ export async function listPokemonRows(
     return {
       id: pid,
       dexNumber: Number(row.dexNumber),
-      slug: String(row.slug),
       nameZh: String(row.nameZh),
       nameJa: row.nameJa ? String(row.nameJa) : undefined,
       nameEn: row.nameEn ? String(row.nameEn) : undefined,
@@ -208,7 +205,6 @@ export async function listPokemonRows(
       baseStats: buildStatBlock(row),
       image: imgs.official,
       shinyImage: imgs.shiny,
-      generations: [],
     } as PokemonSummary;
   });
 

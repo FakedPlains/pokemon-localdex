@@ -46,8 +46,9 @@ pokemon（主表）
 ```
 
 **开发注意**：
-- 查询宝可梦属性/种族值时，必须先确定形态（`form_name`），再查对应子表
-- 默认形态的 `form_name` 为空字符串 `""`，不是 `null`，也不是 `"default"`
+- 查询宝可梦属性/种族值时，必须先确定形态（`form_type`），再查对应子表
+- 默认形态的 `form_type = "default"`，`form_key = "default"`。旧代码中可能有 `form_name` 为空字符串的引用，当前已统一为 `"default"`
+- `form_type` 是形态的稳定标识（如 `mega-x`、`alola`、`gmax`），由 `form_name_rules.json` 中的 `formTypeKeywords` 规则推导
 - 前端 `resolvePokemonDisplayVariant()` 函数封装了这套逻辑，**不要绕过它直接读原始数据**
 
 ### 2.2 世代范围字段
@@ -63,14 +64,14 @@ pokemon（主表）
 
 数据库主键索引查询（`WHERE id = ?`）的性能远优于文本字段匹配（`WHERE name_zh = ?`），且不存在同名歧义问题。所有查询函数必须遵循以下优先级：
 
-**宝可梦形态查询优先级**：`formId` → `pokemonId + formKey` → `formKey` → `pokemonId`（默认形态） → `nameZh`（中文名 fallback）
+**宝可梦形态查询优先级**：`formId` → `pokemonId + formType` → 兼容 `formKey/form` 标签 → `pokemonId`（默认形态） → `nameZh`（中文名 fallback）
 
 **招式/特性/道具查询优先级**：`id` → `nameZh`（中文名 fallback）
 
 **具体约束**：
 
 - `battle-core` 通过 `NameLookup` 接口与 store 层解耦，查询函数签名统一为 `opts: { id?: string | number; nameZh?: string }` 格式，优先通过 `id` 查询，仅在 `id` 缺失时才降级到 `nameZh`
-- 宝可梦形态查询优先使用 `formId`（`pokemon_forms.id`）直接定位，`formKey`（如 "超级喷火龙x"）作为 fallback 保留，用于 formId 缺失时的降级查询
+- 宝可梦形态查询优先使用 `formId`（`pokemon_forms.id`）直接定位，`formType`（如 `mega-x`、`alola`）作为同一宝可梦内稳定标识；旧 `formKey/form` 只作为兼容标签映射
 - 前端在选择宝可梦/形态/招式/特性/道具时，必须同时保存数据库 ID 和中文名，API 请求中优先传递 ID
 - 中文名仅作为 fallback 和界面显示使用，不作为主要查询条件
 
@@ -88,10 +89,10 @@ attacker: {
   item: "喷火龙进化石X" // 仅作 fallback
 }
 
-// 降级：使用 formKey 作为 fallback（formId 不可用时）
+// 降级：使用 formType 作为 fallback（formId 不可用时）
 attacker: {
   pokemonId: "2",
-  formKey: "超级喷火龙x",  // ✅ 作为 fallback 可以使用
+  formType: "mega-x",
   name: "喷火龙",
   abilityId: "42",
   ability: "硬爪",
@@ -124,11 +125,11 @@ interface NameLookup {
 
 ```
 前端选择形态 → 保存 form.id 到 state（formId）
-前端发起计算 → 请求体携带 formId（优先）和 formKey（fallback）
+前端发起计算 → 请求体携带 formId（优先）和 formType/formKey（fallback）
 后端收到请求 → store.pokemonNameEn({ formId, formKey, pokemonId, name })
                    → formId 命中则直接返回
-                   → 未命中则尝试 pokemonId + formKey 组合查询
-                   → 再未命中则尝试 formKey 单独匹配
+                   → 未命中则尝试 pokemonId + formType/legacy formKey 组合查询
+                   → 再未命中则尝试 formType/legacy formKey 单独匹配
                    → 再未命中则降级到 pokemonId 默认形态
                    → 最后降级到 nameZh 文本匹配
 ```
@@ -138,9 +139,13 @@ interface NameLookup {
 修改数据库结构时：
 
 1. 先修改 `schema/d1-schema.sql`（作为 source of truth）
-2. 同步修改 `packages/store/sqlite-store/src/index.ts` 中的类型定义和查询语句
-3. 同步修改 `packages/store/d1-store/src/index.ts` 中的查询逻辑
-4. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/sqlite_upsert.py`
+2. 同步修改 `packages/store/drizzle-schema/src/index.ts`（Drizzle 表定义）
+3. 同步修改 `packages/store/shared-types/src/index.ts`（共享类型/常量）
+4. 同步修改 `packages/store/drizzle-queries/src/index.ts`（查询和 hydrate 逻辑）
+5. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/upsert/` 下对应的写库模块
+6. 如果响应结构变化，同步更新 API 文档、Web 调用和小程序调用
+
+注意：`sqlite-store` 和 `d1-store` 只是薄封装，不包含查询逻辑。查询变更只需修改 `drizzle-queries` 一处。
 
 ---
 
@@ -297,7 +302,7 @@ import { typeIconSrc, categoryIconSrc } from "../utils/constants.js";
 
 ### 4.6 ID 使用规范
 
-前端所有 API 请求和 localStorage 存储**必须使用数据库数字 ID**，不得使用中文名称或 slug 作为标识符。
+前端所有 API 请求和 localStorage 存储**必须使用数据库数字 ID**，不得使用中文名称作为标识符。
 
 **存储字段约定**：
 
@@ -319,7 +324,12 @@ import { typeIconSrc, categoryIconSrc } from "../utils/constants.js";
 - `abilityId` 存储数字 ID，同时保存 `abilityName` 用于显示。PokemonEditor 的特性选择返回 `{id, name}` 对象，同时写入两个字段
 - 界面显示优先使用 `abilityName`，降级到 `abilityId`：`data.abilityName || data.abilityId`
 
-**数据迁移**：`utils/migrateStorage.js` 提供了旧格式数据的自动迁移（当前版本 v3）。应用启动时（`main.jsx`）会检测并迁移旧数据（中文名 → 数字 ID），包括 pokemonId、itemId 和 abilityId 三个字段。迁移标记为 `localdex_migration_v3`，存储在 localStorage 中防止重复执行。
+**数据迁移**：`utils/migrateStorage.js` 提供了旧格式数据的自动迁移（当前版本 v4）。应用启动时（`main.jsx`）会检测并迁移旧数据，包括：
+
+- v1–v3：中文名 → 数字 ID（pokemonId、itemId、abilityId）
+- v4：旧 slug 形中文 formKey → formId 解析（通过 `resolveFormId()` 多级匹配：精确 formKey/formType -> nameZh/displayNameZh/canonicalNameZh -> 大小写不敏感 -> 默认形态回退）
+
+迁移标记为 `localdex_migration_v4`，存储在 localStorage 中防止重复执行。
 
 ### 4.7 DamagePage 开发注意事项
 
@@ -602,10 +612,11 @@ npm install react@18.3.1 react-dom@18.3.1
 ### 数据库变更流程
 
 1. 修改 `schema/d1-schema.sql`
-2. 修改 `packages/store/sqlite-store/src/index.ts`（类型 + 查询）
-3. 修改 `packages/store/d1-store/src/index.ts`（查询）
-4. 修改爬虫写入逻辑（如有）
-5. 本地重建 SQLite：删除 `data/sqlite/localdex.sqlite` 后重新爬取
+2. 修改 `packages/store/drizzle-schema/src/index.ts`（Drizzle 表定义）
+3. 修改 `packages/store/shared-types/src/index.ts`（共享类型/常量）
+4. 修改 `packages/store/drizzle-queries/src/index.ts`（查询和 hydrate 逻辑）
+5. 修改爬虫写入逻辑（如有）
+6. 本地重建 SQLite：删除 `data/sqlite/localdex.sqlite` 后重新爬取
 
 ### 发布前检查清单
 

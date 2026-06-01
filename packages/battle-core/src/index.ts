@@ -11,7 +11,11 @@
 
 import { calculate, Pokemon, Move, Field } from "@fakedplains/smogon-calc";
 import type { GenerationNum } from "@fakedplains/smogon-calc/dist/data/interface";
-import { NATURE_ZH_TO_EN, TYPE_ZH_TO_EN } from "@pokemon-localdex/store-types/constants";
+import {
+  TYPE_ZH_TO_EN,
+  WEATHER_KEY_TO_EN,
+  TERRAIN_KEY_TO_EN,
+} from "@pokemon-localdex/store-types/constants";
 
 import type {
   DamageCalcInput,
@@ -20,6 +24,10 @@ import type {
   NameLookup,
 } from "./types.ts";
 
+import { STATUS_MAP, natureZhToEn } from "./helpers.ts";
+import { buildChineseDescription } from "./description.ts";
+import { buildBreakdown } from "./breakdown.ts";
+
 // 重新导出所有类型
 export type {
   StatsTable,
@@ -27,58 +35,14 @@ export type {
   SideInput,
   DamageCalcInput,
   DamageCalcResult,
+  DamageBreakdown,
+  DamageFactor,
+  FactorEffect,
   ResolvedNames,
   NameLookup,
+  DamageModifierInfo,
 } from "./types.ts";
 
-export { NATURE_ZH_TO_EN, TYPE_ZH_TO_EN } from "@pokemon-localdex/store-types/constants";
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 常量映射
-// ══════════════════════════════════════════════════════════════════════════════
-
-export const WEATHER_MAP: Record<string, string | undefined> = {
-  none: undefined,
-  sun: "Sun",
-  rain: "Rain",
-  sand: "Sand",
-  hail: "Snow",           // Gen 9 中 hail 变为 snow
-  snow: "Snow",
-  harshSunlight: "Harsh Sunshine",  // 始源固拉多 终结之地
-  heavyRain: "Heavy Rain",          // 始源盖欧卡 始源之海
-  strongWinds: "Strong Winds",      // Mega 裂空座 德尔塔气流
-};
-
-export const TERRAIN_MAP: Record<string, string | undefined> = {
-  none: undefined,
-  electric: "Electric",
-  grassy: "Grassy",
-  misty: "Misty",
-  psychic: "Psychic",
-};
-
-export const STATUS_MAP: Record<string, string> = {
-  burn: "brn",
-  paralysis: "par",
-  poison: "psn",
-  sleep: "slp",
-  freeze: "frz",
-  tox: "tox",
-  烧伤: "brn",
-  麻痹: "par",
-  中毒: "psn",
-  剧毒: "tox",
-  睡眠: "slp",
-  冰冻: "frz",
-};
-
-// ══════════════════════════════════════════════════════════════════════════════
-// 工具函数
-// ══════════════════════════════════════════════════════════════════════════════
-
-export function natureZhToEn(natureZh: string): string {
-  return NATURE_ZH_TO_EN[natureZh] || "Serious";
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // resolveNames — 内部名称解析
@@ -216,12 +180,24 @@ export async function calculateDamage(
   }
   const move = new Move(gen, names.moveNameEn, moveOpts);
 
+  // ── 验证构建结果 ──
+  if (!attacker.rawStats) {
+    throw new Error(
+      `攻击方宝可梦 "${input.attacker.name}" 无法识别（英文名解析为 "${names.atkNameEn}"）`
+    );
+  }
+  if (!defender.rawStats) {
+    throw new Error(
+      `防守方宝可梦 "${input.defender.name}" 无法识别（英文名解析为 "${names.defNameEn}"）`
+    );
+  }
+
   // ── 构建场地 ──
   const fieldInput = input.field || {};
   const field = new Field({
     gameType: fieldInput.gameType === "doubles" ? "Doubles" : "Singles",
-    weather: WEATHER_MAP[fieldInput.weather || "none"] as any,
-    terrain: TERRAIN_MAP[fieldInput.terrain || "none"] as any,
+    weather: WEATHER_KEY_TO_EN[fieldInput.weather || "none"] as any,
+    terrain: TERRAIN_KEY_TO_EN[fieldInput.terrain || "none"] as any,
     isGravity: fieldInput.isGravity || false,
     isMagicRoom: fieldInput.isMagicRoom || false,
     isWonderRoom: fieldInput.isWonderRoom || false,
@@ -238,7 +214,7 @@ export async function calculateDamage(
 
   // ── 解析结果 ──
   const [min, max] = result.range();
-  const defenderHp = defender.originalCurHP || defender.rawStats.hp;
+  const defenderHp = defender.originalCurHP || defender.rawStats?.hp || 0;
 
   let damageRolls: number[] = [];
   if (Array.isArray(result.damage)) {
@@ -266,6 +242,12 @@ export async function calculateDamage(
     description = `${min} - ${max} (${minPercent}% - ${maxPercent}%)`;
   }
 
+  // ── 构建伤害分解 ──
+  const breakdown = await buildBreakdown(result, attacker, move, input, lookup);
+
+  // ── 构建中文描述 ──
+  const descriptionZh = buildChineseDescription(result, input, min, max, minPercent, maxPercent);
+
   return {
     min,
     max,
@@ -274,6 +256,8 @@ export async function calculateDamage(
     maxPercent,
     defenderHp,
     description,
+    descriptionZh,
     damageRolls,
+    breakdown,
   };
 }

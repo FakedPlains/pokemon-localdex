@@ -255,6 +255,7 @@
   white-space: nowrap;
 }
 
+/* Stage 分组展示（普通进化链） */
 .pd-evo-chain {
   display: inline-flex;
   align-items: center;
@@ -262,19 +263,65 @@
   gap: 0;
 }
 
-.pd-evo-step {
+.pd-evo-stage-group {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
 }
 
-.pd-evo-arrow-wrap {
+.pd-evo-arrow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.pd-evo-arrow-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 0 8rpx;
 }
 
+.pd-evo-stage-members {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
+/* 树形分支展示 */
+.pd-evo-branches {
+  display: inline-flex;
+  flex-direction: column;
+  padding: 0 24rpx;
+  gap: 16rpx;
+}
+
+.pd-evo-tree-node {
+  display: inline-flex;
+  align-items: flex-start;
+}
+
+.pd-evo-tree-linear {
+  display: inline-flex;
+  align-items: center;
+}
+
+.pd-evo-branch-step {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.pd-evo-tree-fork {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  margin-left: 4rpx;
+}
+
+/* 共享样式 */
 .pd-evo-condition {
   font-size: 18rpx;
   color: #E63946;

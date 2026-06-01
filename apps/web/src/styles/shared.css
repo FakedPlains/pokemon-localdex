@@ -21,7 +21,7 @@
 .ab-wiki-link:hover,
 .it-wiki-link:hover {
   opacity: 1;
-  color: var(--accent, #d94f3d);
+  color: var(--accent, #1aab8a);
 }
 
 /* ── Name Tags ── */
@@ -40,7 +40,7 @@
 .mv-name-ja,
 .ab-name-ja,
 .it-name-ja {
-  background: rgba(217, 79, 61, 0.08);
+  background: rgba(26, 171, 138, 0.08);
   color: var(--accent-strong);
 }
 
@@ -438,7 +438,7 @@
   font-size: 10px;
   font-weight: 600;
   color: var(--accent-strong);
-  background: rgba(217, 79, 61, 0.08);
+  background: rgba(26, 171, 138, 0.08);
   padding: 1px 6px;
   border-radius: 999px;
   margin-top: 2px;

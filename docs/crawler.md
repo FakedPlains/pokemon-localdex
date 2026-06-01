@@ -37,11 +37,19 @@ python3 scripts/crawl-52poke-db.py all
 爬虫提供以下子命令，可以单独采集某一类数据：
 
 **pokemon** — 采集宝可梦列表和详情页。从全国图鉴列表页获取所有宝可梦的基础信息，然后逐一抓取详情页，解析出形态、属性、种族值、图片、进化链等数据。
+写入形态后，爬虫会自动刷新 `pokemon_forms.required_item_id`：先读取 Wiki 汇总页提取原始回归等显式绑定，再根据数据库中的 Mega 形态和道具命名规则推导进化石绑定。
 
 ```bash
 npm run crawl:pokemon
 # 或
 python3 scripts/crawl-52poke-db.py pokemon
+```
+
+**form-items** — 手动刷新形态必需道具绑定。它和 `pokemon` 子命令自动执行的逻辑完全一致，用于单独修复 `pokemon_forms.required_item_id`。
+
+```bash
+python3 packages/crawler_py/crawl-52poke-db.py form-items --dry-run
+python3 packages/crawler_py/crawl-52poke-db.py form-items
 ```
 
 **pokemon-abilities** — 仅刷新宝可梦的特性关联数据。这个命令不会重新抓取详情页，而是从已缓存的页面中重新解析特性信息并更新数据库。适用于特性解析逻辑修改后的快速刷新。
@@ -72,7 +80,7 @@ npm run crawl:catalog
 python3 scripts/crawl-52poke-db.py catalog
 ```
 
-**all** — 依次执行 catalog、pokemon、learnsets、champions 四个子命令，完成全量采集。
+**all** — 依次执行 catalog、pokemon（包含 form-items 自动刷新）、learnsets、champions 四个子命令，完成全量采集。
 
 ## 通用参数
 
@@ -153,18 +161,207 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 
 使用 `--clean` 参数可以在写入前先清空对应的数据表，实现全量重建。`all --clean` 会一次性清空所有表，然后依次重新采集。
 
+## 模块结构
+
+爬虫代码位于 `packages/crawler_py/localdex_crawler/`，按职责分为四层：
+
+### 基础工具层（顶层模块）
+
+| 文件 | 职责 |
+|------|------|
+| `constants.py` | 属性列表（`POKEMON_TYPES`）、版本信息（`GAME_VERSION_INFO`）、URL 常量、世代常量（`CHINESE_GENERATIONS`） |
+| `text.py` | 文本处理：`to_simplified()`、`clean_inline_text()`、`slugify()`、`normalize_type_name()`、`unique_by_key()`、`format_accuracy()` |
+| `urls.py` | URL 构建与规范化：`build_*_page_url()`、`normalize_media_url()`、`to_absolute_url()` |
+| `images.py` | 图片资源提取：`ImageAsset`、`extract_image_candidates()`、`extract_file_name()` |
+| `generations.py` | 世代解析：`generation_from_*()`、`detect_generation_marker()`、`extract_generation_changes()`、`extract_battle_effect()` |
+| `form_type.py` | 形态类型推导：`_derive_form_type()`、`_derive_form_category()`、`_canonical_form_name_zh()`（读取 `form_name_rules.json`） |
+| `form_name_resolver.py` | 形态英文名推导：`resolve_form_name_en()`（读取 `form_name_rules.json`） |
+| `form_items.py` | 形态绑定道具：`extract_all_form_item_bindings()`、`apply_form_item_bindings()` |
+| `fetcher.py` | 缓存优先的 HTTP 获取：`PageFetcher`、`RawPage`、`PageNotFoundError` |
+| `config.py` | 路径配置：`CrawlerPaths`（db_path、raw_dir） |
+
+这一层是纯函数（`fetcher.py` 除外），不含数据库写入逻辑。`form_type.py` 和 `form_name_resolver.py` 在模块加载时各读取一次 `form_name_rules.json`。
+
+### 解析层（`parsers/` 目录）
+
+每个 parser 只负责将 `RawPage` 的 HTML 转换为结构化 Python dict，不写数据库。
+
+| 文件 | 主要导出 | 说明 |
+|------|---------|------|
+| `pokemon_detail.py` | `parse_pokemon_list_page()`、`normalize_pokemon_detail_page()` | 宝可梦列表与详情解析 |
+| `learnset.py` | `parse_learnset_page()` | 招式学习表解析 |
+| `evolution.py` | `parse_evolution_chain()` | 进化链解析 |
+| `pokemon_images.py` | `resolve_pokemon_image_assets()` | 宝可梦图片匹配 |
+| `pokemon_abilities.py` | `parse_pokemon_abilities()` | 宝可梦特性解析 |
+| `moves.py` | `parse_move_list_page()`、`normalize_move_detail_page()` | 招式列表与详情解析 |
+| `abilities.py` | `parse_ability_list_page()`、`normalize_ability_detail_page()` | 特性列表与详情解析 |
+| `items.py` | `parse_item_list_page()`、`normalize_item_detail_page()` | 道具列表与详情解析 |
+| `champions.py` | `normalize_champions_pages()` | Champions 赛制/赛季/道具整合解析 |
+| `field_effects.py` | `ALL_FIELD_EFFECT_SEEDS`、`normalize_field_effect_detail_page()` | 场地效果种子定义与详情解析 |
+
+### 写库层（`upsert/` 目录）
+
+只接收结构化 dict 写入 SQLite，不做 HTML 解析。
+
+| 文件 | 主要导出 | 说明 |
+|------|---------|------|
+| `base.py` | `connect()`、`_lookup_*`、`_safe_count()` | 数据库连接与公共查找函数 |
+| `clear.py` | `clear_moves()`、`clear_abilities()`、`clear_items()`、`clear_pokemon()`、`clear_champions()`、`clear_field_effects()`、`clear_all()` | DROP + CREATE 重建各表 |
+| `pokemon.py` | `upsert_pokemon_detail()`、`upsert_evolution_chains()`、`generate_form_change_chains()`、`select_pokemon()` | 宝可梦主表/形态/子表/进化链 |
+| `catalog.py` | `ensure_move()`、`upsert_move_detail()`、`upsert_ability_detail()`、`upsert_item_detail()` | 招式/特性/道具 upsert |
+| `learnset.py` | `upsert_pokemon_moves()`、`_resolve_learnset_form_id()` | 招式学习表写入，形态解析（被 champions 复用） |
+| `champions.py` | `upsert_champions_data()` | Champions 赛制/赛季/可用宝可梦/道具写入 |
+| `field_effects.py` | `upsert_field_effect_detail()` | 场地效果写入 |
+
+### CLI 调度层
+
+`cli.py` 是唯一的入口文件，将 fetcher → parser → upsert 串联成管道。各子命令定义在此文件中。
+
+## 模块依赖关系
+
+```text
+cli.py (调度层)
+├── config.py
+├── fetcher.py
+├── form_items.py ─── text.py, upsert/base.py, fetcher.py
+│
+├── parsers/
+│    ├── pokemon_detail.py ─── pokemon_abilities.py, pokemon_images.py,
+│    │                         generations.py, text.py, urls.py
+│    ├── learnset.py ────────── fetcher.py, text.py
+│    ├── evolution.py ──────── text.py
+│    ├── moves.py ─────────── fetcher, constants, generations, images, text, urls
+│    ├── abilities.py ─────── fetcher, constants, generations, images, text, urls
+│    ├── items.py ─────────── fetcher, constants, generations, images, text, urls
+│    ├── champions.py ─────── fetcher, text, urls
+│    └── field_effects.py ─── fetcher, generations, text
+│
+└── upsert/
+     ├── base.py ─────────── (无包内依赖)
+     ├── clear.py ────────── base.py
+     ├── pokemon.py ──────── base.py, form_type.py, form_name_resolver.py, text.py
+     ├── catalog.py ──────── base.py, text.py
+     ├── learnset.py ─────── base.py, catalog.py, form_type.py
+     ├── champions.py ────── base.py, learnset.py, form_type.py
+     └── field_effects.py ── base.py
+```
+
+基础工具层内部链条：`images.py` → `urls.py` → `generations.py` → `constants.py` / `text.py`
+
+## 层间调用规则
+
+| 规则 | 说明 |
+|------|------|
+| Parser 不写库 | `parsers/` 只做 HTML → dict 转换，绝不调用 `upsert/` |
+| Upsert 不解析 HTML | `upsert/` 只接收结构化 dict，不 import BeautifulSoup |
+| Fetcher 是网络唯一入口 | 所有 HTTP 请求必须通过 `PageFetcher.load_or_fetch()`，本地缓存优先 |
+| 基础工具层无 I/O | `constants`/`text`/`urls`/`images`/`generations`/`form_type` 是纯函数 |
+| CLI 是唯一调度者 | `cli.py` 组装管道，parser 和 upsert 不直接互调 |
+| Upsert 层内可横向复用 | 如 `learnset._resolve_learnset_form_id()` 被 `champions.py` 直接导入复用 |
+
 ## 运行流程
 
-以 `all` 命令为例，完整的采集流程如下：
+### `crawl all` 全量采集顺序
 
-1. 抓取招式列表页，解析出所有招式的名称和详情页 URL
-2. 逐一抓取招式详情页，解析威力、命中、PP、效果描述和世代变化记录，写入 `moves` 和 `move_generation_records` 表
-3. 抓取特性列表页，逐一抓取详情页，写入 `abilities` 和 `ability_generation_records` 表
-4. 抓取道具列表页，逐一抓取详情页，写入 `items` 表
-5. 抓取宝可梦全国图鉴列表页，获取所有宝可梦的编号、名称和详情页 URL
-6. 逐一抓取宝可梦详情页，解析形态、属性、种族值、图片、进化链等数据，写入 `pokemon`、`pokemon_forms`、`pokemon_form_stats`、`pokemon_form_types`、`pokemon_form_images`、`evolution_chains` 等表
-7. 从详情页解析特性信息，写入 `pokemon_form_abilities` 表
-8. 逐一抓取每只宝可梦在各世代的招式学习页面，写入 `pokemon_learnsets` 表
+```text
+items → abilities → moves → catalog → pokemon → learnsets → evolution → champions → field-effects → form-items
+```
+
+### `crawl pokemon`（宝可梦详情）
+
+```text
+cli.py: crawl_pokemon()
+  ├─ upsert/base.connect()                      → 打开 SQLite
+  ├─ upsert/pokemon.select_pokemon()            → 从 DB 取待爬列表
+  └─ 循环每条 PokemonRow：
+       ├─ fetcher.load_or_fetch(url)             → RawPage
+       ├─ parsers/pokemon_detail.normalize_*()   → payload dict
+       │    ├── parsers/pokemon_abilities.parse_*()
+       │    ├── parsers/pokemon_images.resolve_*()
+       │    └── generations.extract_generation_changes()
+       └─ upsert/pokemon.upsert_pokemon_detail()
+            ├── INSERT/UPDATE pokemon 主表
+            └── _upsert_pokemon_forms()
+                 ├── form_type._derive_form_type()
+                 ├── form_type._derive_form_category()
+                 ├── form_name_resolver.resolve_form_name_en()
+                 └── INSERT pokemon_forms / stats / types / abilities / images
+```
+
+### `crawl learnsets`（招式学习表）
+
+```text
+cli.py: crawl_learnsets()
+  ├─ upsert/pokemon.select_pokemon()
+  └─ 循环 PokemonRow × 目标世代：
+       ├─ fetcher.load_or_fetch(learnset_url)
+       ├─ parsers/learnset.parse_learnset_page() → {form: [moves]}
+       └─ upsert/learnset.upsert_pokemon_moves()
+            ├── _resolve_learnset_form_id() (多级模糊匹配)
+            ├── 去重：形态与默认形态完全一致时跳过
+            └── upsert/catalog.ensure_move() + INSERT pokemon_moves
+```
+
+### `crawl moves` / `abilities` / `items`
+
+```text
+cli.py: crawl_moves() / crawl_abilities() / crawl_items()
+  ├─ 可选 clear_*()                             → DROP + CREATE 重建
+  ├─ parsers/*.parse_*_list_page()               → [{name_zh, url}]
+  └─ 循环每条：
+       ├─ parsers/*.normalize_*_detail_page()    → payload
+       │    └── generations.extract_generation_changes()
+       └─ upsert/catalog.upsert_*_detail()
+            └── INSERT/UPDATE + generation_records
+```
+
+### `crawl evolution`（进化链）
+
+```text
+cli.py: crawl_evolution()
+  ├─ upsert/pokemon.select_pokemon()
+  └─ 循环每条 PokemonRow：
+       ├─ fetcher.load_or_fetch(pokemon_url)
+       ├─ parsers/evolution.parse_evolution_chain() → [step dict]
+       └─ upsert/pokemon.upsert_evolution_chains()
+            └── _lookup_form_id_by_name() (5 级匹配策略)
+  └─ 可选：generate_form_change_chains()
+       → 从 pokemon_forms 推导超级进化/极巨化形态变化链
+```
+
+### `crawl champions`（冠军赛制）
+
+```text
+cli.py: crawl_champions()
+  ├─ parsers/champions.normalize_champions_pages(fetcher) → 整合 payload
+  └─ upsert/champions.upsert_champions_data()
+       ├── _upsert_champions_regulation()
+       ├── _replace_champions_regulation_pokemon()
+       │    └── _resolve_learnset_form_id() (复用 learnset 的形态解析)
+       ├── INSERT champions_regulation_items
+       └── _upsert_champions_season()
+```
+
+### `crawl field-effects`（场地效果）
+
+```text
+cli.py: crawl_field_effects()
+  ├─ 遍历 parsers/field_effects.ALL_FIELD_EFFECT_SEEDS (静态种子)
+  └─ 循环每个 seed：
+       ├─ fetcher.load_or_fetch(seed.url)
+       ├─ parsers/field_effects.normalize_*() → payload
+       │    └── generations.extract_battle_effect()
+       └─ upsert/field_effects.upsert_field_effect_detail()
+```
+
+### `crawl form-items`（形态绑定道具）
+
+```text
+cli.py: crawl_form_items()
+  ├─ form_items.extract_all_form_item_bindings(fetcher) → bindings
+  └─ form_items.apply_form_item_bindings(conn, bindings)
+       └── UPDATE pokemon_forms SET required_item_id = ?
+```
 
 ## 形态图片匹配
 
@@ -173,6 +370,28 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 爬虫通过 `_form_hints()` 函数为每个形态生成匹配提示词（hints）和排除词（anti_hints）。例如太乐巴戈斯的太晶形态会生成 hints=`["t", "terastal"]` 和 anti_hints=`["s", "stellar"]`，确保它匹配到 `HOME_1024T.png` 而不是 `HOME_1024S.png`。
 
 如果某个形态的图片匹配不正确，通常需要在 `_form_hints()` 函数中为该形态添加正确的提示词。
+
+## 形态英文名映射
+
+爬虫写入 `pokemon_forms` 时会同步填充 `name_en`。默认形态会规范化为对战计算库可识别的 canonical 物种名；非默认形态会根据中文形态名、物种英文名和 `packages/crawler_py/localdex_crawler/form_name_rules.json` 中的规则推导，例如 `伽勒尔达摩狒狒（达摩模式）` → `Darmanitan-Galar-Zen`。
+
+`scripts/fill-form-names.mjs` 是历史数据回填和校准工具，也读取同一份 `form_name_rules.json`。新增或修正形态英文名映射时，只维护这份规则文件，避免爬虫写库逻辑和回填脚本产生差异。
+
+### formTypeKeywords 规则
+
+`form_name_rules.json` 中的 `formTypeKeywords` 字段定义了从中文形态名推导 `form_type` 的关键词映射。该规则被 Python 爬虫（`_derive_form_type()`）和 JS 端（`scripts/fill-form-names.mjs` 的 `deriveFormType()`）共享。规则结构如下：
+
+- `megaPatterns`：匹配超级进化形态，推导为 `mega`、`mega-x`、`mega-y`
+- `gmaxPatterns`：匹配超极巨化形态，推导为 `gmax`
+- `keywordMap`：关键词到 formType 的直接映射（如 `"阿罗拉"` → `"alola"`）
+
+修改 `formTypeKeywords` 时必须同时验证 Python 和 JS 两端的行为一致性。
+
+### name_en 保护机制
+
+`_upsert_pokemon_forms` 对 `name_en` 字段实施保护：当数据库中已存在非空的 `name_en` 值，而本次 upsert 的 payload 中 `name_en` 为空或 None 时，保留数据库现有值不覆盖。这防止了因 `form_name_rules.json` 规则不完整而意外清空已由人工校准或历史回填得到的英文名。
+
+具体实现：`_upsert_pokemon_forms` 在构建数据库现有记录的查找映射时，同时以 `form_type` 和 `display_name_zh` 为 key 建立双重索引，确保无论 payload 使用哪种标识都能正确匹配到已有记录。当匹配到已有记录且其 `name_en` 非空时，如果新 payload 的 `name_en` 为空，则自动回填为数据库现有值。
 
 ---
 
@@ -253,7 +472,6 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 
 | 字段 | 格式要求 | 示例 |
 |------|---------|------|
-| `slug` | NFKC 标准化 → 非字母数字非中文替换为连字符 → 小写 | `皮卡丘` → `皮卡丘`，`Mr. Mime` → `mr-mime` |
 | `name_zh` | 简体中文，经 `to_simplified()` 处理 | `皮卡丘` |
 | `name_ja` | 原始日文，不做转换 | `ピカチュウ` |
 | `name_en` | 原始英文，不做转换 | `Pikachu` |
@@ -311,11 +529,13 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 | 字段 | 格式要求 | 说明 |
 |------|---------|------|
 | `generation` | 1-9 或 99 | 世代编号，99 表示 Champions 赛制 |
-| `form_key` | 字符串 | 形态标识，默认形态为 `default` |
+| `form_id` | 整数 | 对应 `pokemon_forms.id`；解析页中的中文形态标签会先映射到具体形态 |
 | `learn_method` | 枚举字符串 | `level-up`（升级）、`tm`（招式学习器）、`egg`（遗传）、`tutor`（教授）、`pre-evolution`（进化前）、`form-change`（形态变化） |
 | `level` | 正整数或 NULL | 仅 `level-up` 方式有值，"进化"/"—" 转为 NULL |
 | `game_version_code` | 版本代码或 NULL | 如 `SV`、`BDSP`、`SWSH` 等，从页面 h4 标题推断 |
 | `tm_number` | 字符串或 NULL | 招式学习器编号，如 `TM001`、`TR01` |
+
+招式学习数据写入 `pokemon_moves`。如果非默认形态解析出的招式集合与默认形态完全一致，爬虫只保留默认形态记录，查询层负责对该形态回退。
 
 #### Champions 字段
 
@@ -327,7 +547,7 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 | `start_at` / `end_at` | `YYYY-MM-DD` 或 `YYYY-MM-DDTHH:mm` | 从期间文本解析出的起止时间；无时间时只存日期 |
 | `msp_code` | 字符串 | 52Poké `data-msp` 中的形态代码，如 `0006MX` |
 | `dex_number` | 整数或 NULL | 从 `msp_code` 前四位解析出的全国图鉴编号 |
-| `form_key` | 字符串 | 可用形态名称的 `slugify()` 结果 |
+| `form_code` | 字符串或 NULL | `msp_code` 的形态后缀，用于解析 `pokemon_forms.form_id` |
 | `item_id` | 整数 | `champions_regulation_items` 直接关联主 `items.id`；Champions 专用道具或票券不写入 |
 
 #### 世代变更记录字段
@@ -354,7 +574,7 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 
 **去重**：所有列表解析结果都通过 `unique_by_key()` 函数去重。招式按中文名去重，特性按编号去重（编号重复时保留最后一条），道具按中文名去重，宝可梦按"编号|名称"组合去重。招式学习表在写入前通过 `_dedupe_learnset()` 去重。
 
-**Upsert 语义**：数据库写入统一使用 upsert 模式——先查询是否存在（通过 slug、编号或中文名匹配），存在则 UPDATE，不存在则 INSERT。UPDATE 时使用 `COALESCE(?, existing_value)` 语法，确保新值为 NULL 时不覆盖已有数据。
+**Upsert 语义**：数据库写入统一使用 upsert 模式——先查询是否存在（通过编号或中文名匹配），存在则 UPDATE，不存在则 INSERT。UPDATE 时使用 `COALESCE(?, existing_value)` 语法，确保新值为 NULL 时不覆盖已有数据。
 
 **外键完整性**：招式学习表写入时，如果引用的招式不存在于 `moves` 表，会通过 `ensure_move()` 自动创建一条只有中文名的占位记录。特性关联写入时，如果引用的特性不存在，`ability_id` 字段设为 NULL，但 `ability_name_zh` 冗余字段保证数据不丢失。
 
@@ -366,11 +586,11 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 
 当需要采集新的数据类型时，应遵循以下步骤和约定：
 
-**模块结构**：在 `packages/crawler_py/localdex_crawler/` 下创建新的解析模块（如 `nature.py`），定义 `Seed` 数据类（如 `NatureSeed`）和解析函数（如 `parse_nature_list_page()`、`normalize_nature_detail_page()`）。Seed 类使用 `@dataclass(frozen=True)` 定义，包含列表页可获取的基础字段和详情页 URL。
+**解析模块**：在 `parsers/` 下创建新文件（如 `parsers/natures.py`），定义 `Seed` 数据类（如 `NatureSeed`）和解析函数（如 `parse_nature_list_page()`、`normalize_nature_detail_page()`）。Seed 类使用 `@dataclass(frozen=True)` 定义，包含列表页可获取的基础字段和详情页 URL。解析模块只负责 HTML → dict 转换，不做数据库写入。
 
-**CLI 集成**：在 `cli.py` 中注册新的子命令，添加对应的 `crawl_xxx()` 函数。新子命令应支持 `--refresh-raw`、`--dry-run`、`--clean` 三个通用标志。如果数据与宝可梦关联，还应支持宝可梦筛选参数。
+**写库模块**：在 `upsert/` 下创建新文件（如 `upsert/natures.py`），添加 `upsert_xxx_detail()` 函数。在 `upsert/clear.py` 中添加对应的 `clear_xxx()` 函数。写入函数必须使用 upsert 语义（存在则更新，不存在则插入），确保多次运行幂等。清除函数使用 DROP + CREATE 重建模式。
 
-**数据库写入**：在 `sqlite_upsert.py` 中添加 `upsert_xxx_detail()` 和 `clear_xxx()` 函数。写入函数必须使用 upsert 语义（存在则更新，不存在则插入），确保多次运行幂等。清除函数应先删除子表数据再删除主表数据，遵循外键约束。
+**CLI 集成**：在 `cli.py` 中注册新的子命令，添加对应的 `crawl_xxx()` 函数。新子命令应支持 `--refresh-raw`、`--dry-run`、`--clean` 三个通用标志。如果数据与宝可梦关联，还应支持宝可梦筛选参数。CLI 负责组装 fetcher → parser → upsert 管道。
 
 ## 新增数据类型检查清单
 

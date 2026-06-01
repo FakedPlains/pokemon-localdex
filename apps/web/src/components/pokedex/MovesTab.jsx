@@ -7,7 +7,7 @@ import TypeChip from "../TypeChip.jsx";
 const PAGE_SIZE = 50;
 
 /* ─── Moves Tab（瀑布流分页 + 服务端方法筛选） ─── */
-export default function MovesTab({ detail, display, detailGeneration, onDetailGenerationChange, learnsetMeta, externalFormKey }) {
+export default function MovesTab({ detail, display, detailGeneration, onDetailGenerationChange, learnsetMeta, externalFormId }) {
   const pokemonId = detail.id;
 
   // 累积的所有已加载数据
@@ -15,7 +15,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
-  const [learnsetFormKey, setLearnsetFormKey] = useState(null);
+  const [learnsetFormId, setLearnsetFormId] = useState(null);
   const [methodFilter, setMethodFilter] = useState("");
   const [selectedVersionRaw, setSelectedVersion] = useState(null);
   const [versionGenRef, setVersionGenRef] = useState(null);
@@ -24,15 +24,15 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
 
   const offsetRef = useRef(0);
   const sentinelRef = useRef(null);
-  // 服务端首次返回的实际 formKey（可能经过 fallback），用 ref 避免驱动 fetchPage 重建
-  const resolvedFormKeyRef = useRef(null);
+  // 服务端首次返回的实际 formId（可能经过 fallback），用 ref 避免驱动 fetchPage 重建
+  const resolvedFormIdRef = useRef(null);
   // 竞态保护：递增 requestId，回调中检查是否过时
   const requestIdRef = useRef(0);
   // 检测 pokemonId 变化，统一在初始加载 effect 中重置筛选器
   const prevPokemonIdRef = useRef(pokemonId);
 
   const learnsetGenOptions = learnsetMeta?.generations || [];
-  const learnsetFormKeys = learnsetMeta?.formKeys || [];
+  const learnsetFormIds = useMemo(() => (learnsetMeta?.forms || []).map(f => f.formId), [learnsetMeta]);
   const versionsByGen = learnsetMeta?.versionsByGen || {};
 
   // 当前选中的世代
@@ -57,29 +57,31 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
     return availableVersions.length > 0 ? availableVersions[0].code : null;
   }, [activeGen, versionGenRef, selectedVersionRaw, availableVersions]);
 
-  // 当前选中的形态
-  const activeFormKey = useMemo(() => {
-    if (externalFormKey && learnsetFormKeys.includes(externalFormKey)) return externalFormKey;
-    const displayFormKey = display.form?.formKey || "default";
-    if (learnsetFormKeys.includes(displayFormKey)) return displayFormKey;
-    const displayName = display.form?.nameZh;
-    if (displayName && learnsetFormKeys.includes(displayName)) return displayName;
-    if (learnsetFormKeys.includes("default")) return "default";
-    return learnsetFormKeys[0] || "default";
-  }, [externalFormKey, display.form, learnsetFormKeys]);
+  // 当前选中的形态 formId（数字）
+  const activeFormId = useMemo(() => {
+    if (externalFormId != null && learnsetFormIds.includes(externalFormId)) return externalFormId;
+    // 从 detail forms 中找到当前形态对应的数据库 formId
+    const detailForms = detail.forms || [];
+    const currentFormKey = display.form?.formKey || "default";
+    const matchedDetail = detailForms.find((f) => f.formKey === currentFormKey);
+    if (matchedDetail?.id && learnsetFormIds.includes(matchedDetail.id)) return matchedDetail.id;
+    // 默认形态
+    const defaultMeta = (learnsetMeta?.forms || []).find((f) => f.isDefault);
+    if (defaultMeta) return defaultMeta.formId;
+    return learnsetFormIds[0] ?? null;
+  }, [externalFormId, display.form, learnsetFormIds, detail.forms, learnsetMeta]);
 
   // 获取一页数据（method 筛选由服务端处理）
   // 返回 false 表示被竞态丢弃，调用方据此决定是否更新 loading 状态
   const fetchPage = useCallback(async (offset, isInitial, method) => {
-    if (!activeGen) return false;
+    if (!activeGen || activeFormId == null) return false;
     const rid = ++requestIdRef.current;
-    // 追加请求使用首次请求服务端返回的实际 formKey（可能是 fallback 后的），
-    // 初始请求仍用 activeFormKey 让服务端做 fallback。
-    // 读 ref 而非 state，避免 learnsetFormKey 变化驱动 fetchPage/effect 重建。
-    const formToSend = (!isInitial && resolvedFormKeyRef.current) ? resolvedFormKeyRef.current : activeFormKey;
+    // 追加请求使用首次请求服务端返回的实际 effectiveFormId（可能经过 fallback），
+    // 初始请求仍用 activeFormId 让服务端做 fallback。
+    const formIdToSend = (!isInitial && resolvedFormIdRef.current != null) ? resolvedFormIdRef.current : activeFormId;
     const params = new URLSearchParams({
       generation: String(activeGen),
-      form: formToSend,
+      formId: String(formIdToSend),
       limit: String(PAGE_SIZE),
       offset: String(offset),
     });
@@ -95,12 +97,12 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       if (rid !== requestIdRef.current) return false;
       const moves = r.data || [];
       const more = r.hasMore ?? false;
-      const fk = r.formKey || activeFormKey;
+      const effectiveId = r.effectiveFormId ?? activeFormId;
 
       if (isInitial) {
         setAllMoves(moves);
-        resolvedFormKeyRef.current = fk;
-        setLearnsetFormKey(fk);
+        resolvedFormIdRef.current = effectiveId;
+        setLearnsetFormId(effectiveId);
         // methodCounts 来自服务端，是当前 form+gen+version 的全量计数（不受 method 筛选影响）
         if (r.methodCounts) setMethodCounts(r.methodCounts);
       } else {
@@ -115,7 +117,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       setHasMore(false);
       return true;
     }
-  }, [pokemonId, activeGen, activeFormKey, selectedVersion]);
+  }, [pokemonId, activeGen, activeFormId, selectedVersion]);
 
   // 初始加载（世代/形态/版本/宝可梦变化时重置）
   // 切换世代/版本/形态/宝可梦时统一清空招式筛选，默认展示全部招式。
@@ -125,8 +127,8 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       prevPokemonIdRef.current = pokemonId;
       setSelectedVersion(null);
       setVersionGenRef(null);
-      setLearnsetFormKey(null);
-      resolvedFormKeyRef.current = null;
+      setLearnsetFormId(null);
+      resolvedFormIdRef.current = null;
     }
     // 无论哪个维度变化，都重置招式筛选为“全部”
     setMethodFilter("");
@@ -178,7 +180,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
 
   const totalCount = Object.values(methodCounts).reduce((s, c) => s + c, 0);
 
-  const isFallback = learnsetFormKey && learnsetFormKey !== activeFormKey;
+  const isFallback = learnsetFormId != null && learnsetFormId !== activeFormId;
 
   return (
     <div className="tab-moves">

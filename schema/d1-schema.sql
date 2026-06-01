@@ -1,6 +1,6 @@
 -- ============================================================
 -- Pokemon LocalDex — Cloudflare D1 Schema
--- 与 packages/sqlite-store/src/index.ts 中的 ensureSchema() 保持同步
+-- 与 packages/store/drizzle-schema/src/index.ts 保持同步
 -- D1 使用 SQLite 语法，直接兼容
 -- ============================================================
 
@@ -12,7 +12,6 @@ PRAGMA foreign_keys = OFF;
 CREATE TABLE IF NOT EXISTS pokemon (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   dex_number INTEGER NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
   name_zh TEXT NOT NULL,
   name_ja TEXT,
   name_en TEXT,
@@ -31,14 +30,15 @@ CREATE TABLE IF NOT EXISTS pokemon (
 CREATE TABLE IF NOT EXISTS pokemon_forms (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-  form_key TEXT NOT NULL,
+  form_type TEXT NOT NULL,
+  form_category TEXT NOT NULL DEFAULT 'default',
   name_zh TEXT NOT NULL,
-  form_type TEXT NOT NULL DEFAULT 'default',
+  display_name_zh TEXT,
+  name_en TEXT,
   is_default INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   required_item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
-  name_en TEXT,
-  UNIQUE (pokemon_id, form_key)
+  UNIQUE (pokemon_id, form_type)
 );
 
 CREATE TABLE IF NOT EXISTS pokemon_form_stats (
@@ -94,8 +94,8 @@ CREATE TABLE IF NOT EXISTS evolution_chains (
   chain_id INTEGER NOT NULL,
   from_pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE CASCADE,
   to_pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-  from_form_key TEXT,
-  to_form_key TEXT,
+  from_form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
+  to_form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
   stage INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   evolution_method TEXT,
@@ -106,24 +106,12 @@ CREATE TABLE IF NOT EXISTS evolution_chains (
 );
 
 -- ============================================================
--- 宝可梦世代可用性
+-- 宝可梦可学招式
 -- ============================================================
-CREATE TABLE IF NOT EXISTS pokemon_generation_regions (
+CREATE TABLE IF NOT EXISTS pokemon_moves (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-  generation INTEGER NOT NULL,
-  region TEXT,
-  regional_dex_number TEXT,
-  UNIQUE (pokemon_id, generation, region)
-);
-
--- ============================================================
--- 招式学习
--- ============================================================
-CREATE TABLE IF NOT EXISTS pokemon_learnsets (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  pokemon_id INTEGER NOT NULL REFERENCES pokemon(id) ON DELETE CASCADE,
-  form_key TEXT NOT NULL DEFAULT 'default',
+  form_id INTEGER NOT NULL REFERENCES pokemon_forms(id) ON DELETE CASCADE,
   move_id INTEGER REFERENCES moves(id),
   move_name_zh TEXT NOT NULL,
   generation INTEGER NOT NULL,
@@ -132,8 +120,7 @@ CREATE TABLE IF NOT EXISTS pokemon_learnsets (
   level INTEGER,
   tm_number TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
-  notes TEXT,
-  UNIQUE (pokemon_id, form_key, move_name_zh, generation, game_version_code, learn_method, level)
+  notes TEXT
 );
 
 -- ============================================================
@@ -204,7 +191,6 @@ CREATE TABLE IF NOT EXISTS ability_generation_records (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  slug TEXT NOT NULL UNIQUE,
   name_zh TEXT NOT NULL,
   name_ja TEXT,
   name_en TEXT,
@@ -227,6 +213,165 @@ CREATE TABLE IF NOT EXISTS item_generation_records (
   notes TEXT,
   version_exclusive INTEGER NOT NULL DEFAULT 0,
   UNIQUE (item_id, generation)
+);
+
+-- ============================================================
+-- 战斗效果结构化数据
+-- 所有枚举字段存储整数，映射见 shared-types/src/battle-effects.ts
+-- ============================================================
+
+-- 招式标签（接触/声音/拳类等）
+-- 一对多：一个招式可带多个标签
+CREATE TABLE IF NOT EXISTS move_flags (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
+  flag INTEGER NOT NULL,           -- MOVE_FLAG 枚举值
+  UNIQUE (move_id, flag)
+);
+
+-- 特性战斗效果
+CREATE TABLE IF NOT EXISTS ability_battle_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ability_id INTEGER NOT NULL REFERENCES abilities(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,    -- EFFECT_TYPE 枚举
+  trigger INTEGER NOT NULL DEFAULT 1,  -- TRIGGER 枚举, 1=ALWAYS
+  target INTEGER NOT NULL DEFAULT 1,   -- TARGET 枚举, 1=SELF
+  modifier_type INTEGER NOT NULL,  -- MODIFIER_TYPE 枚举
+  modifier_value REAL,             -- 倍率/等级数等主数值
+  affected_stat INTEGER,           -- BATTLE_STAT 枚举
+  affected_type INTEGER,           -- 属性 ID（TYPE_DEFS 的 id）
+  affected_move_flag INTEGER,      -- MOVE_FLAG 枚举
+  affected_move_category INTEGER,  -- MOVE_CATEGORY 枚举 (1=物理,2=特殊,3=变化)
+  params TEXT,                     -- JSON 扩展参数
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,          -- NULL = 当前仍有效
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+-- 道具战斗效果
+CREATE TABLE IF NOT EXISTS item_battle_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,
+  trigger INTEGER NOT NULL DEFAULT 1,
+  target INTEGER NOT NULL DEFAULT 1,
+  modifier_type INTEGER NOT NULL,
+  modifier_value REAL,
+  affected_stat INTEGER,
+  affected_type INTEGER,
+  affected_move_flag INTEGER,
+  affected_move_category INTEGER,
+  params TEXT,
+  consumable INTEGER NOT NULL DEFAULT 0,   -- 是否消耗品
+  species_restriction TEXT,                -- JSON 数组，限定宝可梦
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+-- 招式战斗效果（反作用力、多段、特殊公式等）
+CREATE TABLE IF NOT EXISTS move_battle_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  move_id INTEGER NOT NULL REFERENCES moves(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,
+  trigger INTEGER NOT NULL DEFAULT 7,  -- TRIGGER 枚举, 7=ON_ATTACK
+  target INTEGER NOT NULL DEFAULT 2,   -- TARGET 枚举, 2=OPPONENT
+  modifier_type INTEGER NOT NULL,
+  modifier_value REAL,
+  affected_stat INTEGER,
+  affected_type INTEGER,
+  affected_move_flag INTEGER,
+  affected_move_category INTEGER,
+  params TEXT,
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+-- ============================================================
+-- 场地效果（天气、场地、异常状态等）— 主实体表 + 效果明细 + 世代记录
+-- ============================================================
+
+-- 效果类型枚举（field_effect_kind）：
+--   1 = weather    天气
+--   2 = terrain    场地
+--   3 = status     异常状态（烧伤/麻痹/中毒等）
+--   4 = side       场侧效果（反射壁/光墙/撒菱等）
+--   5 = field      全场效果（重力/戏法空间/魔法空间等）
+
+-- 主实体表：每种天气/场地/异常状态一条记录
+CREATE TABLE IF NOT EXISTS field_effects (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind INTEGER NOT NULL,                 -- 效果大类 (1~5)
+  key TEXT NOT NULL,                     -- 程序内标识，如 "sun"、"electric"、"burn"、"reflect"
+  name_zh TEXT NOT NULL,                 -- 中文名，如 "晴天"、"电气场地"、"烧伤"
+  name_en TEXT,                          -- 英文名，如 "Sunny"、"Electric Terrain"、"Burn"
+  name_ja TEXT,                          -- 日文名
+  description TEXT,                      -- 当前最新世代的效果描述
+  introduced_generation INTEGER,         -- 初登场世代
+  max_turns INTEGER,                     -- 默认最大持续回合数（NULL = 无固定回合限制）
+  max_layers INTEGER,                    -- 最大叠加层数（如撒菱 3 层；NULL = 不可叠加）
+  source_url TEXT,
+  source_title TEXT,
+  source_fetched_at TEXT,
+  UNIQUE (kind, key)
+);
+
+-- 效果对战明细表：存储该效果对伤害计算的具体数值影响
+-- 结构复用 ability/item/move_battle_effects 的枚举体系
+CREATE TABLE IF NOT EXISTS field_effect_modifiers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  field_effect_id INTEGER NOT NULL REFERENCES field_effects(id) ON DELETE CASCADE,
+  effect_type INTEGER NOT NULL,          -- EFFECT_TYPE 枚举（如 201=威力倍率, 101=能力值倍率）
+  trigger INTEGER NOT NULL DEFAULT 1,    -- TRIGGER 枚举
+  target INTEGER NOT NULL DEFAULT 7,     -- TARGET 枚举, 7=FIELD 全场
+  modifier_type INTEGER NOT NULL,        -- MODIFIER_TYPE 枚举
+  modifier_value REAL,                   -- 倍率/数值
+  affected_stat INTEGER,                 -- BATTLE_STAT 枚举
+  affected_type INTEGER,                 -- 属性 ID（TYPE_DEFS 的 id）
+  affected_move_flag INTEGER,            -- MOVE_FLAG 枚举
+  affected_move_category INTEGER,        -- MOVE_CATEGORY 枚举
+  condition_key TEXT,                    -- 额外条件标识（如 "grounded" 表示仅接地）
+  params TEXT,                           -- JSON 扩展参数
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,                -- NULL = 当前仍有效
+  priority INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
+
+-- 世代差异记录：记录效果在不同世代的描述/规则变化
+CREATE TABLE IF NOT EXISTS field_effect_generation_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  field_effect_id INTEGER NOT NULL REFERENCES field_effects(id) ON DELETE CASCADE,
+  generation INTEGER NOT NULL,
+  game_version_code TEXT,
+  description TEXT,                      -- 该世代的效果描述
+  notes TEXT,                            -- 备注（如"第五世代前为冰雹而非雪"）
+  version_exclusive INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (field_effect_id, generation, COALESCE(game_version_code, ''))
+);
+
+-- 场地效果来源关联表：记录哪些特性/招式/道具能触发或维持某个场地效果
+-- source_type: 1=ability, 2=move, 3=item
+-- trigger_method: 1=登场设置, 2=使用设置, 3=命中附带, 4=接触附带,
+--                 5=延长持续, 6=维持/增强, 7=移除, 8=阻止
+CREATE TABLE IF NOT EXISTS field_effect_sources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  field_effect_id INTEGER NOT NULL REFERENCES field_effects(id) ON DELETE CASCADE,
+  source_type INTEGER NOT NULL,           -- 来源大类：1=ability, 2=move, 3=item
+  source_id INTEGER NOT NULL,             -- abilities.id / moves.id / items.id
+  trigger_method INTEGER NOT NULL DEFAULT 2,  -- 触发方式枚举
+  layers INTEGER,                         -- 每次触发叠加层数（NULL=不适用）
+  turns_override INTEGER,                 -- 回合数覆盖（延长道具等；NULL=使用默认）
+  condition_key TEXT,                     -- 附加触发条件标识
+  probability REAL,                       -- 触发概率（NULL或1.0=必定触发）
+  generation_start INTEGER NOT NULL DEFAULT 1,
+  generation_end INTEGER,                 -- NULL = 当前仍有效
+  note TEXT,
+  UNIQUE (field_effect_id, source_type, source_id, trigger_method, COALESCE(condition_key, ''))
 );
 
 -- ============================================================
@@ -269,7 +414,6 @@ CREATE TABLE IF NOT EXISTS champions_regulation_pokemon (
   msp_code TEXT NOT NULL,
   form_code TEXT,
   name_zh TEXT NOT NULL,
-  form_key TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   UNIQUE (regulation_id, msp_code, name_zh)
 );
@@ -287,7 +431,6 @@ CREATE TABLE IF NOT EXISTS champions_regulation_items (
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_pokemon_dex ON pokemon(dex_number);
 CREATE INDEX IF NOT EXISTS idx_pokemon_name ON pokemon(name_zh);
-CREATE INDEX IF NOT EXISTS idx_pokemon_slug ON pokemon(slug);
 CREATE INDEX IF NOT EXISTS idx_pokemon_introduced_generation ON pokemon(introduced_generation);
 
 CREATE INDEX IF NOT EXISTS idx_forms_pokemon ON pokemon_forms(pokemon_id);
@@ -302,13 +445,20 @@ CREATE INDEX IF NOT EXISTS idx_form_images_kind ON pokemon_form_images(form_id, 
 
 CREATE INDEX IF NOT EXISTS idx_evo_chain ON evolution_chains(chain_id);
 CREATE INDEX IF NOT EXISTS idx_evo_to ON evolution_chains(to_pokemon_id);
+CREATE INDEX IF NOT EXISTS idx_evo_from ON evolution_chains(from_pokemon_id);
 
-CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon ON pokemon_learnsets(pokemon_id, form_key);
-CREATE INDEX IF NOT EXISTS idx_learnsets_pokemon_gen ON pokemon_learnsets(pokemon_id, generation);
-CREATE INDEX IF NOT EXISTS idx_learnsets_lookup ON pokemon_learnsets(pokemon_id, generation, form_key, game_version_code, learn_method, sort_order);
-CREATE INDEX IF NOT EXISTS idx_learnsets_move ON pokemon_learnsets(move_id);
-
-CREATE INDEX IF NOT EXISTS idx_regions_pokemon ON pokemon_generation_regions(pokemon_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_pokemon_moves ON pokemon_moves(
+  form_id,
+  move_name_zh,
+  generation,
+  COALESCE(game_version_code, ''),
+  learn_method,
+  COALESCE(level, -1),
+  COALESCE(tm_number, '')
+);
+CREATE INDEX IF NOT EXISTS idx_pokemon_moves_lookup ON pokemon_moves(pokemon_id, generation, form_id, game_version_code, learn_method, sort_order);
+CREATE INDEX IF NOT EXISTS idx_pokemon_moves_form_gen ON pokemon_moves(form_id, generation);
+CREATE INDEX IF NOT EXISTS idx_pokemon_moves_move ON pokemon_moves(move_id);
 
 CREATE INDEX IF NOT EXISTS idx_moves_name_zh ON moves(name_zh);
 CREATE INDEX IF NOT EXISTS idx_moves_type ON moves(type_name);
@@ -323,5 +473,25 @@ CREATE INDEX IF NOT EXISTS idx_champions_seasons_regulation ON champions_seasons
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_regulation ON champions_regulation_pokemon(regulation_id);
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_pokemon ON champions_regulation_pokemon(pokemon_id);
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_items_regulation ON champions_regulation_items(regulation_id);
+
+CREATE INDEX IF NOT EXISTS idx_move_flags_move ON move_flags(move_id);
+CREATE INDEX IF NOT EXISTS idx_move_flags_flag ON move_flags(flag);
+CREATE INDEX IF NOT EXISTS idx_abe_ability ON ability_battle_effects(ability_id);
+CREATE INDEX IF NOT EXISTS idx_abe_effect_type ON ability_battle_effects(effect_type);
+CREATE INDEX IF NOT EXISTS idx_abe_trigger ON ability_battle_effects(trigger);
+CREATE INDEX IF NOT EXISTS idx_ibe_item ON item_battle_effects(item_id);
+CREATE INDEX IF NOT EXISTS idx_ibe_effect_type ON item_battle_effects(effect_type);
+CREATE INDEX IF NOT EXISTS idx_mbe_move ON move_battle_effects(move_id);
+CREATE INDEX IF NOT EXISTS idx_mbe_effect_type ON move_battle_effects(effect_type);
+
+CREATE INDEX IF NOT EXISTS idx_fe_kind ON field_effects(kind);
+CREATE INDEX IF NOT EXISTS idx_fe_key ON field_effects(key);
+CREATE INDEX IF NOT EXISTS idx_fe_name_zh ON field_effects(name_zh);
+CREATE INDEX IF NOT EXISTS idx_fem_field_effect ON field_effect_modifiers(field_effect_id);
+CREATE INDEX IF NOT EXISTS idx_fem_effect_type ON field_effect_modifiers(effect_type);
+CREATE INDEX IF NOT EXISTS idx_fegr_field_effect ON field_effect_generation_records(field_effect_id);
+CREATE INDEX IF NOT EXISTS idx_fes_field_effect ON field_effect_sources(field_effect_id);
+CREATE INDEX IF NOT EXISTS idx_fes_source ON field_effect_sources(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_fes_source_type ON field_effect_sources(source_type);
 
 PRAGMA foreign_keys = ON;

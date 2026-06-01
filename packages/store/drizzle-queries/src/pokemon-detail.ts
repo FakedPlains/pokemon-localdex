@@ -6,7 +6,6 @@ import {
   pokemonFormTypes,
   pokemonFormAbilities,
   pokemonFormImages,
-  pokemonGenerationRegions,
   abilities,
   items,
 } from "@pokemon-localdex/drizzle-schema";
@@ -21,26 +20,23 @@ import type {
 import {
   buildSource,
   buildStatBlock,
-  championFormNameMatches,
 } from "./hydration.ts";
 import { championRegulationPokemonRows } from "./champions.ts";
 import { getPokemonEvolutionChainRows } from "./pokemon-evolution.ts";
 
-export async function getPokemonIdentityRow(db: any, idOrSlug: string): Promise<PokemonIdentity | undefined> {
+export async function getPokemonIdentityRow(db: any, idOrName: string): Promise<PokemonIdentity | undefined> {
   const rows = await db
     .select({
       id: pokemon.id,
       dexNumber: pokemon.dexNumber,
-      slug: pokemon.slug,
       nameZh: pokemon.nameZh,
     })
     .from(pokemon)
     .where(
       or(
-        eq(pokemon.id, Number(idOrSlug) || 0),
-        eq(pokemon.slug, idOrSlug),
-        eq(pokemon.nameZh, idOrSlug),
-        eq(sql`CAST(${pokemon.dexNumber} AS TEXT)`, idOrSlug),
+        eq(pokemon.id, Number(idOrName) || 0),
+        eq(pokemon.nameZh, idOrName),
+        eq(sql`CAST(${pokemon.dexNumber} AS TEXT)`, idOrName),
       ),
     )
     .limit(1);
@@ -50,7 +46,6 @@ export async function getPokemonIdentityRow(db: any, idOrSlug: string): Promise<
     ? {
         id: Number(row.id),
         dexNumber: Number(row.dexNumber),
-        slug: String(row.slug),
         nameZh: String(row.nameZh),
       }
     : undefined;
@@ -60,16 +55,27 @@ export async function getPokemonIdentityRow(db: any, idOrSlug: string): Promise<
 // 内部共享辅助函数
 // ────────────────────────────────────────────────────────────────────────────
 
-async function lookupPokemonRow(db: any, idOrSlug: string) {
+async function lookupPokemonRow(db: any, idOrName: string) {
+  // 优先精确匹配 pokemon.id，避免 OR + LIMIT 1 在 id 与 dex_number 不一致时
+  // 返回错误的行（SQLite 按 ROWID 顺序扫描，dex_number 匹配可能先于 id 匹配）
+  const numericId = Number(idOrName) || 0;
+  if (numericId > 0) {
+    const byId = await db
+      .select()
+      .from(pokemon)
+      .where(eq(pokemon.id, numericId))
+      .limit(1);
+    if (byId[0]) return byId[0];
+  }
+
+  // Fallback: 中文名 / 图鉴编号
   const rows = await db
     .select()
     .from(pokemon)
     .where(
       or(
-        eq(pokemon.id, Number(idOrSlug) || 0),
-        eq(pokemon.slug, idOrSlug),
-        eq(pokemon.nameZh, idOrSlug),
-        eq(sql`CAST(${pokemon.dexNumber} AS TEXT)`, idOrSlug),
+        eq(pokemon.nameZh, idOrName),
+        eq(sql`CAST(${pokemon.dexNumber} AS TEXT)`, idOrName),
       ),
     )
     .limit(1);
@@ -90,15 +96,16 @@ async function queryFormsAndBuild(
     .select({
       id: pokemonForms.id,
       pokemonId: pokemonForms.pokemonId,
-      formKey: pokemonForms.formKey,
-      nameZh: pokemonForms.nameZh,
       formType: pokemonForms.formType,
+      formCategory: pokemonForms.formCategory,
+      nameZh: pokemonForms.nameZh,
+      displayNameZh: pokemonForms.displayNameZh,
+      nameEn: pokemonForms.nameEn,
       isDefault: pokemonForms.isDefault,
       sortOrder: pokemonForms.sortOrder,
       requiredItemId: pokemonForms.requiredItemId,
       reqItemId: items.id,
       reqItemNameZh: items.nameZh,
-      reqItemSlug: items.slug,
       reqItemImageUrl: items.imageUrl,
     })
     .from(pokemonForms)
@@ -107,25 +114,7 @@ async function queryFormsAndBuild(
     .orderBy(asc(pokemonForms.sortOrder));
 
   if (championRows) {
-    const allowedFormIds = new Set<number>();
-    const defaultFormId = Number(formRows.find((form: any) => Number(form.isDefault) === 1)?.id ?? formRows[0]?.id);
-
-    for (const champion of championRows) {
-      if (champion.formId != null) {
-        allowedFormIds.add(champion.formId);
-        continue;
-      }
-
-      const matchedForms = formRows.filter((form: any) =>
-        championFormNameMatches(form, champion.nameZh, String(row.nameZh)),
-      );
-      if (matchedForms.length > 0) {
-        for (const form of matchedForms) allowedFormIds.add(Number(form.id));
-      } else if (Number.isFinite(defaultFormId)) {
-        allowedFormIds.add(defaultFormId);
-      }
-    }
-
+    const allowedFormIds = new Set(championRows.map((c) => c.formId));
     formRows = formRows.filter((form: any) => allowedFormIds.has(Number(form.id)));
   }
 
@@ -246,9 +235,13 @@ async function queryFormsAndBuild(
 
     const entry: PokemonFormEntry = {
       id: fid,
-      formKey: String(f.formKey),
-      nameZh: String(f.nameZh),
+      formKey: String(f.formType),
       formType: String(f.formType),
+      formCategory: String(f.formCategory || "alternate"),
+      canonicalNameZh: String(f.nameZh),
+      displayNameZh: f.displayNameZh ? String(f.displayNameZh) : String(f.nameZh),
+      nameZh: f.displayNameZh ? String(f.displayNameZh) : String(f.nameZh),
+      nameEn: f.nameEn ? String(f.nameEn) : undefined,
       isDefault: Boolean(Number(f.isDefault)),
       sortOrder: Number(f.sortOrder),
       primaryType: latestType?.types[0],
@@ -262,7 +255,6 @@ async function queryFormsAndBuild(
       entry.requiredItem = {
         id: String(f.reqItemId),
         nameZh: String(f.reqItemNameZh),
-        slug: String(f.reqItemSlug),
         imageUrl: f.reqItemImageUrl ? String(f.reqItemImageUrl) : undefined,
       };
     }
@@ -293,7 +285,6 @@ function buildBaseFields(row: any, pokemonId: number, forms: PokemonFormEntry[])
   return {
     id: pokemonId,
     dexNumber: Number(row.dexNumber),
-    slug: String(row.slug),
     nameZh: String(row.nameZh),
     nameJa: row.nameJa ? String(row.nameJa) : undefined,
     nameEn: row.nameEn ? String(row.nameEn) : undefined,
@@ -316,14 +307,12 @@ function buildEmptyEntry(row: any, pokemonId: number): PokemonEntry {
   return {
     id: pokemonId,
     dexNumber: Number(row.dexNumber),
-    slug: String(row.slug),
     nameZh: String(row.nameZh),
     nameJa: row.nameJa ? String(row.nameJa) : undefined,
     nameEn: row.nameEn ? String(row.nameEn) : undefined,
     primaryType: undefined,
     secondaryType: undefined,
     abilities: [],
-    generations: [],
     forms: [],
     evolutionChain: [],
     source: buildSource(row),
@@ -331,18 +320,18 @@ function buildEmptyEntry(row: any, pokemonId: number): PokemonEntry {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// getPokemonSummaryRow — 轻量摘要，跳过 evolutionChain 和 generations
-// 用于抽屉初始加载，减少 4 次 D1 查询
+// getPokemonSummaryRow — 轻量摘要，跳过 evolutionChain
+// 用于抽屉初始加载，减少 D1 查询
 // ────────────────────────────────────────────────────────────────────────────
 
-export type PokemonSummaryResult = Omit<PokemonEntry, "evolutionChain" | "generations">;
+export type PokemonSummaryResult = Omit<PokemonEntry, "evolutionChain">;
 
 export async function getPokemonSummaryRow(
   db: any,
-  idOrSlug: string,
+  idOrName: string,
   filters?: { championsSeasonId?: number },
 ): Promise<PokemonSummaryResult | undefined> {
-  const row = await lookupPokemonRow(db, idOrSlug);
+  const row = await lookupPokemonRow(db, idOrName);
   if (!row) return undefined;
 
   const pokemonId = Number(row.id);
@@ -355,7 +344,7 @@ export async function getPokemonSummaryRow(
 
   const forms = await queryFormsAndBuild(db, row, pokemonId, championRows);
   if (!forms) {
-    const { evolutionChain: _e, generations: _g, ...rest } = buildEmptyEntry(row, pokemonId);
+    const { evolutionChain: _e, ...rest } = buildEmptyEntry(row, pokemonId);
     return rest;
   }
 
@@ -374,30 +363,15 @@ export async function getPokemonEvolutionRow(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// getPokemonGenerationsRow — 独立的世代地区查询
-// ────────────────────────────────────────────────────────────────────────────
-
-export async function getPokemonGenerationsRow(
-  db: any,
-  pokemonId: number,
-): Promise<number[]> {
-  const genRows = await db.select({ generation: pokemonGenerationRegions.generation })
-    .from(pokemonGenerationRegions)
-    .where(eq(pokemonGenerationRegions.pokemonId, pokemonId))
-    .orderBy(asc(pokemonGenerationRegions.generation));
-  return [...new Set(genRows.map((r: any) => Number(r.generation)))];
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// getPokemonRow — 完整详情（保留向后兼容，含 evolutionChain + generations）
+// getPokemonRow — 完整详情（含 evolutionChain）
 // ────────────────────────────────────────────────────────────────────────────
 
 export async function getPokemonRow(
   db: any,
-  idOrSlug: string,
+  idOrName: string,
   filters?: { championsSeasonId?: number },
 ): Promise<PokemonEntry | undefined> {
-  const row = await lookupPokemonRow(db, idOrSlug);
+  const row = await lookupPokemonRow(db, idOrName);
   if (!row) return undefined;
 
   const pokemonId = Number(row.id);
@@ -411,15 +385,10 @@ export async function getPokemonRow(
   const forms = await queryFormsAndBuild(db, row, pokemonId, championRows);
   if (!forms) return buildEmptyEntry(row, pokemonId);
 
-  // 进化链和世代地区并行查询
-  const [evolutionChain, generations] = await Promise.all([
-    getPokemonEvolutionRow(db, pokemonId),
-    getPokemonGenerationsRow(db, pokemonId),
-  ]);
+  const evolutionChain = await getPokemonEvolutionRow(db, pokemonId);
 
   return {
     ...buildBaseFields(row, pokemonId, forms),
-    generations,
     evolutionChain,
   };
 }

@@ -9,6 +9,7 @@ import { Hono } from "hono";
 import type { RegisterRoutesOptions } from "./route-utils.ts";
 import { registerBattleRoutes } from "./routes/battle.ts";
 import { registerAbilityRoutes, registerItemRoutes, registerMoveRoutes } from "./routes/catalog.ts";
+import { registerFieldEffectRoutes } from "./routes/field-effects.ts";
 import { registerChampionsRoutes, registerPokemonRoutes } from "./routes/pokemon.ts";
 
 export type { RegisterRoutesOptions } from "./route-utils.ts";
@@ -26,6 +27,7 @@ export function registerApiRoutes<E extends object = object>(
   registerItemRoutes(api, opts);
   registerMoveRoutes(api, opts);
   registerAbilityRoutes(api, opts);
+  registerFieldEffectRoutes(api, opts);
   registerBattleRoutes(api, opts);
   return api;
 }
