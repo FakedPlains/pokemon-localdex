@@ -28,8 +28,8 @@ from bs4 import BeautifulSoup
 
 from .config import CrawlerPaths
 from .fetcher import PageFetcher, RawPage
-from .sqlite_upsert import connect
-from .utils import to_simplified, clean_inline_text
+from .text import to_simplified, clean_inline_text
+from .upsert.base import connect
 
 
 @dataclass

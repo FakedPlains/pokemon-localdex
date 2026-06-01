@@ -9,15 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from urllib.parse import quote
 
-from .fetcher import RawPage
-from .utils import (
-    clean_summary,
-    extract_generation_changes,
-    extract_intro_names,
-    normalize_text,
-    section_text_by_heading,
-    to_simplified,
-)
+from ..fetcher import RawPage
+from ..generations import extract_generation_changes, extract_intro_names, section_text_by_heading
+from ..text import clean_summary, normalize_text, to_simplified
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -5,7 +5,7 @@ import re
 
 from bs4 import BeautifulSoup, Tag
 
-from .utils import to_simplified
+from ..text import to_simplified
 
 
 CHINESE_GENERATIONS = {
@@ -114,4 +114,3 @@ def _find_ability_table(soup: BeautifulSoup) -> Tag | None:
         if {"bgwhite", "fulltable"}.issubset(classes):
             return table
     return None
-

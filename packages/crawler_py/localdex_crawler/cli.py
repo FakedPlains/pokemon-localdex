@@ -4,21 +4,25 @@ import argparse
 from pathlib import Path
 import sys
 
-from .catalog import (
-    parse_ability_list_page,
-    parse_item_list_page,
-    parse_move_list_page,
-    normalize_ability_detail_page,
-    normalize_item_detail_page,
-    normalize_move_detail_page,
+from .config import CrawlerPaths
+from .constants import ABILITY_LIST_URL, ITEM_LIST_URL, MOVE_LIST_URL, POKEMON_LIST_URL
+from .fetcher import PageFetcher, PageNotFoundError
+from .form_items import (
+    apply_form_item_bindings,
+    bindings_to_json,
+    bindings_to_sql,
+    collect_form_item_bindings,
+    extract_all_form_item_bindings,
 )
-from .champions import (
+from .parsers.abilities import AbilitySeed, normalize_ability_detail_page, parse_ability_list_page
+from .parsers.champions import (
     CHAMPIONS_ITEMS_URL,
     CHAMPIONS_REGULATIONS_URL,
     CHAMPIONS_SEASONS_URL,
     normalize_champions_pages,
 )
-from .field_effects import (
+from .parsers.evolution import parse_evolution_chain
+from .parsers.field_effects import (
     ALL_FIELD_EFFECT_SEEDS,
     KIND_FIELD,
     KIND_SIDE,
@@ -28,28 +32,18 @@ from .field_effects import (
     build_field_effect_page_url,
     normalize_field_effect_detail_page,
 )
-from .config import CrawlerPaths
-from .fetcher import PageFetcher, PageNotFoundError
-from .form_items import (
-    apply_form_item_bindings,
-    bindings_to_json,
-    bindings_to_sql,
-    collect_form_item_bindings,
-    extract_all_form_item_bindings,
-)
-from .html_tools import parse_pokemon_abilities
-from .pokemon import (
-    build_learnset_page_url,
-    learnset_cache_key,
-    normalize_pokemon_detail_page,
-    parse_evolution_chain,
-    parse_learnset_page,
-    parse_pokemon_list_page,
-    pokemon_cache_key,
-)
-from .sqlite_upsert import (
-    PokemonRow,
-    cache_key,
+from .parsers.items import ItemSeed, normalize_item_detail_page, parse_item_list_page
+from .parsers.learnset import learnset_cache_key, parse_learnset_page
+from .parsers.moves import MoveSeed, normalize_move_detail_page, parse_move_list_page
+from .parsers.pokemon_abilities import parse_pokemon_abilities
+from .parsers.pokemon_detail import normalize_pokemon_detail_page, parse_pokemon_list_page, pokemon_cache_key
+from .parsers.pokemon_images import resolve_pokemon_image_assets
+from .text import slugify
+from .urls import build_learnset_page_url, build_move_page_url
+from .upsert.base import connect
+from .upsert.catalog import upsert_ability_detail, upsert_item_detail, upsert_move_detail
+from .upsert.champions import upsert_champions_data
+from .upsert.clear import (
     clear_abilities,
     clear_all,
     clear_champions,
@@ -57,21 +51,19 @@ from .sqlite_upsert import (
     clear_items,
     clear_moves,
     clear_pokemon,
-    connect,
+)
+from .upsert.field_effects import upsert_field_effect_detail
+from .upsert.learnset import upsert_pokemon_moves
+from .upsert.pokemon import (
+    PokemonRow,
+    cache_key,
     generate_form_change_chains,
     pokemon_source_url,
     select_pokemon,
-    upsert_ability_detail,
-    upsert_champions_data,
     upsert_evolution_chains,
-    upsert_field_effect_detail,
-    upsert_item_detail,
-    upsert_move_detail,
     upsert_pokemon_abilities,
     upsert_pokemon_detail,
-    upsert_pokemon_moves,
 )
-from .utils import ABILITY_LIST_URL, ITEM_LIST_URL, MOVE_LIST_URL, POKEMON_LIST_URL, build_move_page_url, slugify
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -702,7 +694,7 @@ def _backfill_incomplete_moves(conn, fetcher: PageFetcher) -> None:
         seed = next((s for s in all_seeds if s.name_zh == name_zh), None)
         if not seed:
             # 列表页中没有该招式，构建最小 seed
-            from .catalog import MoveSeed
+            from .parsers.moves import MoveSeed
             seed = MoveSeed(name_zh=name_zh, detail_url=detail_url)
         payload = normalize_move_detail_page(page, seed)
         upsert_move_detail(conn, payload)

@@ -81,8 +81,9 @@ npx taro build --type weapp --watch
 - 请求 52Poké 页面时优先使用 `variant=zh-hans` 获取简体中文，OpenCC 只作为补充兜底。
 - 保留 NFKC 标准化、空白清理和摘要清理逻辑。
 - 写库使用 upsert 语义；需要更新的记录不要用 `INSERT OR IGNORE`。
-- `_upsert_pokemon_forms` 对 `name_en` 字段有保护机制：如果数据库中已有非空 `name_en`，而本次 payload 的 `name_en` 为空或 None，则保留数据库现有值不覆盖。这防止了因 `form_name_rules.json` 规则不完整而意外清空已有的英文名。
-- 新增数据类型时，同步增加解析模块、CLI 子命令、schema、upsert/clear 函数和文档。
+- `_upsert_pokemon_forms`（位于 `upsert/pokemon.py`）对 `name_en` 字段有保护机制：如果数据库中已有非空 `name_en`，而本次 payload 的 `name_en` 为空或 None，则保留数据库现有值不覆盖。这防止了因 `form_name_rules.json` 规则不完整而意外清空已有的英文名。
+- 爬虫代码按四层组织：基础工具层（顶层 `.py`）、解析层（`parsers/`）、写库层（`upsert/`）、CLI 调度层（`cli.py`）。Parser 不写库，Upsert 不解析 HTML，CLI 负责串联管道。
+- 新增数据类型时，在 `parsers/` 下新增解析模块，在 `upsert/` 下新增写库模块，同步增加 CLI 子命令、schema 和文档。
 - `data/raw/` 等页面缓存默认不提交。
 
 ## 数据库与 Store 规则
@@ -103,7 +104,7 @@ schema/d1-schema.sql
 2. 修改 `packages/store/drizzle-schema/src/index.ts`。
 3. 修改 `packages/store/shared-types/src/index.ts` 中的共享类型/常量。
 4. 修改 `packages/store/drizzle-queries/src/index.ts` 中的查询和 hydrate 逻辑。
-5. 如果字段由爬虫写入，修改 `packages/crawler_py/localdex_crawler/sqlite_upsert.py`。
+5. 如果字段由爬虫写入，修改 `packages/crawler_py/localdex_crawler/upsert/` 下对应的写库模块。
 6. 如果响应结构变化，同步更新 API 文档、Web 调用和小程序调用。
 
 `sqlite-store` 和 `d1-store` 通常只应保持薄封装，不要在两边复制查询逻辑。

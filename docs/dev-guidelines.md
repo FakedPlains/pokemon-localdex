@@ -142,7 +142,7 @@ interface NameLookup {
 2. 同步修改 `packages/store/drizzle-schema/src/index.ts`（Drizzle 表定义）
 3. 同步修改 `packages/store/shared-types/src/index.ts`（共享类型/常量）
 4. 同步修改 `packages/store/drizzle-queries/src/index.ts`（查询和 hydrate 逻辑）
-5. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/sqlite_upsert.py`
+5. 如有爬虫写入逻辑，同步修改 `packages/crawler_py/localdex_crawler/upsert/` 下对应的写库模块
 6. 如果响应结构变化，同步更新 API 文档、Web 调用和小程序调用
 
 注意：`sqlite-store` 和 `d1-store` 只是薄封装，不包含查询逻辑。查询变更只需修改 `drizzle-queries` 一处。

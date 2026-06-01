@@ -165,7 +165,7 @@ Python 爬虫，唯一数据源为 52Poké Wiki。核心职责：
 - 解析 HTML，繁体中文自动转简体（请求时追加 `variant=zh-hans`，辅以 opencc）
 - 通过 upsert 语义写入 SQLite，支持增量更新和全量重建
 
-模块分工：`cli.py`（命令行入口）→ `fetcher.py`（HTTP + 缓存）→ `pokemon.py` / `catalog.py`（页面解析）→ `sqlite_upsert.py`（数据库写入）
+模块分工：`cli.py`（命令行入口）→ `fetcher.py`（HTTP + 缓存）→ `parsers/`（HTML 解析，按数据领域拆分为 pokemon_detail、moves、abilities、items 等）→ `upsert/`（数据库写入，按数据领域拆分为 pokemon、catalog、learnset 等）
 
 ### 3.2 存储层（packages/store/）
 

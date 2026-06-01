@@ -113,7 +113,7 @@ pokemon-localdex/
 
 核心职责包括：抓取 52Poké 页面并缓存原始 HTML 到 `data/raw/`，便于追溯和断点续跑；解析页面提取结构化数据，繁体中文自动转换为简体；通过 upsert 语义写入 SQLite，支持增量更新和全量重建（`--clean`）两种模式。
 
-采集层的模块划分如下：`cli.py` 提供命令行入口和参数解析；`fetcher.py` 负责 HTTP 请求和本地缓存管理；`pokemon.py` 处理宝可梦列表和详情页的解析；`catalog.py` 处理招式、特性、道具的列表和详情页解析；`html_tools.py` 提供通用的 HTML 解析工具函数；`sqlite_upsert.py` 封装所有数据库写入操作；`config.py` 管理路径配置；`utils.py` 提供 URL 构建和文本处理工具。
+采集层的代码按四层组织：`cli.py` 提供命令行入口和参数解析，是唯一的调度层；`fetcher.py` 负责 HTTP 请求和本地缓存管理；`parsers/` 目录按数据领域拆分解析模块（`pokemon_detail.py`、`learnset.py`、`evolution.py`、`moves.py`、`abilities.py`、`items.py`、`champions.py`、`field_effects.py` 等），只做 HTML → dict 转换不写库；`upsert/` 目录按数据领域拆分写库模块（`pokemon.py`、`catalog.py`、`learnset.py`、`champions.py`、`field_effects.py`、`clear.py`、`base.py`），只接收结构化 dict 写入 SQLite 不解析 HTML；基础工具层（`constants.py`、`text.py`、`urls.py`、`images.py`、`generations.py`、`form_type.py`、`form_name_resolver.py`、`config.py`）提供纯函数的文本处理、URL 构建和形态推导能力。
 
 ### 存储层
 

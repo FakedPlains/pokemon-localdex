@@ -6,14 +6,9 @@ import unicodedata
 
 from bs4 import BeautifulSoup, Tag
 
-from .fetcher import RawPage
-from .utils import (
-    clean_inline_text,
-    normalize_media_url,
-    to_absolute_url,
-    to_simplified,
-    unique_by_key,
-)
+from ..fetcher import RawPage
+from ..text import clean_inline_text, to_simplified, unique_by_key
+from ..urls import normalize_media_url, to_absolute_url
 
 
 CHAMPIONS_SEASONS_URL = "https://wiki.52poke.com/wiki/%E8%B5%9B%E5%AD%A3%EF%BC%88Champions%EF%BC%89"
