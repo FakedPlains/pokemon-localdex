@@ -227,10 +227,10 @@ export default function PokemonDetailPage() {
   const [methodFilter, setMethodFilter] = useState('')
   // 服务端返回的全量方法计数（精确到当前 form+gen+version，不受 method 筛选影响）
   const [methodCounts, setMethodCounts] = useState({})
-  // 服务端首次请求返回的实际 formKey（可能经过 fallback），state 仅用于 UI fallback 提示
-  const [learnsetFormKey, setLearnsetFormKey] = useState(null)
-  // 用 ref 存服务端实际 formKey，避免驱动 fetchMovesPage 重建导致 effect 重复执行
-  const resolvedFormKeyRef = useRef(null)
+  // 服务端首次请求返回的实际 formId（可能经过 fallback），state 仅用于 UI fallback 提示
+  const [learnsetFormId, setLearnsetFormId] = useState(null)
+  // 用 ref 存服务端实际 formId，避免驱动 fetchMovesPage 重建导致 effect 重复执行
+  const resolvedFormIdRef = useRef(null)
   // 竞态保护：递增 requestId，回调中检查是否过时
   const movesRequestIdRef = useRef(0)
 
@@ -248,8 +248,8 @@ export default function PokemonDetailPage() {
     setActiveGen(null)
     setMethodFilter('')
     setMethodCounts({})
-    setLearnsetFormKey(null)
-    resolvedFormKeyRef.current = null
+    setLearnsetFormId(null)
+    resolvedFormIdRef.current = null
     fetchPokemonSummary(pokemonId).then(r => {
       setDetail(r.data)
       if (r.data) {
@@ -311,11 +311,11 @@ export default function PokemonDetailPage() {
   const fetchMovesPage = useCallback(async (offset, isInitial, method) => {
     if (!detail?.id || !activeGen) return false
     const rid = ++movesRequestIdRef.current
-    // 追加请求使用服务端首次返回的实际 formKey（可能是 fallback 后的），
-    // 读 ref 而非 state，避免 learnsetFormKey 变化驱动 fetchMovesPage/effect 重建。
-    const formKey = (!isInitial && resolvedFormKeyRef.current) ? resolvedFormKeyRef.current : (currentForm?.formKey || 'default')
+    // 追加请求使用服务端首次返回的实际 formId（可能是 fallback 后的），
+    // 读 ref 而非 state，避免 learnsetFormId 变化驱动 fetchMovesPage/effect 重建。
+    const formId = (!isInitial && resolvedFormIdRef.current != null) ? resolvedFormIdRef.current : currentForm?.id
     try {
-      const r = await fetchPokemonLearnset(detail.id, activeGen, formKey, undefined, {
+      const r = await fetchPokemonLearnset(detail.id, activeGen, formId, undefined, {
         limit: MOVES_PAGE_SIZE,
         offset,
         method: method || undefined,
@@ -327,8 +327,8 @@ export default function PokemonDetailPage() {
 
       if (isInitial) {
         setLearnsetData(moves)
-        resolvedFormKeyRef.current = r.formKey || formKey
-        setLearnsetFormKey(r.formKey || formKey)
+        resolvedFormIdRef.current = r.effectiveFormId ?? formId
+        setLearnsetFormId(r.effectiveFormId ?? formId)
         // methodCounts 来自服务端，是当前 form+gen+version 的全量计数
         if (r.methodCounts) setMethodCounts(r.methodCounts)
       } else {
@@ -343,7 +343,7 @@ export default function PokemonDetailPage() {
       setLearnsetHasMore(false)
       return true
     }
-  }, [detail?.id, activeGen, currentForm?.formKey])
+  }, [detail?.id, activeGen, currentForm?.id])
 
   // 世代/形态变化时重新加载第一页，统一清空招式筛选默认展示全部
   useEffect(() => {
@@ -514,7 +514,7 @@ export default function PokemonDetailPage() {
                 <View
                   key={gen}
                   className={`chip ${gen === activeGen ? 'chip-active' : 'chip-inactive'}`}
-                  onClick={() => { setActiveGen(gen); setMethodFilter(''); setMethodCounts({}); setLearnsetFormKey(null); resolvedFormKeyRef.current = null }}
+                  onClick={() => { setActiveGen(gen); setMethodFilter(''); setMethodCounts({}); setLearnsetFormId(null); resolvedFormIdRef.current = null }}
                 >
                   <Text>{gen === 99 ? 'Champions' : `第${gen}世代`}</Text>
                 </View>

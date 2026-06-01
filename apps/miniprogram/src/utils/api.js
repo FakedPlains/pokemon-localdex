@@ -100,10 +100,10 @@ export async function fetchLearnsetMeta(pokemonId) {
 
 // ── Pokemon Learnset ──
 
-export async function fetchPokemonLearnset(pokemonId, generation, formKey = 'default', gameVersionCode, { limit, offset, method } = {}) {
+export async function fetchPokemonLearnset(pokemonId, generation, formId, gameVersionCode, { limit, offset, method } = {}) {
   const params = {}
   if (generation !== undefined) params.generation = generation
-  if (formKey) params.form = formKey
+  if (formId != null) params.formId = formId
   if (gameVersionCode !== undefined) params.version = gameVersionCode
   if (limit !== undefined) params.limit = limit
   if (offset !== undefined) params.offset = offset

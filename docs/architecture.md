@@ -86,14 +86,13 @@ pokemon-localdex/
 │   │   ├── crawl-52poke-db.py   爬虫入口脚本
 │   │   ├── fetch_type_icons.py  属性图标采集脚本
 │   │   ├── localdex_crawler/    爬虫核心包
-│   │   ├── raw_pages/           原始页面缓存
 │   │   └── requirements.txt     Python 依赖
 ├── functions/
 │   └── api/[[path]].ts   Pages Function：通过 Service Binding 代理 /api/* 到 Worker
 ├── schema/               所有数据库 schema 统一管理
 │   └── d1-schema.sql         D1/SQLite 数据库 schema
 ├── scripts/              Node.js 数据工具脚本
-│   └── fill-form-names.mjs       批量填充形态英文名
+│   └── fill-form-names.mjs       按爬虫共享规则回填/校准形态英文名
 ├── data/
 │   ├── raw/              原始抓取页面缓存（gitignored）
 │   └── sqlite/           本地 SQLite 数据库
@@ -112,9 +111,9 @@ pokemon-localdex/
 
 采集层是一个独立的 Python 包，位于 `packages/crawler_py/`，负责从 52Poké Wiki 抓取页面、解析 HTML 并将结构化数据写入 SQLite。
 
-核心职责包括：抓取 52Poké 页面并缓存原始 HTML 到 `packages/crawler_py/raw_pages/`，便于追溯和断点续跑；解析页面提取结构化数据，繁体中文自动转换为简体；通过 upsert 语义写入 SQLite，支持增量更新和全量重建（`--clean`）两种模式。
+核心职责包括：抓取 52Poké 页面并缓存原始 HTML 到 `data/raw/`，便于追溯和断点续跑；解析页面提取结构化数据，繁体中文自动转换为简体；通过 upsert 语义写入 SQLite，支持增量更新和全量重建（`--clean`）两种模式。
 
-采集层的模块划分如下：`cli.py` 提供命令行入口和参数解析；`fetcher.py` 负责 HTTP 请求和本地缓存管理；`pokemon.py` 处理宝可梦列表和详情页的解析；`catalog.py` 处理招式、特性、道具的列表和详情页解析；`html_tools.py` 提供通用的 HTML 解析工具函数；`sqlite_upsert.py` 封装所有数据库写入操作；`config.py` 管理路径配置；`utils.py` 提供 URL 构建和文本处理工具。
+采集层的代码按四层组织：`cli.py` 提供命令行入口和参数解析，是唯一的调度层；`fetcher.py` 负责 HTTP 请求和本地缓存管理；`parsers/` 目录按数据领域拆分解析模块（`pokemon_detail.py`、`learnset.py`、`evolution.py`、`moves.py`、`abilities.py`、`items.py`、`champions.py`、`field_effects.py` 等），只做 HTML → dict 转换不写库；`upsert/` 目录按数据领域拆分写库模块（`pokemon.py`、`catalog.py`、`learnset.py`、`champions.py`、`field_effects.py`、`clear.py`、`base.py`），只接收结构化 dict 写入 SQLite 不解析 HTML；基础工具层（`constants.py`、`text.py`、`urls.py`、`images.py`、`generations.py`、`form_type.py`、`form_name_resolver.py`、`config.py`）提供纯函数的文本处理、URL 构建和形态推导能力。
 
 ### 存储层
 
@@ -171,11 +170,11 @@ service = "pokemon-localdex-api"
 
 **Vite base 路径**：固定为 `"/"`，Cloudflare Pages 在根路径提供服务，无需子路径前缀。
 
-**ID 使用规范**：前端所有 API 请求和 localStorage 存储均使用数据库数字 ID（如 `pokemonId: "25"`、`itemId: "123"`），不使用中文名称或 slug 作为标识符。中文名称仅用于界面显示，通过 `nameZh`、`itemName` 等字段保存。
+**ID 使用规范**：前端所有 API 请求和 localStorage 存储均使用数据库数字 ID（如 `pokemonId: "25"`、`itemId: "123"`），不使用中文名称作为标识符。中文名称仅用于界面显示，通过 `nameZh`、`itemName` 等字段保存。
 
 **abilityId 数字化**：特性使用 `abilityId`（数字 ID）+ `abilityName`（中文名称）双字段存储。`abilityId` 用于数据标识，`abilityName` 用于界面显示。PokemonEditor 的特性选择返回 `{id, name}` 对象，同时写入两个字段。
 
-**数据迁移**：`migrateStorage.js` 提供了从旧格式到新格式的自动迁移逻辑。当前迁移版本为 v3（标记：`localdex_migration_v3`），支持 pokemonId、itemId、abilityId 三个字段的中文名 → 数字 ID 迁移。迁移是异步的、不阻塞渲染、幂等的。
+**数据迁移**：`migrateStorage.js` 提供了从旧格式到新格式的自动迁移逻辑。当前迁移版本为 v4（标记：`localdex_migration_v4`），支持 pokemonId、itemId、abilityId 的中文名 → 数字 ID 迁移，以及旧 slug 形中文 formKey → formId 解析（通过 `resolveFormId()` 多级匹配）。迁移是异步的、不阻塞渲染、幂等的。
 
 **招式搜索**：DamagePage 中的招式搜索采用按需搜索模式（`onSearch` 回调 + 200ms 防抖），使用独立的 `moveSearching` 状态，不会触发全页面 loading。
 
@@ -203,7 +202,7 @@ service = "pokemon-localdex-api"
 
 ### 本地模式
 
-1. **采集**：Python 爬虫从 52Poké Wiki 抓取 HTML 页面，缓存到 `packages/crawler_py/raw_pages/`
+1. **采集**：Python 爬虫从 52Poké Wiki 抓取 HTML 页面，缓存到 `data/raw/`
 2. **解析**：爬虫解析 HTML，提取结构化数据
 3. **存储**：解析结果通过 upsert 写入 `data/sqlite/localdex.sqlite`
 4. **查询**：Hono API 通过 sqlite-store 读取数据库，返回 JSON

@@ -63,32 +63,31 @@ export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOption
     return c.json({ data, pokemonId: entry.id });
   });
 
-  // 独立的世代地区接口
-  api.get("/pokemon/:id/generations", async (c) => {
-    const s = getStore(c);
-    const entry = await s.getPokemonIdentity(c.req.param("id"));
-    if (!entry) return c.json({ error: "Pokemon not found" }, 404);
-    const data = await s.getPokemonGenerations(entry.id);
-    return c.json({ data, pokemonId: entry.id });
-  });
-
   api.get("/pokemon/:id/learnset", async (c) => {
     const s = getStore(c);
     const entry = await s.getPokemonIdentity(c.req.param("id"));
     if (!entry) return c.json({ error: "Pokemon not found" }, 404);
     const generation = numberQuery(c, "generation") ?? 9;
-    const formKey = c.req.query("form") || "default";
+    const formId = numberQuery(c, "formId");
     const gameVersion = c.req.query("version");
     const learnMethod = c.req.query("method") || undefined;
     const limit = numberQuery(c, "limit");
     const offset = numberQuery(c, "offset") ?? 0;
     const pagination = limit !== undefined ? { limit, offset } : undefined;
-    const result = await s.getPokemonLearnset(entry.id, generation, formKey, gameVersion, pagination, learnMethod);
+    const result = await s.getPokemonLearnset(
+      entry.id,
+      generation,
+      { formId, gameVersionCode: gameVersion },
+      pagination,
+      learnMethod,
+    );
     const body: Record<string, unknown> = {
       data: result.moves,
       pokemonId: entry.id,
       generation,
-      formKey: result.formKey,
+      formId: result.formId,
+      effectiveFormId: result.effectiveFormId,
+      usesDefaultLearnset: result.usesDefaultLearnset,
       gameVersionCode: result.gameVersionCode,
     };
     // methodCounts 仅在首次请求（offset=0）时返回，追加加载时省略以减少负载

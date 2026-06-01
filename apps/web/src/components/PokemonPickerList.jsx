@@ -127,12 +127,12 @@ export default function PokemonPickerList({ search = "", onSelect }) {
               const img = getPokemonPreviewImage(p);
               const bst = STAT_KEYS.reduce((s, k) => s + (p.baseStats?.[k] || 0), 0);
               return (
-                <tr key={p.slug || p.id} className="cfg-picker-row" onClick={() => onSelect(p)}>
+                <tr key={p.id} className="cfg-picker-row" onClick={() => onSelect(p)}>
                   <td className="cfg-td-img">
                     {img?.url && <img src={img.url} alt={p.nameZh || ""} referrerPolicy="no-referrer" />}
                   </td>
                   <td className="cfg-td-name">
-                    <span className="cfg-td-name-zh">{p.nameZh || p.slug}</span>
+                    <span className="cfg-td-name-zh">{p.nameZh || ""}</span>
                     <span className="cfg-td-name-en">{p.nameEn || ""}</span>
                   </td>
                   <td className="cfg-td-types">

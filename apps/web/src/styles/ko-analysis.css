@@ -1,0 +1,675 @@
+/* ══════════════════════════════════════════════
+   KO Analysis Page — ko- prefix
+   ══════════════════════════════════════════════ */
+
+.ko-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── 页面标题区 ── */
+.ko-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.ko-header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ko-header-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #666);
+}
+
+/* ── 主体布局：左（配置）右（结果）── */
+.ko-body {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+/* ── 左侧面板 ── */
+.ko-left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── 分析设置面板 ── */
+.ko-settings {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.ko-settings-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.ko-mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.ko-mode-btn {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--card-bg, #fff);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.ko-mode-btn:hover {
+  border-color: var(--primary, #3b82f6);
+  background: var(--primary-light, #eff6ff);
+}
+
+.ko-mode-btn-active {
+  border-color: var(--primary, #3b82f6);
+  background: var(--primary, #3b82f6);
+  color: #fff;
+}
+
+.ko-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ko-settings-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #666);
+  min-width: 48px;
+}
+
+.ko-settings-select {
+  flex: 1;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: var(--card-bg, #fff);
+}
+
+/* ── 招式选择（斩杀线模式）── */
+.ko-move-select {
+  margin-top: 0.75rem;
+}
+
+.ko-move-select-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #666);
+  margin-bottom: 0.375rem;
+}
+
+.ko-move-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.ko-move-chip {
+  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  background: var(--card-bg, #fff);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ko-move-chip:hover {
+  border-color: var(--primary, #3b82f6);
+}
+
+.ko-move-chip-active {
+  border-color: var(--primary, #3b82f6);
+  background: var(--primary-light, #eff6ff);
+  color: var(--primary, #3b82f6);
+  font-weight: 500;
+}
+
+.ko-move-chip-empty {
+  color: var(--text-disabled, #aaa);
+  border-style: dashed;
+  cursor: default;
+}
+
+/* ── 分析按钮 ── */
+.ko-analyze-btn {
+  width: 100%;
+  padding: 0.625rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary, #3b82f6);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-top: 0.75rem;
+}
+
+.ko-analyze-btn:hover:not(:disabled) {
+  background: var(--primary-dark, #2563eb);
+}
+
+.ko-analyze-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── 目标管理面板 ── */
+.ko-targets {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.ko-targets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.ko-targets-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ko-targets-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #666);
+}
+
+.ko-targets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.ko-target-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  transition: background 0.1s;
+}
+
+.ko-target-item:hover {
+  background: var(--hover-bg, #f9fafb);
+}
+
+.ko-target-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.ko-target-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ko-target-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ko-target-detail {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #666);
+}
+
+.ko-target-remove {
+  padding: 0.25rem;
+  border: none;
+  background: none;
+  color: var(--text-secondary, #999);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.ko-target-remove:hover {
+  color: var(--danger, #ef4444);
+  background: var(--danger-light, #fef2f2);
+}
+
+/* ── 添加目标按钮 ── */
+.ko-add-target-btn {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px dashed var(--border, #e5e7eb);
+  border-radius: 8px;
+  background: none;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: all 0.15s;
+}
+
+.ko-add-target-btn:hover {
+  border-color: var(--primary, #3b82f6);
+  color: var(--primary, #3b82f6);
+  background: var(--primary-light, #eff6ff);
+}
+
+/* ── 右侧：结果面板 ── */
+.ko-right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── 进度条 ── */
+.ko-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+}
+
+.ko-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border, #e5e7eb);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ko-progress-fill {
+  height: 100%;
+  background: var(--primary, #3b82f6);
+  border-radius: 3px;
+  transition: width 0.2s;
+}
+
+.ko-progress-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #666);
+  white-space: nowrap;
+}
+
+/* ── 空状态 ── */
+.ko-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary, #999);
+}
+
+.ko-empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.ko-empty-text {
+  font-size: 0.85rem;
+}
+
+.ko-empty-hint {
+  font-size: 0.75rem;
+  margin-top: 0.375rem;
+  color: var(--text-disabled, #bbb);
+}
+
+/* ══════════════════════════════════════════════
+   结果表格
+   ══════════════════════════════════════════════ */
+
+/* ── 表格容器 ── */
+.ko-table-container {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ko-table-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-subtle, #f9fafb);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.ko-table-summary-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.ko-table-summary-move {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  background: var(--primary-light, #eff6ff);
+  color: var(--primary, #3b82f6);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.ko-table-summary-stat {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #666);
+  margin-left: auto;
+}
+
+/* ── 表格外层（横向滚动） ── */
+.ko-table-wrapper {
+  overflow-x: auto;
+}
+
+/* ── 表格 ── */
+.ko-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* ── 表头 ── */
+.ko-th {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: var(--text-secondary, #666);
+  background: var(--bg-subtle, #f9fafb);
+  border-bottom: 2px solid var(--border, #e5e7eb);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  position: sticky;
+  top: 0;
+}
+
+.ko-th-target { min-width: 160px; }
+.ko-th-hp { min-width: 50px; text-align: center; }
+.ko-th-move { min-width: 80px; }
+.ko-th-damage { min-width: 90px; text-align: center; }
+.ko-th-percent { min-width: 100px; text-align: center; }
+.ko-th-ko { min-width: 90px; text-align: center; }
+.ko-th-desc { min-width: 120px; }
+
+/* ── 表格行 ── */
+.ko-tr {
+  border-bottom: 1px solid var(--border-light, #f0f0f0);
+  transition: background 0.1s;
+}
+
+.ko-tr:last-child {
+  border-bottom: none;
+}
+
+.ko-tr:hover {
+  background: var(--hover-bg, #fafafa);
+}
+
+/* ── 表格单元格 ── */
+.ko-td {
+  padding: 0.5rem 0.75rem;
+  vertical-align: middle;
+}
+
+.ko-td-target {
+  font-weight: 500;
+}
+
+.ko-td-target-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.ko-td-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.ko-td-name {
+  font-weight: 500;
+  margin-right: 0.25rem;
+}
+
+.ko-td-hp {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.ko-td-move {
+  color: var(--text-primary, #1a1a1a);
+}
+
+.ko-td-damage {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.ko-td-percent {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.ko-td-ko {
+  text-align: center;
+}
+
+.ko-td-desc {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #666);
+  white-space: normal;
+  max-width: 200px;
+}
+
+/* ── KO 判定 Badge ── */
+.ko-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ko-badge--guaranteed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.ko-badge--probable {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ko-badge--2hko {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.ko-badge--multi {
+  background: var(--bg-subtle, #f5f5f5);
+  color: var(--text-secondary, #666);
+}
+
+.ko-badge--immune {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+.ko-badge--fatal {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.ko-badge--risk {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.ko-badge--safe {
+  background: #dcfce7;
+  color: #166534;
+}
+
+/* ── 行颜色条（左侧指示器） ── */
+.ko-row--guaranteed td:first-child {
+  border-left: 3px solid #16a34a;
+}
+
+.ko-row--probable td:first-child {
+  border-left: 3px solid #f59e0b;
+}
+
+.ko-row--multi td:first-child {
+  border-left: 3px solid #94a3b8;
+}
+
+.ko-row--immune td:first-child {
+  border-left: 3px solid #d1d5db;
+}
+
+.ko-row--fatal td:first-child {
+  border-left: 3px solid #ef4444;
+}
+
+.ko-row--risk td:first-child {
+  border-left: 3px solid #f59e0b;
+}
+
+.ko-row--safe td:first-child {
+  border-left: 3px solid #16a34a;
+}
+
+/* ── 百分比颜色 ── */
+.ko-row--guaranteed .ko-td-percent { color: #16a34a; }
+.ko-row--probable .ko-td-percent { color: #d97706; }
+.ko-row--multi .ko-td-percent { color: var(--text-secondary, #666); }
+.ko-row--immune .ko-td-percent { color: #9ca3af; }
+.ko-row--fatal .ko-td-percent { color: #dc2626; }
+.ko-row--risk .ko-td-percent { color: #d97706; }
+.ko-row--safe .ko-td-percent { color: #16a34a; }
+
+/* ── 目标添加 Modal 内的搜索 ── */
+.ko-target-picker {
+  padding: 0.75rem;
+}
+
+.ko-target-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.ko-target-picker-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.85rem;
+  background: none;
+}
+
+.ko-target-picker-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.ko-target-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.1s;
+}
+
+.ko-target-picker-item:hover {
+  background: var(--hover-bg, #f5f5f5);
+}
+
+.ko-target-picker-item img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+/* ── 响应式 ── */
+@media (max-width: 900px) {
+  .ko-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .ko-page {
+    padding: 0.75rem;
+  }
+
+  .ko-settings,
+  .ko-targets,
+  .ko-table-container {
+    border-radius: 8px;
+  }
+
+  .ko-table {
+    font-size: 0.7rem;
+  }
+
+  .ko-th,
+  .ko-td {
+    padding: 0.375rem 0.5rem;
+  }
+
+  .ko-td-img {
+    width: 22px;
+    height: 22px;
+  }
+
+  .ko-td-desc {
+    display: none;
+  }
+}

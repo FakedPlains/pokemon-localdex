@@ -194,7 +194,7 @@ export default function PokedexPage() {
         <View className='pokemon-grid'>
           {list.map(pokemon => (
             <View
-              key={pokemon.slug || pokemon.id}
+              key={pokemon.id}
               className='poke-card glass-card press-scale'
               onClick={() => handleCardTap(pokemon)}
             >

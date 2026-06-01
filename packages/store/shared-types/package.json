@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./constants": "./src/constants.js"
+    "./constants": "./src/constants.ts",
+    "./battle-effects": "./src/battle-effects.ts"
   }
 }

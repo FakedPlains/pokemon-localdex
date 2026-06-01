@@ -8,27 +8,13 @@ import TypeChip from '../../components/type-chip'
 import {
   NATURES, NATURE_EFFECTS_BY_ID, STAT_KEYS, STAT_LABELS, STAT_LABELS_BY_ID,
   TYPE_COLORS, natureNameToId,
+  WEATHER_PICKER_OPTIONS, TERRAIN_PICKER_OPTIONS,
 } from '@pokemon-localdex/store-types/constants'
 import { TYPE_BG_COLORS } from '../../utils/constants'
 import './index.less'
 
-const WEATHER_OPTIONS = [
-  { key: '', label: '无' },
-  { key: 'sun', label: '大晴天' },
-  { key: 'rain', label: '下雨' },
-  { key: 'sand', label: '沙暴' },
-  { key: 'hail', label: '冰雹' },
-  { key: 'snow', label: '大雪' },
-]
-const TERRAIN_OPTIONS = [
-  { key: '', label: '无' },
-  { key: 'electric', label: '电气场地' },
-  { key: 'grassy', label: '青草场地' },
-  { key: 'psychic', label: '精神场地' },
-  { key: 'misty', label: '薄雾场地' },
-]
-const WEATHER_LABELS = WEATHER_OPTIONS.map(o => o.label)
-const TERRAIN_LABELS = TERRAIN_OPTIONS.map(o => o.label)
+const WEATHER_LABELS = WEATHER_PICKER_OPTIONS.map(o => o.label)
+const TERRAIN_LABELS = TERRAIN_PICKER_OPTIONS.map(o => o.label)
 const NATURE_OPTIONS = NATURES.map(nature => nature.nameZh)
 const GENERATION_OPTIONS = [
   { id: 9, label: '第九世代' },
@@ -92,8 +78,8 @@ export default function DamagePage() {
   const [level, setLevel] = useState('50')
   const [generation, setGeneration] = useState(9)
   const [battleMode, setBattleMode] = useState('single')
-  const [weather, setWeather] = useState(WEATHER_OPTIONS[0])
-  const [terrain, setTerrain] = useState(TERRAIN_OPTIONS[0])
+  const [weather, setWeather] = useState(WEATHER_PICKER_OPTIONS[0])
+  const [terrain, setTerrain] = useState(TERRAIN_PICKER_OPTIONS[0])
   const [critical, setCritical] = useState(false)
   const [calculating, setCalculating] = useState(false)
   const [result, setResult] = useState(null)
@@ -334,7 +320,7 @@ export default function DamagePage() {
           min: data.min,
           max: data.max,
           average: data.average,
-          description: data.description || '',
+          description: data.descriptionZh || data.description || '',
           minPercent: data.minPercent || 0,
           maxPercent: data.maxPercent || 0,
           defHp: data.defenderHp || 0,
@@ -530,7 +516,7 @@ export default function DamagePage() {
           <View className='dc-field-body'>
             <View className='dc-field-row'>
               <Text className='dc-field-label'>天气</Text>
-              <Picker mode='selector' range={WEATHER_LABELS} onChange={(e) => setWeather(WEATHER_OPTIONS[e.detail.value])}>
+              <Picker mode='selector' range={WEATHER_LABELS} onChange={(e) => setWeather(WEATHER_PICKER_OPTIONS[e.detail.value])}>
                 <View className='dc-field-picker press-scale'>
                   <Text className='dc-field-picker-text'>{weather.label}</Text>
                   <Text className='dc-field-picker-arrow'>›</Text>
@@ -539,7 +525,7 @@ export default function DamagePage() {
             </View>
             <View className='dc-field-row'>
               <Text className='dc-field-label'>场地</Text>
-              <Picker mode='selector' range={TERRAIN_LABELS} onChange={(e) => setTerrain(TERRAIN_OPTIONS[e.detail.value])}>
+              <Picker mode='selector' range={TERRAIN_LABELS} onChange={(e) => setTerrain(TERRAIN_PICKER_OPTIONS[e.detail.value])}>
                 <View className='dc-field-picker press-scale'>
                   <Text className='dc-field-picker-text'>{terrain.label}</Text>
                   <Text className='dc-field-picker-arrow'>›</Text>

@@ -246,6 +246,7 @@ export default function DamagePage() {
                   onSelectSlot={handleAtkSelectSlot}
                   pokemonId={attacker.pokemonId}
                   generation={generation}
+                  formId={attacker.formId}
                   onSetMove={handleAtkSetMove}
                 />
                 <MoveExtrasPanel
@@ -319,6 +320,7 @@ export default function DamagePage() {
                   onSelectSlot={handleDefSelectSlot}
                   pokemonId={defender.pokemonId}
                   generation={generation}
+                  formId={defender.formId}
                   onSetMove={handleDefSetMove}
                 />
                 <MoveExtrasPanel

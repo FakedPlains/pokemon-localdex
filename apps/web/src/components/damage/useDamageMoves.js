@@ -19,7 +19,7 @@ function fetchMoveDetail(name, moveId) {
     : unifiedApi(`/moves?q=${encodeURIComponent(name)}&limit=5`);
 
   return request.then((r) => (
-    moveId ? r.data : (r.data || []).find((m) => m.nameZh === name || m.slug === name)
+    moveId ? r.data : (r.data || []).find((m) => m.nameZh === name)
   ));
 }
 

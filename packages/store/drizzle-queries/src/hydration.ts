@@ -34,30 +34,3 @@ export function hydrateGenRecord(r: Record<string, unknown>) {
     notes: r.notes ? String(r.notes) : undefined,
   };
 }
-
-function normalizeChampionFormName(value: string | undefined, speciesName?: string): string {
-  const normalizeBasic = (input: string | undefined) =>
-    (input || "")
-      .normalize("NFKC")
-      .toLowerCase()
-      .replace(/[（）()・·･\s　\-_]/g, "");
-
-  let normalized = normalizeBasic(value);
-  const species = normalizeBasic(speciesName);
-  if (species) normalized = normalized.replaceAll(species, "");
-  return normalized.replaceAll("的样子", "").replaceAll("样子", "");
-}
-
-export function championFormNameMatches(form: any, championName: string, speciesName?: string): boolean {
-  const target = normalizeChampionFormName(championName, speciesName);
-  if (!target) return false;
-
-  const candidates = [
-    normalizeChampionFormName(form.nameZh, speciesName),
-    normalizeChampionFormName(form.formKey, speciesName),
-  ].filter(Boolean);
-
-  return candidates.some((candidate) =>
-    candidate === target || candidate.includes(target) || target.includes(candidate),
-  );
-}

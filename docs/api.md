@@ -73,7 +73,7 @@ GET /api/pokemon?limit=20&offset=0
 
 ### GET /pokemon/cards
 
-获取图鉴卡片视图的轻量列表。只返回卡片展示需要的字段：数字 ID、图鉴编号、名称、当前默认形态属性和官方图。筛选参数与 `/pokemon` 相同。`generation` 使用 `pokemon.introduced_generation` 按初登场世代筛选，不连接 `pokemon_generation_regions`。
+获取图鉴卡片视图的轻量列表。只返回卡片展示需要的字段：数字 ID、图鉴编号、名称、当前默认形态属性和官方图。筛选参数与 `/pokemon` 相同。`generation` 使用 `pokemon.introduced_generation` 按初登场世代筛选。
 
 示例：
 
@@ -95,7 +95,7 @@ GET /api/pokemon/table?sort=speed&order=desc
 
 ### GET /pokemon/:id
 
-获取单只宝可梦的完整详情。`:id` 支持三种格式：数字 ID（数据库主键）、slug（如 `pikachu`）、中文名（如 `皮卡丘`）。
+获取单只宝可梦的完整详情。`:id` 支持两种格式：数字 ID（数据库主键）、中文名（如 `皮卡丘`）。
 
 返回数据包含基础信息、所有形态（含每个形态的属性变体 `typeVariants`、种族值变体 `statVariants`、特性变体 `abilityVariants`、图片 `images`）、进化链、世代可用性等完整数据。
 
@@ -124,26 +124,65 @@ GET /api/pokemon/2?seasonId=1
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | generation | number | 9 | 世代编号 |
-| form | string | "default" | 形态标识（form_key） |
+| formId | number | — | 形态 ID，绑定 `pokemon_forms.id` |
 | version | string | — | 游戏版本代码（可选，如 "SV"） |
 | limit | number | — | 每页条数，传入后启用分页模式 |
 | offset | number | 0 | 偏移量 |
 | method | string | — | 学习方式筛选（如 "level-up"、"tm"、"egg" 等） |
 
-返回数据按学习方式和排序编号排序。响应中还包含实际使用的 `formKey` 和 `gameVersionCode`。分页时使用 `limit+1` 策略返回 `hasMore`，不返回 `total`。首次请求（offset=0）额外返回 `methodCounts` 对象，包含当前 form+gen+version 下各学习方式的全量计数。
+返回数据按学习方式和排序编号排序。响应中包含 `formId`（请求的形态 ID）、`effectiveFormId`（实际命中的形态 ID，可能因 fallback 与请求不同）、`usesDefaultLearnset`（是否回退到默认形态）和 `gameVersionCode`。分页时使用 `limit+1` 策略返回 `hasMore`，不返回 `total`。首次请求（offset=0）额外返回 `methodCounts` 对象，包含当前有效形态+gen+version 下各学习方式的全量计数。
 
 示例：
 
 ```
-GET /api/pokemon/皮卡丘/learnset?generation=1&form=default
-GET /api/pokemon/25/learnset?generation=9&version=SV
+GET /api/pokemon/25/learnset?generation=9&formId=6862&version=SV
+GET /api/pokemon/25/learnset?generation=1
 ```
 
-小程序端对应函数：`fetchPokemonLearnset(pokemonId, generation, formKey, gameVersionCode, { limit, offset, method })`。支持形态回退逻辑：如果指定形态无数据，依次尝试 `default` 形态和该世代的第一个可用形态。形态回退和 `methodCounts` 仅在首次请求（offset=0）时执行，追加请求直接查询数据。
+前端（Web 和小程序）统一使用 `formId` 参数请求招式表。如果指定形态没有自有招式记录，服务端会回退到 `default` 形态。不传 `formId` 时默认使用该宝可梦的默认形态。
 
 ### GET /pokemon/:id/learnset/meta
 
 获取指定宝可梦的招式表元数据，包括该宝可梦在哪些世代有招式数据、每个世代有哪些形态和游戏版本可选。用于前端构建世代/形态/版本选择器。
+
+返回结构：
+
+```json
+{
+  "data": {
+    "generations": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "forms": [
+      {
+        "formId": 6,
+        "formType": "default",
+        "formCategory": "default",
+        "nameZh": "喷火龙",
+        "canonicalNameZh": "喷火龙",
+        "displayNameZh": "喷火龙",
+        "nameEn": "Charizard",
+        "isDefault": true,
+        "hasOwnMovesByGeneration": { "1": true, "9": true }
+      },
+      {
+        "formId": 6862,
+        "formType": "mega-x",
+        "formCategory": "mega",
+        "nameZh": "超级喷火龙X",
+        "canonicalNameZh": "超级喷火龙X",
+        "displayNameZh": "超级喷火龙X",
+        "nameEn": "Charizard-Mega-X",
+        "isDefault": false,
+        "hasOwnMovesByGeneration": { "6": false, "7": false }
+      }
+    ],
+    "versionsByGen": {
+      "9": [{ "code": "SV", "name": "朱/紫" }]
+    }
+  }
+}
+```
+
+`forms` 数组中每个元素为 `LearnsetFormMeta` 类型，包含 `formId`（数据库 ID）、`formType`（稳定形态标识）、`formCategory`（形态分类如 mega/gmax/regional）、`nameZh`（显示名）、`isDefault`（是否默认形态）和 `hasOwnMovesByGeneration`（各世代是否有独立招式记录）。前端应使用 `formId` 作为请求招式表数据的参数。
 
 示例：
 

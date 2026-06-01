@@ -1,19 +1,4 @@
-const WEATHER_OPTIONS = [
-  { v: "sun", l: "晴天" },
-  { v: "harshSunlight", l: "大日照" },
-  { v: "rain", l: "雨天" },
-  { v: "heavyRain", l: "大雨" },
-  { v: "sand", l: "沙暴" },
-  { v: "hail", l: "雪" },
-  { v: "strongWinds", l: "乱流" },
-];
-
-const TERRAIN_OPTIONS = [
-  { v: "electric", l: "电气" },
-  { v: "grassy", l: "青草" },
-  { v: "misty", l: "薄雾" },
-  { v: "psychic", l: "精神" },
-];
+import { WEATHER_UI_OPTIONS, TERRAIN_UI_OPTIONS } from "@pokemon-localdex/store-types/constants";
 
 export default function FieldControlPanel({ field, setField, toggleField }) {
   return (
@@ -22,7 +7,7 @@ export default function FieldControlPanel({ field, setField, toggleField }) {
       <div className="dc-sp-group">
         <span className="dc-sp-group-label">天气</span>
         <div className="dc-sp-chips">
-          {WEATHER_OPTIONS.map((w) => (
+          {WEATHER_UI_OPTIONS.map((w) => (
             <button key={w.v} className={"dc-chip" + (field.weather === w.v ? " dc-chip-on" : "")} onClick={() => setField("weather", field.weather === w.v ? "none" : w.v)}>{w.l}</button>
           ))}
         </div>
@@ -30,7 +15,7 @@ export default function FieldControlPanel({ field, setField, toggleField }) {
       <div className="dc-sp-group">
         <span className="dc-sp-group-label">场地</span>
         <div className="dc-sp-chips">
-          {TERRAIN_OPTIONS.map((t) => (
+          {TERRAIN_UI_OPTIONS.map((t) => (
             <button key={t.v} className={"dc-chip" + (field.terrain === t.v ? " dc-chip-on" : "")} onClick={() => setField("terrain", field.terrain === t.v ? "none" : t.v)}>{t.l}</button>
           ))}
         </div>

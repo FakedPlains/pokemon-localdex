@@ -14,7 +14,7 @@ import EvolutionTab from "./EvolutionTab.jsx";
 export default function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
   const [tab, setTab] = useState("stats");
   const [imageMode, setImageMode] = useState("official");
-  const [detailForm, setDetailForm] = useState("default");
+  const [detailForm, setDetailForm] = useState(null);
   const [learnsetMeta, setLearnsetMeta] = useState(null);
   const [learnsetFormOverride, setLearnsetFormOverride] = useState(null);
 
@@ -28,7 +28,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
   useEffect(() => {
     setTab("stats");
     setImageMode("official");
-    setDetailForm("default");
+    setDetailForm(null);
     setLearnsetFormOverride(null);
     setLearnsetMeta(null);
     setEvolutionChain(null);
@@ -61,59 +61,74 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
     return () => { cancelled = true; };
   }, [pokemonId, tab, evolutionChain]);
 
-  const learnsetFormKeys = learnsetMeta?.formKeys || [];
+  // learnset meta 中的 formId 列表（数字）
+  const learnsetFormIds = useMemo(
+    () => (learnsetMeta?.forms || []).map(f => f.formId),
+    [learnsetMeta]
+  );
 
   const display = useMemo(
     () => resolvePokemonDisplayVariant(detail, detailGeneration, detailForm, ""),
     [detail, detailGeneration, detailForm]
   );
 
-  // 构建 detail form → learnset formKey 的映射表
+  // 构建 detail form → learnset formId 的映射表（通过 formId 匹配到 learnset meta 中的 formId）
   const formToLearnsetMap = useMemo(() => {
     const map = new Map();
-    if (learnsetFormKeys.length === 0 || display.formOptions.length === 0) return map;
-    const usedLearnsetKeys = new Set();
-    // 第一轮：直接匹配 formKey 或 nameZh
+    const metaForms = learnsetMeta?.forms || [];
+    if (metaForms.length === 0 || display.formOptions.length === 0) return map;
+    const usedIds = new Set();
+    // 第一轮：通过 formId 精确匹配
     for (const form of display.formOptions) {
-      const direct = learnsetFormKeys.find(
-        (fk) => !usedLearnsetKeys.has(fk) && (fk === form.formKey || fk === form.nameZh)
+      const matched = metaForms.find(
+        (mf) => !usedIds.has(mf.formId) && mf.formId === form.id
       );
-      if (direct) {
-        map.set(form.id, direct);
-        usedLearnsetKeys.add(direct);
+      if (matched) {
+        map.set(form.id, matched.formId);
+        usedIds.add(matched.formId);
       }
     }
-    // 第二轮：未匹配的 form 按顺序分配剩余的 learnset key
-    const remaining = learnsetFormKeys.filter((fk) => !usedLearnsetKeys.has(fk));
+    // 第二轮：未匹配的 form 通过 formType/nameZh 降级匹配
+    for (const form of display.formOptions) {
+      if (map.has(form.id)) continue;
+      const matched = metaForms.find(
+        (mf) => !usedIds.has(mf.formId) && (mf.formType === form.formType || mf.nameZh === form.nameZh)
+      );
+      if (matched) {
+        map.set(form.id, matched.formId);
+        usedIds.add(matched.formId);
+      }
+    }
+    // 第三轮：未匹配的 form 按顺序分配剩余的 learnset formId
+    const remaining = metaForms.filter((mf) => !usedIds.has(mf.formId));
     let ri = 0;
     for (const form of display.formOptions) {
       if (!map.has(form.id) && ri < remaining.length) {
-        map.set(form.id, remaining[ri++]);
+        map.set(form.id, remaining[ri++].formId);
       }
     }
     return map;
-  }, [display.formOptions, learnsetFormKeys]);
+  }, [display.formOptions, learnsetMeta]);
 
-  const mapFormToLearnsetKey = useCallback((form) => {
+  const mapFormToLearnsetId = useCallback((form) => {
     if (!form) return null;
-    return formToLearnsetMap.get(form.id) || null;
+    return formToLearnsetMap.get(form.id) ?? null;
   }, [formToLearnsetMap]);
 
-  // 当切换 detail 形态时，同时联动 learnset 的 formKey
+  // 当切换 detail 形态时，同时联动 learnset 的 formId
   const handleFormChange = useCallback((formId) => {
     setDetailForm(formId);
     const form = display.formOptions.find((f) => f.id === formId);
-    setLearnsetFormOverride(mapFormToLearnsetKey(form));
-  }, [display.formOptions, mapFormToLearnsetKey]);
+    setLearnsetFormOverride(mapFormToLearnsetId(form));
+  }, [display.formOptions, mapFormToLearnsetId]);
 
-  // 计算当前传给 MovesTab 的 learnset formKey
-  const activeLearnsetFormKey = useMemo(() => {
-    if (learnsetFormOverride && learnsetFormKeys.includes(learnsetFormOverride)) return learnsetFormOverride;
-    // 用当前 display.form 做映射
-    const mapped = mapFormToLearnsetKey(display.form);
-    if (mapped) return mapped;
-    return learnsetFormKeys[0] || null;
-  }, [learnsetFormOverride, learnsetFormKeys, display.form, mapFormToLearnsetKey]);
+  // 计算当前传给 MovesTab 的 learnset formId（数字）
+  const activeLearnsetFormId = useMemo(() => {
+    if (learnsetFormOverride != null && learnsetFormIds.includes(learnsetFormOverride)) return learnsetFormOverride;
+    const mapped = mapFormToLearnsetId(display.form);
+    if (mapped != null) return mapped;
+    return learnsetFormIds[0] ?? null;
+  }, [learnsetFormOverride, learnsetFormIds, display.form, mapFormToLearnsetId]);
 
   const tabs = [
     { key: "stats", label: "种族值" },
@@ -220,7 +235,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
               detailGeneration={detailGeneration}
               onDetailGenerationChange={onDetailGenerationChange}
               learnsetMeta={learnsetMeta}
-              externalFormKey={activeLearnsetFormKey}
+              externalFormId={activeLearnsetFormId}
             />
           )}
           {tab === "evolution" && (
@@ -228,9 +243,8 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
               detail={detail}
               evolutionChain={evolutionChain}
               loading={evolutionLoading}
-              // display.form.id 是 buildPokemonFormOptions 覆盖后的 formKey 字符串（如 "default"/"mega"），
-              // 用它在 detail.forms 中匹配，取出数据库数字 id 传给进化链做高亮比较
-              currentFormId={(detail.forms || []).find((f) => (f.formKey || f.nameZh) === display.form?.id)?.id ?? null}
+              // display.form.id 已经是数据库数字 formId
+              currentFormId={display.form?.id ?? null}
             />
           )}
         </motion.div>

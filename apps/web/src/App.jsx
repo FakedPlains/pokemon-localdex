@@ -10,6 +10,8 @@ const AbilitiesPage = lazy(() => import("./pages/AbilitiesPage.jsx"));
 const TeamsPage = lazy(() => import("./pages/TeamsPage.jsx"));
 const DamagePage = lazy(() => import("./pages/DamagePage.jsx"));
 const TypeChartPage = lazy(() => import("./pages/TypeChartPage.jsx"));
+const KoAnalysisPage = lazy(() => import("./pages/KoAnalysisPage.tsx"));
+const FieldEffectsPage = lazy(() => import("./pages/FieldEffectsPage.jsx"));
 
 const NAV_ITEMS = [
   { key: "pokedex", label: "图鉴", hash: "#/pokedex" },
@@ -18,6 +20,8 @@ const NAV_ITEMS = [
   { key: "items", label: "道具", hash: "#/items" },
   { key: "teams", label: "队伍", hash: "#/teams" },
   { key: "damage", label: "伤害", hash: "#/damage" },
+  { key: "ko", label: "KO分析", hash: "#/ko" },
+  { key: "field-effects", label: "场地", hash: "#/field-effects" },
   { key: "typechart", label: "克制表", hash: "#/typechart" }
 ];
 
@@ -29,6 +33,7 @@ const SEARCH_PLACEHOLDERS = {
   abilities: "搜索特性名（中/英/日）…",
   teams: "队伍页暂无搜索",
   damage: "伤害页暂无搜索",
+  ko: "KO分析页暂无搜索",
   typechart: "克制表页暂无搜索"
 };
 
@@ -170,6 +175,10 @@ export default function App() {
         return <TeamsPage />;
       case "damage":
         return <DamagePage teamDraft={teamDraft} />;
+      case "ko":
+        return <KoAnalysisPage />;
+      case "field-effects":
+        return <FieldEffectsPage />;
       case "typechart":
         return <TypeChartPage />;
       default:

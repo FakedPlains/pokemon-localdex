@@ -1,0 +1,219 @@
+{
+  "baseNameOverrides": {
+    "Farfetch'd": "Farfetch’d",
+    "Sirfetch'd": "Sirfetch’d",
+    "Flabébé": "Flabébé"
+  },
+  "defaultSpeciesNameOverrides": {
+    "Nidoran♀": "Nidoran-F",
+    "Nidoran♂": "Nidoran-M",
+    "Aegislash": "Aegislash-Shield"
+  },
+  "formSuffixRules": [
+    { "pattern": "^超级.+[xXＸ]$", "suffix": "Mega-X" },
+    { "pattern": "^超级.+[yYＹ]$", "suffix": "Mega-Y" },
+    { "pattern": "^超级.+[zZＺ]$", "suffix": "Mega-Z" },
+    { "pattern": "^超级", "suffix": "Mega" },
+    { "pattern": "^阿罗拉", "suffix": "Alola" },
+    { "pattern": "^伽勒尔", "suffix": "Galar" },
+    { "pattern": "^洗翠", "suffix": "Hisui" },
+    { "pattern": "^帕底亚", "suffix": "Paldea" },
+    { "pattern": "^超极巨化", "suffix": "Gmax" },
+    { "pattern": "^原始", "suffix": "Primal" },
+    { "pattern": "^起源", "suffix": "Origin" },
+    { "pattern": "^灵兽", "suffix": "Therian" },
+    { "pattern": "^暗黑", "suffix": "Black" },
+    { "pattern": "^焰白", "suffix": "White" },
+    { "pattern": "^王者", "suffix": "Crowned" },
+    { "pattern": "^无极巨化", "suffix": "Eternamax" },
+    { "pattern": "连击", "suffix": "Rapid-Strike" },
+    { "pattern": "一击", "suffix": "" },
+    { "pattern": "冰骑", "suffix": "Ice" },
+    { "pattern": "灵骑|幽骑", "suffix": "Shadow" },
+    { "pattern": "磐岩", "suffix": "Cornerstone" },
+    { "pattern": "水井", "suffix": "Wellspring" },
+    { "pattern": "火灶", "suffix": "Hearthflame" },
+    { "pattern": "血月", "suffix": "Bloodmoon" },
+    { "pattern": "星晶", "suffix": "Stellar" },
+    { "pattern": "太晶", "suffix": "Terastal" }
+  ],
+  "speciesFormSuffixOverrides": {
+    "Darmanitan": {
+      "达摩狒狒（达摩模式）": "Zen",
+      "伽勒尔达摩狒狒（普通模式）": "Galar",
+      "伽勒尔达摩狒狒（达摩模式）": "Galar-Zen",
+      "伽勒尔达摩模式": "Galar-Zen"
+    },
+    "Oricorio": {
+      "啪滋啪滋风格": "Pom-Pom",
+      "呼拉呼拉风格": "Pa'u",
+      "轻盈轻盈风格": "Sensu",
+      "幽幽幽幽风格": "Sensu"
+    },
+    "Tatsugiri": {
+      "下垂姿势": "Droopy",
+      "平挺姿势": "Stretchy",
+      "超级米立龙（上弓姿势）": "Curly-Mega",
+      "超级米立龙（下垂姿势）": "Droopy-Mega",
+      "超级米立龙（平挺姿势）": "Stretchy-Mega"
+    },
+    "Squawkabilly": {
+      "蓝羽毛": "Blue",
+      "黄羽毛": "Yellow",
+      "白羽毛": "White"
+    },
+    "Pyroar": {
+      "雌性的样子": ""
+    },
+    "Meowstic": {
+      "雌性的样子": "F",
+      "超级超能妙喵": "F-Mega"
+    },
+    "Indeedee": {
+      "雌性": "F"
+    },
+    "Basculegion": {
+      "雌性的样子": "F"
+    },
+    "Urshifu": {
+      "连击流": "Rapid-Strike",
+      "超极巨化武道熊师一击流": "Gmax",
+      "超极巨化武道熊师连击流": "Rapid-Strike-Gmax"
+    },
+    "Zygarde": {
+      "10%形态": "10%"
+    },
+    "Rockruff": {
+      "特殊岩狗狗": "Dusk"
+    },
+    "Mimikyu": {
+      "现形的样子": "Busted"
+    },
+    "Magearna": {
+      "500年前的颜色": "Original",
+      "超级玛机雅娜（500年前的颜色）": "Original-Mega"
+    },
+    "Zarude": {
+      "阿爸": "Dada"
+    },
+    "Maushold": {
+      "四只家庭": "Four"
+    }
+  },
+  "manualFormMappings": [
+    { "key": "伽勒尔大葱鸭", "base": "Farfetch'd", "suffix": "Galar" },
+    { "key": "帕底亚的样子斗战种", "base": "Tauros", "suffix": "Paldea-Combat" },
+    { "key": "帕底亚的样子火炽种", "base": "Tauros", "suffix": "Paldea-Blaze" },
+    { "key": "帕底亚的样子水澜种", "base": "Tauros", "suffix": "Paldea-Aqua" },
+    { "key": "剑之王", "suffix": "Crowned" },
+    { "key": "盾之王", "suffix": "Crowned" },
+    { "key": "永恒之花", "suffix": "Eternal" },
+    { "key": "解冻头", "suffix": "Noice" },
+    { "key": "空腹花纹", "suffix": "Hangry" },
+    { "key": "一口吞的样子", "suffix": "Gulping" },
+    { "key": "大口吞的样子", "suffix": "Gorging" },
+    { "key": "全能形态", "suffix": "Hero" },
+    { "key": "三节形态", "suffix": "Three-Segment" },
+    { "key": "础石面具", "suffix": "Cornerstone" },
+    { "key": "核心", "suffix": "" },
+    { "key": "徒步形态", "suffix": "Roaming" },
+    { "key": "骑白马的样子", "suffix": "Ice" },
+    { "key": "骑黑马的样子", "suffix": "Shadow" },
+    { "key": "赫月", "suffix": "Bloodmoon" },
+    { "key": "啪滋啪滋风格", "suffix": "Pom-Pom" },
+    { "key": "呼拉呼拉风格", "suffix": "Pa'u" },
+    { "key": "轻盈轻盈风格", "suffix": "Sensu" },
+    { "key": "太阳的样子", "suffix": "Sunny" },
+    { "key": "雨水的样子", "suffix": "Rainy" },
+    { "key": "雪云的样子", "suffix": "Snowy" },
+    { "key": "攻击形态", "suffix": "Attack" },
+    { "key": "防御形态", "suffix": "Defense" },
+    { "key": "速度形态", "suffix": "Speed" },
+    { "key": "砂土蓑衣", "suffix": "Sandy" },
+    { "key": "垃圾蓑衣", "suffix": "Trash" },
+    { "key": "晴天形态", "suffix": "Sunshine" },
+    { "key": "加热洛托姆", "suffix": "Heat" },
+    { "key": "清洗洛托姆", "suffix": "Wash" },
+    { "key": "结冰洛托姆", "suffix": "Frost" },
+    { "key": "旋转洛托姆", "suffix": "Fan" },
+    { "key": "切割洛托姆", "suffix": "Mow" },
+    { "key": "天空形态", "suffix": "Sky" },
+    { "key": "蓝条纹的样子", "suffix": "Blue-Striped" },
+    { "key": "白条纹的样子", "suffix": "White-Striped" },
+    { "key": "达摩狒狒-达摩模式", "suffix": "Zen" },
+    { "key": "达摩狒狒（达摩模式）", "suffix": "Zen" },
+    { "key": "伽勒尔达摩狒狒（达摩模式）", "suffix": "Galar-Zen" },
+    { "key": "伽勒尔达摩模式", "suffix": "Galar-Zen" },
+    { "key": "觉悟的样子", "suffix": "Resolute" },
+    { "key": "舞步形态", "suffix": "Pirouette" },
+    { "key": "牵绊变身甲贺忍蛙", "suffix": "Ash" },
+    { "key": "小颗种", "suffix": "Small" },
+    { "key": "大颗种", "suffix": "Large" },
+    { "key": "巨颗种", "suffix": "Super" },
+    { "key": "10-形态", "suffix": "10%" },
+    { "key": "完全体形态", "suffix": "Complete" },
+    { "key": "解放胡帕", "suffix": "Unbound" },
+    { "key": "热辣热辣风格", "suffix": "" },
+    { "key": "幽幽幽幽风格", "suffix": "Sensu" },
+    { "key": "黄昏的样子", "suffix": "Dusk" },
+    { "key": "黑夜的样子", "suffix": "Midnight" },
+    { "key": "鱼群的样子", "suffix": "School" },
+    { "key": "黄昏之鬃", "suffix": "Dusk-Mane" },
+    { "key": "拂晓之翼", "suffix": "Dawn-Wings" },
+    { "key": "究极奈克洛兹玛", "suffix": "Ultra" },
+    { "key": "低调的样子", "suffix": "Low-Key" },
+    { "key": "冰骑士", "suffix": "Ice" },
+    { "key": "幽骑士", "suffix": "Shadow" },
+    { "key": "英雄形态", "suffix": "Hero" },
+    { "key": "灵兽形态", "suffix": "Therian" },
+    { "key": "刀剑形态", "suffix": "Blade" },
+    { "key": "放松模式", "suffix": "" },
+    { "key": "起源形态", "suffix": "Origin" },
+    { "key": "起源形态dialga", "suffix": "Origin" },
+    { "key": "起源形态palkia", "suffix": "Origin" }
+  ],
+  "formTypeKeywords": {
+    "_comment": "Keyword-to-formType mapping used by inferFormTypeFromLabel / _derive_form_type / deriveFormType. Order matters: earlier entries take priority.",
+    "megaPatterns": ["超级", "超級", "mega"],
+    "gmaxPatterns": ["超极巨", "超極巨", "gigantamax", "gmax"],
+    "postures": [
+      { "keyword": "上弓姿势", "value": "curly" },
+      { "keyword": "下垂姿势", "value": "droopy" },
+      { "keyword": "平挺姿势", "value": "stretchy" }
+    ],
+    "simple": [
+      { "keywords": ["蓝羽毛"], "value": "blue" },
+      { "keywords": ["黄羽毛"], "value": "yellow" },
+      { "keywords": ["白羽毛"], "value": "white" },
+      { "keywords": ["雌性的样子"], "value": "female", "exactMatch": "雌性" },
+      { "keywords": ["砂土蓑衣"], "value": "sandy" },
+      { "keywords": ["垃圾蓑衣"], "value": "trash" },
+      { "keywords": ["东海"], "value": "east" },
+      { "keywords": ["夏天"], "value": "summer" },
+      { "keywords": ["秋天"], "value": "autumn" },
+      { "keywords": ["冬天"], "value": "winter" },
+      { "keywords": ["放松模式"], "value": "neutral" },
+      { "keywords": ["10%形态", "１０％形态"], "value": "10%" },
+      { "keywords": ["特殊岩狗狗"], "value": "dusk" },
+      { "keywords": ["核心"], "value": "core" },
+      { "keywords": ["现形"], "value": "busted" },
+      { "keywords": ["旭日"], "value": "radiant-sun" },
+      { "keywords": ["满月"], "value": "full-moon" },
+      { "keywords": ["500年前", "５００年前"], "value": "original", "megaValue": "original-mega" },
+      { "keywords": ["全力玛夏多"], "value": "zenith" },
+      { "keywords": ["阿爸"], "value": "dada" },
+      { "keywords": ["四只家庭"], "value": "four" },
+      { "keywords": ["达摩模式"], "value": "zen", "conditionalKeyword": "伽勒尔", "conditionalValue": "galar-zen" },
+      { "keywords": ["连击流"], "value": "rapid-strike", "gmaxValue": "rapid-strike-gmax" },
+      { "keywords": ["啪滋啪滋风格"], "value": "pom-pom" },
+      { "keywords": ["呼拉呼拉风格"], "value": "pa'u" },
+      { "keywords": ["轻盈轻盈风格", "幽幽幽幽风格"], "value": "sensu" }
+    ],
+    "regions": [
+      { "keyword": "阿罗拉", "value": "alola" },
+      { "keyword": "伽勒尔", "value": "galar" },
+      { "keyword": "洗翠", "value": "hisui" },
+      { "keyword": "帕底亚", "value": "paldea" }
+    ]
+  }
+}
