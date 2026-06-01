@@ -42,9 +42,9 @@
 }
 
 .cfg-toolbar-search:focus-within {
-  border-color: rgba(217, 79, 61, 0.35);
+  border-color: rgba(26, 171, 138, 0.4);
   background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
 }
 
 .cfg-toolbar-search-icon {
@@ -84,7 +84,7 @@
 }
 
 .cfg-toolbar-search-clear:hover {
-  background: rgba(217, 79, 61, 0.15);
+  background: rgba(26, 171, 138, 0.15);
   color: var(--accent-strong);
 }
 
@@ -115,8 +115,8 @@
 }
 
 .cfg-toolbar-pokemon-change:hover {
-  background: rgba(217, 79, 61, 0.08);
-  border-color: rgba(217, 79, 61, 0.3);
+  background: rgba(26, 171, 138, 0.08);
+  border-color: rgba(26, 171, 138, 0.3);
 }
 
 .cfg-toolbar-name {
@@ -134,9 +134,9 @@
 }
 
 .cfg-toolbar-name:focus {
-  border-color: rgba(217, 79, 61, 0.35);
+  border-color: rgba(26, 171, 138, 0.4);
   background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
 }
 
 .cfg-toolbar-name::placeholder {
@@ -159,8 +159,8 @@
 }
 
 .cfg-toolbar-cancel:hover {
-  background: rgba(217, 79, 61, 0.08);
-  border-color: rgba(217, 79, 61, 0.3);
+  background: rgba(26, 171, 138, 0.08);
+  border-color: rgba(26, 171, 138, 0.3);
   color: var(--accent-strong);
 }
 
@@ -189,7 +189,7 @@
 
 .cfg-pokemon-card:hover {
   border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(217, 79, 61, 0.12);
+  box-shadow: 0 2px 8px rgba(26, 171, 138, 0.12);
   transform: translateY(-1px);
 }
 
@@ -227,7 +227,7 @@
 
 .cfg-picker-search:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
 }
 
 .cfg-picker-search-icon {
@@ -265,7 +265,7 @@
 }
 
 .cfg-picker-clear:hover {
-  background: rgba(217, 79, 61, 0.15);
+  background: rgba(26, 171, 138, 0.15);
   color: var(--accent-strong);
 }
 
@@ -344,11 +344,11 @@ transition: color 0.15s;
 }
 
 .cfg-picker-row:hover {
-  background: rgba(217, 79, 61, 0.05);
+  background: rgba(26, 171, 138, 0.05);
 }
 
 .cfg-picker-row:active {
-  background: rgba(217, 79, 61, 0.1);
+  background: rgba(26, 171, 138, 0.1);
 }
 
 .cfg-picker-row td {
@@ -707,8 +707,8 @@ text-overflow: clip;
 
 .cfg-slot-btn.cfg-slot-active {
   border-color: var(--accent);
-  background: rgba(217, 79, 61, 0.06);
-  box-shadow: 0 0 0 2px rgba(217, 79, 61, 0.1);
+  background: rgba(26, 171, 138, 0.06);
+  box-shadow: 0 0 0 2px rgba(26, 171, 138, 0.1);
 }
 
 /* 道具锁定态 */
@@ -814,7 +814,7 @@ text-overflow: clip;
   border-radius: 8px;
   padding: 7px 12px;
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 2px rgba(217, 79, 61, 0.1);
+  box-shadow: 0 0 0 2px rgba(26, 171, 138, 0.1);
   height: 35px;
   box-sizing: border-box;
 }
@@ -864,7 +864,7 @@ text-overflow: clip;
 
 .cfg-item-search-close:hover {
   color: var(--accent-strong);
-  background: rgba(217, 79, 61, 0.08);
+  background: rgba(26, 171, 138, 0.08);
 }
 
 /* 道具按钮中已选道具展示 */
@@ -897,11 +897,11 @@ text-overflow: clip;
 }
 
 .cfg-item-panel-row:hover {
-  background: rgba(217, 79, 61, 0.05);
+  background: rgba(26, 171, 138, 0.05);
 }
 
 .cfg-item-panel-row-active {
-  background: rgba(217, 79, 61, 0.08);
+  background: rgba(26, 171, 138, 0.08);
 }
 
 .cfg-item-panel-img {
@@ -1000,7 +1000,7 @@ text-overflow: clip;
 }
 
 .cfg-panel-close:hover {
-  background: rgba(217, 79, 61, 0.12);
+  background: rgba(26, 171, 138, 0.12);
   color: var(--accent-strong);
 }
 
@@ -1035,7 +1035,7 @@ text-overflow: clip;
 
 .cfg-panel-item.cfg-panel-item-active {
   border-color: var(--accent);
-  background: rgba(217, 79, 61, 0.08);
+  background: rgba(26, 171, 138, 0.08);
 }
 
 .cfg-panel-item-sub {
@@ -1064,7 +1064,7 @@ text-overflow: clip;
   border-radius: 8px;
   padding: 0 10px;
   background: #fff;
-  box-shadow: 0 0 0 2px rgba(217, 79, 61, 0.1);
+  box-shadow: 0 0 0 2px rgba(26, 171, 138, 0.1);
   height: 35px;
   box-sizing: border-box;
 }
@@ -1113,7 +1113,7 @@ text-overflow: clip;
 
 .cfg-move-search-close:hover {
   color: var(--accent-strong);
-  background: rgba(217, 79, 61, 0.08);
+  background: rgba(26, 171, 138, 0.08);
 }
 
 /* ── 招式面板表格 ── */
@@ -1188,15 +1188,15 @@ padding-left: 16px;
 }
 
 .cfg-move-panel-row:hover {
-  background: rgba(217, 79, 61, 0.05);
+  background: rgba(26, 171, 138, 0.05);
 }
 
 .cfg-move-panel-row:active {
-  background: rgba(217, 79, 61, 0.1);
+  background: rgba(26, 171, 138, 0.1);
 }
 
 .cfg-move-panel-row-active {
-  background: rgba(217, 79, 61, 0.08);
+  background: rgba(26, 171, 138, 0.08);
 }
 
 .cfg-move-panel-row td {
