@@ -49,11 +49,18 @@ function formatLearnMethods(methods) {
   return methods.map((m) => LEARN_METHOD_NAMES[m] || m).join("/");
 }
 
+const PAGE_SIZE = 50;
+
 export default function MovesPage({ query = "", type = "", category = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
   const [detailCache, setDetailCache] = useState({});
-  const pendingExpandRef = useRef(parseExpandParam());
   const detailRequestsRef = useRef(new Set());
+
+  // 解析 URL 中的 expand 目标（如 #/moves?expand=123）
+  const expandTargetRef = useRef(parseExpandParam());
+  // 起始 offset：有 expand 目标时先通过 position 接口定位，再据此从列表中间开始加载
+  const [initialOffset, setInitialOffset] = useState(null); // null = 尚未确定
+  const didExpandRef = useRef(false); // 是否已完成首次定位展开
 
   // Reset expanded when filters change
   useEffect(() => { setExpanded(null); }, [query, type, category, generation]);
@@ -69,7 +76,46 @@ export default function MovesPage({ query = "", type = "", category = "", genera
     return qs ? `/moves?${qs}` : "/moves";
   }, [query, type, category, generation]);
 
-  const { data: moves, total, loading, loadingMore, hasMore, sentinelRef, loadMore } = useInfiniteApi(movesPath, { pageSize: 50 });
+  // 先确定起始 offset：有 expand 目标 → 请求 position 接口；否则从 0 开始。
+  useEffect(() => {
+    const expandId = expandTargetRef.current;
+    if (!expandId) {
+      setInitialOffset(0);
+      return;
+    }
+    let cancelled = false;
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (type) params.set("type", type);
+    if (category) params.set("category", category);
+    if (generation) params.set("generation", generation);
+    const qs = params.toString();
+    const url = `/moves/${expandId}/position${qs ? `?${qs}` : ""}`;
+    unifiedApi(url)
+      .then((r) => {
+        if (cancelled) return;
+        const pos = r?.data?.position ?? 0;
+        // 让目标尽量落在加载页的中部偏上：往前多取约半页，对齐到 PAGE_SIZE 边界
+        const start = Math.max(0, Math.floor((pos - Math.floor(PAGE_SIZE / 2)) / PAGE_SIZE) * PAGE_SIZE);
+        setInitialOffset(start);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // position 查询失败（目标不在当前筛选结果中），退回从头加载
+        expandTargetRef.current = null;
+        setInitialOffset(0);
+      });
+    return () => { cancelled = true; };
+  }, [query, type, category, generation]);
+
+  const {
+    data: moves,
+    loading,
+    hasMore,
+    hasPrev,
+    sentinelRef,
+    topSentinelRef,
+  } = useInfiniteApi(movesPath, { pageSize: PAGE_SIZE, initialOffset });
 
   const loadMoveDetail = useCallback((id) => {
     if (detailCache[id] || detailRequestsRef.current.has(id)) return;
@@ -83,41 +129,30 @@ export default function MovesPage({ query = "", type = "", category = "", genera
       });
   }, [detailCache]);
 
-  // Auto-expand move from URL hash param (e.g. #/moves?expand=123)
+  // 首屏数据加载完成后，定位并展开 expand 目标（只执行一次）
   useEffect(() => {
-    const expandId = pendingExpandRef.current;
-    if (!expandId || loading) return;
-    if (moves.length === 0 && !hasMore) {
-      pendingExpandRef.current = null;
-      return;
-    }
-    if (moves.length === 0) return;
+    const expandId = expandTargetRef.current;
+    if (!expandId || didExpandRef.current) return;
+    if (loading || moves.length === 0) return;
 
     const target = moves.find((m) => String(m.id) === expandId);
     if (target) {
-      pendingExpandRef.current = null;
+      didExpandRef.current = true;
+      expandTargetRef.current = null;
       setExpanded(target.id);
       loadMoveDetail(target.id);
       requestAnimationFrame(() => {
         const el = document.querySelector(`[data-move-id="${target.id}"]`);
         if (el) el.scrollIntoView({ block: "center", behavior: "instant" });
       });
-      const hash = window.location.hash || "";
-      const qIdx = hash.indexOf("?");
-      if (qIdx >= 0) {
-        window.history.replaceState(null, "", hash.slice(0, qIdx));
-      }
-    } else if (hasMore && !loadingMore) {
-      loadMore();
-    } else if (!hasMore) {
-      pendingExpandRef.current = null;
+      // 清理 URL 中的 expand 参数
       const hash = window.location.hash || "";
       const qIdx = hash.indexOf("?");
       if (qIdx >= 0) {
         window.history.replaceState(null, "", hash.slice(0, qIdx));
       }
     }
-  }, [moves, loading, hasMore, loadingMore, loadMore, loadMoveDetail]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [moves, loading, loadMoveDetail]);
 
   // 宝可梦区域展开状态（独立于招式详情的展开）
   const [pokemonExpanded, setPokemonExpanded] = useState({});
@@ -135,7 +170,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
     setPokemonExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  if (loading && moves.length === 0) return <Loading />;
+  if (initialOffset === null || (loading && moves.length === 0)) return <Loading />;
 
   return (
     <section className="mv-page">
@@ -162,6 +197,12 @@ export default function MovesPage({ query = "", type = "", category = "", genera
 
         {moves.length === 0 && !loading && (
           <div className="mv-empty">没有找到匹配的招式。</div>
+        )}
+
+        {hasPrev && (
+          <div className="mv-load-more mv-load-prev" ref={topSentinelRef}>
+            <div className="pulse-dot" />
+          </div>
         )}
 
         <div className="mv-list">

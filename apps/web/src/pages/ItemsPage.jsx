@@ -6,10 +6,16 @@ import Loading from "../components/Loading.jsx";
 import GenerationTimeline from "../components/GenerationTimeline.jsx";
 import WikiLink from "../components/WikiLink.jsx";
 
+const PAGE_SIZE = 50;
+
 export default function ItemsPage({ query = "" }) {
   const [expanded, setExpanded] = useState(null);
   const [detailCache, setDetailCache] = useState({});
-  const pendingExpandRef = useRef(parseExpandParam());
+
+  // 解析 URL 中的 expand 目标
+  const expandTargetRef = useRef(parseExpandParam());
+  const [initialOffset, setInitialOffset] = useState(null);
+  const didExpandRef = useRef(false);
 
   // Reset expanded when filters change
   useEffect(() => { setExpanded(null); }, [query]);
@@ -22,21 +28,53 @@ export default function ItemsPage({ query = "" }) {
     return qs ? `/items?${qs}` : "/items";
   }, [query]);
 
-  const { data: items, total, loading, loadingMore, hasMore, sentinelRef, loadMore } = useInfiniteApi(itemsPath, { pageSize: 50 });
-
-  // Auto-expand item from URL hash param (e.g. #/items?expand=123)
+  // 确定起始 offset
   useEffect(() => {
-    const expandId = pendingExpandRef.current;
-    if (!expandId || loading) return;
-    if (items.length === 0 && !hasMore) {
-      pendingExpandRef.current = null;
+    const expandId = expandTargetRef.current;
+    if (!expandId) {
+      setInitialOffset(0);
       return;
     }
-    if (items.length === 0) return;
+    let cancelled = false;
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    const qs = params.toString();
+    const url = `/items/${expandId}/position${qs ? `?${qs}` : ""}`;
+    unifiedApi(url)
+      .then((r) => {
+        if (cancelled) return;
+        const pos = r?.data?.position ?? 0;
+        const start = Math.max(0, Math.floor((pos - Math.floor(PAGE_SIZE / 2)) / PAGE_SIZE) * PAGE_SIZE);
+        setInitialOffset(start);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        expandTargetRef.current = null;
+        setInitialOffset(0);
+      });
+    return () => { cancelled = true; };
+  }, [query]);
+
+  const {
+    data: items,
+    total,
+    loading,
+    hasMore,
+    hasPrev,
+    sentinelRef,
+    topSentinelRef,
+  } = useInfiniteApi(itemsPath, { pageSize: PAGE_SIZE, initialOffset });
+
+  // 首屏加载完后定位展开目标（仅一次）
+  useEffect(() => {
+    const expandId = expandTargetRef.current;
+    if (!expandId || didExpandRef.current) return;
+    if (loading || items.length === 0) return;
 
     const target = items.find((it) => String(it.id) === expandId || it.nameZh === expandId);
     if (target) {
-      pendingExpandRef.current = null;
+      didExpandRef.current = true;
+      expandTargetRef.current = null;
       const key = String(target.id);
       setExpanded(key);
       if (!detailCache[key]) {
@@ -53,17 +91,8 @@ export default function ItemsPage({ query = "" }) {
       if (qIdx >= 0) {
         window.history.replaceState(null, "", hash.slice(0, qIdx));
       }
-    } else if (hasMore && !loadingMore) {
-      loadMore();
-    } else if (!hasMore) {
-      pendingExpandRef.current = null;
-      const hash = window.location.hash || "";
-      const qIdx = hash.indexOf("?");
-      if (qIdx >= 0) {
-        window.history.replaceState(null, "", hash.slice(0, qIdx));
-      }
     }
-  }, [items, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [items, loading, detailCache]);
 
   const toggleExpand = useCallback((key) => {
     if (expanded === key) {
@@ -78,7 +107,7 @@ export default function ItemsPage({ query = "" }) {
     }
   }, [expanded, detailCache]);
 
-  if (loading && items.length === 0) return <Loading />;
+  if (initialOffset === null || (loading && items.length === 0)) return <Loading />;
 
   return (
     <section className="it-page">
@@ -92,6 +121,12 @@ export default function ItemsPage({ query = "" }) {
 
         {items.length === 0 && !loading && (
           <div className="it-empty">没有找到匹配的道具。</div>
+        )}
+
+        {hasPrev && (
+          <div className="it-load-more it-load-prev" ref={topSentinelRef}>
+            <div className="pulse-dot" />
+          </div>
         )}
 
         <div className="it-list">

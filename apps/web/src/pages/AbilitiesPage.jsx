@@ -7,10 +7,19 @@ import PokemonGrid from "../components/PokemonGrid.jsx";
 import GenerationTimeline from "../components/GenerationTimeline.jsx";
 import WikiLink from "../components/WikiLink.jsx";
 
+const PAGE_SIZE = 50;
+
 export default function AbilitiesPage({ query = "", generation = "" }) {
   const [expanded, setExpanded] = useState(null);
   const [detailCache, setDetailCache] = useState({});
-  const pendingExpandRef = useRef(parseExpandParam());
+
+  // 解析 URL 中的 expand 目标
+  const expandTargetRef = useRef(parseExpandParam());
+  const [initialOffset, setInitialOffset] = useState(null);
+  const didExpandRef = useRef(false);
+
+  // Reset expanded when filters change
+  useEffect(() => { setExpanded(null); }, [query, generation]);
 
   // 构建分页请求路径
   const abilitiesPath = useMemo(() => {
@@ -21,22 +30,55 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
     return qs ? `/abilities?${qs}` : "/abilities";
   }, [query, generation]);
 
-  const { data: abilities, total, loading, loadingMore, hasMore, sentinelRef, loadMore } = useInfiniteApi(abilitiesPath, { pageSize: 50 });
-
-  // Auto-expand ability from URL hash param (e.g. #/abilities?expand=123)
+  // 确定起始 offset
   useEffect(() => {
-    const expandId = pendingExpandRef.current;
-    if (!expandId || loading) return;
-    if (abilities.length === 0 && !hasMore) {
-      pendingExpandRef.current = null;
+    const expandId = expandTargetRef.current;
+    if (!expandId) {
+      setInitialOffset(0);
       return;
     }
-    if (abilities.length === 0) return;
+    let cancelled = false;
+    const params = new URLSearchParams();
+    if (query) params.set("q", query);
+    if (generation) params.set("generation", generation);
+    const qs = params.toString();
+    const url = `/abilities/${expandId}/position${qs ? `?${qs}` : ""}`;
+    unifiedApi(url)
+      .then((r) => {
+        if (cancelled) return;
+        const pos = r?.data?.position ?? 0;
+        const start = Math.max(0, Math.floor((pos - Math.floor(PAGE_SIZE / 2)) / PAGE_SIZE) * PAGE_SIZE);
+        setInitialOffset(start);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        expandTargetRef.current = null;
+        setInitialOffset(0);
+      });
+    return () => { cancelled = true; };
+  }, [query, generation]);
+
+  const {
+    data: abilities,
+    total,
+    loading,
+    hasMore,
+    hasPrev,
+    sentinelRef,
+    topSentinelRef,
+  } = useInfiniteApi(abilitiesPath, { pageSize: PAGE_SIZE, initialOffset });
+
+  // 首屏加载完后定位展开目标（仅一次）
+  useEffect(() => {
+    const expandId = expandTargetRef.current;
+    if (!expandId || didExpandRef.current) return;
+    if (loading || abilities.length === 0) return;
 
     const numId = Number(expandId);
     const target = abilities.find((a) => a.id === numId || String(a.id) === expandId);
     if (target) {
-      pendingExpandRef.current = null;
+      didExpandRef.current = true;
+      expandTargetRef.current = null;
       const key = target.id;
       setExpanded(key);
       if (!detailCache[key]) {
@@ -53,17 +95,8 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
       if (qIdx >= 0) {
         window.history.replaceState(null, "", hash.slice(0, qIdx));
       }
-    } else if (hasMore && !loadingMore) {
-      loadMore();
-    } else if (!hasMore) {
-      pendingExpandRef.current = null;
-      const hash = window.location.hash || "";
-      const qIdx = hash.indexOf("?");
-      if (qIdx >= 0) {
-        window.history.replaceState(null, "", hash.slice(0, qIdx));
-      }
     }
-  }, [abilities, loading, hasMore, loadingMore, loadMore]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [abilities, loading, detailCache]);
 
   // 宝可梦区域展开状态（独立于特性详情的展开）
   const [pokemonExpanded, setPokemonExpanded] = useState({});
@@ -85,7 +118,7 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
     setPokemonExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  if (loading && abilities.length === 0) return <Loading />;
+  if (initialOffset === null || (loading && abilities.length === 0)) return <Loading />;
 
   return (
     <section className="ab-page">
@@ -100,6 +133,12 @@ export default function AbilitiesPage({ query = "", generation = "" }) {
 
         {abilities.length === 0 && !loading && (
           <div className="ab-empty">没有找到匹配的特性。</div>
+        )}
+
+        {hasPrev && (
+          <div className="ab-load-more ab-load-prev" ref={topSentinelRef}>
+            <div className="pulse-dot" />
+          </div>
         )}
 
         <div className="ab-list">
