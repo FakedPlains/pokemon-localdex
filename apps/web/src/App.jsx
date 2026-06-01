@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } fro
 import { createDraftMember } from "./utils/helpers.js";
 import { TYPE_OPTIONS, CATEGORY_OPTIONS, GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import { ToastProvider } from "./components/Toast.jsx";
+import GlobalSearch from "./components/GlobalSearch.tsx";
 
 const PokedexPage = lazy(() => import("./pages/PokedexPage.jsx"));
 const ItemsPage = lazy(() => import("./pages/ItemsPage.jsx"));
@@ -10,18 +11,23 @@ const AbilitiesPage = lazy(() => import("./pages/AbilitiesPage.jsx"));
 const TeamsPage = lazy(() => import("./pages/TeamsPage.jsx"));
 const DamagePage = lazy(() => import("./pages/DamagePage.jsx"));
 const TypeChartPage = lazy(() => import("./pages/TypeChartPage.jsx"));
-const KoAnalysisPage = lazy(() => import("./pages/KoAnalysisPage.tsx"));
+// KoAnalysisPage 现在由 DamagePage 内部 tab 切换渲染
 const FieldEffectsPage = lazy(() => import("./pages/FieldEffectsPage.jsx"));
 
+/* "资料库" 下拉子项 */
+const DATABASE_ITEMS = [
+  { key: "pokedex", label: "图鉴", hash: "#/pokedex", icon: "📖" },
+  { key: "moves", label: "招式", hash: "#/moves", icon: "⚔️" },
+  { key: "abilities", label: "特性", hash: "#/abilities", icon: "✨" },
+  { key: "items", label: "道具", hash: "#/items", icon: "🎒" },
+  { key: "field-effects", label: "场地", hash: "#/field-effects", icon: "🌊" },
+];
+const DATABASE_KEYS = new Set(DATABASE_ITEMS.map(i => i.key));
+
 const NAV_ITEMS = [
-  { key: "pokedex", label: "图鉴", hash: "#/pokedex" },
-  { key: "abilities", label: "特性", hash: "#/abilities" },
-  { key: "moves", label: "招式", hash: "#/moves" },
-  { key: "items", label: "道具", hash: "#/items" },
+  { key: "database", label: "资料库", children: DATABASE_ITEMS },
   { key: "teams", label: "队伍", hash: "#/teams" },
-  { key: "damage", label: "伤害", hash: "#/damage" },
-  { key: "ko", label: "KO分析", hash: "#/ko" },
-  { key: "field-effects", label: "场地", hash: "#/field-effects" },
+  { key: "damage", label: "对战", hash: "#/damage" },
   { key: "typechart", label: "克制表", hash: "#/typechart" }
 ];
 
@@ -32,13 +38,10 @@ const SEARCH_PLACEHOLDERS = {
   moves: "搜索招式名（中/英/日）…",
   abilities: "搜索特性名（中/英/日）…",
   teams: "队伍页暂无搜索",
-  damage: "伤害页暂无搜索",
-  ko: "KO分析页暂无搜索",
+  damage: "对战页暂无搜索",
   typechart: "克制表页暂无搜索"
 };
 
-/* Pages that support the shared search */
-const SEARCHABLE_PAGES = new Set(["pokedex", "items", "moves", "abilities"]);
 
 /* Pages that show the floating filter panel */
 const FILTERABLE_PAGES = new Set(["pokedex", "moves", "abilities"]);
@@ -57,7 +60,13 @@ function parseRoute() {
   const key = hash.replace("#/", "").split(/[/?]/)[0];
   // #/pokemon?id=X 也映射到 pokedex
   if (key === "pokemon") return "pokedex";
-  return NAV_ITEMS.find((n) => n.key === key)?.key || "pokedex";
+  // #/ko 映射到 damage 页面（合并后由内部 tab 切换）
+  if (key === "ko") return "damage";
+  // 资料库下拉子项（pokedex/moves/abilities/items/field-effects）
+  if (DATABASE_KEYS.has(key)) return key;
+  // 顶层导航项（teams/damage/typechart 等，"database" 仅作为下拉容器，不会作为实际路由）
+  const topLevel = NAV_ITEMS.find((n) => n.key === key && !n.children);
+  return topLevel?.key || "pokedex";
 }
 
 function parsePokemonIdFromHash() {
@@ -82,11 +91,8 @@ export default function App() {
     members: Array.from({ length: 6 }, () => createDraftMember())
   });
 
-  // ── Shared search state ──
-  const [inputValue, setInputValue] = useState("");
+  // ── Shared search state (driven by GlobalSearch component) ──
   const [query, setQuery] = useState("");
-  const composingRef = useRef(false);
-  const debounceRef = useRef(null);
 
   // ── Shared filter state ──
   const [types, setTypes] = useState([]);
@@ -105,49 +111,23 @@ export default function App() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
-  // Reset search & filters when switching pages
+  // Reset filters when switching pages (search is reset by GlobalSearch internally)
   useEffect(() => {
-    setInputValue("");
     setQuery("");
     setTypes([]);
     setGeneration("");
     setMoveCategory("");
     setFilterOpen(false);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
   }, [route]);
 
-  // Cleanup debounce on unmount
-  useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, []);
-
-  const handleInputChange = useCallback((e) => {
-    const value = e.target.value;
-    setInputValue(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!composingRef.current) {
-      debounceRef.current = setTimeout(() => setQuery(value), 300);
-    }
-  }, []);
-
-  const handleCompositionStart = useCallback(() => {
-    composingRef.current = true;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-  }, []);
-
-  const handleCompositionEnd = useCallback((e) => {
-    composingRef.current = false;
-    const value = e.target.value;
-    setInputValue(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setQuery(value), 300);
+  const handleSearchQueryChange = useCallback((value) => {
+    setQuery(value);
   }, []);
 
   const handleTeamDraftChange = useCallback((updater) => {
     setTeamDraft((prev) => (typeof updater === "function" ? updater(prev) : updater));
   }, []);
 
-  const isSearchable = SEARCHABLE_PAGES.has(route);
   const isFilterable = FILTERABLE_PAGES.has(route);
   const showTypeFilter = TYPE_FILTER_PAGES.has(route);
   const showGenFilter = GEN_FILTER_PAGES.has(route);
@@ -174,9 +154,7 @@ export default function App() {
       case "teams":
         return <TeamsPage />;
       case "damage":
-        return <DamagePage teamDraft={teamDraft} />;
-      case "ko":
-        return <KoAnalysisPage />;
+        return <DamagePage teamDraft={teamDraft} initialTab={window.location.hash.startsWith("#/ko") ? "ko" : "damage"} />;
       case "field-effects":
         return <FieldEffectsPage />;
       case "typechart":
@@ -197,33 +175,12 @@ export default function App() {
           <span className="top-nav-title">Pokemon LocalDex</span>
         </a>
 
-        {/* Shared search box in nav */}
-        {isSearchable && (
-          <div className="nav-search-wrap">
-            <svg className="nav-search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="8.5" cy="8.5" r="5.5" /><line x1="13" y1="13" x2="17" y2="17" />
-            </svg>
-            <input
-              className="nav-search"
-              placeholder={SEARCH_PLACEHOLDERS[route] || "搜索…"}
-              value={inputValue}
-              onChange={handleInputChange}
-              onCompositionStart={handleCompositionStart}
-              onCompositionEnd={handleCompositionEnd}
-            />
-            {inputValue && (
-              <button
-                className="nav-search-clear"
-                onClick={() => { setInputValue(""); setQuery(""); }}
-                title="清除搜索"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <line x1="3" y1="3" x2="11" y2="11" /><line x1="11" y1="3" x2="3" y2="11" />
-                </svg>
-              </button>
-            )}
-          </div>
-        )}
+        {/* Global aggregated search */}
+        <GlobalSearch
+          route={route}
+          onQueryChange={handleSearchQueryChange}
+          placeholder={SEARCH_PLACEHOLDERS[route] || "搜索宝可梦、招式、特性、道具、场地…"}
+        />
 
         {/* Filter toggle button */}
         {isFilterable && (
@@ -240,15 +197,44 @@ export default function App() {
         )}
 
         <div className="top-nav-links">
-          {NAV_ITEMS.map((item) => (
-            <a
-              key={item.key}
-              href={item.hash}
-              className={`top-nav-link${route === item.key ? " top-nav-link-active" : ""}`}
-            >
-              {item.label}
-            </a>
-          ))}
+          {NAV_ITEMS.map((item) => {
+            if (item.children) {
+              const isActive = DATABASE_KEYS.has(route);
+              return (
+                <div key={item.key} className="top-nav-dropdown-wrap">
+                  <button
+                    className={`top-nav-link top-nav-dropdown-trigger${isActive ? " top-nav-link-active" : ""}`}
+                  >
+                    {item.label}
+                    <svg className="top-nav-dropdown-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2.5 4 L5 6.5 L7.5 4" />
+                    </svg>
+                  </button>
+                  <div className="top-nav-dropdown-menu">
+                    {item.children.map((child) => (
+                      <a
+                        key={child.key}
+                        href={child.hash}
+                        className={`top-nav-dropdown-item${route === child.key ? " top-nav-dropdown-item-active" : ""}`}
+                      >
+                        <span className="top-nav-dropdown-item-icon">{child.icon}</span>
+                        {child.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <a
+                key={item.key}
+                href={item.hash}
+                className={`top-nav-link${route === item.key ? " top-nav-link-active" : ""}`}
+              >
+                {item.label}
+              </a>
+            );
+          })}
         </div>
 
         <a

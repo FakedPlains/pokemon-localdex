@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { useApi } from "../hooks/useApi.js";
 import Loading from "../components/Loading.jsx";
@@ -25,13 +25,46 @@ const KIND_OPTIONS = [
   { id: 5, label: "全场效果" },
 ];
 
+function getExpandIdFromHash() {
+  const hash = window.location.hash;
+  const match = hash.match(/[?&]expand=(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
 export default function FieldEffectsPage() {
   const [activeKind, setActiveKind] = useState(KIND_ALL);
   const [expanded, setExpanded] = useState(null);
   const [detailCache, setDetailCache] = useState({});
+  const initialExpandHandled = useRef(false);
 
   // 加载列表数据（useApi 接受路径字符串）
   const { data: allEffects, loading } = useApi("/field-effects");
+
+  // 处理 URL 中的 expand 参数（从全局搜索跳转过来时）
+  useEffect(() => {
+    if (initialExpandHandled.current || !allEffects || allEffects.length === 0) return;
+    initialExpandHandled.current = true;
+    const expandId = getExpandIdFromHash();
+    if (expandId != null) {
+      const target = allEffects.find((e) => e.id === expandId);
+      if (target) {
+        // 切换到对应的 kind tab
+        setActiveKind(target.kind);
+        setExpanded(expandId);
+        // 预加载详情
+        if (!detailCache[expandId]) {
+          unifiedApi(`/field-effects/${expandId}`).then((r) => {
+            setDetailCache((prev) => ({ ...prev, [expandId]: r.data }));
+          });
+        }
+        // 延迟滚动到目标元素
+        setTimeout(() => {
+          const el = document.getElementById(`fe-item-${expandId}`);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100);
+      }
+    }
+  }, [allEffects]);
 
   // 按分类筛选
   const filteredEffects = useMemo(() => {
@@ -102,7 +135,7 @@ export default function FieldEffectsPage() {
             const isExpanded = expanded === effect.id;
             const detail = detailCache[effect.id];
             return (
-              <div key={effect.id} className={`fe-row${isExpanded ? " fe-row-expanded" : ""}`}>
+              <div key={effect.id} id={`fe-item-${effect.id}`} className={`fe-row${isExpanded ? " fe-row-expanded" : ""}`}>
                 <button className="fe-row-header" onClick={() => toggleExpand(effect.id)}>
                   <span className="fe-row-kind-badge" data-kind={effect.kind}>
                     {FIELD_EFFECT_KIND_LABELS[effect.kind] || "未知"}
