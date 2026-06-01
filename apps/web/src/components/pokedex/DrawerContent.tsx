@@ -9,17 +9,77 @@ import MetaPill from "./MetaPill.jsx";
 import MovesTab from "./MovesTab.jsx";
 import StatsTab from "./StatsTab.jsx";
 import EvolutionTab from "./EvolutionTab.jsx";
+import TypeMatchupTab from "./TypeMatchupTab.tsx";
+
+// ─── Types ───
+
+interface PokemonDetail {
+  id: number;
+  dexNumber: number;
+  nameZh: string;
+  nameEn?: string;
+  category?: string;
+  heightM?: number;
+  weightKg?: number;
+  source?: { url?: string; title?: string };
+  forms?: unknown[];
+}
+
+interface LearnsetFormMeta {
+  formId: number;
+  formType: string;
+  nameZh: string;
+}
+
+interface LearnsetMeta {
+  forms: LearnsetFormMeta[];
+  generations?: number[];
+}
+
+interface FormOption {
+  id: number;
+  formType: string;
+  nameZh: string;
+}
+
+interface DisplayVariant {
+  primaryType: string | null;
+  secondaryType: string | null;
+  stats: Record<string, number> | null;
+  images: Record<string, string> | null;
+  form: FormOption | null;
+  formOptions: FormOption[];
+  generation: number;
+  abilitiesDetailed: Array<{
+    nameZh: string;
+    abilityId?: number;
+    isHidden?: boolean;
+    description?: string;
+  }>;
+}
+
+interface DrawerContentProps {
+  detail: PokemonDetail;
+  detailGeneration: string | number;
+  onDetailGenerationChange: (gen: string) => void;
+}
+
+type TabKey = "stats" | "matchup" | "moves" | "evolution";
 
 /* ─── Drawer Content with Tabs ─── */
-export default function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
-  const [tab, setTab] = useState("stats");
+export default function DrawerContent({
+  detail,
+  detailGeneration,
+  onDetailGenerationChange,
+}: DrawerContentProps) {
+  const [tab, setTab] = useState<TabKey>("stats");
   const [imageMode, setImageMode] = useState("official");
-  const [detailForm, setDetailForm] = useState(null);
-  const [learnsetMeta, setLearnsetMeta] = useState(null);
-  const [learnsetFormOverride, setLearnsetFormOverride] = useState(null);
+  const [detailForm, setDetailForm] = useState<number | null>(null);
+  const [learnsetMeta, setLearnsetMeta] = useState<LearnsetMeta | null>(null);
+  const [learnsetFormOverride, setLearnsetFormOverride] = useState<number | null>(null);
 
   // 进化链按需懒加载
-  const [evolutionChain, setEvolutionChain] = useState(null);
+  const [evolutionChain, setEvolutionChain] = useState<unknown[] | null>(null);
   const [evolutionLoading, setEvolutionLoading] = useState(false);
 
   const pokemonId = detail.id;
@@ -39,7 +99,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
   useEffect(() => {
     if (tab !== "moves" || learnsetMeta) return;
     let cancelled = false;
-    unifiedApi(`/pokemon/${pokemonId}/learnset/meta`).then((r) => {
+    unifiedApi(`/pokemon/${pokemonId}/learnset/meta`).then((r: { data: LearnsetMeta }) => {
       if (!cancelled) setLearnsetMeta(r.data);
     });
     return () => { cancelled = true; };
@@ -50,7 +110,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
     if (tab !== "evolution" || evolutionChain) return;
     let cancelled = false;
     setEvolutionLoading(true);
-    unifiedApi(`/pokemon/${pokemonId}/evolution`).then((r) => {
+    unifiedApi(`/pokemon/${pokemonId}/evolution`).then((r: { data: unknown[] }) => {
       if (!cancelled) {
         setEvolutionChain(r.data || []);
         setEvolutionLoading(false);
@@ -63,21 +123,21 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
 
   // learnset meta 中的 formId 列表（数字）
   const learnsetFormIds = useMemo(
-    () => (learnsetMeta?.forms || []).map(f => f.formId),
+    () => (learnsetMeta?.forms || []).map((f) => f.formId),
     [learnsetMeta]
   );
 
-  const display = useMemo(
+  const display: DisplayVariant = useMemo(
     () => resolvePokemonDisplayVariant(detail, detailGeneration, detailForm, ""),
     [detail, detailGeneration, detailForm]
   );
 
-  // 构建 detail form → learnset formId 的映射表（通过 formId 匹配到 learnset meta 中的 formId）
+  // 构建 detail form → learnset formId 的映射表
   const formToLearnsetMap = useMemo(() => {
-    const map = new Map();
+    const map = new Map<number, number>();
     const metaForms = learnsetMeta?.forms || [];
     if (metaForms.length === 0 || display.formOptions.length === 0) return map;
-    const usedIds = new Set();
+    const usedIds = new Set<number>();
     // 第一轮：通过 formId 精确匹配
     for (const form of display.formOptions) {
       const matched = metaForms.find(
@@ -110,13 +170,13 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
     return map;
   }, [display.formOptions, learnsetMeta]);
 
-  const mapFormToLearnsetId = useCallback((form) => {
+  const mapFormToLearnsetId = useCallback((form: FormOption | null | undefined): number | null => {
     if (!form) return null;
     return formToLearnsetMap.get(form.id) ?? null;
   }, [formToLearnsetMap]);
 
   // 当切换 detail 形态时，同时联动 learnset 的 formId
-  const handleFormChange = useCallback((formId) => {
+  const handleFormChange = useCallback((formId: number) => {
     setDetailForm(formId);
     const form = display.formOptions.find((f) => f.id === formId);
     setLearnsetFormOverride(mapFormToLearnsetId(form));
@@ -130,8 +190,9 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
     return learnsetFormIds[0] ?? null;
   }, [learnsetFormOverride, learnsetFormIds, display.form, mapFormToLearnsetId]);
 
-  const tabs = [
+  const tabs: { key: TabKey; label: string }[] = [
     { key: "stats", label: "种族值" },
+    { key: "matchup", label: "属性" },
     { key: "moves", label: "招式表" },
     { key: "evolution", label: "进化链" },
   ];
@@ -185,7 +246,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
                 {display.formOptions.map((form) => (
                   <button
                     key={form.id}
-                    className={`drawer-form-chip ${form.id === display.form.id ? "drawer-form-chip-active" : ""}`}
+                    className={`drawer-form-chip ${form.id === display.form?.id ? "drawer-form-chip-active" : ""}`}
                     onClick={() => handleFormChange(form.id)}
                   >
                     {form.nameZh}
@@ -228,6 +289,9 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
               onDetailGenerationChange={onDetailGenerationChange}
             />
           )}
+          {tab === "matchup" && (
+            <TypeMatchupTab display={display} />
+          )}
           {tab === "moves" && (
             <MovesTab
               detail={detail}
@@ -243,7 +307,6 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
               detail={detail}
               evolutionChain={evolutionChain}
               loading={evolutionLoading}
-              // display.form.id 已经是数据库数字 formId
               currentFormId={display.form?.id ?? null}
             />
           )}

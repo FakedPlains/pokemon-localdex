@@ -1290,3 +1290,102 @@ display: block;
     font-size: 12px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   TYPE MATCHUP TAB — 攻击面/防御面
+   ═══════════════════════════════════════════════════════ */
+
+.tab-matchup {
+  display: grid;
+  gap: 24px;
+}
+
+.matchup-section {
+  display: grid;
+  gap: 10px;
+}
+
+.matchup-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.matchup-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.matchup-groups {
+  display: grid;
+  gap: 8px;
+}
+
+.matchup-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.matchup-group.matchup-super {
+  background: rgba(76, 175, 80, 0.08);
+}
+
+.matchup-group.matchup-weak {
+  background: rgba(244, 67, 54, 0.08);
+}
+
+.matchup-group.matchup-resist {
+  background: rgba(33, 150, 243, 0.06);
+}
+
+.matchup-group.matchup-immune {
+  background: rgba(158, 158, 158, 0.08);
+}
+
+.matchup-mult-label {
+  flex: 0 0 36px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 26px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.matchup-super .matchup-mult-label {
+  color: #2e7d32;
+}
+
+.matchup-weak .matchup-mult-label {
+  color: #c62828;
+}
+
+.matchup-resist .matchup-mult-label {
+  color: #1565c0;
+}
+
+.matchup-immune .matchup-mult-label {
+  color: #616161;
+}
+
+.matchup-type-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.matchup-type-list .type-chip {
+  font-size: 11px;
+  padding: 2px 7px 2px 4px;
+  gap: 3px;
+}
+
+.matchup-type-list .type-chip-icon {
+  width: 14px;
+  height: 14px;
+}
