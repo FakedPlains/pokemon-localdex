@@ -67,9 +67,9 @@
 
 .mv-search:focus {
   outline: none;
-  border-color: rgba(217, 79, 61, 0.35);
+  border-color: rgba(26, 171, 138, 0.4);
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
 }
 
 /* ── Filter selects row ── */
@@ -97,9 +97,9 @@
 
 .mv-filter-select:focus {
   outline: none;
-  border-color: rgba(217, 79, 61, 0.35);
+  border-color: rgba(26, 171, 138, 0.4);
   background-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
 }
 
 .mv-empty {
@@ -153,7 +153,7 @@ gap: 6px;
 }
 
 .mv-row-expanded {
-  border: 1px solid rgba(217, 79, 61, 0.15);
+  border: 1px solid rgba(26, 171, 138, 0.15);
   border-radius: 12px;
   margin: 4px 0;
 }

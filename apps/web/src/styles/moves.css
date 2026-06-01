@@ -67,9 +67,9 @@
 
 .ab-search:focus {
   outline: none;
-  border-color: rgba(217, 79, 61, 0.35);
+  border-color: rgba(26, 171, 138, 0.4);
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
 }
 
 /* ── Filter selects row ── */
@@ -97,9 +97,9 @@
 
 .ab-gen-select:focus {
   outline: none;
-  border-color: rgba(217, 79, 61, 0.35);
+  border-color: rgba(26, 171, 138, 0.4);
   background-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(217, 79, 61, 0.08);
+  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
 }
 
 .ab-empty {
@@ -129,7 +129,7 @@
 
 .ab-row-expanded {
   background: rgba(248, 241, 226, 0.7);
-  border: 1px solid rgba(217, 79, 61, 0.15);
+  border: 1px solid rgba(26, 171, 138, 0.15);
   border-radius: 12px;
   margin: 4px 0;
 }
@@ -228,7 +228,7 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--accent-strong);
-  background: rgba(217, 79, 61, 0.08);
+  background: rgba(26, 171, 138, 0.08);
   padding: 2px 8px;
   border-radius: 999px;
 }
