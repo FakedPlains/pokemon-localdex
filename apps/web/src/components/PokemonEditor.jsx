@@ -28,7 +28,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
   const [pokemonDetail, setPokemonDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [isShiny, setIsShiny] = useState(config.isShiny || false);
-  const [selectedFormKey, setSelectedFormKey] = useState(config.formKey || null); // 当前选中的形态 key
+  const [selectedFormId, setSelectedFormId] = useState(config.formId || null); // 当前选中的形态 ID
   const [activePanel, setActivePanel] = useState(null); // "item" | "move-0" | "move-1" | "move-2" | "move-3" | "stats" | null
   const [panelSearch, setPanelSearch] = useState("");
   const [items, setItems] = useState([]);
@@ -121,19 +121,23 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       if (!cancelled) {
         setPokemonDetail(r.data);
         setDetailLoading(false);
-        // 如果 config 中已有 formKey，使用它；否则默认选中第一个形态
+        // 通过 formId 匹配形态，匹配不上则 fallback 到默认形态
         const forms = r.data?.forms || [];
-        const initialFormKey = config.formKey || (forms[0]?.formKey ?? "default");
-        setSelectedFormKey(initialFormKey);
-        // 根据选中的形态保存闪光图片 URL 和 baseStats 到 config
-        const selectedForm = forms.find((f) => f.formKey === initialFormKey) || forms[0];
+        let selectedForm = null;
+        if (config.formId) {
+          selectedForm = forms.find((f) => String(f.id) === String(config.formId));
+        }
+        if (!selectedForm) {
+          selectedForm = forms.find((f) => f.isDefault) || forms[0];
+        }
+        setSelectedFormId(selectedForm?.id ? String(selectedForm.id) : null);
         const imgs = selectedForm?.images || r.data?.images;
         const shinyObj = imgs?.shiny || imgs?.shinyOfficial || imgs?.shinySprite;
         const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
         const detailBaseStats = selectedForm?.baseStats || r.data?.baseStats;
         const updates = {};
-        // 补全 formId（从盒子导入时可能只有 formKey 没有 formId）
-        if (!config.formId && selectedForm?.id) updates.formId = selectedForm.id;
+        // 补全 formId
+        if ((!config.formId || String(config.formId) !== String(selectedForm?.id)) && selectedForm?.id) updates.formId = String(selectedForm.id);
         if (shinyUrl && !config.shinyImageUrl) updates.shinyImageUrl = shinyUrl;
         if (detailBaseStats && !config.baseStats) updates.baseStats = detailBaseStats;
         // 默认选中第一个特性
@@ -167,8 +171,13 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     if (!pokemonDetail) return null;
     const forms = pokemonDetail.forms || [];
     if (forms.length === 0) return null;
-    return forms.find((f) => f.formKey === selectedFormKey) || forms[0];
-  }, [pokemonDetail, selectedFormKey]);
+    // 通过 formId 匹配
+    if (selectedFormId) {
+      const byId = forms.find((f) => String(f.id) === String(selectedFormId));
+      if (byId) return byId;
+    }
+    return forms.find((f) => f.isDefault) || forms[0];
+  }, [pokemonDetail, selectedFormId]);
 
   /* ── 形态列表（用于选择器，过滤掉超极巨化形态） ── */
   const formOptions = useMemo(() => {
@@ -177,18 +186,18 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
     return forms
       .filter((f) => f.formType !== "gmax" && !/超极巨化/.test(f.nameZh || ""))
       .map((f) => ({
-        value: f.formKey,
-        label: f.nameZh || f.formKey || "默认形态",
+        value: String(f.id),
+        label: f.nameZh || f.formType || "默认形态",
         formType: f.formType || "default",
       }));
   }, [pokemonDetail]);
 
   /* ── 切换形态时更新 config ── */
-  const handleFormChange = useCallback((formKey) => {
-    setSelectedFormKey(formKey);
+  const handleFormChange = useCallback((formId) => {
+    setSelectedFormId(formId);
     if (!pokemonDetail) return;
     const forms = pokemonDetail.forms || [];
-    const form = forms.find((f) => f.formKey === formKey) || forms[0];
+    const form = forms.find((f) => String(f.id) === String(formId)) || forms[0];
     if (!form) return;
     // 更新 config 中的形态相关信息
     const imgs = form.images || pokemonDetail.images;
@@ -206,9 +215,8 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       ? (firstAbility.nameZh || "")
       : (pokemonDetail.abilities?.[0] || "");
     const updates = {
-      formId: form.id || "",
-      formKey,
-      formName: form.nameZh || form.formKey || "",
+      formId: form.id ? String(form.id) : "",
+      formName: form.nameZh || "",
       primaryType: form.primaryType || pokemonDetail.primaryType || "",
       secondaryType: form.secondaryType || pokemonDetail.secondaryType || "",
       baseStats: form.baseStats || pokemonDetail.baseStats || null,
@@ -224,14 +232,14 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
       updates.itemImageUrl = form.requiredItem.imageUrl || "";
     } else {
       // 切换到无绑定道具的形态时，如果之前的道具是被形态锁定的，则清除
-      const prevForm = forms.find((f) => f.formKey === config.formKey);
+      const prevForm = config.formId ? forms.find((f) => String(f.id) === String(config.formId)) : null;
       if (prevForm?.requiredItem) {
         updates.itemId = "";
         updates.itemImageUrl = "";
       }
     }
     onChange((prev) => ({ ...prev, ...updates }));
-  }, [pokemonDetail, onChange, config.formKey]);
+  }, [pokemonDetail, onChange, config.formId]);
 
   /* ── 特性列表（分普通 / 隐藏），返回 {id, name} 对象数组 ── */
   const abilityGroups = useMemo(() => {
@@ -434,7 +442,7 @@ export default function PokemonEditor({ config, onChange, onSave, onCancel, save
           {formOptions.map((opt) => (
             <button
               key={opt.value}
-              className={`cfg-form-slider-item${selectedFormKey === opt.value ? " cfg-form-slider-active" : ""}`}
+              className={`cfg-form-slider-item${String(selectedFormId) === opt.value ? " cfg-form-slider-active" : ""}`}
               onClick={() => handleFormChange(opt.value)}
             >
               {opt.label}

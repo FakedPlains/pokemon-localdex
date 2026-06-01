@@ -38,15 +38,22 @@ export default function PokemonConfigCard({ data, menuActions, className = "" })
     unifiedApi(`/pokemon/${data.pokemonId}`).then((r) => {
       if (cancelled) return;
       const p = r.data;
-      const img = getPokemonPreviewImage(p);
-      const imgs = p?.forms?.[0]?.images || p?.images;
+      // 通过 formId 匹配形态，匹配不上则 fallback 到默认形态
+      const forms = p?.forms || [];
+      let matchedForm = null;
+      if (data.formId) matchedForm = forms.find((f) => String(f.id) === String(data.formId));
+      if (!matchedForm) matchedForm = forms.find((f) => f.isDefault) || forms[0];
+      const img = matchedForm?.images?.official || matchedForm?.images?.sprite || getPokemonPreviewImage(p);
+      const imgs = matchedForm?.images || p?.images;
       const shinyObj = imgs?.shiny || imgs?.shinyOfficial || imgs?.shinySprite;
       const shinyUrl = shinyObj?.url || (typeof shinyObj === "string" ? shinyObj : "");
-      const baseStats = p?.forms?.[0]?.baseStats || p?.baseStats || null;
-      setFetchedInfo({ imageUrl: img?.url || "", shinyImageUrl: shinyUrl, primaryType: p?.primaryType || "", secondaryType: p?.secondaryType || "", baseStats });
+      const baseStats = matchedForm?.baseStats || p?.baseStats || null;
+      const primaryType = matchedForm?.primaryType || p?.primaryType || "";
+      const secondaryType = matchedForm?.secondaryType || p?.secondaryType || "";
+      setFetchedInfo({ imageUrl: img?.url || img || "", shinyImageUrl: shinyUrl, primaryType, secondaryType, baseStats });
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [data.pokemonId, data.imageUrl]);
+  }, [data.pokemonId, data.imageUrl, data.formId]);
 
   // 按需获取道具图片
   useEffect(() => {

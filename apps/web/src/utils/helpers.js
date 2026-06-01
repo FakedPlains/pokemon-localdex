@@ -229,7 +229,7 @@ export function buildPokemonFormOptions(detail, generation) {
   if (forms.length === 0) {
     // Fallback: synthesize a single "default" form from top-level fields
     return [{
-      id: "default",
+      id: null,
       formKey: "default",
       nameZh: detail.nameZh || "普通形态",
       formType: "default",
@@ -246,7 +246,7 @@ export function buildPokemonFormOptions(detail, generation) {
 
   // 每个形态只有一条记录，直接映射
   return forms.map((form) => {
-    const resolved = { ...form, id: form.formKey || form.nameZh };
+    const resolved = { ...form, id: form.id };
 
     // 如果有世代种族值变体，根据当前世代选择
     if (form.statVariants && form.statVariants.length > 0) {
@@ -284,7 +284,10 @@ export function resolvePokemonDisplayVariant(detail, detailGeneration, detailFor
   }
 
   const formOptions = buildPokemonFormOptions(detail, generation);
-  const selectedForm = formOptions.find((f) => f.id === detailForm) || formOptions[0];
+  // detailForm 为数字 formId 或 null；通过 formId 匹配
+  const selectedForm = (detailForm != null
+    ? formOptions.find((f) => String(f.id) === String(detailForm))
+    : null) || formOptions.find((f) => f.isDefault) || formOptions[0];
 
   const stats = selectedForm.baseStats || detail.baseStats || {};
   const primaryType = selectedForm.primaryType || detail.primaryType;

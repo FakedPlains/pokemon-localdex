@@ -14,7 +14,7 @@ import EvolutionTab from "./EvolutionTab.jsx";
 export default function DrawerContent({ detail, detailGeneration, onDetailGenerationChange }) {
   const [tab, setTab] = useState("stats");
   const [imageMode, setImageMode] = useState("official");
-  const [detailForm, setDetailForm] = useState("default");
+  const [detailForm, setDetailForm] = useState(null);
   const [learnsetMeta, setLearnsetMeta] = useState(null);
   const [learnsetFormOverride, setLearnsetFormOverride] = useState(null);
 
@@ -28,7 +28,7 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
   useEffect(() => {
     setTab("stats");
     setImageMode("official");
-    setDetailForm("default");
+    setDetailForm(null);
     setLearnsetFormOverride(null);
     setLearnsetMeta(null);
     setEvolutionChain(null);
@@ -72,23 +72,34 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
     [detail, detailGeneration, detailForm]
   );
 
-  // 构建 detail form → learnset formId 的映射表（通过 formKey 匹配到 learnset meta 中的 formId）
+  // 构建 detail form → learnset formId 的映射表（通过 formId 匹配到 learnset meta 中的 formId）
   const formToLearnsetMap = useMemo(() => {
     const map = new Map();
     const metaForms = learnsetMeta?.forms || [];
     if (metaForms.length === 0 || display.formOptions.length === 0) return map;
     const usedIds = new Set();
-    // 第一轮：通过 formKey 精确匹配
+    // 第一轮：通过 formId 精确匹配
     for (const form of display.formOptions) {
       const matched = metaForms.find(
-        (mf) => !usedIds.has(mf.formId) && (mf.formType === form.formKey || mf.nameZh === form.nameZh)
+        (mf) => !usedIds.has(mf.formId) && mf.formId === form.id
       );
       if (matched) {
         map.set(form.id, matched.formId);
         usedIds.add(matched.formId);
       }
     }
-    // 第二轮：未匹配的 form 按顺序分配剩余的 learnset formId
+    // 第二轮：未匹配的 form 通过 formType/nameZh 降级匹配
+    for (const form of display.formOptions) {
+      if (map.has(form.id)) continue;
+      const matched = metaForms.find(
+        (mf) => !usedIds.has(mf.formId) && (mf.formType === form.formType || mf.nameZh === form.nameZh)
+      );
+      if (matched) {
+        map.set(form.id, matched.formId);
+        usedIds.add(matched.formId);
+      }
+    }
+    // 第三轮：未匹配的 form 按顺序分配剩余的 learnset formId
     const remaining = metaForms.filter((mf) => !usedIds.has(mf.formId));
     let ri = 0;
     for (const form of display.formOptions) {
@@ -232,9 +243,8 @@ export default function DrawerContent({ detail, detailGeneration, onDetailGenera
               detail={detail}
               evolutionChain={evolutionChain}
               loading={evolutionLoading}
-              // display.form.id 是 buildPokemonFormOptions 覆盖后的 formKey 字符串（如 "default"/"mega"），
-              // 用它在 detail.forms 中匹配，取出数据库数字 id 传给进化链做高亮比较
-              currentFormId={(detail.forms || []).find((f) => (f.formKey || f.nameZh) === display.form?.id)?.id ?? null}
+              // display.form.id 已经是数据库数字 formId
+              currentFormId={display.form?.id ?? null}
             />
           )}
         </motion.div>

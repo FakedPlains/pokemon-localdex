@@ -27,33 +27,26 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
   const itemWrapRef = useRef(null);
   const img = member.imageUrl || (detail ? getPokemonPreviewImage(detail)?.url : "") || "";
 
-  // detail 加载后：
-  // 1. 如果 member 已有 formKey（如从盒子导入），补全 formId 并触发道具绑定
-  // 2. 否则自动设置默认形态
+  // detail 加载后：通过 formId 匹配形态，匹配不上则 fallback 到默认形态
   useEffect(() => {
     if (!detail) return;
     const forms = detail.forms || [];
-    if (member.formId) return; // 已有完整 formId，无需处理
 
-    if (member.formKey) {
-      // 从盒子导入时有 formKey 但无 formId，补全 formId 并绑定道具
-      const matchedForm = forms.find((f) => f.formKey === member.formKey) || forms[0];
-      if (matchedForm) {
-        const updates = { formId: matchedForm.id || "", formKey: matchedForm.formKey };
-        // 自动绑定形态道具
-        if (matchedForm.requiredItem) {
-          updates.itemId = matchedForm.requiredItem.id ? String(matchedForm.requiredItem.id) : "";
-          updates.itemName = matchedForm.requiredItem.nameZh || "";
-          updates.itemImageUrl = matchedForm.requiredItem.imageUrl || "";
-        }
-        onChange({ ...member, ...updates });
+    if (member.formId) {
+      const matched = forms.find((f) => String(f.id) === String(member.formId));
+      if (matched) return; // formId 正确，无需处理
+    }
+
+    // formId 缺失或匹配不上，设置默认形态
+    const defaultForm = forms.find((f) => f.isDefault) || forms[0];
+    if (defaultForm?.id) {
+      const updates = { formId: String(defaultForm.id) };
+      if (defaultForm.requiredItem) {
+        updates.itemId = defaultForm.requiredItem.id ? String(defaultForm.requiredItem.id) : "";
+        updates.itemName = defaultForm.requiredItem.nameZh || "";
+        updates.itemImageUrl = defaultForm.requiredItem.imageUrl || "";
       }
-    } else {
-      // 无形态信息，设置默认形态
-      const defaultForm = forms.find((f) => f.isDefault) || forms[0];
-      if (defaultForm?.id) {
-        onChange({ ...member, formId: defaultForm.id, formKey: defaultForm.formKey });
-      }
+      onChange({ ...member, ...updates });
     }
   }, [detail]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -64,16 +57,15 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
     return forms
       .filter((f) => f.formType !== "gmax" && !/超极巨化/.test(f.nameZh || ""))
       .map((f) => ({
-        value: f.formKey,
-        formId: f.id,
-        label: f.nameZh || f.formKey || "默认形态",
+        value: String(f.id),
+        label: f.nameZh || f.formType || "默认形态",
       }));
   }, [detail]);
 
-  const handleFormChange = (formKey) => {
+  const handleFormChange = (formId) => {
     if (!detail) return;
     const forms = detail.forms || [];
-    const form = forms.find((f) => f.formKey === formKey) || forms[0];
+    const form = forms.find((f) => String(f.id) === String(formId)) || forms[0];
     if (!form) return;
     const imgs = form.images || detail.images;
     const officialImg = imgs?.official || imgs?.sprite;
@@ -86,9 +78,8 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
       ? (firstAbility.nameZh || "")
       : (detail.abilities?.[0] || "");
     const updates = {
-      formId: form.id || "",
-      formKey,
-      formName: form.nameZh || form.formKey || "",
+      formId: form.id ? String(form.id) : "",
+      formName: form.nameZh || "",
       primaryType: form.primaryType || detail.primaryType || "",
       secondaryType: form.secondaryType || detail.secondaryType || "",
       imageUrl: officialImg?.url || member.imageUrl || "",
@@ -102,7 +93,7 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
       updates.itemImageUrl = form.requiredItem.imageUrl || "";
     } else {
       // 切换到无绑定道具的形态时，如果之前的道具是被形态锁定的，则清除
-      const prevForm = forms.find((f) => f.formKey === member.formKey);
+      const prevForm = member.formId ? forms.find((f) => String(f.id) === String(member.formId)) : null;
       if (prevForm?.requiredItem) {
         updates.itemId = "";
         updates.itemImageUrl = "";
@@ -111,14 +102,17 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
     onChange({ ...member, ...updates });
   };
 
-  // 当前形态
+  // 当前形态：通过 formId 匹配
   const currentForm = useMemo(() => {
     if (!detail) return null;
     const forms = detail.forms || [];
     if (forms.length === 0) return null;
-    const fk = member.formKey || formOptions[0]?.value || "";
-    return forms.find((f) => f.formKey === fk) || forms[0];
-  }, [detail, member.formKey, formOptions]);
+    if (member.formId) {
+      const byId = forms.find((f) => String(f.id) === String(member.formId));
+      if (byId) return byId;
+    }
+    return forms.find((f) => f.isDefault) || forms[0];
+  }, [detail, member.formId]);
 
   // 道具是否被形态锁定
   const isItemLocked = Boolean(currentForm?.requiredItem);
@@ -247,7 +241,6 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
       itemName: cfg.itemName || "",
       itemImageUrl: cfg.itemImageUrl || "",
       formId: cfg.formId || "",
-      formKey: cfg.formKey || "",
       formName: cfg.formName || "",
       ivs: finalIvs,
       evs: finalEvs,
@@ -404,7 +397,7 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
               {formOptions.map((opt) => (
                 <button
                   key={opt.value}
-                  className={"dc-form-btn" + ((member.formKey || formOptions[0]?.value) === opt.value ? " dc-form-btn-active" : "")}
+                  className={"dc-form-btn" + (String(currentForm?.id || member.formId || "") === opt.value ? " dc-form-btn-active" : "")}
                   onClick={() => handleFormChange(opt.value)}
                 >
                   {opt.label}
@@ -481,10 +474,7 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
             detail={(() => {
               // 使用当前形态的 baseStats
               if (!detail) return null;
-              const forms = detail.forms || [];
-              const currentFormKey = member.formKey || formOptions[0]?.value || "";
-              const form = forms.find((f) => f.formKey === currentFormKey);
-              if (form && form.baseStats) return { ...detail, baseStats: form.baseStats };
+              if (currentForm && currentForm.baseStats) return { ...detail, baseStats: currentForm.baseStats };
               return detail;
             })()}
             isChampions={isChampions}

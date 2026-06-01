@@ -180,6 +180,18 @@ export async function calculateDamage(
   }
   const move = new Move(gen, names.moveNameEn, moveOpts);
 
+  // ── 验证构建结果 ──
+  if (!attacker.rawStats) {
+    throw new Error(
+      `攻击方宝可梦 "${input.attacker.name}" 无法识别（英文名解析为 "${names.atkNameEn}"）`
+    );
+  }
+  if (!defender.rawStats) {
+    throw new Error(
+      `防守方宝可梦 "${input.defender.name}" 无法识别（英文名解析为 "${names.defNameEn}"）`
+    );
+  }
+
   // ── 构建场地 ──
   const fieldInput = input.field || {};
   const field = new Field({
@@ -202,7 +214,7 @@ export async function calculateDamage(
 
   // ── 解析结果 ──
   const [min, max] = result.range();
-  const defenderHp = defender.originalCurHP || defender.rawStats.hp;
+  const defenderHp = defender.originalCurHP || defender.rawStats?.hp || 0;
 
   let damageRolls: number[] = [];
   if (Array.isArray(result.damage)) {

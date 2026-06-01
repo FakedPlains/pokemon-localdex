@@ -63,7 +63,7 @@ test("resolves generation-specific form data for display", () => {
   assert.equal(formOptions[0].primaryType, "火");
   assert.equal(formOptions[0].baseStats.spe, 62);
 
-  const display = resolvePokemonDisplayVariant(detail, 2, "default", 1);
+  const display = resolvePokemonDisplayVariant(detail, 2, 10, 1);
   assert.equal(display.generation, 2);
   assert.equal(display.primaryType, "火");
   assert.equal(display.secondaryType, "飞行");
