@@ -9,7 +9,11 @@ import {
   NATURE_EFFECTS_BY_ID,
   natureNameToId,
 } from "@pokemon-localdex/store-types/constants";
-import { getNatureMultiplier } from "../utils/helpers.js";
+import {
+  EV_MAX, EV_TOTAL_MAX, SP_MAX, SP_TOTAL_MAX,
+  clamp, calcClassicStat, calcChampionsStat,
+  getNatureMultiplier, convertEvsToSps, convertSpsToEvs,
+} from "../utils/statCalcModel";
 import SearchSelect from "./SearchSelect.jsx";
 
 const NATURE_SELECT_OPTIONS = NATURES.map((nature) => {
@@ -32,8 +36,7 @@ const IV_PRESETS = [
 ];
 
 /* ── Champions mode constants ── */
-const SP_MAX_PER_STAT = 32;
-const SP_TOTAL_MAX = 66;
+const SP_MAX_PER_STAT = SP_MAX;
 const CHAMPIONS_LEVEL = 50;
 const CHAMPIONS_IV = 31;
 
@@ -44,52 +47,6 @@ const SP_PRESETS = [
   { label: "满HP满特耐", desc: "HP32 特防32 防御2", values: { hp: 32, atk: 0, def: 2, spa: 0, spd: 32, spe: 0 } },
   { label: "均衡", desc: "每项11", values: { hp: 11, atk: 11, def: 11, spa: 11, spd: 11, spe: 11 } },
 ];
-
-function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-
-/* ── Classic stat formula (any level, any IV, any EV) ── */
-function calcClassicStat(base, iv, ev, level, nature, key) {
-  if (base === undefined || base === null) return 0;
-  if (key === "hp") {
-    return Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + level + 10;
-  }
-  const raw = Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + 5;
-  return Math.floor(raw * getNatureMultiplier(nature, key));
-}
-
-/* ── Champions simplified formula (Lv.50, IV=31 fixed) ── */
-function calcChampionsStat(base, sp, nature, key) {
-  if (base === undefined || base === null) return 0;
-  if (key === "hp") {
-    // HP = 种族值 + SP + 75
-    return base + sp + 75;
-  }
-  // 其他 = floor((种族值 + SP + 20) × 性格修正)
-  return Math.floor((base + sp + 20) * getNatureMultiplier(nature, key));
-}
-
-/* ── Conversion: EV ↔ SP ── */
-/*
- * 经典模式 Lv.50 时，EV 的实际能力值增量 = ceil(floor(EV/4) / 2)
- *   - 首个 4 EV 就贡献 1 点能力值（因为 2*base+31 是奇数）
- *   - 之后每 8 EV 贡献 1 点
- * Champions 的 SP 直接就是能力值加成，所以 SP = 该增量
- *
- * 反向：SP → 最小 EV = (2*SP - 1) * 4 = 8*SP - 4（SP>0 时）
- *   - SP=1 → 4, SP=2 → 12, SP=32 → 252
- */
-function evToSp(ev) {
-  if (ev <= 0) return 0;
-  const evEffect = Math.floor(ev / 4);           // EV 在公式中的实际贡献
-  return clamp(Math.ceil(evEffect / 2), 0, SP_MAX_PER_STAT);
-}
-
-function spToEv(sp) {
-  if (sp <= 0) return 0;
-  // 首个 4 EV = 1 SP，之后每 8 EV = 1 SP
-  // SP=1 → 4, SP=2 → 12, SP=32 → 252
-  return clamp(4 + (sp - 1) * 8, 0, 252);
-}
 
 function totalEv(evs) {
   return STAT_KEYS.reduce((sum, k) => sum + (evs[k] || 0), 0);
@@ -149,18 +106,18 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
 
   /* ── Classic helpers ── */
   const evTotal = useMemo(() => totalEv(evs), [evs]);
-  const evRemaining = 510 - evTotal;
+  const evRemaining = EV_TOTAL_MAX - evTotal;
 
   const setIv = useCallback((key, val) => {
     setIvs((prev) => ({ ...prev, [key]: clamp(Number(val) || 0, 0, 31) }));
   }, []);
 
   const setEv = useCallback((key, val) => {
-    const num = clamp(Number(val) || 0, 0, 252);
+    const num = clamp(Number(val) || 0, 0, EV_MAX);
     setEvs((prev) => {
       const next = { ...prev, [key]: num };
       const newTotal = totalEv(next);
-      if (newTotal > 510) next[key] = Math.max(0, num - (newTotal - 510));
+      if (newTotal > EV_TOTAL_MAX) next[key] = Math.max(0, num - (newTotal - EV_TOTAL_MAX));
       return next;
     });
   }, []);
@@ -173,7 +130,7 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
     setEvs((prev) => {
       const next = { ...prev };
       const othersTotal = STAT_KEYS.reduce((s, k) => s + (k === key ? 0 : (next[k] || 0)), 0);
-      next[key] = Math.min(252, 510 - othersTotal);
+      next[key] = Math.min(EV_MAX, EV_TOTAL_MAX - othersTotal);
       return next;
     });
   }, []);
@@ -207,46 +164,13 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
 
   /* ── Mode switch with conversion ── */
   const switchToChampions = useCallback(() => {
-    // Convert current classic EV → SP, carry nature
-    const converted = {};
-    for (const k of STAT_KEYS) {
-      converted[k] = evToSp(evs[k]);
-    }
-    // Clamp total to 66
-    let t = totalSp(converted);
-    if (t > SP_TOTAL_MAX) {
-      // Proportionally reduce
-      const scale = SP_TOTAL_MAX / t;
-      for (const k of STAT_KEYS) {
-        converted[k] = Math.floor(converted[k] * scale);
-      }
-    }
-    setSps(converted);
+    setSps(convertEvsToSps(evs));
     setChampNature(nature);
     setMode("champions");
   }, [evs, nature]);
 
   const switchToClassic = useCallback(() => {
-    // Convert current SP → EV, carry nature
-    // 按 SP 值从大到小排序，优先满足 SP 高的属性；
-    // 预算不够时把剩余 EV 全部给当前属性，后续属性归零
-    const converted = Object.fromEntries(STAT_KEYS.map((k) => [k, 0]));
-    const sorted = [...STAT_KEYS]
-      .filter((k) => sps[k] > 0)
-      .sort((a, b) => sps[b] - sps[a]);
-    let budget = 510;
-    for (const k of sorted) {
-      const ideal = spToEv(sps[k]);
-      if (ideal <= budget) {
-        converted[k] = ideal;
-        budget -= ideal;
-      } else {
-        // 预算不够，把剩余全给这个属性（对齐到 4 的倍数，且不超过 252）
-        converted[k] = Math.min(252, Math.floor(budget / 4) * 4);
-        budget -= converted[k];
-      }
-    }
-    setEvs(converted);
+    setEvs(convertSpsToEvs(sps));
     setIvs(Object.fromEntries(STAT_KEYS.map((k) => [k, 31])));
     setLevel(50);
     setNature(champNature);
@@ -374,7 +298,7 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
               <span className="sc-preset-label">努力值余量</span>
               <div className="sc-preset-chips">
                 <span className={`sc-ev-budget ${evRemaining < 0 ? "sc-ev-over" : evRemaining === 0 ? "sc-ev-full" : ""}`}>
-                  {evRemaining} / 510
+                  {evRemaining} / {EV_TOTAL_MAX}
                 </span>
                 <button className="sc-chip sc-chip-reset" onClick={resetClassic}>重置全部</button>
               </div>
@@ -484,12 +408,12 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
                 </span>
                 <span className="sc-cell sc-slider-cell">
                   <input
-                    type="range" min={0} max={252} step={4} value={evs[key]}
+                    type="range" min={0} max={EV_MAX} step={4} value={evs[key]}
                     onChange={(e) => setEv(key, e.target.value)}
                     style={{ "--fill": STAT_COLORS[key] }}
                   />
                   <input
-                    type="number" min={0} max={252} step={4} value={evs[key]}
+                    type="number" min={0} max={EV_MAX} step={4} value={evs[key]}
                     className="sc-ev-num"
                     onChange={(e) => setEv(key, e.target.value)}
                   />
@@ -563,7 +487,7 @@ export default function StatCalculator({ baseStats, initialValues, onChange }) {
             <span className="sc-cell sc-input-cell" />
             <span className="sc-cell sc-slider-cell">
               <div className="sc-ev-total-bar">
-                <div className="sc-ev-total-fill" style={{ width: `${(evTotal / 510) * 100}%` }} />
+                <div className="sc-ev-total-fill" style={{ width: `${(evTotal / EV_TOTAL_MAX) * 100}%` }} />
               </div>
               <span className="sc-ev-num sc-ev-total-label">{evTotal}</span>
             </span>

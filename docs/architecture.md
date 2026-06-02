@@ -53,11 +53,11 @@ pokemon-localdex/
 │   │       └── worker.ts Cloudflare Workers 入口
 │   ├── web/              React SPA 客户端（Vite 构建）
 │   │   ├── src/
-│   │   │   ├── styles/       模块化 CSS（16 个文件，Vite 打包合并）
+│   │   │   ├── styles/       模块化 CSS（Vite 打包合并）
 │   │   │   ├── pages/        七个页面（Pokedex、Moves、Abilities、Items、Teams、Damage、TypeChart）
 │   │   │   ├── components/   公共组件（TypeChip、CustomSelect、SearchSelect、StatCalculator 等）
 │   │   │   ├── hooks/        数据请求 hook（useApi、useInfiniteApi）
-│   │   │   └── utils/        工具函数（api、constants、helpers、teamStorage、migrateStorage）
+│   │   │   └── utils/        工具函数（api、constants、helpers、statCalcModel、teamStorage、migrateStorage）
 │   │   ├── .env          本地开发环境变量（VITE_DATA_SOURCE 留空）
 │   │   └── vite.config.js  base: "/" 固定，无需条件切换
 │   └── miniprogram/      微信小程序客户端（Taro + React）
@@ -164,7 +164,7 @@ service = "pokemon-localdex-api"
 
 ### Web 展示层（apps/web）
 
-展示层是一个 React SPA，由 Vite 构建。样式采用模块化 CSS 架构，所有样式文件位于 `src/styles/` 目录下，按页面/功能拆分为 16 个独立模块，通过 `index.css` 统一汇总，再由 `main.jsx` 中的 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 CSS 合并、压缩为单个文件，生产环境零额外 HTTP 请求。前端通过 `VITE_DATA_SOURCE` 环境变量决定数据获取方式。
+展示层是一个 React SPA，由 Vite 构建。样式采用模块化 CSS 架构，所有样式文件位于 `src/styles/` 目录下，按页面/功能拆分为独立模块，通过 `index.css` 统一汇总，再由 `main.jsx` 中的 `import "./styles/index.css"` 引入。Vite 在构建时会将所有 CSS 合并、压缩为单个文件，生产环境零额外 HTTP 请求。前端通过 `VITE_DATA_SOURCE` 环境变量决定数据获取方式。
 
 所有请求通过 `fetch("/api/...")` 发送到后端（本地走 Hono API，生产走 Pages Functions 代理到 Worker）。
 
@@ -177,6 +177,8 @@ service = "pokemon-localdex-api"
 **数据迁移**：`migrateStorage.js` 提供了从旧格式到新格式的自动迁移逻辑。当前迁移版本为 v4（标记：`localdex_migration_v4`），支持 pokemonId、itemId、abilityId 的中文名 → 数字 ID 迁移，以及旧 slug 形中文 formKey → formId 解析（通过 `resolveFormId()` 多级匹配）。迁移是异步的、不阻塞渲染、幂等的。
 
 **招式搜索**：DamagePage 中的招式搜索采用按需搜索模式（`onSearch` 回调 + 200ms 防抖），使用独立的 `moveSearching` 状态，不会触发全页面 loading。
+
+**能力值计算**：`utils/statCalcModel.ts` 是能力值计算的单一来源（single source of truth），集中定义了所有相关常量（`EV_MAX`、`EV_TOTAL_MAX`、`SP_MAX`、`SP_TOTAL_MAX`、`IV_MAX`、`STAT_KEYS` 等）、计算函数（`calculateFinalStat`、`calculateHpStat`、`evToSp`、`spToEv`、`getNatureMultiplier`）以及模式转换函数（`convertEvsToSps`、`convertSpsToEvs`）。所有需要能力值计算或 EV/SP 常量的组件均直接从 `statCalcModel.ts` 导入，不通过 `helpers.js` 中转。
 
 当前包含七个页面：图鉴页（PokedexPage）提供宝可梦列表搜索和详情展示；招式页（MovesPage）提供招式列表和世代差异查看；特性页（AbilitiesPage）提供特性列表和世代差异查看；道具页（ItemsPage）提供道具列表和详情；队伍页（TeamsPage）提供 6 槽队伍编辑器；伤害页（DamagePage）提供完整的伤害计算器，支持性格搜索选择、特性内联选择、道具图片预览、形态切换（自动绑定道具/特性）、天气和场地分段切换、EV↔SP 自动转换等；属性克制表页（TypeChartPage）展示 18 属性相克关系。
 

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
-import { getPokemonPreviewImage, calculateFinalStat } from "../utils/helpers.js";
+import { getPokemonPreviewImage } from "../utils/helpers.js";
+import { calculateFinalStat } from "../utils/statCalcModel";
 
 /**
  * 公共宝可梦配置卡片组件

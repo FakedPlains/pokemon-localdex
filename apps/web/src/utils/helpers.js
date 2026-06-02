@@ -1,6 +1,5 @@
 import {
   TYPE_OPTIONS,
-  NATURE_EFFECTS,
   STAT_KEYS,
   LEARN_METHOD_LABELS,
   typeNameToId,
@@ -49,74 +48,6 @@ export function getTypeChips(type) {
   return [...new Set(splitTypeNames(type))];
 }
 
-export function getNatureMultiplier(nature, statKey) {
-  const effect = NATURE_EFFECTS[nature];
-  if (!effect) return 1;
-  if (effect.up === statKey) return 1.1;
-  if (effect.down === statKey) return 0.9;
-  return 1;
-}
-
-/**
- * 经典 EV → Champions SP 转换
- * Lv.50 时 EV 的实际能力值增量 = ceil(floor(EV/4) / 2)
- * Champions 的 SP 直接就是能力值加成，所以 SP = 该增量
- */
-export function evToSp(ev) {
-  if (ev <= 0) return 0;
-  const evEffect = Math.floor(ev / 4);
-  return Math.min(Math.max(Math.ceil(evEffect / 2), 0), 32);
-}
-
-export function calculateFinalStat(member, detail, statKey) {
-  const base = detail?.baseStats?.[statKey];
-  if (base === undefined) return undefined;
-
-  // Champions 模式：SP 直接加算公式
-  if (member.statMode === "champions") {
-    const sp = Number(member.sps?.[statKey] ?? 0);
-    const nature = member.champNature || member.nature || "认真";
-    if (statKey === "hp") {
-      return base + sp + 75;
-    }
-    return Math.floor((base + sp + 20) * getNatureMultiplier(nature, statKey));
-  }
-
-  // 经典模式：IV + EV 公式
-  const level = Number(member.level || 50);
-  const iv = Number(member.ivs?.[statKey] ?? 31);
-  const ev = Number(member.evs?.[statKey] ?? 0);
-
-  if (statKey === "hp") {
-    return Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + level + 10;
-  }
-
-  const raw = Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + 5;
-  return Math.floor(raw * getNatureMultiplier(member.nature || "认真", statKey));
-}
-
-export function calculateClassicStatValue(base, statKey, {
-  iv = 31,
-  ev = 0,
-  level = 50,
-  nature = "认真",
-} = {}) {
-  if (base === undefined || base === null) return undefined;
-  if (statKey === "hp") {
-    return Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + level + 10;
-  }
-
-  const raw = Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + 5;
-  return Math.floor(raw * getNatureMultiplier(nature, statKey));
-}
-
-export function calculateSpeedLine(baseSpe, level = 50) {
-  return {
-    noInvestment: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 0, level, nature: "认真" }),
-    full: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "认真" }),
-    max: calculateClassicStatValue(baseSpe, "spe", { iv: 31, ev: 252, level, nature: "爽朗" }),
-  };
-}
 
 export function createDefaultStats(kind) {
   return Object.fromEntries(

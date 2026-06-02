@@ -7,10 +7,8 @@ import WikiLink from "../WikiLink.jsx";
 import DrawerImage from "./DrawerImage.jsx";
 import MetaPill from "./MetaPill.jsx";
 import MovesTab from "./MovesTab.jsx";
-import StatsTab from "./StatsTab.jsx";
+import StatsTab from "./StatsTab";
 import EvolutionTab from "./EvolutionTab.jsx";
-import TypeMatchupTab from "./TypeMatchupTab.tsx";
-
 // ─── Types ───
 
 interface PokemonDetail {
@@ -64,7 +62,7 @@ interface DrawerContentProps {
   onDetailGenerationChange: (gen: string) => void;
 }
 
-type TabKey = "stats" | "matchup" | "moves" | "evolution";
+type TabKey = "stats" | "moves" | "evolution";
 
 /* ─── Drawer Content with Tabs ─── */
 export default function DrawerContent({
@@ -192,7 +190,6 @@ export default function DrawerContent({
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: "stats", label: "种族值" },
-    { key: "matchup", label: "属性" },
     { key: "moves", label: "招式表" },
     { key: "evolution", label: "进化链" },
   ];
@@ -288,9 +285,6 @@ export default function DrawerContent({
               detailGeneration={detailGeneration}
               onDetailGenerationChange={onDetailGenerationChange}
             />
-          )}
-          {tab === "matchup" && (
-            <TypeMatchupTab display={display} />
           )}
           {tab === "moves" && (
             <MovesTab

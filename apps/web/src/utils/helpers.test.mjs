@@ -3,12 +3,11 @@ import assert from "node:assert/strict";
 
 import {
   buildPokemonFormOptions,
-  evToSp,
-  getNatureMultiplier,
   normalizeTypeName,
   resolvePokemonDisplayVariant,
   splitTypeNames,
 } from "./helpers.js";
+import { evToSp, getNatureMultiplier } from "./statCalcModel.ts";
 
 test("normalizes aliased and concatenated Pokemon type names", () => {
   assert.equal(normalizeTypeName("電"), "电");

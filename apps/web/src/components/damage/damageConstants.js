@@ -7,16 +7,8 @@ import {
 
 export const BOOST_STATS = ["atk", "def", "spa", "spd", "spe"];
 export const DEFAULT_BOOSTS = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-export const SP_MAX = 32;
-export const SP_TOTAL_MAX = 66;
-export const EV_MAX = 252;
-export const EV_TOTAL_MAX = 510;
-export const IV_MAX = 31;
 
-export function spToEv(sp) {
-  if (sp <= 0) return 0;
-  return Math.min(252, 4 + (sp - 1) * 8);
-}
+export { EV_MAX, EV_TOTAL_MAX, IV_MAX, SP_MAX, SP_TOTAL_MAX, spToEv } from "../../utils/statCalcModel";
 
 export const NATURE_SELECT_OPTIONS = NATURES.map((nature) => {
   const eff = NATURE_EFFECTS_BY_ID[nature.id];
