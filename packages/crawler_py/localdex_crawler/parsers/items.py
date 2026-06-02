@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup, Tag
 
 from ..fetcher import RawPage
 from ..constants import ITEM_LIST_URL
-from ..generations import extract_generation_changes, extract_intro_names, section_text_by_heading
+from ..generations import clean_name, extract_generation_changes, extract_intro_names, section_text_by_heading
 from ..images import ImageAsset, extract_file_name, extract_image_candidates
 from ..text import clean_inline_text, clean_summary, normalize_text, slugify, to_simplified, unique_by_key
 from ..urls import build_item_page_url, normalize_media_url, to_absolute_url
@@ -320,8 +320,8 @@ def normalize_item_detail_page(page: RawPage, seed: ItemSeed) -> dict:
     image_url = normalize_media_url(raw_image_url) if raw_image_url else None
     return {
         "name_zh": seed.name_zh,
-        "name_ja": name_ja or seed.name_ja,
-        "name_en": name_en or seed.name_en,
+        "name_ja": clean_name(seed.name_ja) if seed.name_ja else name_ja,
+        "name_en": clean_name(seed.name_en) if seed.name_en else name_en,
         "category": category,
         "effect_summary": effect_summary,
         "effect_detail": effect_detail,

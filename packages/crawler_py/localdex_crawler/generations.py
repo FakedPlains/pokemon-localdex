@@ -345,12 +345,40 @@ def extract_battle_effect(html: str, parent_heading: str = "特性效果") -> st
     return "\n".join(item for item in chunks if item).strip()
 
 
+def clean_name(value: str) -> str:
+    """Strip invisible control characters (LRM, RLM, ZWSP, etc.) and whitespace."""
+    return re.sub(r"[\u200b-\u200f\u2028-\u202f\ufeff]", "", value).strip()
+
+
 def extract_intro_names(text: str, fallback_name_zh: str) -> tuple[str | None, str | None]:
+    """Extract Japanese and English names from a wiki page's normalized text.
+
+    Strategy 1 (parenthetical): Match the standard intro format
+        「名称（日文︰XXX，英文︰YYY）」
+    Strategy 2 (card layout): Match the infobox card format
+        「名称\\nJapaneseName\\n ...\\nEnglishName\\n」
+    """
     escaped = re.escape(fallback_name_zh)
-    matched = re.search(
-        rf"{escaped}[\s\S]{{0,80}}?日文[︰:：]\s*([^，,）\n]+)[\s\S]{{0,80}}?英文[︰:：]\s*([^，,）\n]+)",
+
+    # --- Strategy 1: parenthetical intro format ---
+    # Exclusion set: commas, parentheses (both half/full-width), newlines, and CJK chars.
+    # NFKC normalizes ）to ), so we must exclude both explicitly.
+    _STOP = r"，,）)\n\u4e00-\u9fff"
+    paren_match = re.search(
+        rf"{escaped}\s*[(（]日文[︰:：]\s*([^{_STOP}]+)[，,][\s\S]{{0,40}}?英文[︰:：]\s*([^{_STOP}]+)",
         text,
     )
-    if not matched:
-        return None, None
-    return matched.group(1).strip(), matched.group(2).strip()
+    if paren_match:
+        return clean_name(paren_match.group(1)), clean_name(paren_match.group(2))
+
+    # --- Strategy 2: card/infobox layout (name on separate lines) ---
+    # Pattern: ZhName\nJaName(+optional LRM)\n(optional whitespace line)\nEnName(+optional LRM)\n
+    card_match = re.search(
+        rf"^{escaped}\n(.+)\n\s*\n([A-Z][A-Za-z0-9 \-']+)[\u200b-\u200f]*\n",
+        text,
+        re.MULTILINE,
+    )
+    if card_match:
+        return clean_name(card_match.group(1)), clean_name(card_match.group(2))
+
+    return None, None
