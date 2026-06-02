@@ -6,7 +6,7 @@ import TypeChip from "../TypeChip.jsx";
 import WikiLink from "../WikiLink.jsx";
 import DrawerImage from "./DrawerImage.jsx";
 import MetaPill from "./MetaPill.jsx";
-import MovesTab from "./MovesTab.jsx";
+import MovesTab from "./MovesTab";
 import StatsTab from "./StatsTab";
 import EvolutionTab from "./EvolutionTab.jsx";
 // ─── Types ───

@@ -95,8 +95,8 @@ export default function MovesPage({ query = "", type = "", category = "", genera
       .then((r) => {
         if (cancelled) return;
         const pos = r?.data?.position ?? 0;
-        // 让目标尽量落在加载页的中部偏上：往前多取约半页，对齐到 PAGE_SIZE 边界
-        const start = Math.max(0, Math.floor((pos - Math.floor(PAGE_SIZE / 2)) / PAGE_SIZE) * PAGE_SIZE);
+        // 让目标出现在首屏中部偏上：直接往前取半页，不对齐边界，确保目标一定在加载范围内
+        const start = Math.max(0, pos - Math.floor(PAGE_SIZE / 2));
         setInitialOffset(start);
       })
       .catch(() => {

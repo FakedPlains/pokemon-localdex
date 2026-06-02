@@ -537,6 +537,7 @@ export interface IStore {
     options?: LearnsetQueryOptions,
     pagination?: PaginationParams,
     learnMethod?: string,
+    search?: string,
   ): Promise<LearnsetResult>;
 
   // Champions

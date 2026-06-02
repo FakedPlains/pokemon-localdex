@@ -71,6 +71,7 @@ export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOption
     const formId = numberQuery(c, "formId");
     const gameVersion = c.req.query("version");
     const learnMethod = c.req.query("method") || undefined;
+    const search = c.req.query("search") || undefined;
     const limit = numberQuery(c, "limit");
     const offset = numberQuery(c, "offset") ?? 0;
     const pagination = limit !== undefined ? { limit, offset } : undefined;
@@ -80,6 +81,7 @@ export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOption
       { formId, gameVersionCode: gameVersion },
       pagination,
       learnMethod,
+      search,
     );
     const body: Record<string, unknown> = {
       data: result.moves,

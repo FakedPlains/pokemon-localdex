@@ -129,6 +129,7 @@ export async function getPokemonLearnsetRows(
   options?: LearnsetQueryOptions,
   pagination?: { limit?: number; offset?: number },
   learnMethod?: string,
+  search?: string,
 ): Promise<LearnsetResult> {
   const forms = await loadFormRows(db, pokemonId);
   const requestedForm = resolveRequestedForm(forms, options);
@@ -183,6 +184,7 @@ export async function getPokemonLearnsetRows(
     ];
     if (versionCondition) conditions.push(versionCondition);
     if (extraMethod) conditions.push(eq(pokemonMoves.learnMethod, extraMethod));
+    if (search) conditions.push(sql`${pokemonMoves.moveNameZh} LIKE ${'%' + search + '%'}`);
 
     let query = db
       .select({

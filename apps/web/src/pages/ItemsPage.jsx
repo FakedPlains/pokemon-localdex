@@ -44,7 +44,7 @@ export default function ItemsPage({ query = "" }) {
       .then((r) => {
         if (cancelled) return;
         const pos = r?.data?.position ?? 0;
-        const start = Math.max(0, Math.floor((pos - Math.floor(PAGE_SIZE / 2)) / PAGE_SIZE) * PAGE_SIZE);
+        const start = Math.max(0, pos - Math.floor(PAGE_SIZE / 2));
         setInitialOffset(start);
       })
       .catch(() => {

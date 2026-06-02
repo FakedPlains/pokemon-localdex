@@ -178,8 +178,9 @@ export class DrizzleStore implements IStore {
     options?: LearnsetQueryOptions,
     pagination?: PaginationParams,
     learnMethod?: string,
+    search?: string,
   ): Promise<LearnsetResult> {
-    return getPokemonLearnsetRows(this.db, pokemonId, generation, options, pagination, learnMethod);
+    return getPokemonLearnsetRows(this.db, pokemonId, generation, options, pagination, learnMethod, search);
   }
 
   // ────────────────────────────────────────────────────────────────────────────
