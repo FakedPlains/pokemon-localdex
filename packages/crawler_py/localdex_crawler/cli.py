@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import subprocess
 import sys
 
 from .config import CrawlerPaths
@@ -169,12 +170,57 @@ def add_runtime_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--clean", action="store_true", default=argparse.SUPPRESS, help="Clear existing data before crawling (delete then re-insert).")
 
 
+def _git_lfs_uninstall_local() -> bool:
+    """在本地仓库级别禁用 Git LFS filter，防止写库期间 clean filter 不断缓存中间状态。"""
+    try:
+        subprocess.run(
+            ["git", "lfs", "uninstall", "--local"],
+            cwd=Path(__file__).resolve().parents[3],  # 仓库根目录
+            capture_output=True,
+            check=True,
+        )
+        print("[lfs] Disabled Git LFS filter (local) before database write.")
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # git 或 git-lfs 不可用时静默跳过
+        return False
+
+
+def _git_lfs_install_local() -> None:
+    """恢复本地仓库的 Git LFS filter。"""
+    try:
+        subprocess.run(
+            ["git", "lfs", "install", "--local"],
+            cwd=Path(__file__).resolve().parents[3],
+            capture_output=True,
+            check=True,
+        )
+        print("[lfs] Re-enabled Git LFS filter (local) after database write.")
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     command = args.command or "pokemon-abilities"
     conn = connect(args.db_path)
     fetcher = PageFetcher(args.raw_dir, refresh_raw=args.refresh_raw)
 
+    # dry-run 不写库，无需禁用 LFS filter
+    lfs_disabled = False
+    if not args.dry_run:
+        lfs_disabled = _git_lfs_uninstall_local()
+
+    try:
+        result = _dispatch(conn, fetcher, args, command)
+    finally:
+        if lfs_disabled:
+            _git_lfs_install_local()
+
+    return result
+
+
+def _dispatch(conn, fetcher: PageFetcher, args, command: str) -> int:
     if command == "catalog":
         return crawl_catalog(conn, fetcher, args)
     if command == "pokemon":
