@@ -58,6 +58,7 @@ interface DisplayVariant {
 
 interface DrawerContentProps {
   detail: PokemonDetail;
+  initialFormId?: number;
   detailGeneration: string | number;
   onDetailGenerationChange: (gen: string) => void;
 }
@@ -67,6 +68,7 @@ type TabKey = "stats" | "moves" | "evolution";
 /* ─── Drawer Content with Tabs ─── */
 export default function DrawerContent({
   detail,
+  initialFormId,
   detailGeneration,
   onDetailGenerationChange,
 }: DrawerContentProps) {
@@ -86,12 +88,12 @@ export default function DrawerContent({
   useEffect(() => {
     setTab("stats");
     setImageMode("official");
-    setDetailForm(null);
+    setDetailForm(initialFormId ?? null);
     setLearnsetFormOverride(null);
     setLearnsetMeta(null);
     setEvolutionChain(null);
     setEvolutionLoading(false);
-  }, [detail]);
+  }, [detail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 加载 learnset meta（可用世代和形态列表）— 仅在切换到招式表 tab 时才加载
   useEffect(() => {

@@ -7,6 +7,7 @@ import sys
 from .config import CrawlerPaths
 from .constants import ABILITY_LIST_URL, ITEM_LIST_URL, MOVE_LIST_URL, POKEMON_LIST_URL
 from .fetcher import PageFetcher, PageNotFoundError
+from .fetcher_pokechamdb import PokechamdbFetcher
 from .form_items import (
     apply_form_item_bindings,
     bindings_to_json,
@@ -52,6 +53,7 @@ from .upsert.clear import (
     clear_moves,
     clear_pokemon,
 )
+from .upsert.pokechamdb_usage import clear_usage_data, upsert_usage_detail, upsert_usage_pokemon
 from .upsert.field_effects import upsert_field_effect_detail
 from .upsert.learnset import upsert_pokemon_moves
 from .upsert.pokemon import (
@@ -116,6 +118,15 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     add_runtime_flags(field_effects_parser)
     field_effects_parser.add_argument("--kind", choices=["weather", "terrain", "status", "side", "field"], help="Only crawl a specific kind.")
     field_effects_parser.add_argument("--name", action="append", default=[], help="Only crawl specific effects by Chinese name.")
+
+    usage_parser = subparsers.add_parser("usage", help="Crawl Pokemon usage stats from pokechamdb.com.")
+    add_runtime_flags(usage_parser)
+    usage_parser.add_argument("--season", required=True, help="Season code, e.g. M-2")
+    usage_parser.add_argument("--format", dest="battle_format", default="single", help="Battle format: single, double, tournament (default: single)")
+    usage_parser.add_argument("--event-id", help="Event ID (only for tournament format).")
+    usage_parser.add_argument("--limit", type=int, help="Limit number of Pokemon to fetch details for.")
+    usage_parser.add_argument("--pokemon", action="append", default=[], help="Only fetch details for specific Pokemon slugs.")
+    usage_parser.add_argument("--interval", type=float, help="Request interval in seconds (default: 4.0).")
 
     all_parser = subparsers.add_parser("all", help="Crawl catalog, Pokemon details, learnsets, and Champions data.")
     add_runtime_flags(all_parser)
@@ -182,6 +193,8 @@ def main(argv: list[str] | None = None) -> int:
         return crawl_champions(conn, fetcher, args)
     if command == "field-effects":
         return crawl_field_effects(conn, fetcher, args)
+    if command == "usage":
+        return crawl_usage(conn, args)
     if command == "all":
         clean = getattr(args, "clean", False)
         if clean and not args.dry_run:
@@ -667,6 +680,121 @@ def crawl_field_effects(conn, fetcher: PageFetcher, args) -> int:
     print(
         f"Field effects finished. total={total} updated={updated} "
         f"errors={errors} dryRun={dry_run}"
+    )
+    return 0
+
+
+def crawl_usage(conn, args) -> int:
+    """从 pokechamdb.com 爬取使用率排名数据。"""
+    from .parsers.pokechamdb_usage import parse_usage_detail, parse_usage_list
+
+    dry_run = getattr(args, "dry_run", False)
+    clean = getattr(args, "clean", False)
+    season_code = args.season
+    fmt = args.battle_format
+    event_id = getattr(args, "event_id", None)
+    limit = getattr(args, "limit", None)
+    pokemon_filters = parse_name_filters(getattr(args, "pokemon", []))
+
+    # 查找 season_id
+    row = conn.execute(
+        "SELECT id FROM champions_seasons WHERE season_code = ?",
+        (season_code,),
+    ).fetchone()
+    if not row:
+        print(f"[error] Season '{season_code}' not found in champions_seasons table.")
+        print("  Hint: Run 'npm run crawl:champions' first to populate seasons data.")
+        return 1
+    season_id = int(row["id"])
+    print(f"Season: {season_code} (id={season_id}), format={fmt}")
+
+    if clean and not dry_run:
+        n = clear_usage_data(conn, season_id=season_id, fmt=fmt)
+        print(f"[clean] Deleted {n} usage records for {season_code}/{fmt}.")
+
+    # 初始化 pokechamdb fetcher
+    raw_dir = args.raw_dir / "pokechamdb"
+    interval = getattr(args, "interval", None)
+    pcdb_fetcher = PokechamdbFetcher(
+        raw_dir=raw_dir,
+        refresh_raw=args.refresh_raw,
+        **(dict(request_interval=interval) if interval is not None else {}),
+    )
+
+    # 1. 获取列表页
+    print(f"\nFetching usage list for {season_code}/{fmt}...")
+    list_page = pcdb_fetcher.fetch_usage_list(season_code, fmt, event_id)
+    pokemon_list = parse_usage_list(list_page.html)
+
+    if not pokemon_list:
+        print("[warn] No Pokemon found in usage list page. The RSC payload structure may have changed.")
+        return 0
+
+    print(f"Found {len(pokemon_list)} Pokemon in usage rankings.")
+
+    # 应用筛选
+    if pokemon_filters:
+        pokemon_list = [p for p in pokemon_list if p.slug in pokemon_filters or p.name_zh in pokemon_filters]
+        print(f"Filtered to {len(pokemon_list)} Pokemon.")
+    if limit is not None:
+        pokemon_list = pokemon_list[:limit]
+        print(f"Limited to top {limit} Pokemon.")
+
+    # 2. 写入主表
+    if dry_run:
+        for entry in pokemon_list:
+            print(f"  [dry-run] #{entry.rank} {entry.name_zh or entry.slug} (slug={entry.slug})")
+        print(f"\n[dry-run] Would write {len(pokemon_list)} usage_pokemon records.")
+    else:
+        slug_to_id = upsert_usage_pokemon(
+            conn, season_id, fmt, event_id, pokemon_list, fetched_at=list_page.fetched_at
+        )
+        print(f"Wrote {len(slug_to_id)} usage_pokemon records.")
+
+    # 3. 逐个获取详情页
+    print(f"\nFetching detail pages...")
+    detail_count = 0
+    detail_errors = 0
+    total = len(pokemon_list)
+
+    for idx, entry in enumerate(pokemon_list, 1):
+        try:
+            detail_page = pcdb_fetcher.fetch_pokemon_detail(entry.slug, season_code, fmt, event_id)
+        except Exception as e:
+            print(f"  [{idx}/{total}] ERROR {entry.slug}: {e}")
+            detail_errors += 1
+            continue
+
+        detail = parse_usage_detail(detail_page.html, entry.slug)
+        if not detail.name_zh:
+            detail.name_zh = entry.name_zh
+
+        if dry_run:
+            print(
+                f"  [{idx}/{total}] dry-run {entry.slug} ({detail.name_zh}): "
+                f"moves={len(detail.moves)} items={len(detail.items)} "
+                f"abilities={len(detail.abilities)} natures={len(detail.natures)} "
+                f"partners={len(detail.partners)} evs={len(detail.ev_spreads)}"
+            )
+        else:
+            usage_pokemon_id = slug_to_id.get(entry.slug)
+            if not usage_pokemon_id:
+                print(f"  [{idx}/{total}] SKIP {entry.slug}: no usage_pokemon_id")
+                continue
+            stats = upsert_usage_detail(conn, usage_pokemon_id, detail)
+            print(
+                f"  [{idx}/{total}] {entry.slug} ({detail.name_zh}): "
+                f"moves={stats['moves']} items={stats['items']} "
+                f"abilities={stats['abilities']} natures={stats['natures']} "
+                f"partners={stats['partners']} evs={stats['ev_spreads']}"
+            )
+        detail_count += 1
+
+    print(
+        f"\nUsage crawl finished. "
+        f"season={season_code} format={fmt} "
+        f"pokemon={total} details={detail_count} errors={detail_errors} "
+        f"dryRun={dry_run}"
     )
     return 0
 

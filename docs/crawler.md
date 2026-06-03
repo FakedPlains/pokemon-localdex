@@ -80,7 +80,17 @@ npm run crawl:catalog
 python3 scripts/crawl-52poke-db.py catalog
 ```
 
-**all** — 依次执行 catalog、pokemon（包含 form-items 自动刷新）、learnsets、champions 四个子命令，完成全量采集。
+**usage** — 从 [pokechamdb.com](https://pokechamdb.com/) 爬取 Pokémon Champions 排位对战的宝可梦使用率数据，包括排名、招式、道具、特性、性格、队友和努力值分布。
+
+```bash
+npm run crawl:usage -- --season M-2 --format double
+# 或
+python3 scripts/crawl-52poke-db.py usage --season M-2 --format single
+```
+
+pokechamdb.com 是 Next.js App Router SPA，数据嵌入 RSC payload 中。爬虫使用独立的 `PokechamdbFetcher` 获取页面，缓存到 `data/raw/pokechamdb/` 目录。该站点由 Cloudflare Worker SSR 提供服务，请求过快容易触发 1102 资源限制错误，默认请求间隔为 4 秒。
+
+**all** — 依次执行 catalog、pokemon（包含 form-items 自动刷新）、learnsets、champions 四个子命令，完成全量采集。注意 `all` 不包含 `usage`，因为 usage 数据来源不同（pokechamdb.com 而非 52Poké Wiki），需要单独运行。
 
 ## 通用参数
 
@@ -147,6 +157,59 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items
 python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十万伏特
 ```
 
+## Usage 专用参数
+
+以下参数仅适用于 `usage` 子命令：
+
+| 参数 | 说明 |
+|------|------|
+| `--season CODE` | 必填。赛季编码，如 `M-2`（对应 `champions_seasons.season_code`） |
+| `--format FORMAT` | 对战模式：`single`（单打，默认）、`double`（双打）、`tournament`（锦标赛） |
+| `--event-id ID` | 赛事 ID，仅 `tournament` 格式需要 |
+| `--limit N` | 最多采集排行榜前 N 只宝可梦 |
+| `--pokemon NAME` | 按 slug 或中文名筛选，可重复使用 |
+| `--interval SEC` | 覆盖默认请求间隔（秒），默认 4.0 |
+
+示例：
+
+```bash
+# 爬取当前赛季双打排行榜（增量更新）
+npm run crawl:usage -- --season M-2 --format double
+
+# 强制重新请求，不使用本地缓存（增量 upsert）
+npm run crawl:usage -- --season M-2 --format double --refresh-raw
+
+# 清空后重新爬取
+npm run crawl:usage -- --season M-2 --format single --clean
+
+# 只爬取前 10 名，用于测试
+npm run crawl:usage -- --season M-2 --format single --limit 10
+
+# 只爬取特定宝可梦的详情
+npm run crawl:usage -- --season M-2 --format single --pokemon garchomp
+
+# 预览解析结果，不写入数据库
+npm run crawl:usage -- --season M-2 --format double --dry-run
+```
+
+### 增量更新 vs 全量重建
+
+不传 `--clean` 时，爬虫使用增量 upsert 模式：新上榜的宝可梦会插入新记录，已有的宝可梦更新排名和详情数据，不会删除任何已有记录。配合 `--refresh-raw` 可以强制重新请求网站获取最新数据，同时保持增量写入。
+
+传 `--clean` 时，先 CASCADE 删除该 season/format 下所有记录（包括子表），然后重新插入。适用于数据源结构大幅变化或需要完全重建的场景。
+
+### pokechamdb 中文译名差异
+
+pokechamdb.com 使用的中文译名与 52Poké Wiki（本项目数据源）存在少量差异。爬虫在 `upsert/pokechamdb_usage.py` 中维护了一个 `POKECHAMDB_NAME_ZH_ALIASES` 映射表，将 pokechamdb 的翻译标准化为 52Poké 译名后再进行 ID 匹配。如果未来出现新的翻译差异导致匹配失败，只需在该映射表中添加条目。
+
+当前已知差异：
+
+| pokechamdb 译名 | 52Poké 译名 | 英文名 |
+|----------------|------------|--------|
+| 仆斩将军 | 仆刀将军 | Kingambit |
+| 谜拟Ｑ | 谜拟丘 | Mimikyu |
+| 流氓熊猫 | 霸道熊猫 | Pangoro |
+
 ## 页面缓存机制
 
 爬虫内置了本地页面缓存，每个抓取的 Wiki 页面会以 JSON 格式保存到 `data/raw/` 目录。JSON 文件包含原始 URL、页面标题、抓取时间和完整 HTML 内容。
@@ -198,6 +261,7 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 | `items.py` | `parse_item_list_page()`、`normalize_item_detail_page()` | 道具列表与详情解析 |
 | `champions.py` | `normalize_champions_pages()` | Champions 赛制/赛季/道具整合解析 |
 | `field_effects.py` | `ALL_FIELD_EFFECT_SEEDS`、`normalize_field_effect_detail_page()` | 场地效果种子定义与详情解析 |
+| `pokechamdb_usage.py` | `parse_usage_list()`、`parse_usage_detail()` | pokechamdb.com 使用率列表与详情解析（RSC payload） |
 
 ### 写库层（`upsert/` 目录）
 
@@ -212,6 +276,7 @@ python3 scripts/crawl-52poke-db.py catalog --no-abilities --no-items --name 十�
 | `learnset.py` | `upsert_pokemon_moves()`、`_resolve_learnset_form_id()` | 招式学习表写入，形态解析（被 champions 复用） |
 | `champions.py` | `upsert_champions_data()` | Champions 赛制/赛季/可用宝可梦/道具写入 |
 | `field_effects.py` | `upsert_field_effect_detail()` | 场地效果写入 |
+| `pokechamdb_usage.py` | `upsert_usage_pokemon()`、`upsert_usage_detail()`、`clear_usage_data()` | pokechamdb 使用率数据写入，含中文译名别名映射 |
 
 ### CLI 调度层
 
@@ -234,7 +299,8 @@ cli.py (调度层)
 │    ├── abilities.py ─────── fetcher, constants, generations, images, text, urls
 │    ├── items.py ─────────── fetcher, constants, generations, images, text, urls
 │    ├── champions.py ─────── fetcher, text, urls
-│    └── field_effects.py ─── fetcher, generations, text
+│    ├── field_effects.py ─── fetcher, generations, text
+│    └── pokechamdb_usage.py ─ (无包内依赖，纯 JSON 解析)
 │
 └── upsert/
      ├── base.py ─────────── (无包内依赖)
@@ -243,7 +309,8 @@ cli.py (调度层)
      ├── catalog.py ──────── base.py, text.py
      ├── learnset.py ─────── base.py, catalog.py, form_type.py
      ├── champions.py ────── base.py, learnset.py, form_type.py
-     └── field_effects.py ── base.py
+     ├── field_effects.py ── base.py
+     └── pokechamdb_usage.py ─ base.py
 ```
 
 基础工具层内部链条：`images.py` → `urls.py` → `generations.py` → `constants.py` / `text.py`
@@ -362,6 +429,27 @@ cli.py: crawl_form_items()
   └─ form_items.apply_form_item_bindings(conn, bindings)
        └── UPDATE pokemon_forms SET required_item_id = ?
 ```
+
+### `crawl usage`（使用率数据）
+
+```text
+cli.py: crawl_usage()
+  ├─ upsert/base.connect()                              → 打开 SQLite
+  ├─ 可选 --clean: clear_usage_data()                   → 清空全部 usage 相关表
+  ├─ parsers/pokechamdb_usage.parse_pokechamdb_page()   → UsagePage
+  │    ├── _parse_panel_entries_as_partners()            → partners (slug=name_zh)
+  │    └── _parse_panel_entries()                        → pokemon / moves / items / ...
+  └─ upsert/pokechamdb_usage.upsert_usage_pokemon()
+       ├── _lookup_pokemon_form_id()                    → 中文名多级匹配
+       │    └── pokemon.name_zh → forms.name_zh
+       │        → forms.display_name_zh → 括号拆解 → usage 表反查
+       ├── INSERT/UPDATE usage_pokemon
+       └── upsert_usage_detail()
+            ├── _lookup_partner_pokemon_id()             → 中文名匹配 + 别名映射
+            └── INSERT/UPDATE usage_moves / items / abilities / spreads / partners
+```
+
+别名映射说明：pokechamdb 中文译名与 52Poké 标准译名存在差异时，`POKECHAMDB_NAME_ZH_ALIASES`（位于 `upsert/pokechamdb_usage.py`）提供手动映射。匹配流程优先查 `pokemon.name_zh`，fallback 时遍历 `pokemon_forms.name_zh` 和 `display_name_zh`，仍未命中则查别名字典。新增别名只需扩展该字典即可。
 
 ## 形态图片匹配
 

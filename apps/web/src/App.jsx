@@ -4,7 +4,7 @@ import { TYPE_OPTIONS, CATEGORY_OPTIONS, GENERATION_OPTIONS } from "@pokemon-loc
 import { ToastProvider } from "./components/Toast.jsx";
 import GlobalSearch from "./components/GlobalSearch.tsx";
 
-const PokedexPage = lazy(() => import("./pages/PokedexPage.jsx"));
+const PokedexPage = lazy(() => import("./pages/PokedexPage.tsx"));
 const ItemsPage = lazy(() => import("./pages/ItemsPage.jsx"));
 const MovesPage = lazy(() => import("./pages/MovesPage.jsx"));
 const AbilitiesPage = lazy(() => import("./pages/AbilitiesPage.jsx"));

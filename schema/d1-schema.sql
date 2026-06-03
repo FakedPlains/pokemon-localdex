@@ -427,6 +427,93 @@ CREATE TABLE IF NOT EXISTS champions_regulation_items (
 );
 
 -- ============================================================
+-- Champions 使用率统计（数据源: pokechamdb.com）
+-- 优先通过 ID 关联；关联失败时 ID 为 NULL，保留原始名称供后续修复
+-- ============================================================
+
+-- 宝可梦使用率排名（主表）
+CREATE TABLE IF NOT EXISTS champions_usage_pokemon (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  season_id INTEGER NOT NULL REFERENCES champions_seasons(id) ON DELETE CASCADE,
+  format TEXT NOT NULL,
+  event_id TEXT NOT NULL DEFAULT '',
+  pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE SET NULL,
+  form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
+  pokemon_slug TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  fetched_at TEXT NOT NULL,
+  UNIQUE (season_id, format, event_id, pokemon_slug)
+);
+
+-- 招式使用率
+CREATE TABLE IF NOT EXISTS champions_usage_moves (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usage_pokemon_id INTEGER NOT NULL REFERENCES champions_usage_pokemon(id) ON DELETE CASCADE,
+  move_id INTEGER REFERENCES moves(id) ON DELETE SET NULL,
+  move_name_zh TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  percentage REAL NOT NULL,
+  UNIQUE (usage_pokemon_id, move_name_zh)
+);
+
+-- 道具使用率
+CREATE TABLE IF NOT EXISTS champions_usage_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usage_pokemon_id INTEGER NOT NULL REFERENCES champions_usage_pokemon(id) ON DELETE CASCADE,
+  item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+  item_name_zh TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  percentage REAL NOT NULL,
+  UNIQUE (usage_pokemon_id, item_name_zh)
+);
+
+-- 特性使用率
+CREATE TABLE IF NOT EXISTS champions_usage_abilities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usage_pokemon_id INTEGER NOT NULL REFERENCES champions_usage_pokemon(id) ON DELETE CASCADE,
+  ability_id INTEGER REFERENCES abilities(id) ON DELETE SET NULL,
+  ability_name_zh TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  percentage REAL NOT NULL,
+  UNIQUE (usage_pokemon_id, ability_name_zh)
+);
+
+-- 性格使用率（nature_id 对应 shared-types NATURE_DEFS 枚举 1-25）
+CREATE TABLE IF NOT EXISTS champions_usage_natures (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usage_pokemon_id INTEGER NOT NULL REFERENCES champions_usage_pokemon(id) ON DELETE CASCADE,
+  nature_id INTEGER NOT NULL,
+  rank INTEGER NOT NULL,
+  percentage REAL NOT NULL,
+  UNIQUE (usage_pokemon_id, nature_id)
+);
+
+-- 队友排名
+CREATE TABLE IF NOT EXISTS champions_usage_partners (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usage_pokemon_id INTEGER NOT NULL REFERENCES champions_usage_pokemon(id) ON DELETE CASCADE,
+  partner_pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE SET NULL,
+  partner_slug TEXT NOT NULL,
+  rank INTEGER NOT NULL,
+  UNIQUE (usage_pokemon_id, partner_slug)
+);
+
+-- EV 分布排名
+CREATE TABLE IF NOT EXISTS champions_usage_ev_spreads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  usage_pokemon_id INTEGER NOT NULL REFERENCES champions_usage_pokemon(id) ON DELETE CASCADE,
+  rank INTEGER NOT NULL,
+  percentage REAL NOT NULL,
+  hp INTEGER NOT NULL DEFAULT 0,
+  atk INTEGER NOT NULL DEFAULT 0,
+  def INTEGER NOT NULL DEFAULT 0,
+  sp_atk INTEGER NOT NULL DEFAULT 0,
+  sp_def INTEGER NOT NULL DEFAULT 0,
+  speed INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (usage_pokemon_id, hp, atk, def, sp_atk, sp_def, speed)
+);
+
+-- ============================================================
 -- 索引
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_pokemon_dex ON pokemon(dex_number);
@@ -473,6 +560,18 @@ CREATE INDEX IF NOT EXISTS idx_champions_seasons_regulation ON champions_seasons
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_regulation ON champions_regulation_pokemon(regulation_id);
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_pokemon_pokemon ON champions_regulation_pokemon(pokemon_id);
 CREATE INDEX IF NOT EXISTS idx_champions_regulation_items_regulation ON champions_regulation_items(regulation_id);
+
+CREATE INDEX IF NOT EXISTS idx_usage_pokemon_season ON champions_usage_pokemon(season_id, format);
+CREATE INDEX IF NOT EXISTS idx_usage_pokemon_pid ON champions_usage_pokemon(pokemon_id);
+CREATE INDEX IF NOT EXISTS idx_usage_moves_parent ON champions_usage_moves(usage_pokemon_id);
+CREATE INDEX IF NOT EXISTS idx_usage_moves_mid ON champions_usage_moves(move_id);
+CREATE INDEX IF NOT EXISTS idx_usage_items_parent ON champions_usage_items(usage_pokemon_id);
+CREATE INDEX IF NOT EXISTS idx_usage_items_iid ON champions_usage_items(item_id);
+CREATE INDEX IF NOT EXISTS idx_usage_abilities_parent ON champions_usage_abilities(usage_pokemon_id);
+CREATE INDEX IF NOT EXISTS idx_usage_abilities_aid ON champions_usage_abilities(ability_id);
+CREATE INDEX IF NOT EXISTS idx_usage_natures_parent ON champions_usage_natures(usage_pokemon_id);
+CREATE INDEX IF NOT EXISTS idx_usage_partners_parent ON champions_usage_partners(usage_pokemon_id);
+CREATE INDEX IF NOT EXISTS idx_usage_ev_spreads_parent ON champions_usage_ev_spreads(usage_pokemon_id);
 
 CREATE INDEX IF NOT EXISTS idx_move_flags_move ON move_flags(move_id);
 CREATE INDEX IF NOT EXISTS idx_move_flags_flag ON move_flags(flag);

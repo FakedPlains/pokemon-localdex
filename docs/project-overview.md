@@ -54,7 +54,7 @@ pokemon-localdex/
 │   │   │   │   ├── damage.css           新版伤害计算器（dc- 前缀）
 │   │   │   │   └── type-chart.css       属性克制表
 │   │   │   ├── pages/          七个页面组件
-│   │   │   │   ├── PokedexPage.jsx      图鉴页（列表 + 详情抽屉）
+│   │   │   │   ├── PokedexPage.tsx      图鉴页（列表 + 详情抽屉 + 使用率排行）
 │   │   │   │   ├── MovesPage.jsx        招式页
 │   │   │   │   ├── AbilitiesPage.jsx    特性页
 │   │   │   │   ├── ItemsPage.jsx        道具页

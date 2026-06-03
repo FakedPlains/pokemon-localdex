@@ -1,14 +1,26 @@
 import { AnimatePresence, motion } from "framer-motion";
+import type { RefObject } from "react";
 import DrawerContent from "./DrawerContent.tsx";
+
+interface PokedexDetailPanelProps {
+  hasSelection: boolean;
+  detailRef: RefObject<HTMLDivElement | null>;
+  detail: any;
+  initialFormId?: number;
+  detailGeneration: string | number;
+  onDetailGenerationChange: (gen: string) => void;
+  onClose: () => void;
+}
 
 export default function PokedexDetailPanel({
   hasSelection,
   detailRef,
   detail,
+  initialFormId,
   detailGeneration,
   onDetailGenerationChange,
   onClose,
-}) {
+}: PokedexDetailPanelProps) {
   return (
     <AnimatePresence mode="wait">
       {hasSelection && (
@@ -29,6 +41,7 @@ export default function PokedexDetailPanel({
           {detail ? (
             <DrawerContent
               detail={detail}
+              initialFormId={initialFormId}
               detailGeneration={detailGeneration}
               onDetailGenerationChange={onDetailGenerationChange}
             />
