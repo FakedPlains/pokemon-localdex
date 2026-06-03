@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
-import { createDraftMember } from "./utils/helpers.js";
 import { TYPE_OPTIONS, CATEGORY_OPTIONS, GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import { ToastProvider } from "./components/Toast.jsx";
 import GlobalSearch from "./components/GlobalSearch.tsx";
 
-const PokedexPage = lazy(() => import("./pages/PokedexPage.jsx"));
+const PokedexPage = lazy(() => import("./pages/PokedexPage.tsx"));
 const ItemsPage = lazy(() => import("./pages/ItemsPage.jsx"));
 const MovesPage = lazy(() => import("./pages/MovesPage.jsx"));
 const AbilitiesPage = lazy(() => import("./pages/AbilitiesPage.jsx"));
 const TeamsPage = lazy(() => import("./pages/TeamsPage.jsx"));
-const DamagePage = lazy(() => import("./pages/DamagePage.jsx"));
+const DamagePage = lazy(() => import("./pages/DamagePage.tsx"));
 const TypeChartPage = lazy(() => import("./pages/TypeChartPage.jsx"));
 // KoAnalysisPage 现在由 DamagePage 内部 tab 切换渲染
 const FieldEffectsPage = lazy(() => import("./pages/FieldEffectsPage.jsx"));
@@ -83,14 +82,6 @@ export default function App() {
   const [initialPokemonId, setInitialPokemonId] = useState(parsePokemonIdFromHash);
   const initialPokemonIdRef = useRef(initialPokemonId);
 
-  // Shared team draft state (lifted from TeamsPage so DamagePage can import from it)
-  const [teamDraft, setTeamDraft] = useState({
-    id: "",
-    name: "",
-    format: "singles",
-    members: Array.from({ length: 6 }, () => createDraftMember())
-  });
-
   // ── Shared search state (driven by GlobalSearch component) ──
   const [query, setQuery] = useState("");
 
@@ -124,10 +115,6 @@ export default function App() {
     setQuery(value);
   }, []);
 
-  const handleTeamDraftChange = useCallback((updater) => {
-    setTeamDraft((prev) => (typeof updater === "function" ? updater(prev) : updater));
-  }, []);
-
   const isFilterable = FILTERABLE_PAGES.has(route);
   const showTypeFilter = TYPE_FILTER_PAGES.has(route);
   const showGenFilter = GEN_FILTER_PAGES.has(route);
@@ -154,7 +141,7 @@ export default function App() {
       case "teams":
         return <TeamsPage />;
       case "damage":
-        return <DamagePage teamDraft={teamDraft} initialTab={window.location.hash.startsWith("#/ko") ? "ko" : "damage"} />;
+        return <DamagePage initialTab={window.location.hash.startsWith("#/ko") ? "ko" : "damage"} />;
       case "field-effects":
         return <FieldEffectsPage />;
       case "typechart":
@@ -164,7 +151,7 @@ export default function App() {
     }
     // Note: initialPokemonId is intentionally read from ref, not listed as dependency.
     // This prevents the page component from being recreated when the id is consumed.
-  }, [route, query, types, generation, moveCategory, teamDraft, consumeInitialPokemonId]);
+  }, [route, query, types, generation, moveCategory, consumeInitialPokemonId]);
 
   return (
     <ToastProvider>

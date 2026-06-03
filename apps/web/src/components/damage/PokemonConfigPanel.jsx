@@ -12,7 +12,7 @@ import TypeChip from "../TypeChip.jsx";
 import { getBox, getTeams, resolveTeamMembers } from "../../utils/teamStorage.js";
 import SimplePokemonList from "./SimplePokemonList.jsx";
 import SimpleStatEditor from "./SimpleStatEditor.jsx";
-import { NATURE_SELECT_OPTIONS, TERA_TYPE_OPTIONS } from "./damageConstants.js";
+import { NATURE_SELECT_OPTIONS, TERA_TYPE_OPTIONS } from "./damageConstants.ts";
 
 //  子组件：宝可梦配置面板（攻击方/防守方通用）
 // ══════════════════════════════════════════════════════════════

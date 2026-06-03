@@ -1,7 +1,22 @@
+import { type RefObject } from "react";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
+import type { PokemonTableSummary, ImageAsset, StatBlock } from "@pokemon-localdex/store-types";
 import TypeChip from "../TypeChip.jsx";
 import { getPokemonPreviewImage } from "../../utils/helpers.js";
 import { calculateSpeedLine } from "../../utils/statCalcModel";
+
+type SortOrder = "asc" | "desc" | "";
+
+interface PokedexTableListProps {
+  displayList: PokemonTableSummary[];
+  loading: boolean;
+  showSpeedLine: boolean;
+  speedSortOrder: SortOrder;
+  onSpeedSortToggle: () => void;
+  onSelect: (slug: string) => void;
+  hasMore: boolean;
+  sentinelRef: RefObject<HTMLDivElement | null>;
+}
 
 export default function PokedexTableList({
   displayList,
@@ -12,7 +27,7 @@ export default function PokedexTableList({
   onSelect,
   hasMore,
   sentinelRef,
-}) {
+}: PokedexTableListProps) {
   return (
     <div className="dex-table-view">
       {displayList.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
@@ -67,11 +82,11 @@ export default function PokedexTableList({
         )}
       </div>
       {displayList.map((member) => {
-        const slug = String(member.id);
-        const image = getPokemonPreviewImage(member);
-        const bs = member.baseStats || {};
-        const total = STAT_KEYS.reduce((s, k) => s + (bs[k] || 0), 0);
-        const speedLine = calculateSpeedLine(bs.spe);
+        const slug = member.formId ? `${member.id}-f${member.formId}` : String(member.id);
+        const image = getPokemonPreviewImage(member) as ImageAsset | undefined;
+        const bs: Partial<StatBlock> = member.baseStats || {};
+        const total = STAT_KEYS.reduce((s, k) => s + (bs[k as keyof StatBlock] || 0), 0);
+        const speedLine = calculateSpeedLine(bs.spe ?? 0);
         return (
           <div key={slug} className={`dex-table-row${showSpeedLine ? " dex-table-row-speed-line" : ""}`} data-slug={slug} onClick={() => onSelect(slug)}>
             <div className="dex-table-col dex-table-col-img">
@@ -86,6 +101,7 @@ export default function PokedexTableList({
             </div>
             <div className="dex-table-col dex-table-col-name">
               <strong className="dex-table-name-zh">{member.nameZh}</strong>
+              {member.formName && <span className="dex-table-form-name">{member.formName}</span>}
               <span className="dex-table-name-en">{member.nameEn || ""}</span>
             </div>
             <div className="dex-table-col dex-table-col-types">
@@ -116,7 +132,7 @@ export default function PokedexTableList({
               <>
                 {STAT_KEYS.map((k) => (
                   <div key={k} className="dex-table-col dex-table-col-stat">
-                    <span className="dex-table-stat-val">{bs[k] ?? "—"}</span>
+                    <span className="dex-table-stat-val">{bs[k as keyof StatBlock] ?? "—"}</span>
                   </div>
                 ))}
                 <div className="dex-table-col dex-table-col-stat dex-table-col-total">

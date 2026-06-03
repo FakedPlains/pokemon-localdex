@@ -514,3 +514,100 @@ export const championsRegulationItems = sqliteTable("champions_regulation_items"
   uniqueIndex("uq_champions_regulation_items").on(table.regulationId, table.itemId),
   index("idx_champions_regulation_items_regulation").on(table.regulationId),
 ]);
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Champions 使用率统计（数据源: pokechamdb.com）
+// ══════════════════════════════════════════════════════════════════════════════
+
+export const championsUsagePokemon = sqliteTable("champions_usage_pokemon", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  seasonId: integer("season_id").notNull().references(() => championsSeasons.id, { onDelete: "cascade" }),
+  format: text("format").notNull(),
+  eventId: text("event_id").notNull().default(""),
+  pokemonId: integer("pokemon_id").references(() => pokemon.id, { onDelete: "set null" }),
+  formId: integer("form_id").references(() => pokemonForms.id, { onDelete: "set null" }),
+  pokemonSlug: text("pokemon_slug").notNull(),
+  rank: integer("rank").notNull(),
+  fetchedAt: text("fetched_at").notNull(),
+}, (table) => [
+  uniqueIndex("uq_usage_pokemon").on(table.seasonId, table.format, table.eventId, table.pokemonSlug),
+  index("idx_usage_pokemon_season").on(table.seasonId, table.format),
+  index("idx_usage_pokemon_pid").on(table.pokemonId),
+]);
+
+export const championsUsageMoves = sqliteTable("champions_usage_moves", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  usagePokemonId: integer("usage_pokemon_id").notNull().references(() => championsUsagePokemon.id, { onDelete: "cascade" }),
+  moveId: integer("move_id").references(() => moves.id, { onDelete: "set null" }),
+  moveNameZh: text("move_name_zh").notNull(),
+  rank: integer("rank").notNull(),
+  percentage: real("percentage").notNull(),
+}, (table) => [
+  uniqueIndex("uq_usage_moves").on(table.usagePokemonId, table.moveNameZh),
+  index("idx_usage_moves_parent").on(table.usagePokemonId),
+  index("idx_usage_moves_mid").on(table.moveId),
+]);
+
+export const championsUsageItems = sqliteTable("champions_usage_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  usagePokemonId: integer("usage_pokemon_id").notNull().references(() => championsUsagePokemon.id, { onDelete: "cascade" }),
+  itemId: integer("item_id").references(() => items.id, { onDelete: "set null" }),
+  itemNameZh: text("item_name_zh").notNull(),
+  rank: integer("rank").notNull(),
+  percentage: real("percentage").notNull(),
+}, (table) => [
+  uniqueIndex("uq_usage_items").on(table.usagePokemonId, table.itemNameZh),
+  index("idx_usage_items_parent").on(table.usagePokemonId),
+  index("idx_usage_items_iid").on(table.itemId),
+]);
+
+export const championsUsageAbilities = sqliteTable("champions_usage_abilities", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  usagePokemonId: integer("usage_pokemon_id").notNull().references(() => championsUsagePokemon.id, { onDelete: "cascade" }),
+  abilityId: integer("ability_id").references(() => abilities.id, { onDelete: "set null" }),
+  abilityNameZh: text("ability_name_zh").notNull(),
+  rank: integer("rank").notNull(),
+  percentage: real("percentage").notNull(),
+}, (table) => [
+  uniqueIndex("uq_usage_abilities").on(table.usagePokemonId, table.abilityNameZh),
+  index("idx_usage_abilities_parent").on(table.usagePokemonId),
+  index("idx_usage_abilities_aid").on(table.abilityId),
+]);
+
+export const championsUsageNatures = sqliteTable("champions_usage_natures", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  usagePokemonId: integer("usage_pokemon_id").notNull().references(() => championsUsagePokemon.id, { onDelete: "cascade" }),
+  natureId: integer("nature_id").notNull(),
+  rank: integer("rank").notNull(),
+  percentage: real("percentage").notNull(),
+}, (table) => [
+  uniqueIndex("uq_usage_natures").on(table.usagePokemonId, table.natureId),
+  index("idx_usage_natures_parent").on(table.usagePokemonId),
+]);
+
+export const championsUsagePartners = sqliteTable("champions_usage_partners", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  usagePokemonId: integer("usage_pokemon_id").notNull().references(() => championsUsagePokemon.id, { onDelete: "cascade" }),
+  partnerPokemonId: integer("partner_pokemon_id").references(() => pokemon.id, { onDelete: "set null" }),
+  partnerSlug: text("partner_slug").notNull(),
+  rank: integer("rank").notNull(),
+}, (table) => [
+  uniqueIndex("uq_usage_partners").on(table.usagePokemonId, table.partnerSlug),
+  index("idx_usage_partners_parent").on(table.usagePokemonId),
+]);
+
+export const championsUsageEvSpreads = sqliteTable("champions_usage_ev_spreads", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  usagePokemonId: integer("usage_pokemon_id").notNull().references(() => championsUsagePokemon.id, { onDelete: "cascade" }),
+  rank: integer("rank").notNull(),
+  percentage: real("percentage").notNull(),
+  hp: integer("hp").notNull().default(0),
+  atk: integer("atk").notNull().default(0),
+  def: integer("def").notNull().default(0),
+  spAtk: integer("sp_atk").notNull().default(0),
+  spDef: integer("sp_def").notNull().default(0),
+  speed: integer("speed").notNull().default(0),
+}, (table) => [
+  uniqueIndex("uq_usage_ev_spreads").on(table.usagePokemonId, table.hp, table.atk, table.def, table.spAtk, table.spDef, table.speed),
+  index("idx_usage_ev_spreads_parent").on(table.usagePokemonId),
+]);

@@ -180,7 +180,7 @@ service = "pokemon-localdex-api"
 
 **能力值计算**：`utils/statCalcModel.ts` 是能力值计算的单一来源（single source of truth），集中定义了所有相关常量（`EV_MAX`、`EV_TOTAL_MAX`、`SP_MAX`、`SP_TOTAL_MAX`、`IV_MAX`、`STAT_KEYS` 等）、计算函数（`calculateFinalStat`、`calculateHpStat`、`evToSp`、`spToEv`、`getNatureMultiplier`）以及模式转换函数（`convertEvsToSps`、`convertSpsToEvs`）。所有需要能力值计算或 EV/SP 常量的组件均直接从 `statCalcModel.ts` 导入，不通过 `helpers.js` 中转。
 
-当前包含七个页面：图鉴页（PokedexPage）提供宝可梦列表搜索和详情展示；招式页（MovesPage）提供招式列表和世代差异查看；特性页（AbilitiesPage）提供特性列表和世代差异查看；道具页（ItemsPage）提供道具列表和详情；队伍页（TeamsPage）提供 6 槽队伍编辑器；伤害页（DamagePage）提供完整的伤害计算器，支持性格搜索选择、特性内联选择、道具图片预览、形态切换（自动绑定道具/特性）、天气和场地分段切换、EV↔SP 自动转换等；属性克制表页（TypeChartPage）展示 18 属性相克关系。
+当前包含七个页面：图鉴页（PokedexPage）提供宝可梦列表搜索和详情展示，支持赛季使用率排行模式（按形态级卡片展示排名，支持单打/双打格式切换）；招式页（MovesPage）提供招式列表和世代差异查看；特性页（AbilitiesPage）提供特性列表和世代差异查看；道具页（ItemsPage）提供道具列表和详情；队伍页（TeamsPage）提供 6 槽队伍编辑器；伤害页（DamagePage）提供完整的伤害计算器，支持性格搜索选择、特性内联选择、道具图片预览、形态切换（自动绑定道具/特性）、天气和场地分段切换、EV↔SP 自动转换等；属性克制表页（TypeChartPage）展示 18 属性相克关系。
 
 前端采用"形态优先"的数据模型：`resolvePokemonDisplayVariant()` 函数根据当前选中的形态和世代，从 API 返回的嵌套数据中解析出正确的属性、种族值、特性和图片，是整个展示层的核心数据转换逻辑。
 

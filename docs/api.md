@@ -60,6 +60,9 @@ API 启用了全局 CORS，允许任意来源访问。
 | type | string | 按属性筛选，支持逗号分隔多属性（如"火,飞行"） |
 | generation | number | 按初登场世代筛选 |
 | seasonId | number | 按 Champions 赛季数据库 ID 筛选可用池 |
+| format | string | 对战格式，仅在 seasonId 存在时生效。可选值 `single`（单打）或 `double`（双打），默认 `double`。非法值会被忽略。 |
+| sort | string | 排序方式。`usage` 按使用率排名排序（需配合 seasonId），`speed` 按速度种族值排序 |
+| order | string | 排序方向，仅 sort=speed 时生效。`asc` 或 `desc`，默认 `desc` |
 | limit | number | 分页：每页条数 |
 | offset | number | 分页：偏移量 |
 
@@ -67,7 +70,8 @@ API 启用了全局 CORS，允许任意来源访问。
 
 ```
 GET /api/pokemon?q=皮卡&type=电&generation=1
-GET /api/pokemon?seasonId=1
+GET /api/pokemon?seasonId=2&format=double&sort=usage
+GET /api/pokemon?seasonId=2&format=single&sort=usage
 GET /api/pokemon?limit=20&offset=0
 ```
 
@@ -75,22 +79,26 @@ GET /api/pokemon?limit=20&offset=0
 
 获取图鉴卡片视图的轻量列表。只返回卡片展示需要的字段：数字 ID、图鉴编号、名称、当前默认形态属性和官方图。筛选参数与 `/pokemon` 相同。`generation` 使用 `pokemon.introduced_generation` 按初登场世代筛选。
 
+当 `sort=usage` 且 `seasonId` 存在时，查询切换为**形态级卡片模式**：从 `champions_usage_pokemon` 表驱动查询，每条记录对应一个具体形态的使用率排名，响应中额外包含 `formId`、`formType`、`formName`、`usageRank` 字段。此时同一只宝可梦的不同形态会作为独立卡片返回。
+
 示例：
 
 ```
 GET /api/pokemon/cards?limit=60&offset=0
 GET /api/pokemon/cards?generation=1&type=电
+GET /api/pokemon/cards?seasonId=2&format=double&sort=usage&limit=60&offset=0
 ```
 
 ### GET /pokemon/table
 
-获取 Web 图鉴表格视图的轻量列表。返回表格需要的字段：卡片字段、当前默认形态特性和当前种族值；不返回世代可用性、进化链、闪光图或详情字段。支持 `sort=speed&order=asc|desc`。
+获取 Web 图鉴表格视图的轻量列表。返回表格需要的字段：卡片字段、当前默认形态特性和当前种族值；不返回世代可用性、进化链、闪光图或详情字段。支持 `sort=speed&order=asc|desc`。当 `sort=usage` 且 `seasonId` 存在时，同样切换为形态级查询模式，额外返回 `formId`、`formType`、`formName`、`usageRank` 字段。
 
 示例：
 
 ```
 GET /api/pokemon/table?limit=60&offset=0
 GET /api/pokemon/table?sort=speed&order=desc
+GET /api/pokemon/table?seasonId=2&format=single&sort=usage&limit=60&offset=0
 ```
 
 ### GET /pokemon/:id
@@ -204,7 +212,7 @@ GET /api/pokemon/25/learnset/meta
 GET /api/champions/seasons
 ```
 
-可将返回的 `id` 传给 `/pokemon?seasonId=...`，按该赛季关联赛制的可使用宝可梦池筛选图鉴列表。`seasonCode` 仅用于展示。
+可将返回的 `id` 传给 `/pokemon?seasonId=...`，按该赛季关联赛制的可使用宝可梦池筛选图鉴列表。配合 `format=double|single` 和 `sort=usage` 可获取使用率排行。`seasonCode` 仅用于展示。
 
 ## 招式
 

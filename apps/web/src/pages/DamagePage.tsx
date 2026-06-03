@@ -4,6 +4,7 @@ import { useToast } from "../components/Toast.jsx";
 import { GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
 import { createDraftMember } from "../utils/helpers.js";
 import { buildDamageRequest, buildDamageResult } from "../components/damage/damageCalculation.ts";
+import { getAbilityFieldMapping } from "../components/damage/damageConstants.ts";
 import DamageResultPanel from "../components/damage/DamageResultPanel.jsx";
 import FieldControlPanel from "../components/damage/FieldControlPanel.jsx";
 import MoveExtrasPanel from "../components/damage/MoveExtrasPanel.jsx";
@@ -19,11 +20,41 @@ import StatusPanel from "../components/damage/StatusPanel.jsx";
 
 const KoAnalysisPage = lazy(() => import("./KoAnalysisPage.tsx"));
 
+// ── 类型定义 ──
+// ══════════════════════════════════════════════════════════════
+
+interface DraftMember {
+  pokemonId: string;
+  nameZh: string;
+  configName: string;
+  level: number;
+  itemId: string;
+  itemName?: string;
+  abilityId: string;
+  abilityName?: string;
+  nature: string;
+  moves: string[];
+  ivs: Record<string, number>;
+  evs: Record<string, number>;
+  sps?: Record<string, number>;
+  formId?: string;
+  statMode?: string;
+  [key: string]: unknown;
+}
+
+interface DamagePageProps {
+  initialTab?: "damage" | "ko";
+}
+
+interface DamageResult {
+  [key: string]: unknown;
+}
+
 //  主页面
 // ══════════════════════════════════════════════════════════════
 
-export default function DamagePage({ initialTab = "damage" }) {
-  const [activeTab, setActiveTab] = useState(initialTab);
+export default function DamagePage({ initialTab = "damage" }: DamagePageProps) {
+  const [activeTab, setActiveTab] = useState<"damage" | "ko">(initialTab);
 
   // 当 initialTab prop 变化时同步（例如从 #/ko 直接导航）
   useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
@@ -34,8 +65,8 @@ export default function DamagePage({ initialTab = "damage" }) {
   const isChampions = Number(generation) === 0;
 
   // ── 攻守双方 ──
-  const [attacker, setAttacker] = useState(() => ({ ...createDraftMember(), statMode: "classic" }));
-  const [defender, setDefender] = useState(() => ({ ...createDraftMember(), statMode: "classic" }));
+  const [attacker, setAttacker] = useState<DraftMember>(() => ({ ...createDraftMember(), statMode: "classic" }));
+  const [defender, setDefender] = useState<DraftMember>(() => ({ ...createDraftMember(), statMode: "classic" }));
 
   // ── 等级（攻守共享） ──
   const [level, setLevel] = useState(50);
@@ -63,7 +94,7 @@ export default function DamagePage({ initialTab = "damage" }) {
   const defenderMoveExtras = useMoveExtraState();
 
   // ── 场地环境（weather/terrain/gravity/magicRoom/wonderRoom/灾厄四宝） ──
-  const [battleMode, setBattleMode] = useState("doubles");
+  const [battleMode, setBattleMode] = useState<"singles" | "doubles">("doubles");
   const { field, setField, toggleField, resetField } = useFieldState();
 
   // ── 攻守双方状态 ──
@@ -77,7 +108,7 @@ export default function DamagePage({ initialTab = "damage" }) {
   const [defTeraType, setDefTeraType] = useState("none");
 
   // ── 计算结果 ──
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<DamageResult | null>(null);
   const [calculating, setCalculating] = useState(false);
 
   // ── 全局数据 ──
@@ -85,6 +116,88 @@ export default function DamagePage({ initialTab = "damage" }) {
 
   // 世代切换时更新 statMode 并自动转换 EV↔SP
   useDamageStatMode(isChampions, setAttacker, setDefender);
+
+  // ── 特性 → 天气/场地自动联动 ──
+  // autoFieldRef 记录由特性自动设置的字段值；当 field 仍等于该值时，表示用户未手动修改，自动逻辑仍有控制权
+  const autoFieldRef = useRef<{ weather: string; terrain: string }>({ weather: "", terrain: "" });
+  const prevAtkAbilityRef = useRef(attacker.abilityId);
+  const prevDefAbilityRef = useRef(defender.abilityId);
+  const prevGenerationRef = useRef(generation);
+
+  // 用 ref 持有最新的 field 值以便 effect 内读取但不作为依赖
+  const fieldRef = useRef(field);
+  fieldRef.current = field;
+
+  /**
+   * 统一 resolver：基于攻防双方当前特性 + 世代，计算某类型字段应有的自动值。
+   * 后出场特性覆盖先出场特性（防守方优先于攻击方），与对战机制一致。
+   * 返回映射值字符串或 null（表示当前无特性提供该类型字段）。
+   */
+  const resolveAutoValue = useCallback(
+    (fieldType: "weather" | "terrain", gen: string | number): string | null => {
+      // 防守方后出场，优先取防守方映射（覆盖逻辑）
+      const sides = [defender.abilityId, attacker.abilityId];
+      for (const abilityId of sides) {
+        if (!abilityId) continue;
+        const mapping = getAbilityFieldMapping(abilityId, gen);
+        if (mapping && mapping.type === fieldType) {
+          return mapping.value;
+        }
+      }
+      return null;
+    },
+    [attacker.abilityId, defender.abilityId],
+  );
+
+  /**
+   * 核心联动 effect：当特性或世代变化时，重新 resolve 每个字段类型。
+   * 只在字段仍由自动逻辑控制时（field === autoFieldRef）才写入或清除。
+   * 用户手动修改后（field !== autoFieldRef），自动逻辑放弃该字段的追踪。
+   */
+  useEffect(() => {
+    const prevAtkId = prevAtkAbilityRef.current;
+    const prevDefId = prevDefAbilityRef.current;
+    const prevGen = prevGenerationRef.current;
+    const atkChanged = attacker.abilityId !== prevAtkId;
+    const defChanged = defender.abilityId !== prevDefId;
+    const genChanged = generation !== prevGen;
+    prevAtkAbilityRef.current = attacker.abilityId;
+    prevDefAbilityRef.current = defender.abilityId;
+    prevGenerationRef.current = generation;
+
+    if (!atkChanged && !defChanged && !genChanged) return;
+
+    const currentField = fieldRef.current;
+    const fieldTypes = ["weather", "terrain"] as const;
+
+    for (const fieldType of fieldTypes) {
+      const prevAutoValue = autoFieldRef.current[fieldType];
+      const currentValue = currentField[fieldType];
+
+      // 如果之前有自动值但用户已手动修改，放弃追踪
+      if (prevAutoValue && currentValue !== prevAutoValue) {
+        autoFieldRef.current[fieldType] = "";
+        continue;
+      }
+
+      // resolve 当前攻防双方 + 世代下该字段应有的值
+      const resolved = resolveAutoValue(fieldType, generation);
+
+      if (resolved) {
+        // 有映射值：当前无自动值或自动值不同时才更新
+        if (resolved !== prevAutoValue) {
+          setField(fieldType, resolved);
+          autoFieldRef.current[fieldType] = resolved;
+        }
+      } else {
+        // 无映射值：如果之前有自动值在控制，清除回 "none"
+        if (prevAutoValue) {
+          setField(fieldType, "none");
+          autoFieldRef.current[fieldType] = "";
+        }
+      }
+    }
+  }, [attacker.abilityId, defender.abilityId, generation, setField, resolveAutoValue]);
 
   // ── 伤害计算（支持双向：calcDirection 决定谁攻谁守） ──
   const handleCalculate = useCallback(async () => {
@@ -138,8 +251,9 @@ export default function DamagePage({ initialTab = "damage" }) {
       });
 
       setResult(buildDamageResult(calcResult.data, meta));
-    } catch (err) {
-      toast.error("计算失败: " + (err.message || "未知错误"));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "未知错误";
+      toast.error("计算失败: " + message);
     }
     setCalculating(false);
   }, [toast, selectedMove, calcDirection, attacker, attackerDetail, defender, defenderDetail, generation, isChampions, level,
@@ -295,7 +409,7 @@ export default function DamagePage({ initialTab = "damage" }) {
               boosts={attackerSide.values.boost}
               onBoostChange={attackerSide.onBoostChange}
               level={level}
-              onMovesSync={(cfg) => syncMovesFromConfig(cfg, "atk")}
+              onMovesSync={(cfg: Record<string, unknown>) => syncMovesFromConfig(cfg, "atk")}
               curHP={attackerSide.values.curHP}
               onCurHPChange={attackerSide.setCurHP}
               teraType={atkTeraType}
@@ -369,7 +483,7 @@ export default function DamagePage({ initialTab = "damage" }) {
               boosts={defenderSide.values.boost}
               onBoostChange={defenderSide.onBoostChange}
               level={level}
-              onMovesSync={(cfg) => syncMovesFromConfig(cfg, "def")}
+              onMovesSync={(cfg: Record<string, unknown>) => syncMovesFromConfig(cfg, "def")}
               curHP={defenderSide.values.curHP}
               onCurHPChange={defenderSide.setCurHP}
               teraType={defTeraType}

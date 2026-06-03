@@ -1,5 +1,31 @@
+import type { ChampionsSeasonSummary } from "@pokemon-localdex/store-types";
 import CustomSelect from "../CustomSelect.jsx";
 import ViewToggle from "../ViewToggle.jsx";
+
+interface SeasonOption {
+  value: string;
+  label: string;
+}
+
+interface PokedexToolbarProps {
+  championsSeasonId: string;
+  onChampionsSeasonChange: (value: string) => void;
+  championsSeasonOptions: SeasonOption[];
+  seasonsLoading: boolean;
+  championsSeasons: ChampionsSeasonSummary[];
+  selectedSeason: ChampionsSeasonSummary | undefined;
+  battleFormat: "double" | "single";
+  onBattleFormatChange: (format: "double" | "single") => void;
+  isUsageRanking: boolean;
+  isRefreshingList: boolean;
+  displayTotal: number;
+  hasSelection: boolean;
+  displayListLength: number;
+  showSpeedLine: boolean;
+  onSpeedLineToggle: () => void;
+  effectiveViewMode: "card" | "list";
+  onViewModeChange: (mode: "card" | "list") => void;
+}
 
 export default function PokedexToolbar({
   championsSeasonId,
@@ -8,6 +34,9 @@ export default function PokedexToolbar({
   seasonsLoading,
   championsSeasons,
   selectedSeason,
+  battleFormat,
+  onBattleFormatChange,
+  isUsageRanking,
   isRefreshingList,
   displayTotal,
   hasSelection,
@@ -16,7 +45,10 @@ export default function PokedexToolbar({
   onSpeedLineToggle,
   effectiveViewMode,
   onViewModeChange,
-}) {
+}: PokedexToolbarProps) {
+  // 是否选择了赛季（用于控制 format toggle 显示）
+  const hasSeason = !!championsSeasonId;
+
   return (
     <div className="dex-list-toolbar">
       <div className="dex-season-control">
@@ -29,13 +61,37 @@ export default function PokedexToolbar({
           onChange={onChampionsSeasonChange}
           disabled={seasonsLoading || championsSeasons.length === 0}
         />
+        {hasSeason && (
+          <div className="dex-format-toggle">
+            <button
+              type="button"
+              className={`dex-format-btn${battleFormat === "double" ? " dex-format-btn-active" : ""}`}
+              onClick={() => onBattleFormatChange("double")}
+            >
+              双打
+            </button>
+            <button
+              type="button"
+              className={`dex-format-btn${battleFormat === "single" ? " dex-format-btn-active" : ""}`}
+              onClick={() => onBattleFormatChange("single")}
+            >
+              单打
+            </button>
+          </div>
+        )}
       </div>
 
       {selectedSeason && (
         <div className="dex-season-note">
           <strong>{selectedSeason.regulationName || selectedSeason.regulationCode}</strong>
           {selectedSeason.periodText && <span>{selectedSeason.periodText}</span>}
-          <span>{isRefreshingList ? "正在更新可用名单…" : `${displayListLength} 只可用宝可梦`}</span>
+          <span>
+            {isRefreshingList
+              ? "正在更新排行…"
+              : isUsageRanking
+                ? `使用率排行 TOP ${displayListLength}`
+                : `${displayListLength} 只可用宝可梦`}
+          </span>
         </div>
       )}
 
