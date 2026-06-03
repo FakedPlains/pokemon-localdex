@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import {
-  calculateFinalStat,
   createDefaultStats,
   createDraftMember,
-  evToSp,
   getPokemonPreviewImage,
 } from "../../utils/helpers.js";
+import { calculateFinalStat, convertEvsToSps, convertSpsToEvs } from "../../utils/statCalcModel";
 import { unifiedApi } from "../../utils/api.js";
 import SearchSelect from "../SearchSelect.jsx";
 import TypeChip from "../TypeChip.jsx";
 import { getBox, getTeams, resolveTeamMembers } from "../../utils/teamStorage.js";
 import SimplePokemonList from "./SimplePokemonList.jsx";
 import SimpleStatEditor from "./SimpleStatEditor.jsx";
-import { EV_MAX, EV_TOTAL_MAX, NATURE_SELECT_OPTIONS, SP_TOTAL_MAX, TERA_TYPE_OPTIONS, spToEv } from "./damageConstants.js";
+import { NATURE_SELECT_OPTIONS, TERA_TYPE_OPTIONS } from "./damageConstants.js";
 
 //  子组件：宝可梦配置面板（攻击方/防守方通用）
 // ══════════════════════════════════════════════════════════════
@@ -189,39 +188,10 @@ export default function PokemonConfigPanel({ title, member, detail, isChampions,
     let finalNature = cfg.nature || cfg.champNature || "认真";
 
     if (cfgMode === "classic" && targetMode === "champions") {
-      // 经典 → Champions：EV 转 SP
-      const converted = {};
-      for (const k of STAT_KEYS) {
-        converted[k] = evToSp(finalEvs[k] || 0);
-      }
-      // 总量限制 66
-      let t = STAT_KEYS.reduce((s, k) => s + converted[k], 0);
-      if (t > SP_TOTAL_MAX) {
-        const scale = SP_TOTAL_MAX / t;
-        for (const k of STAT_KEYS) {
-          converted[k] = Math.floor(converted[k] * scale);
-        }
-      }
-      finalSps = converted;
+      finalSps = convertEvsToSps(finalEvs);
       finalNature = cfg.nature || "认真";
     } else if (cfgMode === "champions" && targetMode === "classic") {
-      // Champions → 经典：SP 转 EV
-      const converted = Object.fromEntries(STAT_KEYS.map((k) => [k, 0]));
-      const sorted = [...STAT_KEYS]
-        .filter((k) => (finalSps[k] || 0) > 0)
-        .sort((a, b) => (finalSps[b] || 0) - (finalSps[a] || 0));
-      let budget = EV_TOTAL_MAX;
-      for (const k of sorted) {
-        const ideal = spToEv(finalSps[k] || 0);
-        if (ideal <= budget) {
-          converted[k] = ideal;
-          budget -= ideal;
-        } else {
-          converted[k] = Math.min(EV_MAX, Math.floor(budget / 4) * 4);
-          budget -= converted[k];
-        }
-      }
-      finalEvs = converted;
+      finalEvs = convertSpsToEvs(finalSps);
       finalIvs = Object.fromEntries(STAT_KEYS.map((k) => [k, 31]));
       finalNature = cfg.champNature || cfg.nature || "认真";
     }

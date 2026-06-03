@@ -11,6 +11,7 @@ import { registerBattleRoutes } from "./routes/battle.ts";
 import { registerAbilityRoutes, registerItemRoutes, registerMoveRoutes } from "./routes/catalog.ts";
 import { registerFieldEffectRoutes } from "./routes/field-effects.ts";
 import { registerChampionsRoutes, registerPokemonRoutes } from "./routes/pokemon.ts";
+import { registerSearchRoutes } from "./routes/search.ts";
 
 export type { RegisterRoutesOptions } from "./route-utils.ts";
 
@@ -29,5 +30,6 @@ export function registerApiRoutes<E extends object = object>(
   registerAbilityRoutes(api, opts);
   registerFieldEffectRoutes(api, opts);
   registerBattleRoutes(api, opts);
+  registerSearchRoutes(api, opts);
   return api;
 }

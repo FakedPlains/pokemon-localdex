@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import { unifiedApi } from "../../utils/api.js";
-import { calculateFinalStat, getPokemonPreviewImage } from "../../utils/helpers.js";
+import { getPokemonPreviewImage } from "../../utils/helpers.js";
+import { calculateFinalStat } from "../../utils/statCalcModel";
 
 export default function BoxListRow({ config, onEdit, onDelete, onDuplicate }) {
   const [menuOpen, setMenuOpen] = useState(false);

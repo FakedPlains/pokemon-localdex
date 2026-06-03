@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup, Tag
 from ..fetcher import RawPage
 from ..constants import MOVE_LIST_URL, POKEMON_TYPES
 from ..generations import (
+    clean_name,
     detect_generation_marker,
     extract_generation_changes,
     extract_intro_names,
@@ -253,8 +254,8 @@ def normalize_move_detail_page(page: RawPage, seed: MoveSeed) -> dict:
     return {
         "number": seed.number or html_info.get("number") or None,
         "name_zh": name_zh,
-        "name_ja": name_ja or seed.name_ja,
-        "name_en": name_en or seed.name_en,
+        "name_ja": clean_name(seed.name_ja) if seed.name_ja else name_ja,
+        "name_en": clean_name(seed.name_en) if seed.name_en else name_en,
         "type": type_name,
         "category": category,
         "power": seed.power or html_info.get("power"),

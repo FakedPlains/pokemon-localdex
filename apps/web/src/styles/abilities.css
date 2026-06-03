@@ -2,82 +2,149 @@
    Moves Tab (inside drawer)
    ═══════════════════════════════════════════════════════ */
 
-.mv-gen-strip {
+/* ── Toolbar Row (Generation + Version dropdowns + Search) ── */
+.mv-toolbar-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 10px;
   margin-bottom: 12px;
+  align-items: center;
 }
 
-.mv-gen-pill {
-  width: auto;
+.mv-select-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mv-select-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.mv-gen-select .cs-trigger,
+.mv-version-select .cs-trigger {
   padding: 6px 12px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--ink);
-  background: rgba(138, 166, 90, 0.12);
-  border: 1px solid transparent;
+  border: 1px solid rgba(138, 166, 90, 0.25);
+  background: rgba(138, 166, 90, 0.08);
+  min-height: 0;
+}
+
+.mv-gen-select .cs-trigger:hover,
+.mv-version-select .cs-trigger:hover {
+  border-color: var(--accent);
+  background: rgba(138, 166, 90, 0.15);
+}
+
+.mv-gen-select .cs-dropdown,
+.mv-version-select .cs-dropdown {
+  border-radius: 12px;
+  min-width: 140px;
+}
+
+.mv-gen-select .cs-option,
+.mv-version-select .cs-option {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+/* ── Move Search ── */
+.mv-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+}
+
+.mv-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.mv-search-input {
+  width: 100%;
+  padding: 8px 32px 8px 34px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.6);
+  outline: none;
+  transition: border-color 200ms, background 200ms;
+}
+
+.mv-search-input:focus {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.mv-search-input::placeholder {
+  color: var(--muted);
+}
+
+.mv-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
   cursor: pointer;
-  transition: background 200ms, color 200ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 200ms;
 }
 
-.mv-gen-pill:hover {
-  background: rgba(138, 166, 90, 0.22);
-  transform: none;
-  box-shadow: none;
+.mv-search-clear:hover {
+  background: rgba(0, 0, 0, 0.15);
 }
 
-.mv-gen-pill-active {
-  color: white;
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-}
-
-.mv-gen-pill-active:hover {
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-}
-
-.mv-version-strip {
+/* ── TM/HM Badge ── */
+.mv-learn-method-cell {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
-  margin-bottom: 10px;
 }
 
-.mv-version-pill {
-  width: auto;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  cursor: pointer;
-  transition: background 200ms, color 200ms;
-}
-
-.mv-version-pill:hover {
-  background: rgba(100, 140, 200, 0.15);
-  transform: none;
-  box-shadow: none;
-}
-
-.mv-version-pill-active {
-  color: white;
-  background: linear-gradient(135deg, #5b8bd4, #3a6bb5);
-  border-color: #5b8bd4;
-}
-
-.mv-version-pill-active:hover {
-  background: linear-gradient(135deg, #4a7ac3, #2f5da6);
+.mv-tm-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #5b6eae;
+  background: rgba(91, 110, 174, 0.12);
+  white-space: nowrap;
 }
 
 .mv-method-strip {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
   margin-bottom: 12px;
+}
+
+.mv-method-count {
+  margin-left: auto;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .mv-method-pill {

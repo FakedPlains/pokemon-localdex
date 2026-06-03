@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from urllib.parse import quote
 
 from ..fetcher import RawPage
-from ..generations import extract_generation_changes, extract_intro_names, section_text_by_heading
+from ..generations import clean_name, extract_generation_changes, extract_intro_names, section_text_by_heading
 from ..text import clean_summary, normalize_text, to_simplified
 
 
@@ -207,8 +207,8 @@ def normalize_field_effect_detail_page(page: RawPage, seed: FieldEffectSeed) -> 
         "kind": seed.kind,
         "key": seed.key,
         "name_zh": seed.name_zh,
-        "name_en": name_en_page or seed.name_en,
-        "name_ja": name_ja_page or seed.name_ja,
+        "name_en": clean_name(seed.name_en) if seed.name_en else name_en_page,
+        "name_ja": clean_name(seed.name_ja) if seed.name_ja else name_ja_page,
         "description": description,
         "introduced_generation": seed.introduced_generation,
         "max_turns": seed.max_turns,
