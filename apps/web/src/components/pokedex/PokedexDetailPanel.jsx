@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import DrawerContent from "./DrawerContent.jsx";
+import DrawerContent from "./DrawerContent.tsx";
 
 export default function PokedexDetailPanel({
   hasSelection,

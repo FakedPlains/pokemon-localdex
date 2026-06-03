@@ -11,17 +11,22 @@
     padding: 8px 10px 8px 16px;
     top: 6px;
     border-radius: 20px;
+    /* 窄屏允许换行：品牌/导航/GitHub 在第一行，全局搜索框换到第二行占满整行 */
+    flex-wrap: wrap;
   }
   .top-nav-title { font-size: 14px; }
-  .top-nav-links { gap: 2px; flex-wrap: wrap; }
+  .top-nav-brand { margin-right: 0; }
+  .top-nav-links { gap: 2px; flex-wrap: wrap; margin-left: auto; }
   .top-nav-link { padding: 6px 12px; font-size: 13px; }
-  .nav-search-wrap { flex: 1 1 100%; order: 10; min-width: 0; }
-  .nav-search { font-size: 12px; padding: 6px 28px 6px 28px; }
-  .nav-search-icon { left: 8px; width: 13px; height: 13px; }
-  .nav-search-clear { width: 20px; height: 20px; right: 4px; }
+  /* 全局聚合搜索框：窄屏占满整行并排到导航项下方，重置桌面端的居中外边距 */
+  .global-search-wrap { flex: 1 1 100%; order: 10; min-width: 0; margin-left: 0; margin-right: 0; }
+  .global-search-input { font-size: 12px; padding: 6px 30px 6px 30px; }
+  .global-search-icon { left: 8px; width: 13px; height: 13px; }
+  .global-search-clear { width: 20px; height: 20px; right: 4px; }
   .top-nav-github { padding: 4px; margin-left: 0; }
   .top-nav-github svg { width: 18px; height: 18px; }
-  .nav-filter-btn { width: 32px; height: 32px; }
+  /* 筛选按钮与全局搜索框一起排到第二行 */
+  .nav-filter-btn { width: 32px; height: 32px; order: 11; }
   .filter-panel-overlay { padding: 64px 12px 12px; }
   .filter-panel { width: 100%; border-radius: 16px; padding: 16px; }
   .stat-input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

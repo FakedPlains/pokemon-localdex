@@ -5,67 +5,8 @@
 .tab-stats,
 .tab-moves { display: grid; gap: 20px; }
 
-.ov-section { display: grid; gap: 10px; }
+.ov-section { display: grid; gap: 0; }
 .ov-heading { margin: 0; font-size: 16px; color: var(--ink); }
-
-/* ═══════════════════════════════════════════════════════
-   Base Stat Bars
-   ═══════════════════════════════════════════════════════ */
-
-.bsb-grid { display: grid; gap: 2px; }
-
-.bsb-row {
-  display: grid;
-  grid-template-columns: 42px 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding: 5px 8px;
-  border-radius: 8px;
-}
-
-.bsb-label {
-  font-size: 13px;
-  font-weight: 700;
-  text-align: right;
-}
-
-.bsb-track {
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(31, 42, 31, 0.06);
-  overflow: hidden;
-}
-
-.bsb-fill {
-  height: 100%;
-  border-radius: inherit;
-}
-
-.bsb-val-group {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  min-width: 48px;
-}
-
-.bsb-val {
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.bsb-total .bsb-label { color: var(--ink); }
-.bsb-total .bsb-val { font-size: 14px; }
-
-.bsb-diff {
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  text-align: left;
-  min-width: 36px;
-}
-.bsb-diff-up { color: #2e9e3e; }
-.bsb-diff-down { color: #d94040; }
 
 /* ── Stat Variant Switcher ── */
 .stat-variant-switcher {
@@ -903,5 +844,606 @@ animation: sc-picker-in 0.25s ease;
   padding: 8px 12px;
   border-radius: 10px;
   background: rgba(31, 42, 31, 0.03);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Inline Stat Calculator (ISC) — 左右平分布局
+   左侧: 种族值（名称 + 数值 + 条形图）
+   右侧: 分配（IV + EV/SP + 性格 + 实际值）
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Heading row (title + mode toggle + controls all inline) ── */
+.isc-heading-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.isc-heading-row .ov-heading {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.isc-heading-controls {
+  display: contents;
+}
+
+.isc-heading-controls .isc-controls {
+  display: contents;
+}
+
+.isc-mode-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: rgba(31, 42, 31, 0.05);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.isc-mode-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+  white-space: nowrap;
+}
+
+.isc-mode-btn:hover:not(.isc-mode-active) {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.isc-mode-active {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(31, 42, 31, 0.1);
+  cursor: default;
+}
+
+/* ── Root ── */
+.isc-root {
+  display: grid;
+  gap: 0;
+  font-size: 13px;
+}
+
+.isc-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* ── Controls row ── */
+.isc-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.isc-nature-select {
+  min-width: 0;
+}
+
+.isc-nature-select .ss-trigger {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 0;
+  width: auto;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(31, 42, 31, 0.1);
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.isc-nature-select .ss-dropdown {
+  min-width: 240px;
+  width: max-content;
+  border-radius: 10px;
+}
+
+.isc-level-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.isc-level-input {
+  width: 42px;
+  padding: 3px 5px;
+  border-radius: 6px;
+  font-size: 11px;
+  text-align: center;
+  border: 1px solid rgba(31, 42, 31, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.isc-presets {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.isc-preset-chip {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid rgba(31, 42, 31, 0.1);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink-light);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+  white-space: nowrap;
+}
+
+.isc-preset-chip:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(31, 42, 31, 0.2);
+}
+
+.isc-preset-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong)) !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+
+.isc-budget {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: rgba(138, 166, 90, 0.1);
+  color: #3d5a1e;
+  margin-left: auto;
+}
+
+.isc-budget-full {
+  background: rgba(31, 42, 31, 0.06);
+  color: var(--muted);
+}
+
+.isc-nature-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.isc-nature-up { color: #c0392b; }
+.isc-nature-down { color: #2980b9; }
+
+.isc-reset-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(31, 42, 31, 0.05);
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--muted);
+  transition: background 150ms, color 150ms;
+  flex-shrink: 0;
+}
+
+.isc-reset-btn:hover {
+  background: rgba(31, 42, 31, 0.1);
+  color: var(--ink);
+}
+
+/* ── Grid header ── */
+.isc-grid-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 6px 6px;
+  margin-top: 12px;
+  border-bottom: 1px solid rgba(31, 42, 31, 0.06);
+}
+
+.isc-hdr-left {
+  display: grid;
+  grid-template-columns: 32px 36px 1fr 28px 56px;
+  gap: 8px;
+  align-items: center;
+}
+.isc-hdr-left--no-diff {
+  grid-template-columns: 32px 36px 1fr 56px;
+}
+.isc-hdr-left > span:first-child {
+  grid-column: 3; /* "种族值" 对齐进度条列 */
+}
+.isc-hdr-left .isc-hdr-range {
+  grid-column: -2 / -1; /* "范围" 对齐最后一列 */
+}
+
+.isc-hdr-right {
+  display: grid;
+  /* Classic: IV slider EV MAX 性格 实际 */
+  grid-template-columns: 36px 1fr 44px 26px 16px 42px;
+  align-items: center;
+  gap: 8px;
+}
+
+.isc-hdr-right--champ {
+  /* Champions: slider EV MAX 性格 实际 (无 IV 列) */
+  grid-template-columns: 1fr 44px 26px 16px 42px;
+}
+
+.isc-hdr-ev {
+  text-align: center;
+}
+
+.isc-hdr-final {
+  text-align: right;
+}
+
+.isc-hdr-range {
+  text-align: center;
+}
+
+/* ── Grid (stat rows) ── */
+.isc-grid {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.isc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 6px;
+  border-radius: 6px;
+  transition: background 150ms;
+}
+
+.isc-row:nth-child(even) {
+  background: rgba(31, 42, 31, 0.015);
+}
+
+.isc-row.isc-nat-up {
+  background: rgba(192, 57, 43, 0.025);
+}
+
+.isc-row.isc-nat-down {
+  background: rgba(41, 128, 185, 0.025);
+}
+
+.isc-total-row {
+  margin-top: 3px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(31, 42, 31, 0.08);
+  font-weight: 700;
+}
+
+/* ── Left half: label + base + bar + diff + range ── */
+.isc-left {
+  display: grid;
+  grid-template-columns: 32px 36px 1fr 28px 56px;
+  align-items: center;
+  gap: 8px;
+}
+.isc-left--no-diff {
+  grid-template-columns: 32px 36px 1fr 56px;
+}
+
+.isc-stat-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.isc-base-val {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--ink-light);
+}
+
+.isc-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(31, 42, 31, 0.06);
+  overflow: hidden;
+}
+
+.isc-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.isc-diff {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  min-width: 28px;
+}
+
+.isc-diff-up { color: #2e9e3e; }
+.isc-diff-down { color: #d94040; }
+
+/* ── Right half: IV + slider + num + MAX + nature + final + range ── */
+.isc-right {
+  display: grid;
+  /* Classic: IV slider EV MAX 性格 实际 */
+  grid-template-columns: 36px 1fr 44px 26px 16px 42px;
+  align-items: center;
+  gap: 8px;
+}
+
+.isc-right--champ {
+  /* Champions: slider EV MAX 性格 实际 (无 IV 列) */
+  grid-template-columns: 1fr 44px 26px 16px 42px;
+}
+
+.isc-iv-input {
+  width: 100%;
+  padding: 3px 4px;
+  border-radius: 5px;
+  font-size: 12px;
+  text-align: center;
+  border: 1px solid rgba(31, 42, 31, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  box-sizing: border-box;
+}
+
+.isc-iv-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.isc-iv-input::-webkit-inner-spin-button,
+.isc-iv-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.isc-iv-input {
+  -moz-appearance: textfield;
+}
+
+.isc-iv-placeholder {
+  visibility: hidden;
+  border: none;
+}
+
+.isc-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(31, 42, 31, 0.08);
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  outline: none;
+}
+
+.isc-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.isc-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.isc-ev-input {
+  width: 100%;
+  padding: 3px 4px;
+  border-radius: 5px;
+  font-size: 12px;
+  text-align: center;
+  border: 1px solid rgba(31, 42, 31, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  box-sizing: border-box;
+}
+
+.isc-ev-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.isc-ev-input::-webkit-inner-spin-button,
+.isc-ev-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.isc-ev-input {
+  -moz-appearance: textfield;
+}
+
+.isc-max-btn {
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  background: rgba(138, 166, 90, 0.15);
+  color: #3d5a1e;
+  border: 1px solid rgba(138, 166, 90, 0.2);
+  cursor: pointer;
+  transition: background 150ms;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.isc-max-btn:hover {
+  background: rgba(138, 166, 90, 0.3);
+}
+
+/* ── Nature indicator ── */
+.isc-nature-ind {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--muted);
+}
+
+.isc-nat-up .isc-nature-ind { color: #c0392b; }
+.isc-nat-down .isc-nature-ind { color: #2980b9; }
+
+/* ── Final value ── */
+.isc-final {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink);
+}
+
+/* ── EV total bar in total row ── */
+.isc-ev-total-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(31, 42, 31, 0.08);
+  overflow: hidden;
+}
+
+.isc-ev-total-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--grass), var(--electric));
+  transition: width 300ms ease;
+}
+
+/* ── Range column ── */
+.isc-range {
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Type Coverage Summary
+   ═══════════════════════════════════════════════════════ */
+
+.type-coverage-summary {
+  margin-top: 24px;
+}
+
+.tcs-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.tcs-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.tcs-row-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-top: 7px;
+}
+
+.tcs-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tcs-group {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.tcs-group-label {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.tcs-col-super { color: #2e7d32; }
+.tcs-col-resist { color: #1565c0; }
+.tcs-col-immune { color: #616161; }
+
+.tcs-bg-super { background: rgba(76, 175, 80, 0.08); }
+.tcs-bg-resist { background: rgba(33, 150, 243, 0.06); }
+.tcs-bg-immune { background: rgba(158, 158, 158, 0.08); }
+
+.tcs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tcs-chips .type-chip {
+  font-size: 12px;
+  padding: 3px 8px 3px 5px;
+  gap: 4px;
+}
+
+.tcs-chips .type-chip-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.tcs-mult {
+  font-size: 10px;
+  font-weight: 800;
+  opacity: 0.7;
+  margin-left: 1px;
+}
+
+.tcs-none {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 2px 0;
 }
 

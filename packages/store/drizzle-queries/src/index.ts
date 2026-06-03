@@ -26,6 +26,7 @@ import type {
   PokemonByAbilitySummary,
   PaginatedResult,
   PaginationParams,
+  GlobalSearchResults,
   FieldEffectEntry,
   FieldEffectFullDetail,
   IStore,
@@ -43,6 +44,9 @@ import {
   listAbilityRows,
   listItemRows,
   listMoveRows,
+  getAbilityPosition,
+  getItemPosition,
+  getMovePosition,
   type AbilityListFilters,
   type ItemListFilters,
   type MoveListFilters,
@@ -87,6 +91,7 @@ import {
   listFieldEffectRows,
   getFieldEffectRow,
 } from "./field-effects.query.ts";
+import { globalSearchRows } from "./global-search.ts";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DrizzleStore — 实现 IStore 接口
@@ -173,8 +178,9 @@ export class DrizzleStore implements IStore {
     options?: LearnsetQueryOptions,
     pagination?: PaginationParams,
     learnMethod?: string,
+    search?: string,
   ): Promise<LearnsetResult> {
-    return getPokemonLearnsetRows(this.db, pokemonId, generation, options, pagination, learnMethod);
+    return getPokemonLearnsetRows(this.db, pokemonId, generation, options, pagination, learnMethod, search);
   }
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -239,6 +245,30 @@ export class DrizzleStore implements IStore {
 
   async getItem(idOrName: string): Promise<ItemEntry | undefined> {
     return getItemRow(this.db, idOrName);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Position Queries
+  // ────────────────────────────────────────────────────────────────────────────
+
+  async getMovePosition(id: number, filters?: { query?: string; type?: string; category?: string; generation?: number }): Promise<number | undefined> {
+    return getMovePosition(this.db, id, filters);
+  }
+
+  async getAbilityPosition(id: number, filters?: { query?: string; generation?: number }): Promise<number | undefined> {
+    return getAbilityPosition(this.db, id, filters);
+  }
+
+  async getItemPosition(id: number, filters?: { query?: string; category?: string }): Promise<number | undefined> {
+    return getItemPosition(this.db, id, filters);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Global Search
+  // ────────────────────────────────────────────────────────────────────────────
+
+  async globalSearch(query: string, limit?: number): Promise<GlobalSearchResults> {
+    return globalSearchRows(this.db, query, limit);
   }
 
   // ────────────────────────────────────────────────────────────────────────────

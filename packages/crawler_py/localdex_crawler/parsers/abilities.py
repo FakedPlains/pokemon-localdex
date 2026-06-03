@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 
 from ..fetcher import RawPage
 from ..constants import ABILITY_LIST_URL
-from ..generations import extract_battle_effect, extract_generation_changes, extract_intro_names
+from ..generations import clean_name, extract_battle_effect, extract_generation_changes, extract_intro_names
 from ..images import ImageAsset
 from ..text import clean_inline_text, clean_summary, normalize_text, to_simplified
 from ..urls import build_ability_page_url, to_absolute_url
@@ -122,8 +122,8 @@ def normalize_ability_detail_page(page: RawPage, seed: AbilitySeed) -> dict:
     return {
         "number": seed.number,
         "name_zh": seed.name_zh,
-        "name_ja": name_ja or seed.name_ja,
-        "name_en": name_en or seed.name_en,
+        "name_ja": clean_name(seed.name_ja) if seed.name_ja else name_ja,
+        "name_en": clean_name(seed.name_en) if seed.name_en else name_en,
         "description": description,
         "effect_detail": effect_detail,
         "introduced_generation": seed.generation,

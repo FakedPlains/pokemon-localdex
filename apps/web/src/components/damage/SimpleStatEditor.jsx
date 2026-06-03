@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { STAT_KEYS, STAT_LABELS } from "@pokemon-localdex/store-types/constants";
-import { calculateFinalStat, getNatureMultiplier } from "../../utils/helpers.js";
+import { calculateFinalStat, getNatureMultiplier } from "../../utils/statCalcModel";
 import { BOOST_STATS, DEFAULT_BOOSTS, EV_MAX, EV_TOTAL_MAX, IV_MAX, SP_MAX, SP_TOTAL_MAX } from "./damageConstants.js";
 
 //  子组件：简化能力值编辑器（含性格指示 + 努力值上限）

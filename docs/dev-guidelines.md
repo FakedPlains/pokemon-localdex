@@ -335,7 +335,7 @@ import { typeIconSrc, categoryIconSrc } from "../utils/constants.js";
 
 DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 
-**EV↔SP 自动转换**：DamagePage 支持 Champions 赛制（SP 模式）和标准赛制（EV 模式）。切换赛制时会自动转换努力值，转换逻辑使用 `evToSp()` 和 `spToEv()` 函数，确保数据不丢失。
+**EV↔SP 自动转换**：DamagePage 支持 Champions 赛制（SP 模式）和标准赛制（EV 模式）。切换赛制时会自动转换努力值，整体转换逻辑统一使用 `convertEvsToSps(evs)` 和 `convertSpsToEvs(sps)` 函数（位于 `utils/statCalcModel.ts`），不要在各组件中重复实现逐项 `evToSp` / `spToEv` + 总量裁剪的转换逻辑。
 
 **形态切换自动绑定**：当用户切换宝可梦形态时，DamagePage 会自动绑定对应形态的道具和特性。例如超级进化形态会自动设置对应的超级石，极巨化形态会自动清除道具。
 
@@ -531,6 +531,8 @@ npx taro build --type weapp
 - `apps/miniprogram/src/utils/constants.js`
 
 两份文件内容应保持同步。如果需要新增常量，两处都要更新。
+
+**能力值计算常量**（`EV_MAX`、`EV_TOTAL_MAX`、`SP_MAX`、`SP_TOTAL_MAX`、`IV_MAX`、`STAT_KEYS` 等）统一定义在 `apps/web/src/utils/statCalcModel.ts` 中。其他文件（如 `damageConstants.js`）通过 re-export 引用，不得重复定义。需要使用这些常量或计算函数的组件，应直接从 `statCalcModel.ts` 导入。
 
 ---
 

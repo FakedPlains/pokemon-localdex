@@ -2,6 +2,48 @@
    Damage Calculator v2 (dc- prefix)
    ═══════════════════════════════════════════════════════════════ */
 
+/* ── 页面级 Tab 切换（伤害计算 / KO 分析） ── */
+.dc-page-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--line);
+  margin-bottom: 0;
+  padding: 0 20px;
+  background: var(--card-bg, #fff);
+  border-radius: 12px 12px 0 0;
+}
+
+.dc-page-tab {
+  position: relative;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.dc-page-tab:hover {
+  color: var(--text);
+}
+
+.dc-page-tab-active {
+  color: var(--accent, #e53935);
+}
+
+.dc-page-tab-active::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  background: var(--accent, #e53935);
+  border-radius: 1px;
+}
+
 .dc-page {
   max-width: none;
 }

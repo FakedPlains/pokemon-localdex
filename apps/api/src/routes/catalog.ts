@@ -20,6 +20,16 @@ export function registerItemRoutes(api: Hono<any>, opts: RegisterRoutesOptions):
     return c.json({ data });
   });
 
+  api.get("/items/:id/position", async (c) => {
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ error: "Invalid item ID" }, 400);
+    const query = c.req.query("q") || undefined;
+    const category = c.req.query("category") || undefined;
+    const position = await getStore(c).getItemPosition(id, { query, category });
+    if (position === undefined) return c.json({ error: "Item not found in current list" }, 404);
+    return c.json({ data: { position } });
+  });
+
   api.get("/items/:id", async (c) => {
     const entry = await getStore(c).getItem(c.req.param("id"));
     return entry ? c.json({ data: entry }) : c.json({ error: "Item not found" }, 404);
@@ -44,6 +54,18 @@ export function registerMoveRoutes(api: Hono<any>, opts: RegisterRoutesOptions):
     }
     const data = await s.listMoves({ query, type, category, generation });
     return c.json({ data });
+  });
+
+  api.get("/moves/:id/position", async (c) => {
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ error: "Invalid move ID" }, 400);
+    const query = c.req.query("q") || undefined;
+    const type = c.req.query("type") || undefined;
+    const category = c.req.query("category") || undefined;
+    const generation = numberQuery(c, "generation");
+    const position = await getStore(c).getMovePosition(id, { query, type, category, generation });
+    if (position === undefined) return c.json({ error: "Move not found in current list" }, 404);
+    return c.json({ data: { position } });
   });
 
   api.get("/moves/:id", async (c) => {
@@ -81,6 +103,16 @@ export function registerAbilityRoutes(api: Hono<any>, opts: RegisterRoutesOption
     }
     const data = await s.listAbilities({ query, generation });
     return c.json({ data });
+  });
+
+  api.get("/abilities/:id/position", async (c) => {
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ error: "Invalid ability ID" }, 400);
+    const query = c.req.query("q") || undefined;
+    const generation = numberQuery(c, "generation");
+    const position = await getStore(c).getAbilityPosition(id, { query, generation });
+    if (position === undefined) return c.json({ error: "Ability not found in current list" }, 404);
+    return c.json({ data: { position } });
   });
 
   api.get("/abilities/:id", async (c) => {

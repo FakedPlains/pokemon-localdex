@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { api } from "../utils/api.js";
 import { useToast } from "../components/Toast.jsx";
 import { GENERATION_OPTIONS } from "@pokemon-localdex/store-types/constants";
@@ -17,10 +17,16 @@ import useMoveExtraState from "../components/damage/useMoveExtraState.ts";
 import usePokemonDetails from "../components/damage/usePokemonDetails.js";
 import StatusPanel from "../components/damage/StatusPanel.jsx";
 
+const KoAnalysisPage = lazy(() => import("./KoAnalysisPage.tsx"));
+
 //  主页面
 // ══════════════════════════════════════════════════════════════
 
-export default function DamagePage() {
+export default function DamagePage({ initialTab = "damage" }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // 当 initialTab prop 变化时同步（例如从 #/ko 直接导航）
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const toast = useToast();
 
   // ── 世代 ──
@@ -192,6 +198,27 @@ export default function DamagePage() {
 
   return (
     <section className="view-grid">
+      {/* ── 页面级 Tab 切换：伤害计算 / KO 分析 ── */}
+      <div className="dc-page-tabs">
+        <button
+          className={`dc-page-tab${activeTab === "damage" ? " dc-page-tab-active" : ""}`}
+          onClick={() => { setActiveTab("damage"); window.location.hash = "#/damage"; }}
+        >
+          伤害计算
+        </button>
+        <button
+          className={`dc-page-tab${activeTab === "ko" ? " dc-page-tab-active" : ""}`}
+          onClick={() => { setActiveTab("ko"); window.location.hash = "#/ko"; }}
+        >
+          KO 分析
+        </button>
+      </div>
+
+      {activeTab === "ko" ? (
+        <Suspense fallback={<div className="shared-loading">加载中…</div>}>
+          <KoAnalysisPage />
+        </Suspense>
+      ) : (
       <div className="panel dc-page">
         {/* ── 页面标题栏 ── */}
         <div className="dc-header">
@@ -354,6 +381,7 @@ export default function DamagePage() {
         </div>
 
       </div>
+      )}
     </section>
   );
 }

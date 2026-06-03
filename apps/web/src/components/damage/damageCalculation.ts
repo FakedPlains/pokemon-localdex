@@ -1,4 +1,5 @@
-import { evToSp, resolveMoveGenerationRecord } from "../../utils/helpers.js";
+import { evToSp } from "../../utils/statCalcModel";
+import { resolveMoveGenerationRecord } from "../../utils/helpers.js";
 
 type AnyRecord = Record<string, any>;
 

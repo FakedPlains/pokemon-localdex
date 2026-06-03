@@ -1,6 +1,7 @@
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import TypeChip from "../TypeChip.jsx";
-import { calculateSpeedLine, getPokemonPreviewImage } from "../../utils/helpers.js";
+import { getPokemonPreviewImage } from "../../utils/helpers.js";
+import { calculateSpeedLine } from "../../utils/statCalcModel";
 
 export default function PokedexTableList({
   displayList,

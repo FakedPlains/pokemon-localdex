@@ -340,6 +340,30 @@ export type PokemonByAbilitySummary = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// 全局聚合搜索
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type GlobalSearchResultItem = {
+  id: string | number;
+  nameZh: string;
+  nameEn?: string;
+  /** 补充信息：宝可梦图鉴号、招式属性+分类、特性描述、道具效果等 */
+  subtitle?: string;
+  /** 宝可梦/道具的图片 URL */
+  image?: string;
+  /** 宝可梦属性（用于渲染 type chip） */
+  types?: string[];
+};
+
+export type GlobalSearchResults = {
+pokemon: GlobalSearchResultItem[];
+moves: GlobalSearchResultItem[];
+abilities: GlobalSearchResultItem[];
+items: GlobalSearchResultItem[];
+fieldEffects: GlobalSearchResultItem[];
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // 分页
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -513,6 +537,7 @@ export interface IStore {
     options?: LearnsetQueryOptions,
     pagination?: PaginationParams,
     learnMethod?: string,
+    search?: string,
   ): Promise<LearnsetResult>;
 
   // Champions
@@ -531,6 +556,14 @@ export interface IStore {
   // Items
   listItems(filters?: { query?: string; category?: string } & PaginationParams): Promise<ItemEntry[] | PaginatedResult<ItemEntry>>;
   getItem(idOrName: string): Promise<ItemEntry | undefined>;
+
+  // Position Queries — 计算目标 ID 在已排序列表中的 0-based offset（用于从任意位置开始加载）
+  getMovePosition(id: number, filters?: { query?: string; type?: string; category?: string; generation?: number }): Promise<number | undefined>;
+  getAbilityPosition(id: number, filters?: { query?: string; generation?: number }): Promise<number | undefined>;
+  getItemPosition(id: number, filters?: { query?: string; category?: string }): Promise<number | undefined>;
+
+  // Global Search
+  globalSearch(query: string, limit?: number): Promise<GlobalSearchResults>;
 
   // Field Effects
   listFieldEffects(filters?: { kind?: number }): Promise<FieldEffectEntry[]>;
