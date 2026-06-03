@@ -20,8 +20,9 @@ export function paginatedJson(c: AnyContext, result: unknown, offset: number, li
   return c.json(body);
 }
 
-function pokemonSortQuery(c: AnyContext): { sort?: "speed"; order?: "asc" | "desc" } {
+function pokemonSortQuery(c: AnyContext): { sort?: "speed" | "usage"; order?: "asc" | "desc" } {
   const sortRaw = c.req.query("sort");
+  if (sortRaw === "usage") return { sort: "usage" };
   const sort = sortRaw === "speed" || sortRaw === "spe" ? "speed" : undefined;
   if (!sort) return {};
   return {
@@ -38,8 +39,10 @@ export function pokemonListQuery(c: AnyContext) {
     : undefined;
   const generation = numberQuery(c, "generation");
   const championsSeasonId = numberQuery(c, "seasonId");
+  const formatRaw = c.req.query("format");
+  const battleFormat = formatRaw === "single" || formatRaw === "double" ? formatRaw : undefined;
   const sortOptions = pokemonSortQuery(c);
   const limit = numberQuery(c, "limit");
   const offset = numberQuery(c, "offset") ?? 0;
-  return { query, type, generation, championsSeasonId, sortOptions, limit, offset };
+  return { query, type, generation, championsSeasonId, battleFormat, sortOptions, limit, offset };
 }

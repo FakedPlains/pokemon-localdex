@@ -1,14 +1,23 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import type { PokemonCardSummary, PokemonTableSummary, ChampionsSeasonSummary } from "@pokemon-localdex/store-types";
 import { unifiedApi } from "../utils/api.js";
 import { useApi } from "../hooks/useApi.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import Loading from "../components/Loading.jsx";
-import PokedexCardList from "../components/pokedex/PokedexCardList.jsx";
-import PokedexDetailPanel from "../components/pokedex/PokedexDetailPanel.jsx";
-import PokedexTableList from "../components/pokedex/PokedexTableList.jsx";
-import PokedexToolbar from "../components/pokedex/PokedexToolbar.jsx";
+import PokedexCardList from "../components/pokedex/PokedexCardList";
+import PokedexDetailPanel from "../components/pokedex/PokedexDetailPanel";
+import PokedexTableList from "../components/pokedex/PokedexTableList";
+import PokedexToolbar from "../components/pokedex/PokedexToolbar";
 
-function formatSeasonLabel(season) {
+type ViewMode = "card" | "list";
+type SpeedSortOrder = "asc" | "desc" | "";
+
+interface SeasonOption {
+  value: string;
+  label: string;
+}
+
+function formatSeasonLabel(season: ChampionsSeasonSummary): string {
   if (!season) return "";
   const parts = [season.seasonCode, season.regulationCode];
   if (season.regulationName && season.regulationName !== season.regulationCode) {
@@ -17,26 +26,44 @@ function formatSeasonLabel(season) {
   return parts.filter(Boolean).join(" · ");
 }
 
+interface PokedexPageProps {
+  query?: string;
+  types?: string[];
+  generation?: string;
+  initialPokemonId?: string | null;
+  onInitialPokemonConsumed?: () => void;
+}
+
 /* ─── Main Page ─── */
-export default function PokedexPage({ query = "", types = [], generation = "", initialPokemonId = null, onInitialPokemonConsumed }) {
-  const [selectedSlug, setSelectedSlug] = useState(null);
-  const [detail, setDetail] = useState(null);
+export default function PokedexPage({
+  query = "",
+  types = [],
+  generation = "",
+  initialPokemonId = null,
+  onInitialPokemonConsumed,
+}: PokedexPageProps) {
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [detail, setDetail] = useState<any>(null);
   const [detailGeneration, setDetailGeneration] = useState("");
-  const [dexViewMode, setDexViewMode] = useState("card"); // "card" | "list"
+  const [dexViewMode, setDexViewMode] = useState<ViewMode>("card");
   const [championsSeasonId, setChampionsSeasonId] = useState("");
-  const [speedSortOrder, setSpeedSortOrder] = useState("");
+  const [battleFormat, setBattleFormat] = useState<"double" | "single">("double");
+  const [speedSortOrder, setSpeedSortOrder] = useState<SpeedSortOrder>("");
   const [showSpeedLine, setShowSpeedLine] = useState(false);
   const [hasLoadedList, setHasLoadedList] = useState(false);
-  const [lastList, setLastList] = useState([]);
+  const [lastList, setLastList] = useState<(PokemonCardSummary | PokemonTableSummary)[]>([]);
   const [lastTotal, setLastTotal] = useState(0);
 
-  const { data: championsSeasonsData = [], loading: seasonsLoading } = useApi("/champions/seasons");
+  const { data: championsSeasonsData = [], loading: seasonsLoading } = useApi("/champions/seasons") as {
+    data: ChampionsSeasonSummary[];
+    loading: boolean;
+  };
   const championsSeasons = championsSeasonsData || [];
   const selectedSeason = useMemo(
     () => championsSeasons.find((season) => String(season.id) === championsSeasonId),
     [championsSeasons, championsSeasonId],
   );
-  const championsSeasonOptions = useMemo(() => {
+  const championsSeasonOptions = useMemo<SeasonOption[]>(() => {
     const defaultLabel = seasonsLoading
       ? "加载赛季…"
       : championsSeasons.length === 0 ? "暂无赛季" : "全部赛季";
@@ -49,11 +76,11 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     ];
   }, [championsSeasons, seasonsLoading]);
 
-  const detailRef = useRef(null);
-  const activeCardRef = useRef(null);
-  const prevSlugRef = useRef(null);  // remember slug before closing detail
-  const filterChangedWhileOpenRef = useRef(false); // track filter changes with detail open
-  const fromUrlNavRef = useRef(false); // true when selection comes from URL navigation (#/pokemon?id=X)
+  const detailRef = useRef<HTMLDivElement>(null);
+  const activeCardRef = useRef<HTMLButtonElement>(null);
+  const prevSlugRef = useRef<string | null>(null);
+  const filterChangedWhileOpenRef = useRef(false);
+  const fromUrlNavRef = useRef(false);
 
   // 构建分页请求路径
   const pokemonPath = useMemo(() => {
@@ -61,24 +88,36 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     if (query) params.set("q", query);
     if (types.length > 0) params.set("type", types.join(","));
     if (generation) params.set("generation", generation);
-    if (championsSeasonId) params.set("seasonId", championsSeasonId);
+    if (championsSeasonId) {
+      params.set("seasonId", championsSeasonId);
+      params.set("format", battleFormat);
+    }
     if (dexViewMode === "list" && speedSortOrder) {
       params.set("sort", "speed");
       params.set("order", speedSortOrder);
+    } else if (championsSeasonId) {
+      // 选择赛季后默认按使用率排名排序
+      params.set("sort", "usage");
     }
     const qs = params.toString();
     const endpoint = dexViewMode === "list" ? "/pokemon/table" : "/pokemon/cards";
     return qs ? `${endpoint}?${qs}` : endpoint;
-  }, [query, types, generation, championsSeasonId, speedSortOrder, dexViewMode]);
+  }, [query, types, generation, championsSeasonId, battleFormat, speedSortOrder, dexViewMode]);
 
   // Mark that filters changed while detail panel is open
   useEffect(() => {
     if (selectedSlug && !fromUrlNavRef.current) {
       filterChangedWhileOpenRef.current = true;
     }
-  }, [query, types, generation, championsSeasonId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, types, generation, championsSeasonId, battleFormat]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: list, total, loading, hasMore, sentinelRef } = useInfiniteApi(pokemonPath, { pageSize: 60 });
+  const { data: list, total, loading, hasMore, sentinelRef } = useInfiniteApi(pokemonPath, { pageSize: 60 }) as {
+    data: (PokemonCardSummary | PokemonTableSummary)[];
+    total: number;
+    loading: boolean;
+    hasMore: boolean;
+    sentinelRef: React.RefObject<HTMLDivElement | null>;
+  };
   const isRefreshingList = loading && hasLoadedList;
   const displayList = isRefreshingList && list.length === 0 ? lastList : list;
   const displayTotal = isRefreshingList && list.length === 0 ? lastTotal : total;
@@ -98,7 +137,8 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     filterChangedWhileOpenRef.current = false;
 
     if (list.length > 0) {
-      const firstSlug = String(list[0].id);
+      const first = list[0];
+      const firstSlug = first.formId ? `${first.id}-f${first.formId}` : String(first.id);
       setSelectedSlug(firstSlug);
     } else {
       setSelectedSlug(null);
@@ -124,10 +164,12 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     if (!selectedSlug) { setDetail(null); return; }
     let cancelled = false;
     setDetail(null);
+    // slug 格式可能是 "123-f456"（形态级卡片）或 "123"（普通卡片），提取 pokemonId
+    const pokemonId = selectedSlug.includes("-f") ? selectedSlug.split("-f")[0] : selectedSlug;
     const params = new URLSearchParams();
     if (championsSeasonId) params.set("seasonId", championsSeasonId);
     const qs = params.toString();
-    unifiedApi(`/pokemon/${selectedSlug}/summary${qs ? `?${qs}` : ""}`).then((r) => {
+    unifiedApi(`/pokemon/${pokemonId}/summary${qs ? `?${qs}` : ""}`).then((r: any) => {
       if (!cancelled) {
         setDetail(r.data);
         setDetailGeneration("");
@@ -146,7 +188,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
   // Scroll handling for layout transitions.
   // Only scroll when layout actually changes (entering/leaving split view),
   // NOT when switching between pokemon within the split view.
-  const scrollTimerRef = useRef(null);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hadSelectionRef = useRef(false); // was there a selection BEFORE this change?
 
   useEffect(() => {
@@ -166,7 +208,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
           // Navigated from another page (e.g. moves/abilities) — scroll to top so detail panel is visible
           window.scrollTo({ top: 0, behavior: "instant" });
         } else {
-          const card = document.querySelector(`[data-slug="${CSS.escape(selectedSlug)}"]`);
+          const card = document.querySelector(`[data-slug="${CSS.escape(selectedSlug!)}"]`);
           if (card) {
             card.scrollIntoView({ block: "start", behavior: "instant" });
           }
@@ -189,7 +231,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
     return () => { if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current); };
   }, [selectedSlug]);
 
-  const handleSelect = useCallback((slug) => {
+  const handleSelect = useCallback((slug: string) => {
     setSelectedSlug((prev) => (prev === slug ? null : slug));
   }, []);
 
@@ -214,8 +256,11 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
 
   const hasSelection = selectedSlug !== null;
 
+  // 是否处于使用率排行模式：有赛季且不是速度排序时才是使用率排行
+  const isUsageRanking = !!championsSeasonId && !(dexViewMode === "list" && speedSortOrder);
+
   // 选中详情时强制使用卡片模式（紧凑列表）
-  const effectiveViewMode = hasSelection ? "card" : dexViewMode;
+  const effectiveViewMode: ViewMode = hasSelection ? "card" : dexViewMode;
 
   return (
     <div className="dex-page">
@@ -226,6 +271,9 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
         seasonsLoading={seasonsLoading}
         championsSeasons={championsSeasons}
         selectedSeason={selectedSeason}
+        battleFormat={battleFormat}
+        onBattleFormatChange={setBattleFormat}
+        isUsageRanking={isUsageRanking}
         isRefreshingList={isRefreshingList}
         displayTotal={displayTotal}
         hasSelection={hasSelection}
@@ -241,7 +289,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
         <div className={`dex-list-panel${hasSelection ? " dex-list-panel-narrow" : ""}`}>
           {effectiveViewMode === "card" ? (
             <PokedexCardList
-              displayList={displayList}
+              displayList={displayList as PokemonCardSummary[]}
               loading={loading}
               hasSelection={hasSelection}
               selectedSlug={selectedSlug}
@@ -252,7 +300,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
             />
           ) : (
             <PokedexTableList
-              displayList={displayList}
+              displayList={displayList as PokemonTableSummary[]}
               loading={loading}
               showSpeedLine={showSpeedLine}
               speedSortOrder={speedSortOrder}
@@ -269,6 +317,7 @@ export default function PokedexPage({ query = "", types = [], generation = "", i
           hasSelection={hasSelection}
           detailRef={detailRef}
           detail={detail}
+          initialFormId={selectedSlug?.includes("-f") ? Number(selectedSlug.split("-f")[1]) : undefined}
           detailGeneration={detailGeneration}
           onDetailGenerationChange={setDetailGeneration}
           onClose={handleClose}

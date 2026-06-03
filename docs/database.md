@@ -8,7 +8,7 @@ Pokemon LocalDex 使用单个 SQLite 数据库文件 `data/sqlite/localdex.sqlit
 
 ## 表结构总览
 
-数据库包含主实体表、形态相关表、世代记录表、关联表和 Champions 专用表。
+数据库包含主实体表、形态相关表、世代记录表、关联表、Champions 专用表和使用率数据表。
 
 ### 主实体表
 
@@ -244,6 +244,106 @@ Champions 数据来自 52Poké 的 `赛季（Champions）`、`赛制（Champions
 | item_id | INTEGER FK | 关联主 items.id；Champions 道具页中找不到主表记录的条目不写入 |
 | sort_order | INTEGER | Champions 道具源页面顺序 |
 
+### 使用率数据表
+
+使用率数据来自 pokechamdb.com，记录 Champions 赛季各格式下宝可梦的排名和配置统计。以 `champions_usage_pokemon` 为核心，通过 `usage_pokemon_id` 外键关联各维度子表。
+
+**champions_usage_pokemon** — 使用率排名主表，每条记录对应一只宝可梦在某赛季某格式下的排名。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增主键 |
+| season_id | INTEGER FK | 关联 champions_seasons.id |
+| format | TEXT | 对战格式（`single` / `double`） |
+| event_id | TEXT | 赛事 ID（ranked 为空字符串，预留锦标赛格式） |
+| pokemon_id | INTEGER FK | 关联 pokemon.id（可 NULL） |
+| form_id | INTEGER FK | 关联 pokemon_forms.id（可 NULL） |
+| pokemon_slug | TEXT | 宝可梦标识（中文名，用于匹配和去重） |
+| rank | INTEGER | 使用率排名 |
+| fetched_at | TEXT | 数据抓取时间 |
+
+唯一约束：`(season_id, format, event_id, pokemon_slug)`。索引：`(season_id, format)`、`pokemon_id`。
+
+**champions_usage_moves** — 招式使用率。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增主键 |
+| usage_pokemon_id | INTEGER FK | 关联 champions_usage_pokemon.id |
+| move_id | INTEGER FK | 关联 moves.id（可 NULL） |
+| move_name_zh | TEXT | 招式中文名 |
+| rank | INTEGER | 使用率排名 |
+| percentage | REAL | 使用率百分比 |
+
+唯一约束：`(usage_pokemon_id, move_name_zh)`。
+
+**champions_usage_items** — 道具使用率。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增主键 |
+| usage_pokemon_id | INTEGER FK | 关联 champions_usage_pokemon.id |
+| item_id | INTEGER FK | 关联 items.id（可 NULL） |
+| item_name_zh | TEXT | 道具中文名 |
+| rank | INTEGER | 使用率排名 |
+| percentage | REAL | 使用率百分比 |
+
+唯一约束：`(usage_pokemon_id, item_name_zh)`。
+
+**champions_usage_abilities** — 特性使用率。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增主键 |
+| usage_pokemon_id | INTEGER FK | 关联 champions_usage_pokemon.id |
+| ability_id | INTEGER FK | 关联 abilities.id（可 NULL） |
+| ability_name_zh | TEXT | 特性中文名 |
+| rank | INTEGER | 使用率排名 |
+| percentage | REAL | 使用率百分比 |
+
+唯一约束：`(usage_pokemon_id, ability_name_zh)`。
+
+**champions_usage_natures** — 性格使用率。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增主键 |
+| usage_pokemon_id | INTEGER FK | 关联 champions_usage_pokemon.id |
+| nature_id | INTEGER | 性格编号（对应 shared-types NATURE_DEFS 枚举 1-25） |
+| rank | INTEGER | 使用率排名 |
+| percentage | REAL | 使用率百分比 |
+
+唯一约束：`(usage_pokemon_id, nature_id)`。
+
+**champions_usage_partners** — 队友排名。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增主键 |
+| usage_pokemon_id | INTEGER FK | 关联 champions_usage_pokemon.id |
+| partner_pokemon_id | INTEGER FK | 关联 pokemon.id（通过中文名多级匹配） |
+| partner_slug | TEXT | 队友标识（中文名） |
+| rank | INTEGER | 队友匹配率排名 |
+
+唯一约束：`(usage_pokemon_id, partner_slug)`。
+
+**champions_usage_ev_spreads** — EV（努力值）分布排名。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 自增主键 |
+| usage_pokemon_id | INTEGER FK | 关联 champions_usage_pokemon.id |
+| rank | INTEGER | 排名 |
+| percentage | REAL | 使用率百分比 |
+| hp | INTEGER | HP 努力值 |
+| atk | INTEGER | 攻击努力值 |
+| def | INTEGER | 防御努力值 |
+| sp_atk | INTEGER | 特攻努力值 |
+| sp_def | INTEGER | 特防努力值 |
+| speed | INTEGER | 速度努力值 |
+
+唯一约束：`(usage_pokemon_id, hp, atk, def, sp_atk, sp_def, speed)`。
+
 ## ER 关系
 
 ```mermaid
@@ -266,6 +366,15 @@ erDiagram
     items ||--o{ champions_regulation_items : "available in"
     pokemon ||--o{ champions_regulation_pokemon : "matched by dex"
     pokemon_forms ||--o{ champions_regulation_pokemon : "matched by form"
+    champions_seasons ||--o{ champions_usage_pokemon : "has usage"
+    champions_usage_pokemon ||--o{ champions_usage_moves : "uses moves"
+    champions_usage_pokemon ||--o{ champions_usage_items : "uses items"
+    champions_usage_pokemon ||--o{ champions_usage_abilities : "uses abilities"
+    champions_usage_pokemon ||--o{ champions_usage_natures : "uses natures"
+    champions_usage_pokemon ||--o{ champions_usage_partners : "paired with"
+    champions_usage_pokemon ||--o{ champions_usage_ev_spreads : "ev distribution"
+    pokemon ||--o{ champions_usage_pokemon : "ranked in"
+    pokemon_forms ||--o{ champions_usage_pokemon : "ranked as form"
 ```
 
 ## 设计要点
@@ -275,3 +384,5 @@ erDiagram
 **世代范围**：形态子表（stats/types/abilities）使用 `generation_start` 和 `generation_end` 表示生效范围，而非为每个世代创建一条记录。这样既节省空间，又能方便地查询"第 N 世代时这个形态的种族值是多少"。
 
 **冗余中文名**：`pokemon_form_abilities.ability_name_zh` 和 `pokemon_moves.move_name_zh` 冗余存储了中文名。这是因为爬虫解析时可能还没有对应的 abilities/moves 记录（采集顺序不固定），冗余字段保证数据完整性，同时也简化了查询。
+
+**使用率数据中文名匹配**：`champions_usage_pokemon` 和 `champions_usage_partners` 通过中文名多级匹配关联到 `pokemon.id`。pokechamdb 仅提供日文 `name` 字段和中文 `displayNames`，爬虫以中文名为主键进行匹配（`pokemon.name_zh` → `pokemon_forms.name_zh` → `display_name_zh` → 括号拆解 → 别名映射）。`pokemon_slug` / `partner_slug` 冗余存储中文名作为去重键，即使 ID 匹配失败数据仍可保留。

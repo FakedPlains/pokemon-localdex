@@ -33,6 +33,7 @@
     "crawl:moves": "python3 packages/crawler_py/crawl-52poke-db.py moves",
     "crawl:items": "python3 packages/crawler_py/crawl-52poke-db.py items",
     "crawl:field-effects": "python3 packages/crawler_py/crawl-52poke-db.py field-effects",
+    "crawl:usage": "python3 packages/crawler_py/crawl-52poke-db.py usage",
     "seed:battle-effects": "node --experimental-sqlite scripts/run-seed.mjs scripts/seed-battle-effects.sql",
     "seed:field-effect-modifiers": "node --experimental-sqlite scripts/run-seed.mjs scripts/seed-field-effect-modifiers.sql",
     "seed:field-effect-sources": "node --experimental-sqlite scripts/run-seed.mjs scripts/seed-field-effect-sources.sql"

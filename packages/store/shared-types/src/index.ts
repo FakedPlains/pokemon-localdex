@@ -132,6 +132,14 @@ export type PokemonCardSummary = {
   primaryType?: string;
   secondaryType?: string;
   image?: ImageAsset;
+  /** 赛季使用率排名（仅在按赛季筛选时返回） */
+  usageRank?: number;
+  /** 形态 ID（仅在按使用率排序时返回，用于区分同物种不同形态） */
+  formId?: number;
+  /** 形态类型标识（如 "wash"、"paldea-aqua"），仅非默认形态时有值 */
+  formType?: string;
+  /** 形态中文名（如 "洛托姆(清洗洛托姆)"），仅非默认形态时有值 */
+  formName?: string;
 };
 
 export type PokemonTableSummary = PokemonCardSummary & {
@@ -368,7 +376,7 @@ fieldEffects: GlobalSearchResultItem[];
 // ══════════════════════════════════════════════════════════════════════════════
 
 export type SortOrder = "asc" | "desc";
-export type PokemonListSortKey = "speed";
+export type PokemonListSortKey = "speed" | "usage";
 export type PaginationParams = { offset?: number; limit?: number };
 export type PaginatedResult<T> = { items: T[]; total?: number; hasMore: boolean };
 
@@ -507,6 +515,7 @@ export interface IStore {
     type?: string | string[];
     generation?: number;
     championsSeasonId?: number;
+    battleFormat?: string;
     sort?: PokemonListSortKey;
     order?: SortOrder;
   } & PaginationParams): Promise<PokemonSummary[] | PaginatedResult<PokemonSummary>>;
@@ -515,6 +524,7 @@ export interface IStore {
     type?: string | string[];
     generation?: number;
     championsSeasonId?: number;
+    battleFormat?: string;
     sort?: PokemonListSortKey;
     order?: SortOrder;
   } & PaginationParams): Promise<PokemonCardSummary[] | PaginatedResult<PokemonCardSummary>>;
@@ -523,6 +533,7 @@ export interface IStore {
     type?: string | string[];
     generation?: number;
     championsSeasonId?: number;
+    battleFormat?: string;
     sort?: PokemonListSortKey;
     order?: SortOrder;
   } & PaginationParams): Promise<PokemonTableSummary[] | PaginatedResult<PokemonTableSummary>>;

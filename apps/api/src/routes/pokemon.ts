@@ -7,37 +7,37 @@ export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOption
 
   api.get("/pokemon", async (c) => {
     const s = getStore(c);
-    const { query, type, generation, championsSeasonId, sortOptions, limit, offset } = pokemonListQuery(c);
+    const { query, type, generation, championsSeasonId, battleFormat, sortOptions, limit, offset } = pokemonListQuery(c);
 
     if (limit !== undefined) {
-      const result = await s.listPokemon({ query, type, generation, championsSeasonId, ...sortOptions, limit, offset });
+      const result = await s.listPokemon({ query, type, generation, championsSeasonId, battleFormat, ...sortOptions, limit, offset });
       return paginatedJson(c, result, offset, limit);
     }
-    const data = await s.listPokemon({ query, type, generation, championsSeasonId, ...sortOptions });
+    const data = await s.listPokemon({ query, type, generation, championsSeasonId, battleFormat, ...sortOptions });
     return c.json({ data });
   });
 
   api.get("/pokemon/cards", async (c) => {
     const s = getStore(c);
-    const { query, type, generation, championsSeasonId, sortOptions, limit, offset } = pokemonListQuery(c);
+    const { query, type, generation, championsSeasonId, battleFormat, sortOptions, limit, offset } = pokemonListQuery(c);
 
     if (limit !== undefined) {
-      const result = await s.listPokemonCards({ query, type, generation, championsSeasonId, ...sortOptions, limit, offset });
+      const result = await s.listPokemonCards({ query, type, generation, championsSeasonId, battleFormat, ...sortOptions, limit, offset });
       return paginatedJson(c, result, offset, limit);
     }
-    const data = await s.listPokemonCards({ query, type, generation, championsSeasonId, ...sortOptions });
+    const data = await s.listPokemonCards({ query, type, generation, championsSeasonId, battleFormat, ...sortOptions });
     return c.json({ data });
   });
 
   api.get("/pokemon/table", async (c) => {
     const s = getStore(c);
-    const { query, type, generation, championsSeasonId, sortOptions, limit, offset } = pokemonListQuery(c);
+    const { query, type, generation, championsSeasonId, battleFormat, sortOptions, limit, offset } = pokemonListQuery(c);
 
     if (limit !== undefined) {
-      const result = await s.listPokemonTable({ query, type, generation, championsSeasonId, ...sortOptions, limit, offset });
+      const result = await s.listPokemonTable({ query, type, generation, championsSeasonId, battleFormat, ...sortOptions, limit, offset });
       return paginatedJson(c, result, offset, limit);
     }
-    const data = await s.listPokemonTable({ query, type, generation, championsSeasonId, ...sortOptions });
+    const data = await s.listPokemonTable({ query, type, generation, championsSeasonId, battleFormat, ...sortOptions });
     return c.json({ data });
   });
 
