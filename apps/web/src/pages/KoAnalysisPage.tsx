@@ -3,12 +3,12 @@
  * 路由: #/ko
  */
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { createDraftMember, getPokemonPreviewImage } from "../utils/helpers.js";
+import { createDraftMember } from "../utils/helpers.js";
 import { unifiedApi } from "../utils/api.js";
 import PokemonConfigPanel from "../components/damage/PokemonConfigPanel.jsx";
 import usePokemonDetails from "../components/damage/usePokemonDetails.js";
 import useDamageStatMode from "../components/damage/useDamageStatMode.js";
-import { DEFAULT_BOOSTS } from "../components/damage/damageConstants.js";
+import { DEFAULT_BOOSTS } from "../components/damage/damageConstants";
 import KoTargetPanel from "../components/ko/KoTargetPanel";
 import KoResultPanel from "../components/ko/KoResultPanel";
 import useKoAnalysis from "../hooks/useKoAnalysis";
@@ -170,6 +170,7 @@ export default function KoAnalysisPage() {
             boosts={myBoosts}
             onBoostChange={(key: string, val: number) => setMyBoosts((prev) => ({ ...prev, [key]: Math.max(-6, Math.min(6, val)) }))}
             level={50}
+            onMovesSync={() => {}}
             curHP={0}
             onCurHPChange={() => {}}
             teraType={myTeraType}
@@ -211,7 +212,6 @@ export default function KoAnalysisPage() {
                           index={idx}
                           learnset={learnset}
                           onSelect={handleSelectMove}
-                          isActive={false}
                         />
                       );
                     }
@@ -301,7 +301,6 @@ interface MovePickerChipProps {
   index: number;
   learnset: LearnsetMove[];
   onSelect: (move: MoveInfo, idx: number) => void;
-  isActive: boolean;
 }
 
 function MovePickerChip({ index, learnset, onSelect }: MovePickerChipProps) {
