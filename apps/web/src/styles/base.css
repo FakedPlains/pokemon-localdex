@@ -1,15 +1,58 @@
+/* ═══════════════════════════════════════════════════════════════
+   Pokemon LocalDex — Glassmorphism Design System
+   ═══════════════════════════════════════════════════════════════ */
+
 :root {
-  --bg: #f5f8f6;
-  --panel: rgba(255, 255, 255, 0.92);
-  --ink: #1a2b2a;
-  --muted: #5e7370;
-  --line: rgba(30, 70, 60, 0.10);
-  --accent: #1aab8a;
-  --accent-strong: #0e8a6e;
+  /* ── Base ── */
+  --bg: #F0F4F8;
+  --ink: #1A1A1A;
+  --muted: #6B7280;
+  --line: rgba(0, 0, 0, 0.05);
+
+  /* ── Accent ── */
+  --accent: #E8453C;
+  --accent-strong: #D03A32;
+  --accent-soft: rgba(232, 69, 60, 0.08);
+
+  /* ── Glass Layers ── */
+  --glass-l1: rgba(255, 255, 255, 0.72);  /* Nav, top-level floating */
+  --glass-l2: rgba(255, 255, 255, 0.55);  /* Main panels */
+  --glass-l3: rgba(255, 255, 255, 0.38);  /* Cards */
+  --glass-l4: rgba(255, 255, 255, 0.45);  /* Subpanels (inside panels) */
+  --glass-l5: rgba(255, 255, 255, 0.82);  /* Modals */
+
+  /* ── Glass Borders ── */
+  --border-l1: rgba(255, 255, 255, 0.65);
+  --border-l2: rgba(255, 255, 255, 0.5);
+  --border-l3: rgba(255, 255, 255, 0.35);
+  --border-l4: rgba(255, 255, 255, 0.4);
+  --border-l5: rgba(255, 255, 255, 0.7);
+
+  /* ── Blur ── */
+  --blur-sm: blur(8px);
+  --blur-md: blur(14px);
+  --blur-lg: blur(20px);
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12);
+
+  /* ── Radii ── */
+  --radius: 20px;
+  --radius-sm: 12px;
+  --radius-xs: 8px;
+  --radius-pill: 999px;
+
+  /* ── Type colors (kept) ── */
   --grass: #77CC55;
   --electric: #FFCC33;
   --water: #3399FF;
-  --shadow: 0 18px 48px rgba(20, 60, 50, 0.08);
+
+  /* ── Legacy compat ── */
+  --panel: var(--glass-l2);
+  --panel-solid: #FFFFFF;
 }
 
 * { box-sizing: border-box; }
@@ -18,11 +61,16 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--ink);
-  font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(26, 171, 138, 0.08), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(59, 162, 197, 0.06), transparent 28%),
-    linear-gradient(180deg, #f7faf9 0%, #eef4f2 100%);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse 100% 80% at 15% -5%, rgba(120, 210, 180, 0.35) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 70% at 88% 5%, rgba(130, 195, 240, 0.28) 0%, transparent 45%),
+    radial-gradient(ellipse 70% 55% at 55% 45%, rgba(180, 230, 200, 0.18) 0%, transparent 45%),
+    radial-gradient(ellipse 55% 50% at 8% 72%, rgba(160, 190, 240, 0.15) 0%, transparent 40%),
+    radial-gradient(ellipse 50% 40% at 85% 75%, rgba(232, 69, 60, 0.05) 0%, transparent 35%),
+    radial-gradient(ellipse 45% 35% at 50% 95%, rgba(170, 150, 220, 0.1) 0%, transparent 35%);
+  background-attachment: fixed;
 }
 
 .app-shell {
@@ -31,3 +79,7 @@ body {
   padding: 20px 0 40px;
 }
 
+/* ── Utility: glass highlight on top edge ── */
+.glass-highlight {
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}

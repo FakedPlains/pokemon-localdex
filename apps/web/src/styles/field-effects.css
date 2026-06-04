@@ -8,6 +8,11 @@
 
 .fe-panel {
   padding: 1.5rem;
+  background: var(--glass-l4);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid var(--border-l4);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .fe-header {
@@ -33,9 +38,10 @@
 
 .fe-tab {
   padding: 0.4rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
   color: var(--text);
   font-size: 0.85rem;
   cursor: pointer;
@@ -43,21 +49,21 @@
 }
 
 .fe-tab:hover {
-  border-color: var(--grass);
-  color: var(--grass);
-  background: rgba(119, 204, 85, 0.08);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft, rgba(232, 69, 60, 0.08));
 }
 
 .fe-tab-active {
   color: white;
-  background: linear-gradient(135deg, var(--grass), #6b9a3a);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   border-color: transparent;
-  box-shadow: 0 2px 8px rgba(107, 154, 58, 0.3);
+  box-shadow: 0 2px 8px rgba(232, 69, 60, 0.2);
 }
 
 .fe-tab-active:hover {
-  background: linear-gradient(135deg, #7aaf4a, #5a8a2e);
-  box-shadow: 0 2px 8px rgba(107, 154, 58, 0.4);
+  background: linear-gradient(135deg, var(--accent-strong), #a51d2a);
+  box-shadow: 0 2px 8px rgba(232, 69, 60, 0.3);
 }
 
 .fe-tab-count {
@@ -74,19 +80,23 @@
 }
 
 .fe-row {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
   overflow: hidden;
   transition: border-color 0.15s;
 }
 
 .fe-row:hover {
-  border-color: rgba(119, 204, 85, 0.4);
+  border-color: rgba(232, 69, 60, 0.3);
+  background: var(--glass-l2);
+  box-shadow: var(--shadow-hover);
 }
 
 .fe-row-expanded {
-  border-color: var(--grass);
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
 }
 
 .fe-row-header {
@@ -112,10 +122,10 @@
   white-space: nowrap;
 }
 
-.fe-row-kind-badge[data-kind="1"] { background: #fef3c7; color: #92400e; }
-.fe-row-kind-badge[data-kind="2"] { background: #d1fae5; color: #065f46; }
+.fe-row-kind-badge[data-kind="1"] { background: rgba(232, 69, 60, 0.08); color: #92400e; }
+.fe-row-kind-badge[data-kind="2"] { background: rgba(22, 163, 74, 0.08); color: #065f46; }
 .fe-row-kind-badge[data-kind="3"] { background: #fce7f3; color: #9d174d; }
-.fe-row-kind-badge[data-kind="4"] { background: #dbeafe; color: #1e40af; }
+.fe-row-kind-badge[data-kind="4"] { background: rgba(59, 130, 246, 0.08); color: #1e40af; }
 .fe-row-kind-badge[data-kind="5"] { background: #ede9fe; color: #5b21b6; }
 
 .fe-row-name {
@@ -147,8 +157,8 @@
 
 .fe-row-meta-tag {
   padding: 0.1rem 0.4rem;
-  background: var(--bg);
-  border-radius: 3px;
+  background: var(--glass-l3);
+  border-radius: 6px;
 }
 
 .fe-row-arrow {
@@ -164,8 +174,9 @@
 /* ── Detail panel ── */
 .fe-row-detail {
   padding: 1rem 1.25rem;
-  border-top: 1px solid var(--border);
-  background: var(--bg);
+  border-top: 1px solid var(--border-l3);
+  background: var(--glass-l5);
+  backdrop-filter: var(--blur-sm);
 }
 
 .fe-detail-names {
@@ -204,9 +215,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.4rem 0.6rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--glass-l3);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  backdrop-filter: var(--blur-sm);
   font-size: 0.82rem;
 }
 
@@ -218,9 +230,9 @@
   font-weight: 600;
 }
 
-.fe-source-type-badge[data-type="1"] { background: #dbeafe; color: #1e40af; }
-.fe-source-type-badge[data-type="2"] { background: #fef3c7; color: #92400e; }
-.fe-source-type-badge[data-type="3"] { background: #d1fae5; color: #065f46; }
+.fe-source-type-badge[data-type="1"] { background: rgba(59, 130, 246, 0.08); color: #1e40af; }
+.fe-source-type-badge[data-type="2"] { background: rgba(232, 69, 60, 0.08); color: #92400e; }
+.fe-source-type-badge[data-type="3"] { background: rgba(22, 163, 74, 0.08); color: #065f46; }
 
 .fe-source-name {
   font-weight: 500;
@@ -247,7 +259,8 @@
 .fe-modifiers-table th {
   text-align: left;
   padding: 0.4rem 0.5rem;
-  background: var(--surface);
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
   border-bottom: 1px solid var(--border);
   font-weight: 600;
   color: var(--text-muted);

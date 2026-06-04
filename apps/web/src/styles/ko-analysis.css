@@ -47,9 +47,11 @@
 
 /* ── 分析设置面板 ── */
 .ko-settings {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 12px;
+  background: var(--glass-l4);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid var(--border-l4);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   padding: 1rem;
 }
 
@@ -69,9 +71,10 @@
 .ko-mode-btn {
   flex: 1;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
-  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
@@ -80,13 +83,13 @@
 }
 
 .ko-mode-btn:hover {
-  border-color: var(--primary, #3b82f6);
-  background: var(--primary-light, #eff6ff);
+  border-color: var(--accent, #E8453C);
+  background: var(--accent-soft, rgba(232, 69, 60, 0.08));
 }
 
 .ko-mode-btn-active {
-  border-color: var(--primary, #3b82f6);
-  background: var(--primary, #3b82f6);
+  border-color: var(--accent, #E8453C);
+  background: var(--accent, #E8453C);
   color: #fff;
 }
 
@@ -106,10 +109,10 @@
 .ko-settings-select {
   flex: 1;
   padding: 0.375rem 0.5rem;
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--border-l3);
   border-radius: 6px;
   font-size: 0.8rem;
-  background: var(--card-bg, #fff);
+  background: var(--glass-l3);
 }
 
 /* ── 招式选择（斩杀线模式）── */
@@ -131,22 +134,22 @@
 
 .ko-move-chip {
   padding: 0.375rem 0.625rem;
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 6px;
-  background: var(--card-bg, #fff);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
   font-size: 0.75rem;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .ko-move-chip:hover {
-  border-color: var(--primary, #3b82f6);
+  border-color: var(--accent, #E8453C);
 }
 
 .ko-move-chip-active {
-  border-color: var(--primary, #3b82f6);
-  background: var(--primary-light, #eff6ff);
-  color: var(--primary, #3b82f6);
+  border-color: var(--accent, #E8453C);
+  background: var(--accent-soft, rgba(232, 69, 60, 0.08));
+  color: var(--accent, #E8453C);
   font-weight: 500;
 }
 
@@ -162,7 +165,7 @@
   padding: 0.625rem;
   border: none;
   border-radius: 8px;
-  background: var(--primary, #3b82f6);
+  background: var(--accent, #E8453C);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
@@ -172,7 +175,7 @@
 }
 
 .ko-analyze-btn:hover:not(:disabled) {
-  background: var(--primary-dark, #2563eb);
+  background: var(--accent-strong, #D03A32);
 }
 
 .ko-analyze-btn:disabled {
@@ -182,9 +185,11 @@
 
 /* ── 目标管理面板 ── */
 .ko-targets {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 12px;
+  background: var(--glass-l4);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid var(--border-l4);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   padding: 1rem;
 }
 
@@ -218,14 +223,16 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
   font-size: 0.8rem;
   transition: background 0.1s;
 }
 
 .ko-target-item:hover {
-  background: var(--hover-bg, #f9fafb);
+  background: var(--glass-l2);
+  box-shadow: var(--shadow-sm);
 }
 
 .ko-target-img {
@@ -282,9 +289,9 @@
 }
 
 .ko-add-target-btn:hover {
-  border-color: var(--primary, #3b82f6);
-  color: var(--primary, #3b82f6);
-  background: var(--primary-light, #eff6ff);
+  border-color: var(--accent, #E8453C);
+  color: var(--accent, #E8453C);
+  background: var(--glass-l3);
 }
 
 /* ── 右侧：结果面板 ── */
@@ -300,22 +307,23 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
 }
 
 .ko-progress-bar {
   flex: 1;
   height: 6px;
-  background: var(--border, #e5e7eb);
+  background: var(--border-l3);
   border-radius: 3px;
   overflow: hidden;
 }
 
 .ko-progress-fill {
   height: 100%;
-  background: var(--primary, #3b82f6);
+  background: var(--accent, #E8453C);
   border-radius: 3px;
   transition: width 0.2s;
 }
@@ -354,9 +362,11 @@
 
 /* ── 表格容器 ── */
 .ko-table-container {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 12px;
+  background: var(--glass-l5);
+  backdrop-filter: var(--blur-lg);
+  border: 1px solid var(--border-l5);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   overflow: hidden;
 }
 
@@ -365,8 +375,9 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: var(--bg-subtle, #f9fafb);
-  border-bottom: 1px solid var(--border, #e5e7eb);
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
+  border-bottom: 1px solid var(--border-l3);
 }
 
 .ko-table-summary-title {
@@ -378,8 +389,8 @@
 .ko-table-summary-move {
   font-size: 0.75rem;
   padding: 0.125rem 0.5rem;
-  background: var(--primary-light, #eff6ff);
-  color: var(--primary, #3b82f6);
+  background: var(--accent-soft, rgba(232, 69, 60, 0.08));
+  color: var(--accent, #E8453C);
   border-radius: 4px;
   font-weight: 500;
 }
@@ -410,8 +421,9 @@
   font-weight: 600;
   font-size: 0.7rem;
   color: var(--text-secondary, #666);
-  background: var(--bg-subtle, #f9fafb);
-  border-bottom: 2px solid var(--border, #e5e7eb);
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
+  border-bottom: 2px solid var(--border-l3);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   position: sticky;
@@ -428,7 +440,7 @@
 
 /* ── 表格行 ── */
 .ko-tr {
-  border-bottom: 1px solid var(--border-light, #f0f0f0);
+  border-bottom: 1px solid var(--border-l3);
   transition: background 0.1s;
 }
 
@@ -437,7 +449,7 @@
 }
 
 .ko-tr:hover {
-  background: var(--hover-bg, #fafafa);
+  background: var(--glass-l3);
 }
 
 /* ── 表格单元格 ── */
@@ -516,7 +528,7 @@
 }
 
 .ko-badge--probable {
-  background: #fef3c7;
+  background: rgba(232, 69, 60, 0.06);
   color: #92400e;
 }
 
@@ -526,7 +538,7 @@
 }
 
 .ko-badge--multi {
-  background: var(--bg-subtle, #f5f5f5);
+  background: var(--glass-l3);
   color: var(--text-secondary, #666);
 }
 
@@ -541,7 +553,7 @@
 }
 
 .ko-badge--risk {
-  background: #fef3c7;
+  background: rgba(232, 69, 60, 0.06);
   color: #92400e;
 }
 
@@ -556,7 +568,7 @@
 }
 
 .ko-row--probable td:first-child {
-  border-left: 3px solid #f59e0b;
+  border-left: 3px solid var(--accent, #E8453C);
 }
 
 .ko-row--multi td:first-child {
@@ -572,7 +584,7 @@
 }
 
 .ko-row--risk td:first-child {
-  border-left: 3px solid #f59e0b;
+  border-left: 3px solid var(--accent, #E8453C);
 }
 
 .ko-row--safe td:first-child {
@@ -581,11 +593,11 @@
 
 /* ── 百分比颜色 ── */
 .ko-row--guaranteed .ko-td-percent { color: #16a34a; }
-.ko-row--probable .ko-td-percent { color: #d97706; }
+.ko-row--probable .ko-td-percent { color: var(--accent, #E8453C); }
 .ko-row--multi .ko-td-percent { color: var(--text-secondary, #666); }
 .ko-row--immune .ko-td-percent { color: #9ca3af; }
 .ko-row--fatal .ko-td-percent { color: #dc2626; }
-.ko-row--risk .ko-td-percent { color: #d97706; }
+.ko-row--risk .ko-td-percent { color: var(--accent-strong, #D03A32); }
 .ko-row--safe .ko-td-percent { color: #16a34a; }
 
 /* ── 目标添加 Modal 内的搜索 ── */
@@ -598,8 +610,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
   margin-bottom: 0.75rem;
 }
 
@@ -628,7 +642,7 @@
 }
 
 .ko-target-picker-item:hover {
-  background: var(--hover-bg, #f5f5f5);
+  background: var(--glass-l3);
 }
 
 .ko-target-picker-item img {
@@ -652,7 +666,7 @@
   .ko-settings,
   .ko-targets,
   .ko-table-container {
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
   }
 
   .ko-table {

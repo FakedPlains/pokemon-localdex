@@ -4,9 +4,10 @@
 
 .cfg-inline-wrap {
   margin-top: 16px;
-  border-radius: 16px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--glass-l4);
+  backdrop-filter: var(--blur-md);
+  border: 1px solid var(--border-l4);
   padding: 16px;
   box-shadow: var(--shadow);
   scroll-margin-top: 80px;
@@ -19,7 +20,7 @@
   gap: 12px;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-l3);
 }
 
 .cfg-toolbar strong {
@@ -35,16 +36,16 @@
   gap: 6px;
   padding: 0 12px;
   height: 30px;
-  border: 1px solid rgba(31, 42, 31, 0.10);
+  border: 1px solid rgba(0, 0, 0, 0.10);
   border-radius: 999px;
-  background: rgba(255, 248, 236, 0.6);
+  background: rgba(0, 0, 0, 0.02);
   transition: border-color 200ms, background 200ms, box-shadow 200ms;
 }
 
 .cfg-toolbar-search:focus-within {
-  border-color: rgba(26, 171, 138, 0.4);
+  border-color: rgba(232, 69, 60, 0.4);
   background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
+  box-shadow: 0 0 0 3px rgba(232, 69, 60, 0.08);
 }
 
 .cfg-toolbar-search-icon {
@@ -76,7 +77,7 @@
   place-items: center;
   border: none;
   border-radius: 50%;
-  background: rgba(31, 42, 31, 0.08);
+  background: rgba(0, 0, 0, 0.08);
   color: var(--muted);
   font-size: 10px;
   cursor: pointer;
@@ -84,7 +85,7 @@
 }
 
 .cfg-toolbar-search-clear:hover {
-  background: rgba(26, 171, 138, 0.15);
+  background: rgba(232, 69, 60, 0.15);
   color: var(--accent-strong);
 }
 
@@ -105,7 +106,7 @@
 
 .cfg-toolbar-pokemon-change {
   padding: 3px 10px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-l3);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.7);
   font-size: 11px;
@@ -115,8 +116,8 @@
 }
 
 .cfg-toolbar-pokemon-change:hover {
-  background: rgba(26, 171, 138, 0.08);
-  border-color: rgba(26, 171, 138, 0.3);
+  background: rgba(232, 69, 60, 0.08);
+  border-color: rgba(232, 69, 60, 0.3);
 }
 
 .cfg-toolbar-name {
@@ -124,9 +125,9 @@
   flex-shrink: 0;
   padding: 0 12px;
   height: 30px;
-  border: 1px solid rgba(31, 42, 31, 0.10);
+  border: 1px solid rgba(0, 0, 0, 0.10);
   border-radius: 999px;
-  background: rgba(255, 248, 236, 0.6);
+  background: rgba(0, 0, 0, 0.02);
   font-size: 12px;
   color: var(--ink);
   outline: none;
@@ -134,9 +135,9 @@
 }
 
 .cfg-toolbar-name:focus {
-  border-color: rgba(26, 171, 138, 0.4);
+  border-color: rgba(232, 69, 60, 0.4);
   background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
+  box-shadow: 0 0 0 3px rgba(232, 69, 60, 0.08);
 }
 
 .cfg-toolbar-name::placeholder {
@@ -149,7 +150,7 @@
   flex-shrink: 0;
   margin-left: 8px;
   padding: 5px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-l3);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.7);
   font-size: 13px;
@@ -159,8 +160,8 @@
 }
 
 .cfg-toolbar-cancel:hover {
-  background: rgba(26, 171, 138, 0.08);
-  border-color: rgba(26, 171, 138, 0.3);
+  background: rgba(232, 69, 60, 0.08);
+  border-color: rgba(232, 69, 60, 0.3);
   color: var(--accent-strong);
 }
 
@@ -180,16 +181,18 @@
   align-items: center;
   gap: 4px;
   padding: 8px 4px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
 .cfg-pokemon-card:hover {
   border-color: var(--accent);
-  box-shadow: 0 2px 8px rgba(26, 171, 138, 0.12);
+  box-shadow: var(--shadow-hover);
+  background: var(--glass-l2);
   transform: translateY(-1px);
 }
 
@@ -219,7 +222,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-l3);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.8);
   transition: border-color 0.2s;
@@ -227,7 +230,7 @@
 
 .cfg-picker-search:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
+  box-shadow: 0 0 0 3px rgba(232, 69, 60, 0.08);
 }
 
 .cfg-picker-search-icon {
@@ -257,7 +260,7 @@
   place-items: center;
   border: none;
   border-radius: 50%;
-  background: rgba(31, 42, 31, 0.08);
+  background: rgba(0, 0, 0, 0.08);
   color: var(--muted);
   font-size: 11px;
   cursor: pointer;
@@ -265,7 +268,7 @@
 }
 
 .cfg-picker-clear:hover {
-  background: rgba(26, 171, 138, 0.15);
+  background: rgba(232, 69, 60, 0.15);
   color: var(--accent-strong);
 }
 
@@ -278,9 +281,10 @@
 .cfg-picker-table-wrap {
   max-height: 420px;
   overflow-y: auto;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
 }
 
 .cfg-picker-table {
@@ -294,8 +298,8 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  background: rgba(255, 248, 236, 0.95);
-  backdrop-filter: blur(4px);
+  background: var(--glass-l5);
+  backdrop-filter: var(--blur-md);
 }
 
 .cfg-picker-table th {
@@ -304,7 +308,7 @@
   font-weight: 600;
   color: var(--muted);
   text-align: left;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-l3);
   white-space: nowrap;
   user-select: none;
 }
@@ -344,16 +348,16 @@ transition: color 0.15s;
 }
 
 .cfg-picker-row:hover {
-  background: rgba(26, 171, 138, 0.05);
+  background: var(--glass-l3);
 }
 
 .cfg-picker-row:active {
-  background: rgba(26, 171, 138, 0.1);
+  background: rgba(232, 69, 60, 0.1);
 }
 
 .cfg-picker-row td {
 padding: 6px 4px;
-border-bottom: 1px solid rgba(31, 42, 31, 0.04);
+border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 vertical-align: middle;
 }
 
@@ -423,7 +427,7 @@ text-overflow: clip;
   padding: 2px 7px;
   border-radius: 999px;
   font-size: 11px;
-  background: rgba(31, 42, 31, 0.06);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--ink);
   white-space: nowrap;
   vertical-align: middle;
@@ -468,9 +472,9 @@ text-overflow: clip;
   gap: 0;
   align-items: stretch;
   padding: 20px 0;
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.35);
-  border-radius: 12px;
+  border-bottom: 1px solid var(--border-l3);
+  background: var(--glass-l3);
+  border-radius: var(--radius-sm);
 }
 
 .cfg-col {
@@ -520,9 +524,9 @@ text-overflow: clip;
   height: 90px;
   display: grid;
   place-items: center;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
+  border: 1px solid var(--border-l3);
   overflow: visible;
   position: relative;
 }
@@ -543,7 +547,7 @@ text-overflow: clip;
   object-fit: contain;
   background: rgba(255, 255, 255, 0.9);
   border-radius: 50%;
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--border-l3);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -574,15 +578,15 @@ text-overflow: clip;
 .cfg-col-moves {
   gap: 8px;
   padding: 0 24px;
-  border-left: 1px solid var(--line);
-  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--border-l3);
+  border-right: 1px solid var(--border-l3);
   justify-content: center;
 }
 
 /* ── 形态切换滑块（toolbar 内联） ── */
 .cfg-form-slider-inline {
   display: inline-flex;
-  background: rgba(31, 42, 31, 0.06);
+  background: rgba(0, 0, 0, 0.06);
   border-radius: 6px;
   padding: 2px;
   gap: 1px;
@@ -628,7 +632,7 @@ text-overflow: clip;
   font-size: 14px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.9);
-  border: 1.5px solid var(--line);
+  border: 1.5px solid var(--border-l3);
   cursor: pointer;
   opacity: 0.6;
   transition: all 0.2s;
@@ -690,9 +694,9 @@ text-overflow: clip;
   display: block;
   width: 100%;
   padding: 7px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
   font-size: 13px;
   color: var(--ink);
   text-align: left;
@@ -702,13 +706,13 @@ text-overflow: clip;
 
 .cfg-slot-btn:hover {
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--glass-l2);
 }
 
 .cfg-slot-btn.cfg-slot-active {
   border-color: var(--accent);
-  background: rgba(26, 171, 138, 0.06);
-  box-shadow: 0 0 0 2px rgba(26, 171, 138, 0.1);
+  background: rgba(232, 69, 60, 0.06);
+  box-shadow: 0 0 0 2px rgba(232, 69, 60, 0.1);
 }
 
 /* 道具锁定态 */
@@ -716,7 +720,7 @@ text-overflow: clip;
   cursor: not-allowed;
   opacity: 0.65;
   background: rgba(0, 0, 0, 0.04);
-  border-color: var(--line);
+  border-color: var(--border-l3);
   border-style: dashed;
   pointer-events: none;
 }
@@ -770,7 +774,7 @@ text-overflow: clip;
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: rgba(31, 42, 31, 0.08);
+  background: rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
@@ -811,10 +815,11 @@ text-overflow: clip;
   align-items: center;
   gap: 6px;
   border: 1px solid var(--accent);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 7px 12px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 2px rgba(26, 171, 138, 0.1);
+  background: var(--glass-l5);
+  backdrop-filter: var(--blur-sm);
+  box-shadow: 0 0 0 2px rgba(232, 69, 60, 0.1);
   height: 35px;
   box-sizing: border-box;
 }
@@ -864,7 +869,7 @@ text-overflow: clip;
 
 .cfg-item-search-close:hover {
   color: var(--accent-strong);
-  background: rgba(26, 171, 138, 0.08);
+  background: rgba(232, 69, 60, 0.08);
 }
 
 /* 道具按钮中已选道具展示 */
@@ -893,15 +898,15 @@ text-overflow: clip;
   padding: 10px 16px;
   cursor: pointer;
   transition: background 0.12s;
-  border-bottom: 1px solid rgba(31, 42, 31, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .cfg-item-panel-row:hover {
-  background: rgba(26, 171, 138, 0.05);
+  background: rgba(232, 69, 60, 0.05);
 }
 
 .cfg-item-panel-row-active {
-  background: rgba(26, 171, 138, 0.08);
+  background: rgba(232, 69, 60, 0.08);
 }
 
 .cfg-item-panel-img {
@@ -946,9 +951,11 @@ text-overflow: clip;
 /* ── 下方联动面板 ── */
 .cfg-bottom-panel {
   margin-top: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border-l4);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l4);
+  backdrop-filter: var(--blur-md);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
@@ -957,14 +964,14 @@ text-overflow: clip;
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 248, 236, 0.5);
+  border-bottom: 1px solid var(--border-l3);
+  background: var(--glass-l3);
 }
 
 .cfg-panel-search {
   flex: 1;
   padding: 6px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-l3);
   border-radius: 999px;
   background: #fff;
   font-size: 13px;
@@ -991,7 +998,7 @@ text-overflow: clip;
   justify-content: center;
   border: none;
   border-radius: 50%;
-  background: rgba(31, 42, 31, 0.06);
+  background: rgba(0, 0, 0, 0.06);
   color: var(--muted);
   cursor: pointer;
   font-size: 14px;
@@ -1000,7 +1007,7 @@ text-overflow: clip;
 }
 
 .cfg-panel-close:hover {
-  background: rgba(26, 171, 138, 0.12);
+  background: rgba(232, 69, 60, 0.12);
   color: var(--accent-strong);
 }
 
@@ -1018,9 +1025,9 @@ text-overflow: clip;
   flex-direction: column;
   gap: 2px;
   padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--border-l3);
+  border-radius: var(--radius-sm);
+  background: var(--glass-l3);
   font-size: 13px;
   color: var(--ink);
   text-align: left;
@@ -1030,12 +1037,12 @@ text-overflow: clip;
 
 .cfg-panel-item:hover {
   border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--glass-l2);
 }
 
 .cfg-panel-item.cfg-panel-item-active {
   border-color: var(--accent);
-  background: rgba(26, 171, 138, 0.08);
+  background: rgba(232, 69, 60, 0.08);
 }
 
 .cfg-panel-item-sub {
@@ -1061,10 +1068,11 @@ text-overflow: clip;
   align-items: center;
   gap: 6px;
   border: 1px solid var(--accent);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0 10px;
-  background: #fff;
-  box-shadow: 0 0 0 2px rgba(26, 171, 138, 0.1);
+  background: var(--glass-l5);
+  backdrop-filter: var(--blur-sm);
+  box-shadow: 0 0 0 2px rgba(232, 69, 60, 0.1);
   height: 35px;
   box-sizing: border-box;
 }
@@ -1113,7 +1121,7 @@ text-overflow: clip;
 
 .cfg-move-search-close:hover {
   color: var(--accent-strong);
-  background: rgba(26, 171, 138, 0.08);
+  background: rgba(232, 69, 60, 0.08);
 }
 
 /* ── 招式面板表格 ── */
@@ -1133,8 +1141,8 @@ text-overflow: clip;
   position: sticky;
   top: 0;
   z-index: 2;
-  background: rgba(255, 248, 236, 0.95);
-  backdrop-filter: blur(4px);
+  background: var(--glass-l5);
+  backdrop-filter: var(--blur-md);
 }
 
 .cfg-move-panel-table th,
@@ -1154,7 +1162,7 @@ padding-left: 16px;
   font-weight: 600;
   color: var(--muted);
   text-align: left;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border-l3);
   white-space: nowrap;
   user-select: none;
 }
@@ -1188,19 +1196,19 @@ padding-left: 16px;
 }
 
 .cfg-move-panel-row:hover {
-  background: rgba(26, 171, 138, 0.05);
+  background: rgba(232, 69, 60, 0.05);
 }
 
 .cfg-move-panel-row:active {
-  background: rgba(26, 171, 138, 0.1);
+  background: rgba(232, 69, 60, 0.1);
 }
 
 .cfg-move-panel-row-active {
-  background: rgba(26, 171, 138, 0.08);
+  background: rgba(232, 69, 60, 0.08);
 }
 
 .cfg-move-panel-row td {
-  border-bottom: 1px solid rgba(31, 42, 31, 0.04);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .cfg-mtd-name {
@@ -1269,7 +1277,7 @@ padding-left: 16px;
   gap: 8px;
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border-l3);
 }
 
 .cfg-actions button {

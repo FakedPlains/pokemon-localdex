@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { STAT_KEYS, TYPE_OPTIONS, TYPE_CHART_BY_ID, TYPE_IDS, typeNameToId } from "@pokemon-localdex/store-types/constants";
 import { getPokemonPreviewImage } from "../../utils/helpers.js";
 import { saveBoxConfig, saveTeam } from "../../utils/teamStorage.js";
@@ -22,8 +22,8 @@ interface StatsTabProps {
   detail: PokemonDetail;
   display: DisplayVariant;
   onDetailGenerationChange: (gen: string) => void;
-  /** 对战 Tab 联动：注入性格/EV 预设 */
-  applyPreset?: { nature?: string; evs?: Record<string, number> } | null;
+  /** 对战 Tab 联动：注入性格/SP 预设（pokechamdb 数据本身就是 SP 值） */
+  applyPreset?: { nature?: string; sps?: Record<string, number> } | null;
 }
 
 /* ─── Type Coverage Summary ─── */
@@ -198,6 +198,13 @@ export default function StatsTab({ detail, display, onDetailGenerationChange, ap
   const [addFeedback, setAddFeedback] = useState<"box" | "team" | "">("");
   const [statMode, setStatMode] = useState<"classic" | "champions">("classic");
   const [controlsNode, setControlsNode] = useState<HTMLDivElement | null>(null);
+
+  // 对战 Tab 联动时自动切换到 Champions 模式
+  useEffect(() => {
+    if (applyPreset) {
+      setStatMode("champions");
+    }
+  }, [applyPreset]);
 
   // 构建当前宝可梦配置数据
   const buildConfig = useCallback(() => {

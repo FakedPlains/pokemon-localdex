@@ -48,12 +48,12 @@
 }
 
 .it-row:hover {
-  background: rgba(248, 241, 226, 0.5);
+  background: rgba(232, 69, 60, 0.03);
 }
 
 .it-row-expanded {
-  background: rgba(248, 241, 226, 0.7);
-  border: 1px solid rgba(26, 171, 138, 0.15);
+  background: rgba(232, 69, 60, 0.04);
+  border: 1px solid rgba(232, 69, 60, 0.15);
   border-radius: 12px;
   margin: 4px 0;
 }
@@ -90,7 +90,7 @@
   place-items: center;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(31, 42, 31, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
@@ -157,7 +157,7 @@
 /* ── Expanded Detail Panel ── */
 .it-row-detail {
   padding: 0 16px 16px 64px;
-  border-top: 1px solid rgba(31, 42, 31, 0.06);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 /* it-detail-loading: moved to shared.css */

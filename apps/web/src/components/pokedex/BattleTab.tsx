@@ -13,7 +13,7 @@ interface BattleTabProps {
   championsSeasonId: string;
   battleFormat: "double" | "single";
   championsSeasons: ChampionsSeasonSummary[];
-  onApplyToCalc?: (nature: string, evs: Record<string, number>) => void;
+  onApplyToCalc?: (nature: string, sps: Record<string, number>) => void;
   onSearchMove?: (moveName: string) => void;
 }
 
@@ -36,11 +36,11 @@ function formatSeasonLabel(season: ChampionsSeasonSummary): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-// 饼图颜色
+// 饼图颜色（绿色调，与全局 accent 统一）
 const PIE_COLORS = [
-  "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe", "#f5f3ff",
-  "#e9d5ff", "#d8b4fe", "#c084fc", "#a855f7", "#9333ea",
-  "#7c3aed", "#6d28d9",
+  "#1aab8a", "#34c9a4", "#5edbb8", "#8ae8cf", "#b5f0e0",
+  "#d4f7ed", "#0e8a6e", "#15976f", "#3bb89a", "#6dcdb3",
+  "#99dfc9", "#c2ede0",
 ];
 
 // ─── Pie Chart (SVG) ───
@@ -141,6 +141,7 @@ export default function BattleTab({
 
   const handleApplySpread = useCallback((spread: PokemonUsageSpread) => {
     if (!onApplyToCalc) return;
+    // pokechamdb 数据本身就是 SP 值（0-32），直接传递
     onApplyToCalc("", {
       hp: spread.hp, atk: spread.atk, def: spread.def,
       spa: spread.spa, spd: spread.spd, spe: spread.spe,

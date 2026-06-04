@@ -25,11 +25,35 @@ const DATABASE_ITEMS = [
 const DATABASE_KEYS = new Set(DATABASE_ITEMS.map(i => i.key));
 
 const NAV_ITEMS = [
-  { key: "database", label: "资料库", children: DATABASE_ITEMS },
-  { key: "teams", label: "队伍", hash: "#/teams" },
-  { key: "damage", label: "对战", hash: "#/damage" },
-  { key: "typechart", label: "克制表", hash: "#/typechart" }
+  { key: "database", label: "资料库", children: DATABASE_ITEMS, icon: "book" },
+  { key: "teams", label: "队伍", hash: "#/teams", icon: "users" },
+  { key: "damage", label: "对战", hash: "#/damage", icon: "swords" },
+  { key: "typechart", label: "克制表", hash: "#/typechart", icon: "chart" }
 ];
+
+/* Nav icon SVGs (inline, lightweight) */
+const NAV_ICONS = {
+  book: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  ),
+  users: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  swords: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" /><line x1="13" y1="19" x2="19" y2="13" /><line x1="16" y1="16" x2="20" y2="20" /><line x1="19" y1="21" x2="21" y2="19" /><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" /><line x1="5" y1="14" x2="9" y2="18" /><line x1="7" y1="17" x2="4" y2="20" /><line x1="3" y1="19" x2="5" y2="21" />
+    </svg>
+  ),
+  chart: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+    </svg>
+  ),
+};
 
 /* Per-page search placeholder text */
 const SEARCH_PLACEHOLDERS = {
@@ -193,6 +217,7 @@ export default function App() {
                   <button
                     className={`top-nav-link top-nav-dropdown-trigger${isActive ? " top-nav-link-active" : ""}`}
                   >
+                    {item.icon && NAV_ICONS[item.icon]}
                     {item.label}
                     <svg className="top-nav-dropdown-arrow" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M2.5 4 L5 6.5 L7.5 4" />
@@ -219,6 +244,7 @@ export default function App() {
                 href={item.hash}
                 className={`top-nav-link${route === item.key ? " top-nav-link-active" : ""}`}
               >
+                {item.icon && NAV_ICONS[item.icon]}
                 {item.label}
               </a>
             );

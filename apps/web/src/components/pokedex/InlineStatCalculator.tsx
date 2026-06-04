@@ -30,7 +30,7 @@ interface CalcValues {
 
 interface ApplyPreset {
   nature?: string;
-  evs?: Record<string, number>;
+  sps?: Record<string, number>;
 }
 
 interface InlineStatCalculatorProps {
@@ -93,6 +93,9 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
   const prevModeRef = useRef(mode);
   useEffect(() => {
     if (prevModeRef.current === mode) return;
+    prevModeRef.current = mode;
+    // 如果有 applyPreset 正在注入，跳过自动转换，由 applyPreset effect 负责填充
+    if (applyPreset) return;
     if (mode === "champions") {
       setSps(convertEvsToSps(evs));
       setChampNature(nature);
@@ -102,25 +105,16 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
       setLevel(50);
       setNature(champNature);
     }
-    prevModeRef.current = mode;
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, applyPreset]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── Apply preset from BattleTab linkage ── */
+  /* ── Apply preset from BattleTab linkage（直接填充 SP 值，不做转换） ── */
   useEffect(() => {
     if (!applyPreset) return;
     if (applyPreset.nature) {
-      if (mode === "champions") {
-        setChampNature(applyPreset.nature);
-      } else {
-        setNature(applyPreset.nature);
-      }
+      setChampNature(applyPreset.nature);
     }
-    if (applyPreset.evs && Object.keys(applyPreset.evs).length > 0) {
-      if (mode === "champions") {
-        setSps(convertEvsToSps(applyPreset.evs));
-      } else {
-        setEvs(prev => ({ ...prev, ...applyPreset.evs }));
-      }
+    if (applyPreset.sps && Object.keys(applyPreset.sps).length > 0) {
+      setSps(applyPreset.sps);
     }
   }, [applyPreset]); // eslint-disable-line react-hooks/exhaustive-deps
 

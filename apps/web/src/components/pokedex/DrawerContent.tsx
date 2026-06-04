@@ -155,12 +155,12 @@ export default function DrawerContent({
     return learnsetFormIds[0] ?? null;
   }, [learnsetFormOverride, learnsetFormIds, display.form, mapFormToLearnsetId]);
 
-  // ─── Battle tab 联动: 应用性格/EVs → StatsTab ───
-  const [battleApply, setBattleApply] = useState<{ nature: string; evs: Record<string, number> } | null>(null);
+  // ─── Battle tab 联动: 应用性格/SPs → StatsTab ───
+  const [battleApply, setBattleApply] = useState<{ nature: string; sps: Record<string, number> } | null>(null);
   const [moveSearchApply, setMoveSearchApply] = useState<string | null>(null);
 
-  const handleApplyToCalc = useCallback((nature: string, evs: Record<string, number>) => {
-    setBattleApply({ nature, evs });
+  const handleApplyToCalc = useCallback((nature: string, sps: Record<string, number>) => {
+    setBattleApply({ nature, sps });
     setTab("stats");
   }, []);
 
