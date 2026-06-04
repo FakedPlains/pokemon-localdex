@@ -3,7 +3,7 @@
  * 负责批量调用伤害计算 API，汇总结果并分组
  */
 import { useState, useCallback, useRef } from "react";
-import { api } from "../utils/api.js";
+import { unifiedApi } from "../utils/api.js";
 import {
   determineKO,
   checkImmunity,
@@ -204,7 +204,7 @@ export default function useKoAnalysis(): UseKoAnalysisReturn {
             battleMode,
           });
 
-          const resp = await api("/battle/damage", {
+          const resp = await unifiedApi("/battle/damage", {
             method: "POST",
             body: JSON.stringify(payload),
           });
@@ -319,7 +319,7 @@ export default function useKoAnalysis(): UseKoAnalysisReturn {
             battleMode,
           });
 
-          const resp = await api("/battle/damage", {
+          const resp = await unifiedApi("/battle/damage", {
             method: "POST",
             body: JSON.stringify(payload),
           });

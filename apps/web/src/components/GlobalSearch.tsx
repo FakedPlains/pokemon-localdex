@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { api } from "../utils/api.js";
+import { unifiedApi } from "../utils/api.js";
 
 // ── 类型定义 ──
 
@@ -120,7 +120,7 @@ export default function GlobalSearch({ route, onQueryChange, placeholder }: Glob
     }
     setLoading(true);
     try {
-      const res = await api(`/search?q=${encodeURIComponent(query.trim())}&limit=5`);
+      const res = await unifiedApi(`/search?q=${encodeURIComponent(query.trim())}&limit=5`);
       setResults(normalizeResults(res.data));
       setShowDropdown(true);
     } catch {

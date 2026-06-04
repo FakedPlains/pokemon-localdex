@@ -18,7 +18,6 @@ interface PokedexToolbarProps {
   onBattleFormatChange: (format: "double" | "single") => void;
   isUsageRanking: boolean;
   isRefreshingList: boolean;
-  displayTotal: number;
   hasSelection: boolean;
   displayListLength: number;
   showSpeedLine: boolean;
@@ -38,7 +37,6 @@ export default function PokedexToolbar({
   onBattleFormatChange,
   isUsageRanking,
   isRefreshingList,
-  displayTotal,
   hasSelection,
   displayListLength,
   showSpeedLine,

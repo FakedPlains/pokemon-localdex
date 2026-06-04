@@ -3,15 +3,37 @@ import assert from "node:assert/strict";
 
 import {
   buildPokemonFormOptions,
-  normalizeTypeName,
   resolvePokemonDisplayVariant,
+  normalizeTypeName,
   splitTypeNames,
-} from "./helpers.js";
+} from "./helpers.ts";
 import { evToSp, getNatureMultiplier } from "./statCalcModel.ts";
 
-test("normalizes aliased and concatenated Pokemon type names", () => {
-  assert.equal(normalizeTypeName("電"), "电");
-  assert.deepEqual(splitTypeNames("火飛行"), ["火", "飞行"]);
+test("normalizes Pokemon type names to the canonical Chinese name", () => {
+  // 中文名原样返回
+  assert.equal(normalizeTypeName("火"), "火");
+  // 英文名归一化到中文
+  assert.equal(normalizeTypeName("Fire"), "火");
+  // 内部 key 归一化到中文
+  assert.equal(normalizeTypeName("flying"), "飞行");
+  // 数字 ID（字符串）归一化到中文
+  assert.equal(normalizeTypeName("2"), "火");
+  // 未知名按原值 trim 返回
+  assert.equal(normalizeTypeName("  未知属性  "), "未知属性");
+  // 空值返回空串
+  assert.equal(normalizeTypeName(null), "");
+  assert.equal(normalizeTypeName(undefined), "");
+});
+
+test("splits concatenated Chinese type names into individual types", () => {
+  // 单个属性原样返回
+  assert.deepEqual(splitTypeNames("火"), ["火"]);
+  // 拼接的双属性按最长匹配优先拆分，避免「飞」误吞「飞行」
+  assert.deepEqual(splitTypeNames("火飞行"), ["火", "飞行"]);
+  assert.deepEqual(splitTypeNames("飞行火"), ["飞行", "火"]);
+  // 空值返回空数组
+  assert.deepEqual(splitTypeNames(""), []);
+  assert.deepEqual(splitTypeNames(null), []);
 });
 
 test("calculates nature modifiers from shared constants", () => {

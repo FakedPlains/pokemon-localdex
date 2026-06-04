@@ -1,12 +1,17 @@
 /**
  * Wiki 外链图标组件
  * 通用于招式页、特性页、道具页、图鉴页
- *
- * @param {string} url - 链接地址
- * @param {string} [title="Wiki"] - 链接 title 属性
- * @param {string} [className] - 额外的 CSS 类名
  */
-export default function WikiLink({ url, title = "Wiki", className = "" }) {
+interface WikiLinkProps {
+  /** 链接地址 */
+  url?: string | null;
+  /** 链接 title 属性 */
+  title?: string;
+  /** 额外的 CSS 类名 */
+  className?: string;
+}
+
+export default function WikiLink({ url, title = "Wiki", className = "" }: WikiLinkProps) {
   if (!url) return null;
 
   return (

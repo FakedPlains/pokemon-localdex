@@ -8,6 +8,7 @@ import { createDraftMember, getPokemonPreviewImage } from "../../utils/helpers.j
 import TypeChip from "../TypeChip.jsx";
 import Modal from "../Modal.jsx";
 import type { PokemonMember, TargetEntry } from "../../utils/koCalculation";
+import type { ImageAsset } from "@pokemon-localdex/store-types";
 
 interface KoTargetPanelProps {
   targets: TargetEntry[];
@@ -19,8 +20,8 @@ interface PokemonSearchResult {
   nameZh?: string;
   primaryType?: string;
   secondaryType?: string;
-  image?: { url?: string };
-  images?: { official?: { url?: string }; sprite?: { url?: string }; shinyOfficial?: { url?: string }; shinySprite?: { url?: string } };
+  image?: ImageAsset;
+  images?: { official?: ImageAsset; sprite?: ImageAsset; shinyOfficial?: ImageAsset; shinySprite?: ImageAsset };
 }
 
 export default function KoTargetPanel({ targets, onTargetsChange }: KoTargetPanelProps) {
@@ -58,7 +59,7 @@ export default function KoTargetPanel({ targets, onTargetsChange }: KoTargetPane
       nameZh: pokemon.nameZh || "",
       primaryType: pokemon.primaryType || "",
       secondaryType: pokemon.secondaryType || "",
-      imageUrl: img ? (img as any).url || "" : "",
+      imageUrl: img?.url || "",
       // 默认使用 champions 模式
       statMode: "champions",
       nature: "认真",
@@ -143,7 +144,7 @@ export default function KoTargetPanel({ targets, onTargetsChange }: KoTargetPane
                     className="ko-target-picker-item"
                     onClick={() => handleAddTarget(pokemon)}
                   >
-                    {img && <img src={(img as any).url || ""} alt="" referrerPolicy="no-referrer" />}
+                    {img && <img src={img.url || ""} alt="" referrerPolicy="no-referrer" />}
                     <span>{pokemon.nameZh || pokemon.id}</span>
                     {pokemon.primaryType && <TypeChip type={pokemon.primaryType} size="xs" />}
                     {pokemon.secondaryType && <TypeChip type={pokemon.secondaryType} size="xs" />}
