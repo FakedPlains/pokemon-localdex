@@ -7,8 +7,11 @@
 
 .tc-table-scroll {
   overflow-x: auto;
-  border-radius: 8px;
-  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-l5);
+  background: var(--glass-l5);
+  backdrop-filter: var(--blur-md);
+  box-shadow: var(--shadow);
 }
 
 .tc-table {
@@ -22,14 +25,14 @@
 .tc-table td {
   text-align: center;
   padding: 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-l3);
 }
 
 .tc-corner {
   position: relative;
   width: 60px;
   height: 48px;
-  background: var(--panel);
+  background: var(--glass-l3);
 }
 .tc-corner-atk,
 .tc-corner-def {
@@ -43,7 +46,8 @@
 
 .tc-header-col,
 .tc-header-row {
-  background: var(--panel);
+  background: var(--glass-l3);
+  backdrop-filter: var(--blur-sm);
   padding: 4px 2px;
   white-space: nowrap;
 }
@@ -84,7 +88,7 @@
 }
 
 .tc-neutral {
-  background: var(--panel);
+  background: var(--glass-l3);
   color: var(--muted);
 }
 
@@ -123,9 +127,11 @@
   gap: 20px;
   margin-top: 12px;
   padding: 8px 12px;
-  background: var(--panel);
-  border-radius: 6px;
-  border: 1px solid var(--line);
+  background: var(--glass-l4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-l4);
+  backdrop-filter: var(--blur-sm);
+  box-shadow: var(--shadow-sm);
   font-size: 12px;
   color: var(--muted);
   flex-wrap: wrap;

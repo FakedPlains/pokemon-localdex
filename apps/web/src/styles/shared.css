@@ -21,7 +21,7 @@
 .ab-wiki-link:hover,
 .it-wiki-link:hover {
   opacity: 1;
-  color: var(--accent, #1aab8a);
+  color: var(--accent, #E63946);
 }
 
 /* ── Name Tags ── */
@@ -40,7 +40,7 @@
 .mv-name-ja,
 .ab-name-ja,
 .it-name-ja {
-  background: rgba(26, 171, 138, 0.08);
+  background: rgba(232, 69, 60, 0.08);
   color: var(--accent-strong);
 }
 
@@ -49,18 +49,42 @@
 .ab-name-en,
 .it-name-en {
   background: rgba(59, 132, 197, 0.1);
-  color: #1a5276;
+  color: #4a5568;
 }
 
 .shared-name-gen,
 .mv-name-gen,
 .ab-name-gen,
 .it-name-gen {
-  background: rgba(138, 166, 90, 0.12);
-  color: #3d5a1e;
+  background: rgba(232, 69, 60, 0.12);
+  color: var(--accent-strong);
 }
 
-/* ── Detail Loading ── */
+/* ── Loading Component ── */
+.loading-panel { display: grid; place-items: center; min-height: 260px; }
+.loading-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  padding: 20px 0;
+  color: var(--muted);
+}
+.loading-text {
+  text-align: center;
+  padding: 20px 0;
+  color: var(--muted);
+}
+.pulse-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* Legacy aliases — keep for backward compat */
 .shared-detail-loading,
 .mv-detail-loading,
 .ab-detail-loading,
@@ -110,7 +134,7 @@
 .it-source {
   margin-top: 14px;
   padding-top: 10px;
-  border-top: 1px solid rgba(31, 42, 31, 0.06);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .shared-source a,
@@ -167,8 +191,8 @@
   gap: 10px;
   padding: 8px 12px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(31, 42, 31, 0.05);
+  background: var(--glass-l4);
+  border: 1px solid var(--border-l4);
 }
 
 .shared-gen-badges,
@@ -194,8 +218,8 @@
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.02em;
-  background: linear-gradient(135deg, rgba(138, 166, 90, 0.18), rgba(138, 166, 90, 0.08));
-  color: #3d5a1e;
+  background: linear-gradient(135deg, rgba(232, 69, 60, 0.18), rgba(232, 69, 60, 0.08));
+  color: var(--accent-strong);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -283,7 +307,7 @@
   border-radius: 10px;
   text-decoration: none;
   color: var(--ink);
-  border: 1px solid rgba(31, 42, 31, 0.06);
+  border: 1px solid var(--border-l3);
   transition: transform 150ms ease, box-shadow 150ms ease;
   cursor: pointer;
 }
@@ -315,7 +339,7 @@
   font-size: 24px;
   color: var(--muted);
   opacity: 0.4;
-  background: rgba(31, 42, 31, 0.04);
+  background: rgba(0, 0, 0, 0.04);
   border-radius: 8px;
 }
 
@@ -427,7 +451,7 @@
 .mv-pokemon-card-label {
   font-size: 10px;
   font-weight: 600;
-  color: #1a5276;
+  color: #4a5568;
   background: rgba(59, 132, 197, 0.1);
   padding: 1px 6px;
   border-radius: 999px;
@@ -438,7 +462,7 @@
   font-size: 10px;
   font-weight: 600;
   color: var(--accent-strong);
-  background: rgba(26, 171, 138, 0.08);
+  background: rgba(232, 69, 60, 0.08);
   padding: 1px 6px;
   border-radius: 999px;
   margin-top: 2px;
@@ -460,9 +484,9 @@
 .mv-pokemon-pager-btn,
 .ab-pokemon-pager-btn {
   padding: 5px 14px;
-  border: 1px solid rgba(31, 42, 31, 0.12);
+  border: 1px solid var(--border-l4);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--glass-l4);
   font-size: 12px;
   font-weight: 600;
   color: var(--ink);
@@ -510,9 +534,9 @@
   gap: 8px;
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid rgba(31, 42, 31, 0.08);
+  border: 1px solid var(--border-l4);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--glass-l4);
   color: var(--ink);
   cursor: pointer;
   text-align: left;
@@ -533,7 +557,7 @@
 .ab-pokemon-toggle-open {
   border-color: rgba(90, 130, 180, 0.25);
   border-radius: 10px 10px 0 0;
-  border-bottom: 1px solid rgba(31, 42, 31, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .shared-pokemon-section-title,
@@ -565,8 +589,8 @@
 .mv-pokemon-content,
 .ab-pokemon-content {
   padding: 12px 14px 14px;
-  border: 1px solid rgba(31, 42, 31, 0.08);
+  border: 1px solid var(--border-l3);
   border-top: none;
   border-radius: 0 0 10px 10px;
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--glass-l3);
 }

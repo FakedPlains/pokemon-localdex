@@ -1,7 +1,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import type { RefObject } from "react";
 import DrawerContent from "./DrawerContent.tsx";
+import Loading from "../Loading.tsx";
 import type { PokemonDetail } from "./types";
+import type { ChampionsSeasonSummary } from "@pokemon-localdex/store-types";
 
 interface PokedexDetailPanelProps {
   hasSelection: boolean;
@@ -11,6 +13,9 @@ interface PokedexDetailPanelProps {
   detailGeneration: string;
   onDetailGenerationChange: (gen: string) => void;
   onClose: () => void;
+  championsSeasonId: string;
+  battleFormat: "double" | "single";
+  championsSeasons: ChampionsSeasonSummary[];
 }
 
 export default function PokedexDetailPanel({
@@ -21,6 +26,9 @@ export default function PokedexDetailPanel({
   detailGeneration,
   onDetailGenerationChange,
   onClose,
+  championsSeasonId,
+  battleFormat,
+  championsSeasons,
 }: PokedexDetailPanelProps) {
   return (
     <AnimatePresence mode="wait">
@@ -45,12 +53,12 @@ export default function PokedexDetailPanel({
               initialFormId={initialFormId}
               detailGeneration={detailGeneration}
               onDetailGenerationChange={onDetailGenerationChange}
+              championsSeasonId={championsSeasonId}
+              battleFormat={battleFormat}
+              championsSeasons={championsSeasons}
             />
           ) : (
-            <div className="dex-drawer-loading">
-              <div className="pulse-dot" />
-              <span>加载详情…</span>
-            </div>
+            <Loading variant="inline" text="加载详情…" style={{ padding: 40 }} />
           )}
         </motion.div>
       )}

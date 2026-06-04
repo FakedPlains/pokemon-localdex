@@ -52,9 +52,9 @@
 .mv-search {
   width: 100%;
   padding: 9px 14px 9px 36px;
-  border: 1px solid rgba(31, 42, 31, 0.10);
+  border: 1px solid var(--border-l3);
   border-radius: 10px;
-  background: rgba(255, 248, 236, 0.6);
+  background: rgba(255, 255, 255, 0.5);
   font-size: 13px;
   color: var(--ink);
   transition: border-color 200ms, background 200ms, box-shadow 200ms;
@@ -67,9 +67,9 @@
 
 .mv-search:focus {
   outline: none;
-  border-color: rgba(26, 171, 138, 0.4);
+  border-color: rgba(232, 69, 60, 0.35);
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
+  box-shadow: 0 0 0 3px rgba(232, 69, 60, 0.06);
 }
 
 /* ── Filter selects row ── */
@@ -83,9 +83,9 @@
   flex: 1 1 0;
   min-width: 90px;
   padding: 7px 28px 7px 12px;
-  border: 1px solid rgba(31, 42, 31, 0.10);
+  border: 1px solid var(--border-l3);
   border-radius: 999px;
-  background: rgba(255, 248, 236, 0.6) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235f6b5c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+  background: rgba(255, 255, 255, 0.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235f6b5c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -97,9 +97,9 @@
 
 .mv-filter-select:focus {
   outline: none;
-  border-color: rgba(26, 171, 138, 0.4);
+  border-color: rgba(232, 69, 60, 0.35);
   background-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 3px rgba(26, 171, 138, 0.08);
+  box-shadow: 0 0 0 3px rgba(232, 69, 60, 0.06);
 }
 
 .mv-empty {
@@ -153,7 +153,7 @@ gap: 6px;
 }
 
 .mv-row-expanded {
-  border: 1px solid rgba(26, 171, 138, 0.15);
+  border: 1px solid rgba(232, 69, 60, 0.12);
   border-radius: 12px;
   margin: 4px 0;
 }
@@ -340,7 +340,7 @@ gap: 6px;
 /* ── Expanded Detail Panel ── */
 .mv-row-detail {
   padding: 0 16px 16px 60px;
-  border-top: 1px solid rgba(31, 42, 31, 0.06);
+  border-top: 1px solid var(--border-l3);
 }
 
 .mv-detail-names {
@@ -366,8 +366,8 @@ gap: 6px;
   gap: 3px;
   padding: 8px 14px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(31, 42, 31, 0.05);
+  background: var(--glass-l4);
+  border: 1px solid var(--border-l3);
   min-width: 64px;
 }
 
@@ -404,7 +404,7 @@ gap: 6px;
 .mv-pokemon-count {
   font-size: 11px;
   font-weight: 600;
-  color: #1a5276;
+  color: #4a5568;
   background: rgba(59, 132, 197, 0.1);
   padding: 2px 8px;
   border-radius: 999px;

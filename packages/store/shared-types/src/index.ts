@@ -502,6 +502,31 @@ export type FieldEffectFullDetail = FieldEffectDetail & {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Pokemon Usage (对战数据)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type PokemonUsageAbility = { id: number | null; nameZh: string; rank: number; usage: number };
+export type PokemonUsageItem = { id: number | null; nameZh: string; rank: number; usage: number; imageUrl?: string };
+export type PokemonUsageNature = { natureId: number; nameZh: string; rank: number; usage: number; plus?: string; minus?: string };
+export type PokemonUsageMove = { id: number | null; nameZh: string; type?: string; category?: string; rank: number; usage: number };
+export type PokemonUsageSpread = { rank: number; usage: number; hp: number; atk: number; def: number; spa: number; spd: number; spe: number };
+export type PokemonUsageTeammate = { pokemonId: number | null; nameZh: string; rank: number; iconUrl?: string };
+
+export type PokemonUsageData = {
+  rank: number;
+  seasonId: number;
+  seasonCode: string;
+  regulationCode: string;
+  format: string;
+  abilities: PokemonUsageAbility[];
+  items: PokemonUsageItem[];
+  natures: PokemonUsageNature[];
+  moves: PokemonUsageMove[];
+  spreads: PokemonUsageSpread[];
+  teammates: PokemonUsageTeammate[];
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Store 统一接口（sqlite-store 和 d1-store 共同实现）
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -555,6 +580,7 @@ export interface IStore {
 
   // Champions
   listChampionsSeasons(): Promise<ChampionsSeasonSummary[]>;
+  getPokemonUsage(pokemonId: number, seasonId: number, format: string, formId?: number): Promise<PokemonUsageData | undefined>;
 
   // Moves
   listMoves(filters?: { query?: string; type?: string; category?: string; generation?: number } & PaginationParams): Promise<MoveEntry[] | PaginatedResult<MoveEntry>>;

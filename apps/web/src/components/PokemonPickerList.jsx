@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
 import { getPokemonPreviewImage } from "../utils/helpers.js";
+import Loading from "./Loading.tsx";
 
 /**
  * 宝可梦选择列表（横向表格样式，按需分页加载）
@@ -163,13 +164,13 @@ export default function PokemonPickerList({ search = "", onSelect }) {
           </tbody>
         </table>
         {initialLoading && (
-          <div className="cfg-picker-empty">加载中…</div>
+          <Loading variant="text" text="加载中…" className="cfg-picker-empty" />
         )}
         {!initialLoading && allData.length === 0 && (
           <div className="cfg-picker-empty">没有找到匹配的宝可梦</div>
         )}
         {loadingMore && !initialLoading && (
-          <div className="cfg-picker-empty" style={{ padding: "8px 0" }}>加载更多…</div>
+          <Loading variant="text" text="加载更多…" className="cfg-picker-empty" style={{ padding: "8px 0" }} />
         )}
       </div>
     </div>

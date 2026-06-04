@@ -4,7 +4,7 @@ import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import { TYPE_BG_COLORS, CATEGORY_COLORS } from "@pokemon-localdex/store-types/constants";
 import { typeIconSrc, categoryIconSrc } from "../utils/iconPaths.js";
 import { parseExpandParam } from "../utils/helpers.js";
-import Loading from "../components/Loading.jsx";
+import Loading from "../components/Loading.tsx";
 import PokemonGrid from "../components/PokemonGrid.jsx";
 import GenerationTimeline from "../components/GenerationTimeline.jsx";
 import WikiLink from "../components/WikiLink.jsx";
@@ -248,10 +248,7 @@ export default function MovesPage({ query = "", type = "", category = "", genera
                 {isExpanded && (
                   <div className="mv-row-detail">
                     {!detail ? (
-                      <div className="shared-detail-loading">
-                        <div className="pulse-dot" />
-                        <span>加载中…</span>
-                      </div>
+                      <Loading variant="inline" text="加载中…" />
                     ) : (
                       <>
                         {/* 名称标签 */}

@@ -28,12 +28,19 @@ interface CalcValues {
   champNature: string;
 }
 
+interface ApplyPreset {
+  nature?: string;
+  sps?: Record<string, number>;
+}
+
 interface InlineStatCalculatorProps {
   baseStats: Record<string, number>;
   diff?: Record<string, number> | null;
   mode: "classic" | "champions";
   onChange?: (values: CalcValues) => void;
   controlsPortal?: HTMLElement | null;
+  /** 从对战 Tab 联动注入的性格/EV 预设，消费后由父组件清空 */
+  applyPreset?: ApplyPreset | null;
 }
 
 /* ── Constants ── */
@@ -65,7 +72,7 @@ const SP_PRESETS = [
    左侧: 能力名 + 种族值 + 进度条
    右侧: IV(经典) + EV/SP + 性格 + 实际值
    ══════════════════════════════════════════════════════════════════ */
-export default function InlineStatCalculator({ baseStats, diff, mode, onChange, controlsPortal }: InlineStatCalculatorProps) {
+export default function InlineStatCalculator({ baseStats, diff, mode, onChange, controlsPortal, applyPreset }: InlineStatCalculatorProps) {
   /* Classic state */
   const [level, setLevel] = useState(50);
   const [nature, setNature] = useState("认真");
@@ -86,6 +93,9 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
   const prevModeRef = useRef(mode);
   useEffect(() => {
     if (prevModeRef.current === mode) return;
+    prevModeRef.current = mode;
+    // 如果有 applyPreset 正在注入，跳过自动转换，由 applyPreset effect 负责填充
+    if (applyPreset) return;
     if (mode === "champions") {
       setSps(convertEvsToSps(evs));
       setChampNature(nature);
@@ -95,8 +105,18 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
       setLevel(50);
       setNature(champNature);
     }
-    prevModeRef.current = mode;
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, applyPreset]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Apply preset from BattleTab linkage（直接填充 SP 值，不做转换） ── */
+  useEffect(() => {
+    if (!applyPreset) return;
+    if (applyPreset.nature) {
+      setChampNature(applyPreset.nature);
+    }
+    if (applyPreset.sps && Object.keys(applyPreset.sps).length > 0) {
+      setSps(applyPreset.sps);
+    }
+  }, [applyPreset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── onChange callback ── */
   const onChangeRef = useRef(onChange);

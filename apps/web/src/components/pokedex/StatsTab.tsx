@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { STAT_KEYS, TYPE_OPTIONS, TYPE_CHART_BY_ID, TYPE_IDS, typeNameToId } from "@pokemon-localdex/store-types/constants";
 import { getPokemonPreviewImage } from "../../utils/helpers.js";
 import { saveBoxConfig, saveTeam } from "../../utils/teamStorage.js";
@@ -22,6 +22,8 @@ interface StatsTabProps {
   detail: PokemonDetail;
   display: DisplayVariant;
   onDetailGenerationChange: (gen: string) => void;
+  /** 对战 Tab 联动：注入性格/SP 预设（pokechamdb 数据本身就是 SP 值） */
+  applyPreset?: { nature?: string; sps?: Record<string, number> } | null;
 }
 
 /* ─── Type Coverage Summary ─── */
@@ -188,7 +190,7 @@ function TypeChips({ items }: { items: { name: string; mult: number }[] }) {
 }
 
 /* ─── Stats Tab ─── */
-export default function StatsTab({ detail, display, onDetailGenerationChange }: StatsTabProps) {
+export default function StatsTab({ detail, display, onDetailGenerationChange, applyPreset }: StatsTabProps) {
   const toast = useToast();
   const stats = display.stats || {};
   const [calcValues, setCalcValues] = useState<CalcValues | null>(null);
@@ -196,6 +198,13 @@ export default function StatsTab({ detail, display, onDetailGenerationChange }: 
   const [addFeedback, setAddFeedback] = useState<"box" | "team" | "">("");
   const [statMode, setStatMode] = useState<"classic" | "champions">("classic");
   const [controlsNode, setControlsNode] = useState<HTMLDivElement | null>(null);
+
+  // 对战 Tab 联动时自动切换到 Champions 模式
+  useEffect(() => {
+    if (applyPreset) {
+      setStatMode("champions");
+    }
+  }, [applyPreset]);
 
   // 构建当前宝可梦配置数据
   const buildConfig = useCallback(() => {
@@ -353,7 +362,7 @@ export default function StatsTab({ detail, display, onDetailGenerationChange }: 
           {/* 性格/等级/预设控件挂载到这里 */}
           <div ref={setControlsNode} className="isc-heading-controls" />
         </div>
-        <InlineStatCalculator baseStats={stats} diff={diffStats} mode={statMode} onChange={setCalcValues} controlsPortal={controlsNode} />
+        <InlineStatCalculator baseStats={stats} diff={diffStats} mode={statMode} onChange={setCalcValues} controlsPortal={controlsNode} applyPreset={applyPreset} />
       </div>
 
       {/* 添加到盒子/队伍按钮 */}

@@ -322,6 +322,7 @@ Champions 数据来自 52Poké 的 `赛季（Champions）`、`赛制（Champions
 | id | INTEGER PK | 自增主键 |
 | usage_pokemon_id | INTEGER FK | 关联 champions_usage_pokemon.id |
 | partner_pokemon_id | INTEGER FK | 关联 pokemon.id（通过中文名多级匹配） |
+| partner_form_id | INTEGER FK | 关联 pokemon_forms.id（队友的具体形态） |
 | partner_slug | TEXT | 队友标识（中文名） |
 | rank | INTEGER | 队友匹配率排名 |
 
@@ -371,10 +372,11 @@ erDiagram
     champions_usage_pokemon ||--o{ champions_usage_items : "uses items"
     champions_usage_pokemon ||--o{ champions_usage_abilities : "uses abilities"
     champions_usage_pokemon ||--o{ champions_usage_natures : "uses natures"
-    champions_usage_pokemon ||--o{ champions_usage_partners : "paired with"
-    champions_usage_pokemon ||--o{ champions_usage_ev_spreads : "ev distribution"
-    pokemon ||--o{ champions_usage_pokemon : "ranked in"
-    pokemon_forms ||--o{ champions_usage_pokemon : "ranked as form"
+champions_usage_pokemon ||--o{ champions_usage_partners : "paired with"
+pokemon_forms ||--o{ champions_usage_partners : "partner form"
+champions_usage_pokemon ||--o{ champions_usage_ev_spreads : "ev distribution"
+pokemon ||--o{ champions_usage_pokemon : "ranked in"
+pokemon_forms ||--o{ champions_usage_pokemon : "ranked as form"
 ```
 
 ## 设计要点
@@ -385,4 +387,6 @@ erDiagram
 
 **冗余中文名**：`pokemon_form_abilities.ability_name_zh` 和 `pokemon_moves.move_name_zh` 冗余存储了中文名。这是因为爬虫解析时可能还没有对应的 abilities/moves 记录（采集顺序不固定），冗余字段保证数据完整性，同时也简化了查询。
 
-**使用率数据中文名匹配**：`champions_usage_pokemon` 和 `champions_usage_partners` 通过中文名多级匹配关联到 `pokemon.id`。pokechamdb 仅提供日文 `name` 字段和中文 `displayNames`，爬虫以中文名为主键进行匹配（`pokemon.name_zh` → `pokemon_forms.name_zh` → `display_name_zh` → 括号拆解 → 别名映射）。`pokemon_slug` / `partner_slug` 冗余存储中文名作为去重键，即使 ID 匹配失败数据仍可保留。
+**使用率数据中文名匹配**：`champions_usage_pokemon` 和 `champions_usage_partners` 通过中文名多级匹配关联到 `pokemon.id` 和 `pokemon_forms.id`。pokechamdb 仅提供日文 `name` 字段和中文 `displayNames`，爬虫以中文名为主键进行匹配（`pokemon.name_zh` → `pokemon_forms.name_zh` → `display_name_zh` → 括号拆解 → 别名映射）。队友数据区分形态维度，匹配时同时解析 `partner_pokemon_id` 和 `partner_form_id`；若中文名命中主表则取默认形态，命中形态表则取具体形态。`pokemon_slug` / `partner_slug` 冗余存储中文名作为去重键，即使 ID 匹配失败数据仍可保留。
+
+**队友查询优化**：查询层（`drizzle-queries/champions.ts`）通过 `partner_form_id` 直接 JOIN `pokemon_form_images` 获取队友官方图片，同时 JOIN `pokemon_forms` 获取形态级名称（如"超级喷火龙X"而非"喷火龙"），无需再通过 `pokemon_id + is_default` 中间匹配。去重逻辑按 `partner_form_id` 去重（同一队友可能因日文/中文 slug 产生重复行），保留较小 rank 并按 rank 排序。

@@ -5,6 +5,7 @@ import { describeLearnsetEntry } from "../../utils/helpers.js";
 import { unifiedApi } from "../../utils/api.js";
 import TypeChip from "../TypeChip.jsx";
 import CustomSelect from "../CustomSelect.jsx";
+import Loading from "../Loading.tsx";
 import type { PokemonDetail, DisplayVariant } from "./types";
 
 const PAGE_SIZE = 50;
@@ -18,6 +19,8 @@ interface MovesTabProps {
   onDetailGenerationChange: (gen: string) => void;
   learnsetMeta: LearnsetMeta | null | undefined;
   externalFormId?: number | null;
+  /** 从对战 Tab 联动注入的招式搜索关键词，消费后由父组件清空 */
+  initialSearch?: string | null;
 }
 
 interface LearnsetResponse {
@@ -33,7 +36,7 @@ interface SelectOption {
 }
 
 /* ─── Moves Tab（瀑布流分页 + 服务端方法筛选） ─── */
-export default function MovesTab({ detail, display, detailGeneration, onDetailGenerationChange, learnsetMeta, externalFormId }: MovesTabProps) {
+export default function MovesTab({ detail, display, detailGeneration, onDetailGenerationChange, learnsetMeta, externalFormId, initialSearch }: MovesTabProps) {
   const pokemonId = detail.id;
 
   // 累积的所有已加载数据
@@ -61,6 +64,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
   // 搜索防抖相关 refs（提前声明，供多处 effect 使用）
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchMountedRef = useRef(false);
+
 
   const learnsetGenOptions = learnsetMeta?.generations || [];
   const learnsetFormIds = useMemo(() => (learnsetMeta?.forms || []).map(f => f.formId), [learnsetMeta]);
@@ -180,10 +184,11 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       setLearnsetFormId(null);
       resolvedFormIdRef.current = null;
     }
-    // 无论哪个维度变化，都重置招式筛选为"全部"
+    // 无论哪个维度变化，都重置招式筛选为"全部"（但保留联动搜索词）
     setMethodFilter("");
-    setMoveSearch("");
-    // 重置搜索防抖标记，避免 setMoveSearch("") 触发多余的搜索请求
+    const initSearch = initialSearch || "";
+    setMoveSearch(initSearch);
+    // 重置搜索防抖标记，避免 setMoveSearch 触发多余的搜索请求
     searchMountedRef.current = false;
     // 重置加载更多状态，防止被竞态丢弃的旧请求导致 loadingMore 卡住
     setLoadingMore(false);
@@ -192,7 +197,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
     offsetRef.current = 0;
     // 记住本次请求的 requestId，用于在 .then() 中判断是否仍是最新请求
     const rid = requestIdRef.current + 1; // fetchPage 内部会设为这个值
-    fetchPage(0, true, "", "").then((accepted) => {
+    fetchPage(0, true, "", initSearch || undefined).then((accepted) => {
       // accepted=true: 本次请求未过期，正常关闭 loading
       // accepted=false 且 rid 仍是最新: fetchPage 早退（activeGen/formId 无效），也要关闭
       if (accepted !== false || rid === requestIdRef.current) {
@@ -200,7 +205,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       }
       // accepted=false 且 rid 已过时: 说明更新请求已发出，由它负责关闭 loading
     });
-  }, [fetchPage, activeGen]); // fetchPage 已包含 pokemonId/gen/form/version 依赖
+  }, [fetchPage, activeGen, initialSearch]); // fetchPage 已包含 pokemonId/gen/form/version 依赖
 
   // 方法筛选变化时重置分页并重新请求
   const handleMethodChange = useCallback((method: string) => {
@@ -383,10 +388,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       <div style={{ position: "relative" }}>
         {initialLoading && (
           <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.6)", zIndex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: 32 }}>
-            <div className="dex-drawer-loading">
-              <div className="pulse-dot" />
-              <span>加载招式…</span>
-            </div>
+            <Loading variant="inline" text="加载招式…" />
           </div>
         )}
         {allMoves.length === 0 && !initialLoading ? (
@@ -446,10 +448,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
             {/* 瀑布流加载触发器 */}
             <div ref={sentinelRef} style={{ height: 1 }} />
             {loadingMore && (
-              <div className="dex-drawer-loading" style={{ padding: "12px 0" }}>
-                <div className="pulse-dot" />
-                <span>加载更多招式…</span>
-              </div>
+              <Loading variant="inline" text="加载更多招式…" style={{ padding: "12px 0" }} />
             )}
             {hasMore && !loadingMore && !moveSearch && (
               <button

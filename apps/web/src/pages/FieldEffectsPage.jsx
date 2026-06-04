@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { useApi } from "../hooks/useApi.js";
-import Loading from "../components/Loading.jsx";
+import Loading from "../components/Loading.tsx";
 import GenerationTimeline from "../components/GenerationTimeline.jsx";
 import WikiLink from "../components/WikiLink.jsx";
 import {
@@ -153,10 +153,7 @@ export default function FieldEffectsPage() {
                 {isExpanded && (
                   <div className="fe-row-detail">
                     {!detail ? (
-                      <div className="fe-loading-detail">
-                        <div className="pulse-dot" />
-                        <span>加载中…</span>
-                      </div>
+                      <Loading variant="inline" text="加载中…" />
                     ) : (
                       <>
                         {/* 名称标签 */}
