@@ -515,6 +515,7 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   gap: 2px;
   min-width: 0;
   width: 100%;
+  margin-top: 8px;
   transition: align-items 0.3s ease;
 }
 
@@ -522,6 +523,7 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   flex: 1;
   align-items: flex-start;
   gap: 1px;
+  margin-top: 0;
 }
 
 .dex-item-dex {
@@ -531,26 +533,40 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   opacity: 0.65;
 }
 
+.dex-item-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.dex-item-compact .dex-item-name-row {
+  max-width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
 .dex-item-name {
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .dex-item-compact .dex-item-name {
   text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .dex-item-form {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--accent, #e67e22);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .dex-item-en {

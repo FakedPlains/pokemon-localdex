@@ -60,8 +60,10 @@ export default function PokedexCardList({
                 : <span className="dex-card-placeholder">?</span>}
             </div>
             <div className="dex-item-info">
-              <strong className="dex-item-name">{member.nameZh}</strong>
-              {member.formName && <span className="dex-item-form">{getShortFormName(member.formName)}</span>}
+              <span className="dex-item-name-row">
+                <strong className="dex-item-name">{member.nameZh}</strong>
+                {member.formName && <span className="dex-item-form">{getShortFormName(member.formName)}</span>}
+              </span>
               <span className="dex-item-en">{member.nameEn || ""}</span>
             </div>
             <div className="dex-item-types">
