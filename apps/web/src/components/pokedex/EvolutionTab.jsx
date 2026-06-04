@@ -1,4 +1,5 @@
 import TypeChip from "../TypeChip.jsx";
+import Loading from "../Loading.tsx";
 
 /**
  * 格式化进化条件为简短的展示文本。
@@ -236,10 +237,7 @@ export default function EvolutionTab({ detail, evolutionChain, loading, currentF
   if (loading) {
     return (
       <div className="tab-evolution">
-        <div className="dex-drawer-loading">
-          <div className="pulse-dot" />
-          <span>加载进化链…</span>
-        </div>
+        <Loading variant="inline" text="加载进化链…" />
       </div>
     );
   }

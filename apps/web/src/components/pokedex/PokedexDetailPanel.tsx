@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import type { RefObject } from "react";
 import DrawerContent from "./DrawerContent.tsx";
+import Loading from "../Loading.tsx";
 import type { PokemonDetail } from "./types";
 
 interface PokedexDetailPanelProps {
@@ -47,10 +48,7 @@ export default function PokedexDetailPanel({
               onDetailGenerationChange={onDetailGenerationChange}
             />
           ) : (
-            <div className="dex-drawer-loading">
-              <div className="pulse-dot" />
-              <span>加载详情…</span>
-            </div>
+            <Loading variant="inline" text="加载详情…" style={{ padding: 40 }} />
           )}
         </motion.div>
       )}

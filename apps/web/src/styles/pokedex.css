@@ -636,14 +636,7 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   box-shadow: none;
 }
 
-.dex-drawer-loading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: center;
-  padding: 40px;
-  color: var(--muted);
-}
+/* .dex-drawer-loading — replaced by shared Loading component (see shared.css) */
 
 /* ── Drawer Hero ── */
 .drawer-hero {

@@ -1264,14 +1264,4 @@ button.secondary {
   background: linear-gradient(90deg, var(--accent), #4ecdc4);
 }
 
-.loading-panel { display: grid; place-items: center; min-height: 260px; }
-.pulse-dot {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--accent); animation: pulse 1s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(0.85); opacity: 0.6; }
-  50% { transform: scale(1.2); opacity: 1; }
-}
-
+/* Loading styles moved to shared.css */

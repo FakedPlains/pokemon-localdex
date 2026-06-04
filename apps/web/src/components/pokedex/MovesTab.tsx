@@ -5,6 +5,7 @@ import { describeLearnsetEntry } from "../../utils/helpers.js";
 import { unifiedApi } from "../../utils/api.js";
 import TypeChip from "../TypeChip.jsx";
 import CustomSelect from "../CustomSelect.jsx";
+import Loading from "../Loading.tsx";
 import type { PokemonDetail, DisplayVariant } from "./types";
 
 const PAGE_SIZE = 50;
@@ -383,10 +384,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
       <div style={{ position: "relative" }}>
         {initialLoading && (
           <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.6)", zIndex: 1, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: 32 }}>
-            <div className="dex-drawer-loading">
-              <div className="pulse-dot" />
-              <span>加载招式…</span>
-            </div>
+            <Loading variant="inline" text="加载招式…" />
           </div>
         )}
         {allMoves.length === 0 && !initialLoading ? (
@@ -446,10 +444,7 @@ export default function MovesTab({ detail, display, detailGeneration, onDetailGe
             {/* 瀑布流加载触发器 */}
             <div ref={sentinelRef} style={{ height: 1 }} />
             {loadingMore && (
-              <div className="dex-drawer-loading" style={{ padding: "12px 0" }}>
-                <div className="pulse-dot" />
-                <span>加载更多招式…</span>
-              </div>
+              <Loading variant="inline" text="加载更多招式…" style={{ padding: "12px 0" }} />
             )}
             {hasMore && !loadingMore && !moveSearch && (
               <button

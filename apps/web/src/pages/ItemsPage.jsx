@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
 import { parseExpandParam } from "../utils/helpers.js";
-import Loading from "../components/Loading.jsx";
+import Loading from "../components/Loading.tsx";
 import GenerationTimeline from "../components/GenerationTimeline.jsx";
 import WikiLink from "../components/WikiLink.jsx";
 
@@ -158,10 +158,7 @@ export default function ItemsPage({ query = "" }) {
                 {isExpanded && (
                   <div className="it-row-detail">
                     {!detail ? (
-                      <div className="shared-detail-loading">
-                        <div className="pulse-dot" />
-                        <span>加载中…</span>
-                      </div>
+                      <Loading variant="inline" text="加载中…" />
                     ) : (
                       <>
                         {/* 图片 */}

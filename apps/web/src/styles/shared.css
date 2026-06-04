@@ -60,7 +60,31 @@
   color: #3d5a1e;
 }
 
-/* ── Detail Loading ── */
+/* ── Loading Component ── */
+.loading-panel { display: grid; place-items: center; min-height: 260px; }
+.loading-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  padding: 20px 0;
+  color: var(--muted);
+}
+.loading-text {
+  text-align: center;
+  padding: 20px 0;
+  color: var(--muted);
+}
+.pulse-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* Legacy aliases — keep for backward compat */
 .shared-detail-loading,
 .mv-detail-loading,
 .ab-detail-loading,
