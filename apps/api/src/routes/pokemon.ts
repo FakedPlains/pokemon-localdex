@@ -109,6 +109,20 @@ export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOption
     const meta = await s.getLearnsetMeta(entry.id);
     return c.json({ data: meta, pokemonId: entry.id });
   });
+
+  // 对战使用率数据
+  api.get("/pokemon/:id/usage", async (c) => {
+    const s = getStore(c);
+    const entry = await s.getPokemonIdentity(c.req.param("id"));
+    if (!entry) return c.json({ error: "Pokemon not found" }, 404);
+    const seasonId = numberQuery(c, "seasonId");
+    const formId = numberQuery(c, "formId");
+    const format = c.req.query("format") || "double";
+    if (!seasonId) return c.json({ error: "seasonId is required" }, 400);
+    const data = await s.getPokemonUsage(entry.id, seasonId, format, formId || undefined);
+    if (!data) return c.json({ error: "No usage data found" }, 404);
+    return c.json({ data });
+  });
 }
 
 export function registerChampionsRoutes(api: Hono<any>, opts: RegisterRoutesOptions): void {

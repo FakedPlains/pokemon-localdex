@@ -315,6 +315,9 @@ export default function PokedexPage({
           detailGeneration={detailGeneration}
           onDetailGenerationChange={setDetailGeneration}
           onClose={handleClose}
+          championsSeasonId={championsSeasonId}
+          battleFormat={battleFormat}
+          championsSeasons={championsSeasons}
         />
       </div>
     </div>

@@ -1034,6 +1034,12 @@ button.secondary {
   flex-shrink: 0;
 }
 
+.type-chip-icon-only {
+  padding: 3px;
+  gap: 0;
+  border-radius: 4px;
+}
+
 .type-chip.type-草 { background: #77CC55; }
 .type-chip.type-毒 { background: #AA5599; }
 .type-chip.type-电 { background: #FFCC33; color: #352a00; }

@@ -28,12 +28,19 @@ interface CalcValues {
   champNature: string;
 }
 
+interface ApplyPreset {
+  nature?: string;
+  evs?: Record<string, number>;
+}
+
 interface InlineStatCalculatorProps {
   baseStats: Record<string, number>;
   diff?: Record<string, number> | null;
   mode: "classic" | "champions";
   onChange?: (values: CalcValues) => void;
   controlsPortal?: HTMLElement | null;
+  /** 从对战 Tab 联动注入的性格/EV 预设，消费后由父组件清空 */
+  applyPreset?: ApplyPreset | null;
 }
 
 /* ── Constants ── */
@@ -65,7 +72,7 @@ const SP_PRESETS = [
    左侧: 能力名 + 种族值 + 进度条
    右侧: IV(经典) + EV/SP + 性格 + 实际值
    ══════════════════════════════════════════════════════════════════ */
-export default function InlineStatCalculator({ baseStats, diff, mode, onChange, controlsPortal }: InlineStatCalculatorProps) {
+export default function InlineStatCalculator({ baseStats, diff, mode, onChange, controlsPortal, applyPreset }: InlineStatCalculatorProps) {
   /* Classic state */
   const [level, setLevel] = useState(50);
   const [nature, setNature] = useState("认真");
@@ -97,6 +104,25 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
     }
     prevModeRef.current = mode;
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Apply preset from BattleTab linkage ── */
+  useEffect(() => {
+    if (!applyPreset) return;
+    if (applyPreset.nature) {
+      if (mode === "champions") {
+        setChampNature(applyPreset.nature);
+      } else {
+        setNature(applyPreset.nature);
+      }
+    }
+    if (applyPreset.evs && Object.keys(applyPreset.evs).length > 0) {
+      if (mode === "champions") {
+        setSps(convertEvsToSps(applyPreset.evs));
+      } else {
+        setEvs(prev => ({ ...prev, ...applyPreset.evs }));
+      }
+    }
+  }, [applyPreset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── onChange callback ── */
   const onChangeRef = useRef(onChange);

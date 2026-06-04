@@ -163,7 +163,7 @@ def clear_usage_data(conn: sqlite3.Connection, season_id: int | None = None, fmt
 
 
 def _ensure_usage_schema(conn: sqlite3.Connection) -> None:
-    """确保使用率相关表已创建。"""
+    """确保使用率相关表已创建。如果表已存在但缺少新列，执行轻量迁移。"""
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS champions_usage_pokemon (
@@ -222,6 +222,7 @@ def _ensure_usage_schema(conn: sqlite3.Connection) -> None:
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           usage_pokemon_id INTEGER NOT NULL REFERENCES champions_usage_pokemon(id) ON DELETE CASCADE,
           partner_pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE SET NULL,
+          partner_form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
           partner_slug TEXT NOT NULL,
           rank INTEGER NOT NULL,
           UNIQUE (usage_pokemon_id, partner_slug)
@@ -255,6 +256,14 @@ def _ensure_usage_schema(conn: sqlite3.Connection) -> None:
         """
     )
 
+    # 轻量迁移：为旧表添加 partner_form_id 列（SQLite 不支持 IF NOT EXISTS for ALTER TABLE）
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(champions_usage_partners)").fetchall()}
+    if "partner_form_id" not in cols:
+        conn.execute(
+            "ALTER TABLE champions_usage_partners ADD COLUMN partner_form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL"
+        )
+        conn.commit()
+
 
 def _lookup_default_form_id(conn: sqlite3.Connection, pokemon_id: int | None) -> int | None:
     """查找宝可梦的默认形态 ID。"""
@@ -267,6 +276,14 @@ def _lookup_default_form_id(conn: sqlite3.Connection, pokemon_id: int | None) ->
     return int(row[0]) if row else None
 
 
+
+# pokechamdb slug -> 实际应匹配的 name_en 覆盖映射
+# 用于 pokechamdb 不区分形态后缀，但实际参赛形态是非默认形态的情况
+SLUG_FORM_OVERRIDES: dict[str, str] = {
+    "floette": "floette-eternal",  # 花叶蒂在 Champions 赛制中只有永恒之花形态参赛
+}
+
+
 def _lookup_by_slug(conn: sqlite3.Connection, slug: str) -> tuple[int | None, int | None]:
     """通过 slug 匹配 pokemon_forms.name_en 查找 pokemon_id 和 form_id。
 
@@ -277,6 +294,16 @@ def _lookup_by_slug(conn: sqlite3.Connection, slug: str) -> tuple[int | None, in
     """
     if not slug:
         return None, None
+
+    # 0. 检查覆盖映射（处理 pokechamdb 不区分形态但实际是非默认形态的情况）
+    override = SLUG_FORM_OVERRIDES.get(slug)
+    if override:
+        row = conn.execute(
+            "SELECT pokemon_id, id FROM pokemon_forms WHERE LOWER(name_en) = ? LIMIT 1",
+            (override,),
+        ).fetchone()
+        if row:
+            return int(row[0]), int(row[1])
 
     # 1. 直接用 LOWER(name_en) = slug 精确匹配
     row = conn.execute(
@@ -319,42 +346,46 @@ def _resolve_nature_id(name_zh: str) -> int | None:
     return NATURE_EN_TO_ID.get(name_zh.lower())
 
 
-def _lookup_partner_pokemon_id(conn: sqlite3.Connection, slug: str, name_zh: str) -> int | None:
-    """查找队友宝可梦 ID，完全基于中文名和英文名匹配，不依赖日文。
+def _lookup_partner_pokemon_id(conn: sqlite3.Connection, slug: str, name_zh: str) -> tuple[int | None, int | None]:
+    """查找队友宝可梦的 pokemon_id 和 form_id，完全基于中文名和英文名匹配，不依赖日文。
+
+    返回 (pokemon_id, form_id) 元组。pokechamdb 队友数据区分形态，
+    因此尽可能匹配到具体 form_id。
 
     匹配优先级：
-    1. 中文名精确匹配 pokemon.name_zh（大多数情况）
+    1. 中文名精确匹配 pokemon.name_zh -> 取默认形态
     2. 中文名精确匹配 pokemon_forms.name_zh（如"花叶蒂(永恒之花)"）
     3. 中文名匹配 pokemon_forms.display_name_zh（如"永恒之花"）
     4. 带括号的中文名拆解匹配：基础名查 pokemon.name_zh + 括号内容查 display_name_zh
     5. 从同表反查英文 slug，走 _lookup_by_slug
     """
     if not name_zh:
-        return None
+        return None, None
 
     # 0. 先做别名标准化（pokechamdb 译名差异）
     normalized_name = POKECHAMDB_NAME_ZH_ALIASES.get(name_zh, name_zh)
 
-    # 1. pokemon.name_zh 精确匹配
+    # 1. pokemon.name_zh 精确匹配 -> 取默认形态
     pid = _lookup_pokemon_by_name(conn, normalized_name)
     if pid:
-        return pid
+        form_id = _lookup_default_form_id(conn, pid)
+        return pid, form_id
 
     # 2. pokemon_forms.name_zh 精确匹配（处理形态完整名，如"超能妙喵(雌性的样子)"）
     row = conn.execute(
-        "SELECT pokemon_id FROM pokemon_forms WHERE name_zh = ? LIMIT 1",
+        "SELECT pokemon_id, id FROM pokemon_forms WHERE name_zh = ? LIMIT 1",
         (normalized_name,),
     ).fetchone()
     if row:
-        return int(row[0])
+        return int(row[0]), int(row[1])
 
     # 3. pokemon_forms.display_name_zh 匹配
     row = conn.execute(
-        "SELECT pokemon_id FROM pokemon_forms WHERE display_name_zh = ? LIMIT 1",
+        "SELECT pokemon_id, id FROM pokemon_forms WHERE display_name_zh = ? LIMIT 1",
         (normalized_name,),
     ).fetchone()
     if row:
-        return int(row[0])
+        return int(row[0]), int(row[1])
 
     # 4. 带括号的中文名拆解：如"花叶蒂（永恒之花）"
     bracket_match = re.match(r"^(.+?)[（(](.+?)[）)]$", normalized_name)
@@ -363,31 +394,32 @@ def _lookup_partner_pokemon_id(conn: sqlite3.Connection, slug: str, name_zh: str
         form_name = bracket_match.group(2)
         # 先查基础名确认 pokemon_id，再用 display_name_zh 精确到形态
         row = conn.execute(
-            """SELECT pf.pokemon_id FROM pokemon_forms pf
+            """SELECT pf.pokemon_id, pf.id FROM pokemon_forms pf
                JOIN pokemon p ON p.id = pf.pokemon_id
                WHERE p.name_zh = ? AND pf.display_name_zh = ?
                LIMIT 1""",
             (base_name, form_name),
         ).fetchone()
         if row:
-            return int(row[0])
-        # 退而求其次：只用基础名
+            return int(row[0]), int(row[1])
+        # 退而求其次：只用基础名 -> 取默认形态
         pid = _lookup_pokemon_by_name(conn, base_name)
         if pid:
-            return pid
+            form_id = _lookup_default_form_id(conn, pid)
+            return pid, form_id
 
     # 5. 从 champions_usage_pokemon 表反查：同中文名的宝可梦应该在列表中有英文 slug
     row = conn.execute(
-        """SELECT cup.pokemon_id FROM champions_usage_pokemon cup
+        """SELECT cup.pokemon_id, cup.form_id FROM champions_usage_pokemon cup
            JOIN pokemon p ON p.id = cup.pokemon_id
            WHERE p.name_zh = ? AND cup.pokemon_id IS NOT NULL
            LIMIT 1""",
         (normalized_name,),
     ).fetchone()
     if row:
-        return int(row[0])
+        return int(row[0]), int(row[1]) if row[1] else None
 
-    return None
+    return None, None
 
 
 def _upsert_moves(conn: sqlite3.Connection, usage_pokemon_id: int, entries: list[UsageMoveEntry]) -> int:
@@ -479,18 +511,19 @@ def _upsert_natures(conn: sqlite3.Connection, usage_pokemon_id: int, entries: li
 def _upsert_partners(conn: sqlite3.Connection, usage_pokemon_id: int, entries: list[UsagePartnerEntry]) -> int:
     count = 0
     for entry in entries:
-        partner_id = _lookup_partner_pokemon_id(conn, entry.slug, entry.name_zh)
+        partner_id, partner_form_id = _lookup_partner_pokemon_id(conn, entry.slug, entry.name_zh)
         conn.execute(
             """
             INSERT INTO champions_usage_partners
-              (usage_pokemon_id, partner_pokemon_id, partner_slug, rank)
-            VALUES (?, ?, ?, ?)
+              (usage_pokemon_id, partner_pokemon_id, partner_form_id, partner_slug, rank)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(usage_pokemon_id, partner_slug)
             DO UPDATE SET
               partner_pokemon_id = COALESCE(excluded.partner_pokemon_id, champions_usage_partners.partner_pokemon_id),
+              partner_form_id = COALESCE(excluded.partner_form_id, champions_usage_partners.partner_form_id),
               rank = excluded.rank
             """,
-            (usage_pokemon_id, partner_id, entry.slug, entry.rank),
+            (usage_pokemon_id, partner_id, partner_form_id, entry.slug, entry.rank),
         )
         count += 1
     return count

@@ -72,16 +72,23 @@ npx taro build --type weapp --watch
 
 ## 数据源与爬虫规则
 
-52Poké Wiki 是唯一数据源。除非用户明确要求临时实验，不要引入第三方数据源或手写权威数据。
+项目有两个数据源：
+
+- **52Poké Wiki**（主数据源）：宝可梦图鉴、招式、特性、道具、进化链、招式学习表、Champions 赛制等全部基础数据。
+- **pokechamdb.com**（使用率数据源）：Champions 排位对战的使用率排名和配置统计（招式、道具、特性、性格、队友、EV 分布）。
+
+除上述两个已接入数据源外，不要引入第三方数据源或手写权威数据。
 
 爬虫开发必须遵守：
 
-- 使用 `packages/crawler_py/localdex_crawler/fetcher.py` 中的缓存优先流程。
+- 52Poké 数据使用 `packages/crawler_py/localdex_crawler/fetcher.py` 中的缓存优先流程。
+- pokechamdb 数据使用 `fetcher_pokechamdb.py` 中的独立 fetcher，缓存目录为 `data/raw/pokechamdb/`。pokechamdb 站点由 Cloudflare Worker SSR 提供服务，有 bot 保护，默认请求间隔 4 秒，优先使用 curl（支持 brotli）。
 - 保留自定义 User-Agent、请求间隔和超时控制。
 - 请求 52Poké 页面时优先使用 `variant=zh-hans` 获取简体中文，OpenCC 只作为补充兜底。
 - 保留 NFKC 标准化、空白清理和摘要清理逻辑。
 - 写库使用 upsert 语义；需要更新的记录不要用 `INSERT OR IGNORE`。
 - `_upsert_pokemon_forms`（位于 `upsert/pokemon.py`）对 `name_en` 字段有保护机制：如果数据库中已有非空 `name_en`，而本次 payload 的 `name_en` 为空或 None，则保留数据库现有值不覆盖。这防止了因 `form_name_rules.json` 规则不完整而意外清空已有的英文名。
+- pokechamdb 使用率数据的 partner（队友）匹配以中文名为主键，通过 `POKECHAMDB_NAME_ZH_ALIASES` 字典处理译名差异。不使用日文名匹配。
 - 爬虫代码按四层组织：基础工具层（顶层 `.py`）、解析层（`parsers/`）、写库层（`upsert/`）、CLI 调度层（`cli.py`）。Parser 不写库，Upsert 不解析 HTML，CLI 负责串联管道。
 - 新增数据类型时，在 `parsers/` 下新增解析模块，在 `upsert/` 下新增写库模块，同步增加 CLI 子命令、schema 和文档。
 - `data/raw/` 等页面缓存默认不提交。
@@ -215,8 +222,17 @@ Web 数据请求必须走 `apps/web/src/utils/api.js` 中的 `api`/`unifiedApi`�
 优先复用这些组件/工具：
 
 - `WikiLink`、`GenerationTimeline`、`PokemonGrid`、`Modal`、`ViewToggle`
+- `TypeChip`（属性标签，支持 `iconOnly` 模式仅显示图标小方块）
+- `ExternalImage`（外部图片，自动处理 `referrerPolicy` 防盗链和加载失败 fallback）
 - `CustomSelect`、`SearchSelect`、`PokemonConfigCard`、`PokemonEditor`、`PokemonPickerList`、`StatCalculator`
 - `parseExpandParam()`、`TYPE_BG_COLORS`、`TYPE_BG_COLORS_CARD`、`typeIconSrc()`、`categoryIconSrc()`
+
+DrawerContent（图鉴详情抽屉）跨 Tab 联动：
+
+- BattleTab 接收 `formId`（形态级使用率查询）、`onApplyToCalc`（联动到 StatsTab）、`onSearchMove`（联动到 MovesTab）。
+- StatsTab/InlineStatCalculator 通过 `applyPreset` prop 接收外部注入的性格/EV 预设。
+- MovesTab 通过 `initialSearch` prop 接收外部注入的搜索关键词（整合在初始加载 effect 中，非独立 effect）。
+- 联动状态由 DrawerContent 统一管理，子组件消费后离开 Tab 时清空。
 
 DamagePage 特别注意：
 

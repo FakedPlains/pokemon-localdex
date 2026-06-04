@@ -268,6 +268,22 @@ import ViewToggle from "../components/ViewToggle.jsx";
 <ViewToggle mode={viewMode} onChange={setViewMode} />
 ```
 
+**TypeChip** (`components/TypeChip.tsx`) — 属性标签组件，渲染属性图标和文字。接受 `type`（属性名或数组）、可选 `size`（添加 `type-chip-<size>` 类名）和 `iconOnly`（仅显示图标小方块，不显示文字）。已在多个页面和 BattleTab 中使用。
+
+```tsx
+import TypeChip from "../components/TypeChip.tsx";
+<TypeChip type="火" />
+<TypeChip type={["火", "飞行"]} />
+<TypeChip type="电" iconOnly />
+```
+
+**ExternalImage** (`components/ExternalImage.tsx`) — 外部图片组件，自动添加 `referrerPolicy="no-referrer"`（解决 52poke.com 等站点的防盗链问题）并提供加载失败时的 fallback 占位。接受标准 `<img>` 属性加 `fallback`（自定义 fallback 元素）。用于展示道具图片、队友官方图等外部 CDN 图片。
+
+```tsx
+import ExternalImage from "../components/ExternalImage.tsx";
+<ExternalImage src={imageUrl} alt={name} className="my-img" />
+```
+
 #### 4.5.3 共享工具函数与常量
 
 **`parseExpandParam()`** (`utils/helpers.js`) — 从 URL hash 中解析 `expand` 参数，用于从其他页面跳转后自动展开指定条目。已在 MovesPage、AbilitiesPage、ItemsPage 中使用。
@@ -343,7 +359,25 @@ DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 
 **道具图片预览**：选中道具后，道具图片和名称以 flex 布局展示在搜索框位置，点击可清除选择恢复搜索框。不要使用绝对定位覆盖输入框的方式（会导致图片和文字重叠）。
 
-### 4.8 CSS 模块化开发规范
+### 4.8 宝可梦详情 Drawer 跨 Tab 联动
+
+宝可梦图鉴详情 Drawer（`DrawerContent.tsx`）包含四个 Tab：种族值（StatsTab）、招式表（MovesTab）、进化链（EvolutionTab）、对战数据（BattleTab）。
+
+BattleTab 与其他 Tab 之间存在跨 Tab 联动机制：
+
+**对战数据 → 种族值计算器**：用户在 BattleTab 点击性格/努力值分配的"应用"按钮后，自动切换到 StatsTab，并将性格和 EV 注入种族值计算器。实现方式是 `DrawerContent` 维护 `battleApply` 状态，通过 `applyPreset` prop 传递给 `StatsTab` → `InlineStatCalculator`，后者在 `useEffect` 中消费数据（支持经典/Champions 两种模式的自动转换）。离开 StatsTab 时清空预设。
+
+**对战数据 → 招式表搜索**：用户在 BattleTab 点击招式名后，自动切换到 MovesTab，并将招式名填入搜索框触发搜索。实现方式是 `DrawerContent` 维护 `moveSearchApply` 状态，通过 `initialSearch` prop 传递给 `MovesTab`。关键实现细节：`initialSearch` 直接整合在 MovesTab 的初始加载 effect 中（而非单独 effect），避免与重置逻辑打架——初始加载 effect 会用 `initialSearch || ""` 同时设置 `moveSearch` 状态和作为 `fetchPage` 的搜索参数。
+
+**BattleTab 形态感知**：BattleTab 接收 `formId` prop（来自 `display.form?.id`），请求使用率数据时带上 `formId` 参数。不同形态的使用率是分开统计的（`champions_usage_pokemon` 表同时有 `pokemonId` 和 `formId`），切换形态时对战数据会自动刷新。
+
+开发注意事项：
+
+- 联动数据采用"一次性消费"模式：preset/search 被子组件消费后，离开 Tab 时由父组件清空为 null
+- 新增联动方向时，在 `DrawerContent` 中添加状态和 handler，通过 props 单向传递给目标 Tab
+- InlineStatCalculator 的 `applyPreset` effect 会自动判断当前模式（classic/champions），将 EV 转换为对应的 SP
+
+### 4.9 CSS 模块化开发规范
 
 项目样式采用模块化架构，所有 CSS 文件位于 `apps/web/src/styles/` 目录下，按页面或功能拆分为独立模块。
 
@@ -365,6 +399,7 @@ DamagePage 是项目中最复杂的页面，开发时需注意以下几点：
 | `modal.css` | 通用弹窗 | `.modal-` |
 | `pokemon-editor.css` | 配置编辑器 | `.editor-` |
 | `common.css` | Toast、Version Tags、视图切换 | `.toast-`、`.version-` |
+| `battle-tab.css` | 对战数据 Tab（使用率统计） | `.btd-` |
 | `damage-v1.css` | 旧版伤害计算器 | `.damage-` |
 | `damage.css` | 新版伤害计算器 | `.dc-` |
 | `type-chart.css` | 属性克制表 | `.type-chart-` |

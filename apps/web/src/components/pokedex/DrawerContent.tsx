@@ -9,7 +9,8 @@ import MetaPill from "./MetaPill.jsx";
 import MovesTab from "./MovesTab";
 import StatsTab from "./StatsTab";
 import EvolutionTab from "./EvolutionTab.jsx";
-import type { LearnsetMeta } from "@pokemon-localdex/store-types";
+import BattleTab from "./BattleTab";
+import type { LearnsetMeta, ChampionsSeasonSummary } from "@pokemon-localdex/store-types";
 import type { PokemonDetail, DisplayVariant, FormOption } from "./types";
 
 // ─── Types ───
@@ -19,9 +20,12 @@ interface DrawerContentProps {
   initialFormId?: number;
   detailGeneration: string;
   onDetailGenerationChange: (gen: string) => void;
+  championsSeasonId: string;
+  battleFormat: "double" | "single";
+  championsSeasons: ChampionsSeasonSummary[];
 }
 
-type TabKey = "stats" | "moves" | "evolution";
+type TabKey = "stats" | "moves" | "evolution" | "battle";
 
 /* ─── Drawer Content with Tabs ─── */
 export default function DrawerContent({
@@ -29,6 +33,9 @@ export default function DrawerContent({
   initialFormId,
   detailGeneration,
   onDetailGenerationChange,
+  championsSeasonId,
+  battleFormat,
+  championsSeasons,
 }: DrawerContentProps) {
   const [tab, setTab] = useState<TabKey>("stats");
   const [imageMode, setImageMode] = useState("official");
@@ -148,10 +155,33 @@ export default function DrawerContent({
     return learnsetFormIds[0] ?? null;
   }, [learnsetFormOverride, learnsetFormIds, display.form, mapFormToLearnsetId]);
 
+  // ─── Battle tab 联动: 应用性格/EVs → StatsTab ───
+  const [battleApply, setBattleApply] = useState<{ nature: string; evs: Record<string, number> } | null>(null);
+  const [moveSearchApply, setMoveSearchApply] = useState<string | null>(null);
+
+  const handleApplyToCalc = useCallback((nature: string, evs: Record<string, number>) => {
+    setBattleApply({ nature, evs });
+    setTab("stats");
+  }, []);
+
+  const handleSearchMove = useCallback((moveName: string) => {
+    setMoveSearchApply(moveName);
+    setTab("moves");
+  }, []);
+
+  // 当 StatsTab/MovesTab 消费了联动数据后清除
+  useEffect(() => {
+    if (tab !== "stats") setBattleApply(null);
+  }, [tab]);
+  useEffect(() => {
+    if (tab !== "moves") setMoveSearchApply(null);
+  }, [tab]);
+
   const tabs: { key: TabKey; label: string }[] = [
     { key: "stats", label: "种族值" },
     { key: "moves", label: "招式表" },
     { key: "evolution", label: "进化链" },
+    { key: "battle", label: "对战数据" },
   ];
 
   return (
@@ -243,6 +273,7 @@ export default function DrawerContent({
               detail={detail}
               display={display}
               onDetailGenerationChange={onDetailGenerationChange}
+              applyPreset={battleApply}
             />
           )}
           {tab === "moves" && (
@@ -253,6 +284,7 @@ export default function DrawerContent({
               onDetailGenerationChange={onDetailGenerationChange}
               learnsetMeta={learnsetMeta}
               externalFormId={activeLearnsetFormId}
+              initialSearch={moveSearchApply}
             />
           )}
           {tab === "evolution" && (
@@ -261,6 +293,17 @@ export default function DrawerContent({
               evolutionChain={evolutionChain}
               loading={evolutionLoading}
               currentFormId={display.form?.id ?? null}
+            />
+          )}
+          {tab === "battle" && (
+            <BattleTab
+              pokemonId={pokemonId}
+              formId={display.form?.id}
+              championsSeasonId={championsSeasonId}
+              battleFormat={battleFormat}
+              championsSeasons={championsSeasons}
+              onApplyToCalc={handleApplyToCalc}
+              onSearchMove={handleSearchMove}
             />
           )}
         </motion.div>

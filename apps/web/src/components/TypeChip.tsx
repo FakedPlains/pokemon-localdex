@@ -5,22 +5,25 @@ interface TypeChipProps {
   type: string | string[] | null | undefined;
   /** 尺寸修饰（可选），落为 type-chip-<size> 类名，便于按需定制样式 */
   size?: string;
+  /** 是否只显示图标，不显示文字名称 */
+  iconOnly?: boolean;
 }
 
-export default function TypeChip({ type, size }: TypeChipProps) {
+export default function TypeChip({ type, size, iconOnly }: TypeChipProps) {
   if (!type) return null;
   const chips: string[] = getTypeChips(type);
   const sizeClass = size ? ` type-chip-${size}` : "";
+  const iconOnlyClass = iconOnly ? " type-chip-icon-only" : "";
   return (
     <>
       {chips.map((name) => (
-        <span key={name} className={`type-chip type-${name}${sizeClass}`}>
+        <span key={name} className={`type-chip type-${name}${sizeClass}${iconOnlyClass}`}>
           <img
             className="type-chip-icon"
             src={`${import.meta.env.BASE_URL}assets/type-icons/type-${name}@sm.png`}
-            alt=""
+            alt={name}
           />
-          {name}
+          {!iconOnly && name}
         </span>
       ))}
     </>

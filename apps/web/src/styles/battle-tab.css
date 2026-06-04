@@ -1,0 +1,366 @@
+/* ══════════════════════════════════════════════
+   Battle Tab — 对战数据 (btd- prefix)
+   卡片式布局 + 饼图，参考 pokechamdb 风格
+   ══════════════════════════════════════════════ */
+
+.btd-container {
+  padding: 4px 0;
+}
+
+/* ── Season Picker ── */
+.btd-season-picker {
+  text-align: center;
+  padding: 24px 16px;
+}
+
+.btd-hint {
+  color: var(--text-secondary, #666);
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.btd-inline-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btd-inline-controls-top {
+  margin-bottom: 12px;
+  justify-content: flex-start;
+}
+
+.btd-inline-controls-compact {
+  margin-left: auto;
+}
+
+.btd-season-select {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #ddd);
+  background: var(--bg-secondary, #f8f8f8);
+  font-size: 0.82rem;
+  max-width: 200px;
+}
+
+.btd-season-select-sm {
+  max-width: 160px;
+  font-size: 0.78rem;
+  padding: 3px 6px;
+}
+
+.btd-format-toggle {
+  display: inline-flex;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-color, #ddd);
+}
+
+.btd-format-btn {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  border: none;
+  background: var(--bg-secondary, #f8f8f8);
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btd-format-btn-sm {
+  padding: 3px 8px;
+  font-size: 0.75rem;
+}
+
+.btd-format-btn:hover {
+  background: var(--bg-hover, #eee);
+}
+
+.btd-format-active {
+  background: var(--accent, #7c3aed);
+  color: #fff;
+}
+
+.btd-format-active:hover {
+  background: var(--accent-hover, #6d28d9);
+}
+
+/* ── Loading / Empty ── */
+.btd-loading,
+.btd-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-secondary, #888);
+  font-size: 0.9rem;
+}
+
+/* ── Header ── */
+.btd-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 12px;
+  flex-wrap: wrap;
+}
+
+.btd-rank {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-primary, #222);
+}
+
+.btd-season-info {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #888);
+}
+
+/* ══════════════════════════════════════════════
+   Card Grid Layout
+   ══════════════════════════════════════════════ */
+
+.btd-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.btd-card {
+  background: var(--bg-card, #faf8ff);
+  border: 1px solid var(--border-light, #ede9fe);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.btd-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.btd-card-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-tertiary, #a0a0a0);
+}
+
+.btd-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent, #7c3aed);
+}
+
+/* ── Pie Chart ── */
+.btd-pie {
+  width: 90px;
+  height: 90px;
+  margin: 4px 0 10px;
+}
+
+.btd-pie-empty {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: var(--bg-tertiary, #eee);
+  margin: 4px 0 10px;
+}
+
+/* ── Card List ── */
+.btd-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.btd-card-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+  font-size: 0.78rem;
+  border-bottom: 1px solid var(--border-ultra-light, #f3f0ff);
+}
+
+.btd-card-item:last-child {
+  border-bottom: none;
+}
+
+.btd-card-item > .type-chip {
+  flex-shrink: 0;
+}
+
+.btd-item-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.btd-card-item .external-img-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--bg-tertiary, #eee);
+  color: var(--text-tertiary, #aaa);
+  font-size: 0.65rem;
+  flex-shrink: 0;
+}
+
+.btd-card-item-name {
+  flex: 1;
+  color: var(--text-primary, #333);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btd-link {
+  cursor: pointer;
+  color: var(--accent, #7c3aed);
+}
+
+.btd-link:hover {
+  text-decoration: underline;
+}
+
+.btd-card-item-usage {
+  flex-shrink: 0;
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Apply Button ── */
+.btd-apply-btn {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 0.68rem;
+  border-radius: 4px;
+  border: 1px solid var(--accent, #7c3aed);
+  background: transparent;
+  color: var(--accent, #7c3aed);
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: 2px;
+}
+
+.btd-apply-btn:hover {
+  background: var(--accent, #7c3aed);
+  color: #fff;
+}
+
+/* ── Partner list ── */
+.btd-partner-list {
+  margin-top: 8px;
+}
+
+.btd-partner-item {
+  gap: 6px;
+}
+
+.btd-partner-icon {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.btd-partner-rank {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  color: var(--text-tertiary, #aaa);
+}
+
+/* ══════════════════════════════════════════════
+   EV Spreads Section (full width)
+   ══════════════════════════════════════════════ */
+
+.btd-spreads-section {
+  background: var(--bg-card, #faf8ff);
+  border: 1px solid var(--border-light, #ede9fe);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.btd-spreads-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btd-spread-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-ultra-light, #f3f0ff);
+}
+
+.btd-spread-row:last-child {
+  border-bottom: none;
+}
+
+.btd-spread-stats {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.btd-spread-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 28px;
+}
+
+.btd-spread-stat-active .btd-spread-value {
+  color: var(--accent, #7c3aed);
+  font-weight: 600;
+}
+
+.btd-spread-label {
+  font-size: 0.6rem;
+  color: var(--text-tertiary, #aaa);
+  text-transform: uppercase;
+}
+
+.btd-spread-value {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary, #888);
+}
+
+.btd-spread-usage {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-primary, #333);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .btd-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 400px) {
+  .btd-cards {
+    grid-template-columns: 1fr;
+  }
+}

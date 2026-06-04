@@ -188,6 +188,10 @@ def parse_usage_list(html: str) -> list[UsagePokemonEntry]:
     if not rsc_text:
         return []
 
+    # RSC payload 的 chunk 拼接可能在 JSON 键名/值中间插入换行符，
+    # 导致正则无法匹配。在匹配前去除换行以确保完整提取。
+    rsc_text = rsc_text.replace("\n", "")
+
     entries: list[UsagePokemonEntry] = []
 
     # 使用正则从 RSC 文本中提取 entries 数组内的对象
@@ -236,6 +240,9 @@ def parse_usage_detail(html: str, slug: str) -> UsagePokemonDetail:
     rsc_text = extract_rsc_text(html)
     if not rsc_text:
         return UsagePokemonDetail(slug=slug, name_zh="")
+
+    # RSC chunk 拼接可能在任意位置插入换行符，统一去除
+    rsc_text = rsc_text.replace("\n", "")
 
     detail = UsagePokemonDetail(slug=slug, name_zh="")
 

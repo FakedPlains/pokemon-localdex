@@ -22,6 +22,8 @@ interface StatsTabProps {
   detail: PokemonDetail;
   display: DisplayVariant;
   onDetailGenerationChange: (gen: string) => void;
+  /** 对战 Tab 联动：注入性格/EV 预设 */
+  applyPreset?: { nature?: string; evs?: Record<string, number> } | null;
 }
 
 /* ─── Type Coverage Summary ─── */
@@ -188,7 +190,7 @@ function TypeChips({ items }: { items: { name: string; mult: number }[] }) {
 }
 
 /* ─── Stats Tab ─── */
-export default function StatsTab({ detail, display, onDetailGenerationChange }: StatsTabProps) {
+export default function StatsTab({ detail, display, onDetailGenerationChange, applyPreset }: StatsTabProps) {
   const toast = useToast();
   const stats = display.stats || {};
   const [calcValues, setCalcValues] = useState<CalcValues | null>(null);
@@ -353,7 +355,7 @@ export default function StatsTab({ detail, display, onDetailGenerationChange }: 
           {/* 性格/等级/预设控件挂载到这里 */}
           <div ref={setControlsNode} className="isc-heading-controls" />
         </div>
-        <InlineStatCalculator baseStats={stats} diff={diffStats} mode={statMode} onChange={setCalcValues} controlsPortal={controlsNode} />
+        <InlineStatCalculator baseStats={stats} diff={diffStats} mode={statMode} onChange={setCalcValues} controlsPortal={controlsNode} applyPreset={applyPreset} />
       </div>
 
       {/* 添加到盒子/队伍按钮 */}

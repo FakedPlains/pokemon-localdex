@@ -15,6 +15,7 @@ import type {
   PokemonIdentity,
   EvolutionStep,
   ChampionsSeasonSummary,
+  PokemonUsageData,
   MoveEntry,
   AbilityEntry,
   ItemEntry,
@@ -75,7 +76,7 @@ import {
   listPokemonRows,
   type PokemonSummaryListFilters,
 } from "./pokemon-summary.ts";
-import { listChampionsSeasonRows } from "./champions.ts";
+import { listChampionsSeasonRows, getPokemonUsageRow } from "./champions.ts";
 import {
   getLearnsetMetaRows,
   getPokemonLearnsetRows,
@@ -132,6 +133,10 @@ export class DrizzleStore implements IStore {
 
   async listChampionsSeasons(): Promise<ChampionsSeasonSummary[]> {
     return listChampionsSeasonRows(this.db);
+  }
+
+  async getPokemonUsage(pokemonId: number, seasonId: number, format: string, formId?: number): Promise<PokemonUsageData | undefined> {
+    return getPokemonUsageRow(this.db, pokemonId, seasonId, format, formId);
   }
 
   // ────────────────────────────────────────────────────────────────────────────
