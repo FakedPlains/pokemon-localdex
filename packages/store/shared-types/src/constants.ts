@@ -53,7 +53,10 @@ export const TYPE_OPTIONS: TypeOption[] = TYPE_DEFS.map(({ id, key, nameZh, name
 export const TYPE_IDS: number[] = TYPE_OPTIONS.map(({ id }) => id);
 export const TYPE_NAMES: string[] = TYPE_OPTIONS.map(({ nameZh }) => nameZh);
 export const ALL_TYPE_OPTIONS: string[] = TYPE_NAMES;
-export const TYPE_ID_BY_NAME: Record<string, number> = toMap(TYPE_OPTIONS.flatMap(({ id, key, nameZh, nameEn }) => [[nameZh, id], [nameEn, id], [key, id], [String(id), id]] as [string, number][]));
+
+export const TYPE_ID_BY_NAME: Record<string, number> = toMap(
+  TYPE_OPTIONS.flatMap(({ id, key, nameZh, nameEn }) => [[nameZh, id], [nameEn, id], [key, id], [String(id), id]] as [string, number][]),
+);
 export const TYPE_NAME_BY_ID: Record<string, string> = toMap(TYPE_OPTIONS.map(({ id, nameZh }) => [id, nameZh] as [number, string]));
 export const TYPE_ZH_TO_EN: Record<string, string> = toMap(TYPE_OPTIONS.map(({ nameZh, nameEn }) => [nameZh, nameEn] as [string, string]));
 export const TYPE_EN_TO_ZH: Record<string, string> = toMap(TYPE_OPTIONS.map(({ nameEn, nameZh }) => [nameEn, nameZh] as [string, string]));

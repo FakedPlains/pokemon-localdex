@@ -9,57 +9,15 @@ import MetaPill from "./MetaPill.jsx";
 import MovesTab from "./MovesTab";
 import StatsTab from "./StatsTab";
 import EvolutionTab from "./EvolutionTab.jsx";
+import type { LearnsetMeta } from "@pokemon-localdex/store-types";
+import type { PokemonDetail, DisplayVariant, FormOption } from "./types";
+
 // ─── Types ───
-
-interface PokemonDetail {
-  id: number;
-  dexNumber: number;
-  nameZh: string;
-  nameEn?: string;
-  category?: string;
-  heightM?: number;
-  weightKg?: number;
-  source?: { url?: string; title?: string };
-  forms?: unknown[];
-}
-
-interface LearnsetFormMeta {
-  formId: number;
-  formType: string;
-  nameZh: string;
-}
-
-interface LearnsetMeta {
-  forms: LearnsetFormMeta[];
-  generations?: number[];
-}
-
-interface FormOption {
-  id: number;
-  formType: string;
-  nameZh: string;
-}
-
-interface DisplayVariant {
-  primaryType: string | null;
-  secondaryType: string | null;
-  stats: Record<string, number> | null;
-  images: Record<string, string> | null;
-  form: FormOption | null;
-  formOptions: FormOption[];
-  generation: number;
-  abilitiesDetailed: Array<{
-    nameZh: string;
-    abilityId?: number;
-    isHidden?: boolean;
-    description?: string;
-  }>;
-}
 
 interface DrawerContentProps {
   detail: PokemonDetail;
   initialFormId?: number;
-  detailGeneration: string | number;
+  detailGeneration: string;
   onDetailGenerationChange: (gen: string) => void;
 }
 
@@ -284,7 +242,6 @@ export default function DrawerContent({
             <StatsTab
               detail={detail}
               display={display}
-              detailGeneration={detailGeneration}
               onDetailGenerationChange={onDetailGenerationChange}
             />
           )}

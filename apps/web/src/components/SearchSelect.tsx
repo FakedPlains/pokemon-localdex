@@ -1,23 +1,36 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, ReactNode } from "react";
+
+export interface SearchSelectOption {
+  value: string;
+  label: string;
+  sublabel?: string;
+}
+
+interface SearchSelectProps {
+  /** 当前选中值 */
+  value?: string;
+  /** 选项列表 */
+  options: SearchSelectOption[];
+  /** 选中回调 */
+  onChange: (value: string) => void;
+  /** 未选中时的占位文字 */
+  placeholder?: string;
+  /** 可选自定义渲染 */
+  renderOption?: (option: SearchSelectOption) => ReactNode;
+}
 
 /**
  * 模糊搜索下拉选择组件
- *
- * @param {string}   value        - 当前选中值
- * @param {Array}    options      - [{ value, label, sublabel? }]
- * @param {Function} onChange     - (value) => void
- * @param {string}   placeholder  - 未选中时的占位文字
- * @param {Function} renderOption - 可选自定义渲染
  */
-export default function SearchSelect({ value, options, onChange, placeholder, renderOption }) {
+export default function SearchSelect({ value, options, onChange, placeholder, renderOption }: SearchSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const wrapRef = useRef(null);
-  const inputRef = useRef(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const handler = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);

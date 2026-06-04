@@ -393,6 +393,8 @@ import type {
   MoveFlag,
   MoveCategory,
   FieldEffectKind,
+  FieldEffectSourceType,
+  FieldEffectTriggerMethod,
 } from "./battle-effects.ts";
 
 export type BattleEffectRow = {

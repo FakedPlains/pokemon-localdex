@@ -15,7 +15,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
     "paths": {
       "@pokemon-localdex/store-types/*": ["../../packages/store/shared-types/src/*"]
     }

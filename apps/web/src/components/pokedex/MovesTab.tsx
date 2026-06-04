@@ -5,27 +5,11 @@ import { describeLearnsetEntry } from "../../utils/helpers.js";
 import { unifiedApi } from "../../utils/api.js";
 import TypeChip from "../TypeChip.jsx";
 import CustomSelect from "../CustomSelect.jsx";
+import type { PokemonDetail, DisplayVariant } from "./types";
 
 const PAGE_SIZE = 50;
 
 // ─── Types ───
-
-interface FormDetail {
-  id: number;
-  formKey?: string;
-  [key: string]: unknown;
-}
-
-interface PokemonDetail {
-  id: number;
-  forms?: FormDetail[];
-  [key: string]: unknown;
-}
-
-interface DisplayVariant {
-  form?: { formKey?: string } | null;
-  [key: string]: unknown;
-}
 
 interface MovesTabProps {
   detail: PokemonDetail;

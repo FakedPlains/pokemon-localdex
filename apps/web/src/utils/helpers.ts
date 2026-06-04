@@ -1,17 +1,79 @@
 import {
-  TYPE_OPTIONS,
+  TYPE_ID_BY_NAME,
   STAT_KEYS,
   LEARN_METHOD_LABELS,
   typeNameToId,
   typeIdToName,
 } from "@pokemon-localdex/store-types/constants";
+import type {
+  PokemonDetail,
+  FormOption,
+  StatVariant,
+  TypeVariant,
+  AbilityVariant,
+  AbilityDetail,
+  DisplayVariant,
+} from "../components/pokedex/types";
+import type { ImageAsset } from "@pokemon-localdex/store-types";
+
+/* ─── 局部输入类型 ─── */
+
+/** statVariants / typeVariants / abilityVariants 的公共形状 */
+interface GenerationVariant {
+  generationStart?: number;
+  generationEnd?: number;
+}
+
+interface DraftPokemon {
+  id?: number | string;
+  nameZh?: string;
+}
+
+interface DraftMember {
+  pokemonId: string;
+  nameZh: string;
+  configName: string;
+  level: number;
+  itemId: string;
+  abilityId: string;
+  nature: string;
+  moves: string[];
+  ivs: Record<string, number>;
+  evs: Record<string, number>;
+}
+
+/** 任意带 images / image 字段的对象（预览图取值） */
+interface ImageBearer {
+  image?: ImageAsset;
+  images?: {
+    official?: ImageAsset;
+    sprite?: ImageAsset;
+    shinyOfficial?: ImageAsset;
+    shinySprite?: ImageAsset;
+    [key: string]: ImageAsset | undefined;
+  };
+}
+
+interface LearnsetEntryLike {
+  learnMethod: string;
+  level?: number;
+  notes?: string;
+}
+
+interface MoveGenerationRecord {
+  generation: number;
+  [key: string]: unknown;
+}
+
+interface MoveLike {
+  generations?: MoveGenerationRecord[];
+}
 
 /**
  * 从 hash 路由的 query string 中解析 expand 参数
  * 用于 #/moves?expand=123、#/abilities?expand=456 等场景
- * @returns {string|null}
  */
-export function parseExpandParam() {
+export function parseExpandParam(): string | null {
   const hash = window.location.hash || "";
   const qIdx = hash.indexOf("?");
   if (qIdx < 0) return null;
@@ -19,19 +81,22 @@ export function parseExpandParam() {
   return params.get("expand") || null;
 }
 
-export function normalizeTypeName(type) {
+export function normalizeTypeName(type: string | null | undefined): string {
   const id = typeNameToId(type);
   return id ? typeIdToName(id) : String(type || "").trim();
 }
 
-export function splitTypeNames(type) {
+export function splitTypeNames(type: string | null | undefined): string[] {
   const normalized = normalizeTypeName(type);
   if (!normalized) return [];
   if (typeNameToId(normalized)) return [normalized];
 
-  const result = [];
+  const result: string[] = [];
   let remaining = normalized;
-  const candidates = TYPE_OPTIONS.map((typeOption) => typeOption.nameZh)
+  // 候选名取自 TYPE_ID_BY_NAME 的所有键中的中文属性名，
+  // 按长度降序优先匹配长名，避免「飞」误吞「飞行」。
+  const candidates = Object.keys(TYPE_ID_BY_NAME)
+    .filter((name) => /[\u4e00-\u9fff]/.test(name))
     .sort((a, b) => b.length - a.length);
 
   while (remaining) {
@@ -43,19 +108,19 @@ export function splitTypeNames(type) {
   return result;
 }
 
-export function getTypeChips(type) {
+export function getTypeChips(type: string | string[] | null | undefined): string[] {
   if (!type) return [];
-  return [...new Set(splitTypeNames(type))];
+  const single = Array.isArray(type) ? type.join("") : type;
+  return [...new Set(splitTypeNames(single))];
 }
 
-
-export function createDefaultStats(kind) {
+export function createDefaultStats(kind: "iv" | "ev"): Record<string, number> {
   return Object.fromEntries(
     STAT_KEYS.map((key) => [key, kind === "iv" ? 31 : 0])
   );
 }
 
-export function createDraftMember(pokemon) {
+export function createDraftMember(pokemon?: DraftPokemon | null): DraftMember {
   return {
     pokemonId: pokemon?.id ? String(pokemon.id) : "",
     nameZh: pokemon?.nameZh || "",
@@ -66,16 +131,22 @@ export function createDraftMember(pokemon) {
     nature: "认真",
     moves: ["", "", "", ""],
     ivs: createDefaultStats("iv"),
-    evs: createDefaultStats("ev")
+    evs: createDefaultStats("ev"),
   };
 }
 
-export function getPokemonPreviewImage(pokemon) {
-  return pokemon?.image || pokemon?.images?.official || pokemon?.images?.sprite || pokemon?.images?.shinyOfficial || pokemon?.images?.shinySprite;
+export function getPokemonPreviewImage(pokemon?: ImageBearer | null): ImageAsset | undefined {
+  return (
+    pokemon?.image ||
+    pokemon?.images?.official ||
+    pokemon?.images?.sprite ||
+    pokemon?.images?.shinyOfficial ||
+    pokemon?.images?.shinySprite
+  );
 }
 
-export function describeLearnsetEntry(entry) {
-  const parts = [];
+export function describeLearnsetEntry(entry: LearnsetEntryLike): string {
+  const parts: string[] = [];
   const method = LEARN_METHOD_LABELS[entry.learnMethod] || entry.learnMethod;
   if (method) parts.push(method);
   if (entry.level !== undefined) parts.push(`Lv.${entry.level}`);
@@ -83,7 +154,10 @@ export function describeLearnsetEntry(entry) {
   return parts.join(" · ");
 }
 
-export function resolveMoveGenerationRecord(move, generation) {
+export function resolveMoveGenerationRecord(
+  move: MoveLike | null | undefined,
+  generation: number | string | null | undefined,
+): MoveGenerationRecord | undefined {
   const target = Number(generation || 9);
   const records = [...(move?.generations || [])].sort((a, b) => a.generation - b.generation);
   if (records.length === 0) return undefined;
@@ -101,21 +175,20 @@ export function resolveMoveGenerationRecord(move, generation) {
  * 推导逻辑：收集所有 variant 的 generationStart / generationEnd，
  * 展开为连续的世代范围。如果没有任何 variant 则返回空数组（单世代无需切换）。
  */
-export function buildPokemonGenerationOptions(detail) {
+export function buildPokemonGenerationOptions(detail: PokemonDetail): number[] {
   const forms = detail.forms || [];
-  const values = new Set();
+  const values = new Set<number>();
+
+  const collectVariants = (form: FormOption): GenerationVariant[] => [
+    ...(form.statVariants || []),
+    ...(form.typeVariants || []),
+    ...(form.abilityVariants || []),
+  ];
 
   for (const form of forms) {
-    const allVariants = [
-      ...(form.statVariants || []),
-      ...(form.typeVariants || []),
-      ...(form.abilityVariants || []),
-    ];
-    for (const v of allVariants) {
-      const gs = v.generationStart;
-      const ge = v.generationEnd;
-      if (gs) values.add(Number(gs));
-      if (ge) values.add(Number(ge));
+    for (const v of collectVariants(form)) {
+      if (v.generationStart) values.add(Number(v.generationStart));
+      if (v.generationEnd) values.add(Number(v.generationEnd));
     }
   }
 
@@ -126,12 +199,11 @@ export function buildPokemonGenerationOptions(detail) {
   const sorted = [...values].filter(Boolean).sort((a, b) => a - b);
   const min = sorted[0];
   const hasOpenEnd = forms.some((f) =>
-    [...(f.statVariants || []), ...(f.typeVariants || []), ...(f.abilityVariants || [])]
-      .some((v) => v.generationStart && !v.generationEnd),
+    collectVariants(f).some((v) => v.generationStart && !v.generationEnd),
   );
   const max = hasOpenEnd ? 9 : sorted[sorted.length - 1];
 
-  const result = [];
+  const result: number[] = [];
   for (let g = min; g <= max; g++) result.push(g);
   return result;
 }
@@ -141,7 +213,10 @@ export function buildPokemonGenerationOptions(detail) {
  * variants 中每个元素有 generationStart/generationEnd 字段。
  * 返回匹配的变体，如果没有匹配则返回 undefined。
  */
-function _resolveVariantForGeneration(variants, gen) {
+function _resolveVariantForGeneration<T extends GenerationVariant>(
+  variants: T[] | undefined,
+  gen: number,
+): T | undefined {
   if (!variants || variants.length === 0) return undefined;
   if (!gen) return variants.find((v) => !v.generationEnd) || variants[variants.length - 1];
   const matched = variants.find((v) => {
@@ -155,12 +230,15 @@ function _resolveVariantForGeneration(variants, gen) {
   return matched || variants.find((v) => !v.generationEnd) || variants[variants.length - 1];
 }
 
-export function buildPokemonFormOptions(detail, generation) {
+export function buildPokemonFormOptions(
+  detail: PokemonDetail,
+  generation: number | string | null | undefined,
+): FormOption[] {
   const forms = detail.forms || [];
   if (forms.length === 0) {
     // Fallback: synthesize a single "default" form from top-level fields
-    return [{
-      id: null,
+    const fallback: FormOption = {
+      id: 0,
       formKey: "default",
       nameZh: detail.nameZh || "普通形态",
       formType: "default",
@@ -169,25 +247,26 @@ export function buildPokemonFormOptions(detail, generation) {
       secondaryType: detail.secondaryType,
       abilities: (detail.abilities || []).map((a) => ({ nameZh: a, isHidden: false })),
       baseStats: detail.baseStats,
-      images: detail.images ? { official: detail.image } : undefined
-    }];
+      images: detail.images || (detail.image ? { official: detail.image } : undefined),
+    };
+    return [fallback];
   }
 
   const gen = Number(generation || 0);
 
   // 每个形态只有一条记录，直接映射
   return forms.map((form) => {
-    const resolved = { ...form, id: form.id };
+    const resolved: FormOption = { ...form, id: form.id };
 
     // 如果有世代种族值变体，根据当前世代选择
     if (form.statVariants && form.statVariants.length > 0) {
-      const sv = _resolveVariantForGeneration(form.statVariants, gen);
+      const sv = _resolveVariantForGeneration<StatVariant>(form.statVariants, gen);
       if (sv) resolved.baseStats = sv.baseStats;
     }
 
     // 如果有世代属性变体，根据当前世代选择
     if (form.typeVariants && form.typeVariants.length > 0) {
-      const tv = _resolveVariantForGeneration(form.typeVariants, gen);
+      const tv = _resolveVariantForGeneration<TypeVariant>(form.typeVariants, gen);
       if (tv) {
         resolved.primaryType = tv.primaryType;
         resolved.secondaryType = tv.secondaryType;
@@ -196,7 +275,7 @@ export function buildPokemonFormOptions(detail, generation) {
 
     // 如果有世代特性变体，根据当前世代选择
     if (form.abilityVariants && form.abilityVariants.length > 0) {
-      const av = _resolveVariantForGeneration(form.abilityVariants, gen);
+      const av = _resolveVariantForGeneration<AbilityVariant>(form.abilityVariants, gen);
       if (av) resolved.abilities = av.abilities;
     }
 
@@ -204,9 +283,14 @@ export function buildPokemonFormOptions(detail, generation) {
   });
 }
 
-export function resolvePokemonDisplayVariant(detail, detailGeneration, detailForm, globalGeneration) {
+export function resolvePokemonDisplayVariant(
+  detail: PokemonDetail,
+  detailGeneration: number | string | null | undefined,
+  detailForm: number | string | null | undefined,
+  globalGeneration: number | string | null | undefined,
+): DisplayVariant {
   const genOptions = buildPokemonGenerationOptions(detail);
-  let generation;
+  let generation: number | undefined;
   if (genOptions.length === 0) {
     generation = undefined;
   } else {
@@ -239,12 +323,13 @@ export function resolvePokemonDisplayVariant(detail, detailGeneration, detailFor
     ? (hiddenAbilitiesList.length > 0 ? hiddenAbilitiesList.map((a) => a.nameZh).join(" / ") : "无")
     : (detail.hiddenAbility || "无");
   // Full abilities array with id & description for tooltip / linking
-  const abilitiesDetailed = hasOwnAbilities
+  const abilitiesDetailed: AbilityDetail[] = hasOwnAbilities
     ? formAbilities
     : (detail.abilities || []).map((name) => ({ nameZh: name, isHidden: false }));
 
   // Resolve images: form images → top-level image fallback
-  const images = selectedForm.images || (detail.image ? { official: detail.image } : undefined);
+  const images = selectedForm.images ||
+    (detail.image ? { official: detail.image } : null);
 
   return {
     generation,
@@ -257,6 +342,6 @@ export function resolvePokemonDisplayVariant(detail, detailGeneration, detailFor
     secondaryType,
     abilityText,
     hiddenAbilityText,
-    abilitiesDetailed
+    abilitiesDetailed,
   };
 }
