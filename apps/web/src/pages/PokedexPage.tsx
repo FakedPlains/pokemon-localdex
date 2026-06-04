@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { PokemonCardSummary, PokemonTableSummary, ChampionsSeasonSummary } from "@pokemon-localdex/store-types";
+import type { PokemonDetail } from "../components/pokedex/types";
 import { unifiedApi } from "../utils/api.js";
 import { useApi } from "../hooks/useApi.js";
 import { useInfiniteApi } from "../hooks/useInfiniteApi.js";
@@ -43,7 +44,7 @@ export default function PokedexPage({
   onInitialPokemonConsumed,
 }: PokedexPageProps) {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<PokemonDetail | null>(null);
   const [detailGeneration, setDetailGeneration] = useState("");
   const [dexViewMode, setDexViewMode] = useState<ViewMode>("card");
   const [championsSeasonId, setChampionsSeasonId] = useState("");
@@ -52,12 +53,9 @@ export default function PokedexPage({
   const [showSpeedLine, setShowSpeedLine] = useState(false);
   const [hasLoadedList, setHasLoadedList] = useState(false);
   const [lastList, setLastList] = useState<(PokemonCardSummary | PokemonTableSummary)[]>([]);
-  const [lastTotal, setLastTotal] = useState(0);
 
-  const { data: championsSeasonsData = [], loading: seasonsLoading } = useApi("/champions/seasons") as {
-    data: ChampionsSeasonSummary[];
-    loading: boolean;
-  };
+  const { data: championsSeasonsData, loading: seasonsLoading } =
+    useApi<ChampionsSeasonSummary[]>("/champions/seasons");
   const championsSeasons = championsSeasonsData || [];
   const selectedSeason = useMemo(
     () => championsSeasons.find((season) => String(season.id) === championsSeasonId),
@@ -111,23 +109,20 @@ export default function PokedexPage({
     }
   }, [query, types, generation, championsSeasonId, battleFormat]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: list, total, loading, hasMore, sentinelRef } = useInfiniteApi(pokemonPath, { pageSize: 60 }) as {
+  const { data: list, loading, hasMore, sentinelRef } = useInfiniteApi(pokemonPath, { pageSize: 60 }) as {
     data: (PokemonCardSummary | PokemonTableSummary)[];
-    total: number;
     loading: boolean;
     hasMore: boolean;
     sentinelRef: React.RefObject<HTMLDivElement | null>;
   };
   const isRefreshingList = loading && hasLoadedList;
   const displayList = isRefreshingList && list.length === 0 ? lastList : list;
-  const displayTotal = isRefreshingList && list.length === 0 ? lastTotal : total;
 
   useEffect(() => {
     if (loading) return;
     setHasLoadedList(true);
     setLastList(list);
-    setLastTotal(total);
-  }, [list, loading, total]);
+  }, [list, loading]);
 
   // After list reloads due to filter change while detail is open:
   // - has results → auto-select the first pokemon
@@ -169,7 +164,7 @@ export default function PokedexPage({
     const params = new URLSearchParams();
     if (championsSeasonId) params.set("seasonId", championsSeasonId);
     const qs = params.toString();
-    unifiedApi(`/pokemon/${pokemonId}/summary${qs ? `?${qs}` : ""}`).then((r: any) => {
+    unifiedApi<PokemonDetail>(`/pokemon/${pokemonId}/summary${qs ? `?${qs}` : ""}`).then((r) => {
       if (!cancelled) {
         setDetail(r.data);
         setDetailGeneration("");
@@ -275,7 +270,6 @@ export default function PokedexPage({
         onBattleFormatChange={setBattleFormat}
         isUsageRanking={isUsageRanking}
         isRefreshingList={isRefreshingList}
-        displayTotal={displayTotal}
         hasSelection={hasSelection}
         displayListLength={displayList.length}
         showSpeedLine={showSpeedLine}

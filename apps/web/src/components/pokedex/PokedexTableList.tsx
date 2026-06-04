@@ -1,9 +1,10 @@
 import { type RefObject } from "react";
 import { STAT_KEYS } from "@pokemon-localdex/store-types/constants";
-import type { PokemonTableSummary, ImageAsset, StatBlock } from "@pokemon-localdex/store-types";
+import type { PokemonTableSummary, StatBlock } from "@pokemon-localdex/store-types";
 import TypeChip from "../TypeChip.jsx";
 import { getPokemonPreviewImage } from "../../utils/helpers.js";
 import { calculateSpeedLine } from "../../utils/statCalcModel";
+import { getShortFormName } from "./formUtils";
 
 type SortOrder = "asc" | "desc" | "";
 
@@ -83,7 +84,7 @@ export default function PokedexTableList({
       </div>
       {displayList.map((member) => {
         const slug = member.formId ? `${member.id}-f${member.formId}` : String(member.id);
-        const image = getPokemonPreviewImage(member) as ImageAsset | undefined;
+        const image = getPokemonPreviewImage(member);
         const bs: Partial<StatBlock> = member.baseStats || {};
         const total = STAT_KEYS.reduce((s, k) => s + (bs[k as keyof StatBlock] || 0), 0);
         const speedLine = calculateSpeedLine(bs.spe ?? 0);
@@ -101,7 +102,7 @@ export default function PokedexTableList({
             </div>
             <div className="dex-table-col dex-table-col-name">
               <strong className="dex-table-name-zh">{member.nameZh}</strong>
-              {member.formName && <span className="dex-table-form-name">{member.formName}</span>}
+              {member.formName && <span className="dex-table-form-name">{getShortFormName(member.formName)}</span>}
               <span className="dex-table-name-en">{member.nameEn || ""}</span>
             </div>
             <div className="dex-table-col dex-table-col-types">

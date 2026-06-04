@@ -1,13 +1,14 @@
 import { AnimatePresence, motion } from "framer-motion";
 import type { RefObject } from "react";
 import DrawerContent from "./DrawerContent.tsx";
+import type { PokemonDetail } from "./types";
 
 interface PokedexDetailPanelProps {
   hasSelection: boolean;
   detailRef: RefObject<HTMLDivElement | null>;
-  detail: any;
+  detail: PokemonDetail | null;
   initialFormId?: number;
-  detailGeneration: string | number;
+  detailGeneration: string;
   onDetailGenerationChange: (gen: string) => void;
   onClose: () => void;
 }

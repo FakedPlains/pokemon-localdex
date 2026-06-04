@@ -1,8 +1,10 @@
 import { type RefObject } from "react";
 import { motion } from "framer-motion";
-import type { PokemonCardSummary, ImageAsset } from "@pokemon-localdex/store-types";
+import type { PokemonCardSummary } from "@pokemon-localdex/store-types";
+import { TYPE_BG_RGB } from "@pokemon-localdex/store-types/constants";
 import TypeChip from "../TypeChip.jsx";
 import { getPokemonPreviewImage } from "../../utils/helpers.js";
+import { getShortFormName } from "./formUtils";
 
 interface PokedexCardListProps {
   displayList: PokemonCardSummary[];
@@ -31,7 +33,7 @@ export default function PokedexCardList({
       {displayList.map((member) => {
         const slug = member.formId ? `${member.id}-f${member.formId}` : String(member.id);
         const isActive = selectedSlug === slug;
-        const image = getPokemonPreviewImage(member) as ImageAsset | undefined;
+        const image = getPokemonPreviewImage(member);
         return (
           <motion.button
             layout
@@ -43,18 +45,23 @@ export default function PokedexCardList({
             onClick={() => onSelect(slug)}
             transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
           >
-            {member.usageRank != null && (
-              <span className="dex-item-usage-rank">#{member.usageRank}</span>
-            )}
-            <div className="dex-item-img">
+            <div className="dex-item-numbers">
+              {member.usageRank != null && (
+                <span className="dex-item-usage-rank">#{member.usageRank}</span>
+              )}
+              <span className="dex-item-dex">#{String(member.dexNumber || "?").padStart(4, "0")}</span>
+            </div>
+            <div
+              className="dex-item-img"
+              style={{ "--type-rgb": member.primaryType ? TYPE_BG_RGB[member.primaryType] || "200,200,200" : "200,200,200" } as React.CSSProperties}
+            >
               {image?.url
                 ? <img src={image.url} alt={image.alt || member.nameZh} referrerPolicy="no-referrer" loading="lazy" />
                 : <span className="dex-card-placeholder">?</span>}
             </div>
-            <span className="dex-item-dex">#{String(member.dexNumber || "?").padStart(4, "0")}</span>
             <div className="dex-item-info">
               <strong className="dex-item-name">{member.nameZh}</strong>
-              {member.formName && <span className="dex-item-form">{member.formName}</span>}
+              {member.formName && <span className="dex-item-form">{getShortFormName(member.formName)}</span>}
               <span className="dex-item-en">{member.nameEn || ""}</span>
             </div>
             <div className="dex-item-types">

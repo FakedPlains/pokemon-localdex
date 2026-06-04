@@ -5,6 +5,7 @@ import { saveBoxConfig, saveTeam } from "../../utils/teamStorage.js";
 import { useToast } from "../Toast.jsx";
 import InlineStatCalculator from "./InlineStatCalculator";
 import TeamPickerModal from "./TeamPickerModal.jsx";
+import type { PokemonDetail, DisplayVariant } from "./types";
 
 /* ── Types ── */
 interface CalcValues {
@@ -17,36 +18,9 @@ interface CalcValues {
   champNature: string;
 }
 
-interface StatVariant {
-  generationStart?: number;
-  generationEnd?: number;
-  baseStats?: Record<string, number>;
-}
-
-interface DisplayForm {
-  nameZh?: string;
-  statVariants?: StatVariant[];
-}
-
-interface Display {
-  stats?: Record<string, number>;
-  form?: DisplayForm;
-  generation?: number;
-  primaryType?: string;
-  secondaryType?: string;
-  images?: { shinyOfficial?: string; shinySprite?: string };
-}
-
-interface Detail {
-  id: number;
-  nameZh?: string;
-  [key: string]: unknown;
-}
-
 interface StatsTabProps {
-  detail: Detail;
-  display: Display;
-  detailGeneration: string;
+  detail: PokemonDetail;
+  display: DisplayVariant;
   onDetailGenerationChange: (gen: string) => void;
 }
 
@@ -214,7 +188,7 @@ function TypeChips({ items }: { items: { name: string; mult: number }[] }) {
 }
 
 /* ─── Stats Tab ─── */
-export default function StatsTab({ detail, display, detailGeneration, onDetailGenerationChange }: StatsTabProps) {
+export default function StatsTab({ detail, display, onDetailGenerationChange }: StatsTabProps) {
   const toast = useToast();
   const stats = display.stats || {};
   const [calcValues, setCalcValues] = useState<CalcValues | null>(null);
@@ -241,7 +215,7 @@ export default function StatsTab({ detail, display, detailGeneration, onDetailGe
       itemImageUrl: "",
       abilityId: "",
       imageUrl: img?.url || "",
-      shinyImageUrl: display.images?.shinyOfficial || display.images?.shinySprite || "",
+      shinyImageUrl: display.images?.shinyOfficial?.url || display.images?.shinySprite?.url || "",
       isShiny: false,
       primaryType: display.primaryType || "",
       secondaryType: display.secondaryType || "",
@@ -277,8 +251,7 @@ export default function StatsTab({ detail, display, detailGeneration, onDetailGe
   }, [buildConfig, toast]);
 
   // 获取当前形态的 statVariants
-  const currentForm = display.form || {};
-  const statVariants = currentForm.statVariants || [];
+  const statVariants = display.form?.statVariants || [];
   const hasStatVariants = statVariants.length > 1;
 
   // 构建世代段切换选项
