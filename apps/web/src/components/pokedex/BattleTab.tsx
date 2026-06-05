@@ -36,11 +36,11 @@ function formatSeasonLabel(season: ChampionsSeasonSummary): string {
   return parts.filter(Boolean).join(" · ");
 }
 
-// 饼图颜色（绿色调，与全局 accent 统一）
+// 饼图颜色（多色系，柔和明亮）
 const PIE_COLORS = [
-  "#1aab8a", "#34c9a4", "#5edbb8", "#8ae8cf", "#b5f0e0",
-  "#d4f7ed", "#0e8a6e", "#15976f", "#3bb89a", "#6dcdb3",
-  "#99dfc9", "#c2ede0",
+  "#F87171", "#60A5FA", "#6EE7B7", "#FCD34D", "#A78BFA",
+  "#F9A8D4", "#67E8F9", "#FDBA74", "#A5B4FC", "#5EEAD4",
+  "#FCA5A5", "#BEF264",
 ];
 
 // ─── Pie Chart (SVG) ───
@@ -226,9 +226,9 @@ export default function BattleTab({
         )}
       </div>
 
-      {/* 5 列卡片网格 */}
+      {/* 卡片网格（4列） */}
       <div className="btd-cards">
-        {/* 招式 */}
+        {/* 第一行：招式、道具、特性、性格（各占 1 格） */}
         {usageData.moves.length > 0 && (
           <div className="btd-card">
             <div className="btd-card-header">
@@ -237,7 +237,7 @@ export default function BattleTab({
             </div>
             <PieChart data={usageData.moves} />
             <ul className="btd-card-list">
-              {usageData.moves.map((move) => (
+              {usageData.moves.map((move, i) => (
                 <li key={move.rank} className="btd-card-item">
                   {move.type && <TypeChip type={move.type} iconOnly />}
                   <span
@@ -253,7 +253,6 @@ export default function BattleTab({
           </div>
         )}
 
-        {/* 道具 */}
         {usageData.items.length > 0 && (
           <div className="btd-card">
             <div className="btd-card-header">
@@ -262,7 +261,7 @@ export default function BattleTab({
             </div>
             <PieChart data={usageData.items} />
             <ul className="btd-card-list">
-              {usageData.items.map((item) => (
+              {usageData.items.map((item, i) => (
                 <li key={item.rank} className="btd-card-item">
                   <ExternalImage className="btd-item-icon" src={item.imageUrl} alt={item.nameZh} loading="lazy" />
                   <span className="btd-card-item-name">{item.nameZh}</span>
@@ -273,7 +272,6 @@ export default function BattleTab({
           </div>
         )}
 
-        {/* 特性 */}
         {usageData.abilities.length > 0 && (
           <div className="btd-card">
             <div className="btd-card-header">
@@ -282,17 +280,21 @@ export default function BattleTab({
             </div>
             <PieChart data={usageData.abilities} />
             <ul className="btd-card-list">
-              {usageData.abilities.map((ab) => (
+              {usageData.abilities.map((ab, i) => (
                 <li key={ab.rank} className="btd-card-item">
+                  <span className="btd-color-dot" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
                   <span className="btd-card-item-name">{ab.nameZh}</span>
                   <span className="btd-card-item-usage">{formatUsage(ab.usage)}</span>
                 </li>
+              ))}
+              {/* 虚拟占位元素，使间距与 10 条数据的卡片一致 */}
+              {Array.from({ length: 10 - usageData.abilities.length }, (_, i) => (
+                <li key={`placeholder-${i}`} className="btd-card-item btd-card-item-placeholder" aria-hidden="true" />
               ))}
             </ul>
           </div>
         )}
 
-        {/* 性格 */}
         {usageData.natures.length > 0 && (
           <div className="btd-card">
             <div className="btd-card-header">
@@ -301,8 +303,9 @@ export default function BattleTab({
             </div>
             <PieChart data={usageData.natures} />
             <ul className="btd-card-list">
-              {usageData.natures.map((nat) => (
+              {usageData.natures.map((nat, i) => (
                 <li key={nat.rank} className="btd-card-item btd-card-item-nature">
+                  <span className="btd-color-dot" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
                   <span className="btd-card-item-name">
                     {nat.nameZh}
                   </span>
@@ -318,7 +321,7 @@ export default function BattleTab({
           </div>
         )}
 
-        {/* 队友 */}
+        {/* 第二行：队友占 1 格 + 能力点分配占 3 格 */}
         {usageData.teammates.length > 0 && (
           <div className="btd-card">
             <div className="btd-card-header">
@@ -336,37 +339,37 @@ export default function BattleTab({
             </ul>
           </div>
         )}
-      </div>
 
-      {/* 努力值分配 — 单独展示为宽行 */}
-      {usageData.spreads.length > 0 && (
-        <div className="btd-spreads-section">
-          <div className="btd-card-header">
-            <span className="btd-card-label">EV SPREADS</span>
-            <span className="btd-card-title">努力值分配</span>
-          </div>
-          <div className="btd-spreads-list">
-            {usageData.spreads.map((spread) => (
-              <div key={spread.rank} className="btd-spread-row">
-                <div className="btd-spread-stats">
-                  {STAT_KEYS.map((key) => (
-                    <span key={key} className={`btd-spread-stat ${(spread[key as keyof PokemonUsageSpread] as number) > 0 ? "btd-spread-stat-active" : ""}`}>
-                      <span className="btd-spread-label">{STAT_LABELS_SHORT[key]}</span>
-                      <span className="btd-spread-value">{spread[key as keyof PokemonUsageSpread] as number}</span>
-                    </span>
-                  ))}
+        {/* 努力值分配（占 3 格） */}
+        {usageData.spreads.length > 0 && (
+          <div className="btd-card btd-card-spreads btd-card-wide">
+            <div className="btd-card-header">
+              <span className="btd-card-label">SP SPREADS</span>
+              <span className="btd-card-title">能力点分配</span>
+            </div>
+            <div className="btd-spreads-list">
+              {usageData.spreads.map((spread) => (
+                <div key={spread.rank} className="btd-spread-row">
+                  <div className="btd-spread-stats">
+                    {STAT_KEYS.map((key) => (
+                      <span key={key} className={`btd-spread-stat ${(spread[key as keyof PokemonUsageSpread] as number) > 0 ? "btd-spread-stat-active" : ""}`}>
+                        <span className="btd-spread-label">{STAT_LABELS_SHORT[key]}</span>
+                        <span className="btd-spread-value">{spread[key as keyof PokemonUsageSpread] as number}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <span className="btd-spread-usage">{formatUsage(spread.usage)}</span>
+                  {onApplyToCalc && (
+                    <button className="btd-apply-btn" onClick={() => handleApplySpread(spread)} title="应用到能力值计算">
+                      应用
+                    </button>
+                  )}
                 </div>
-                <span className="btd-spread-usage">{formatUsage(spread.usage)}</span>
-                {onApplyToCalc && (
-                  <button className="btd-apply-btn" onClick={() => handleApplySpread(spread)} title="应用到能力值计算">
-                    应用
-                  </button>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

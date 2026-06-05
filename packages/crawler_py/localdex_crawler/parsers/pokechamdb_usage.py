@@ -504,8 +504,8 @@ def _parse_ev_spreads_from_table(rsc_text: str) -> list[UsageEvSpreadEntry]:
     if tbody_idx < 0:
         return results
 
-    # 提取 tbody 后的区域（EV 表最多 10 行，限制搜索范围）
-    ev_section = rsc_text[tbody_idx : tbody_idx + 8000]
+    # 提取 tbody 后的区域（EV 表最多 10 行，每行约 1000-1200 字符）
+    ev_section = rsc_text[tbody_idx : tbody_idx + 15000]
 
     # 找到所有 tr 的起始位置（tr 的 key 是排名数字）
     tr_starts = [m.start() for m in re.finditer(r'\["\$","tr","(\d+)"', ev_section)]
