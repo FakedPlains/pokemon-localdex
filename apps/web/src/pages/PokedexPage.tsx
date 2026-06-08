@@ -278,10 +278,7 @@ export default function PokedexPage({
     return () => { cancelled = true; };
   }, [selectedSlug, championsSeasonId]);
 
-  // 切换宝可梦时关闭 battle 面板
-  useEffect(() => {
-    setBattleOpen(false);
-  }, [selectedSlug]);
+  // 切换宝可梦时：保持对战面板的开/关状态不变（用户已打开则继续显示新宝可梦的对战数据）
 
   // Scroll detail panel to top when detail changes
   useEffect(() => {
@@ -387,6 +384,23 @@ export default function PokedexPage({
     const display = resolvePokemonDisplayVariant(detail, detailGeneration, initialFid, "");
     return display.form?.id;
   }, [detail, detailGeneration, selectedSlug]);
+
+  // ─── 回到顶部按钮 ───
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 600);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const handleBackToTop = useCallback(() => {
+    setInitialOffset(0);
+    navigateTargetRef.current = null;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   if (initialOffset === null || (loading && list.length === 0 && !hasLoadedList)) return <Loading />;
 
@@ -510,6 +524,27 @@ export default function PokedexPage({
           )}
         </AnimatePresence>
       </div>
+
+      {/* 回到顶部按钮 */}
+      <AnimatePresence>
+        {showBackToTop && (
+          <motion.button
+            className="dex-back-to-top"
+            onClick={handleBackToTop}
+            title="回到顶部"
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 20 }}
+            transition={{ duration: 0.2 }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6,14 12,8 18,14" />
+              <line x1="12" y1="8" x2="12" y2="20" />
+              <line x1="6" y1="4" x2="18" y2="4" />
+            </svg>
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
