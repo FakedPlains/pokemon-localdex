@@ -429,6 +429,41 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   background: rgba(232, 69, 60, 0.06);
 }
 
+/* ── Icon-only mode (三栏 battle 模式下仅显示图片) ── */
+.dex-list-icon-only {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 6px;
+  padding: 8px;
+}
+
+.dex-item-icon-only {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 10px;
+  gap: 0;
+  aspect-ratio: 1;
+}
+
+.dex-item-icon-only .dex-item-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(var(--type-rgb), 0.08);
+}
+
+.dex-item-icon-only:hover {
+  transform: none;
+  box-shadow: var(--shadow-hover);
+}
+
+.dex-item-icon-only.dex-item-active {
+  background: rgba(232, 69, 60, 0.08);
+  border-color: rgba(232, 69, 60, 0.3);
+}
+
 /* ── Numbers Container ── */
 .dex-item-numbers {
   display: contents;
@@ -652,6 +687,48 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* .dex-drawer-loading — replaced by shared Loading component (see shared.css) */
+
+/* ── Battle Panel: 独立第三栏卡片，突破容器居中到左对齐 ── */
+.dex-page.dex-page-battle-open {
+  /* 突破 .app-shell 的 max-width 居中限制，扩展到全屏宽度 */
+  width: calc(100vw - 24px);
+  max-width: calc(100vw - 24px);
+  margin-left: calc(-1 * (100vw - 24px - min(1200px, calc(100vw - 24px))) / 2);
+  transition: margin-left 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dex-body-with-battle .dex-list-panel-narrow {
+  flex: 0 0 160px;
+  max-width: 160px;
+}
+
+.dex-battle-panel {
+  position: sticky;
+  top: 72px;
+  padding: 24px;
+  overflow-y: auto;
+  max-height: calc(100vh - 84px);
+  transform-origin: top right;
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.dex-battle-panel-header {
+  margin-bottom: 16px;
+}
+
+.dex-battle-panel-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink, #2D2D2D);
+  margin: 0;
+}
+
+/* Tab bar 中的对战数据按钮样式 */
+.drawer-tab-battle {
+  margin-left: auto;
+}
 
 /* ── Drawer Hero ── */
 .drawer-hero {

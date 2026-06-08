@@ -488,6 +488,62 @@ async function listPokemonTableByUsage(
   return usePagination ? { items, hasMore } : items;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Position Query — 计算目标宝可梦在卡片列表中的 0-based offset
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 获取某宝可梦在卡片列表排序中的 0-based 位置。
+ * 默认排序键：dexNumber ASC（与 listPokemonCardRows 一致）。
+ * 仅支持非 usage 模式（按 dexNumber 排序）。
+ *
+ * @param pokemonId pokemon.id
+ * @param filters 与列表相同的过滤条件（不含分页和排序）
+ */
+export async function getPokemonCardPosition(
+  db: any,
+  pokemonId: number,
+  filters?: Omit<PokemonListFilters, "limit" | "offset" | "sort" | "order">,
+): Promise<number | undefined> {
+  // 先查目标行的排序键值
+  const [target] = await db
+    .select({ id: pokemon.id, dexNumber: pokemon.dexNumber })
+    .from(pokemon)
+    .where(eq(pokemon.id, pokemonId))
+    .limit(1);
+
+  if (!target) return undefined;
+
+  // 构建与 listPokemonCardRows 一致的过滤条件
+  const where = buildPokemonListWhere(filters as PokemonListFilters);
+
+  // 验证目标行满足过滤条件
+  // 需要加入 pokemonForms JOIN，因为 buildPokemonListWhere 可能引用 pokemonForms.id
+  const existConditions: SQL[] = [eq(pokemon.id, pokemonId)];
+  if (where) existConditions.push(where);
+  const existQuery = db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(pokemon)
+    .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
+    .where(and(...existConditions));
+  const [exists] = await existQuery;
+  if (!exists || exists.count === 0) return undefined;
+
+  // 计算排在 target 前面的行数（dexNumber ASC）
+  const targetDex = target.dexNumber;
+  const positionCondition = sql`${pokemon.dexNumber} < ${targetDex}`;
+  const allConditions: SQL[] = [positionCondition];
+  if (where) allConditions.push(where);
+
+  const [result] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(pokemon)
+    .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
+    .where(and(...allConditions));
+
+  return result.count;
+}
+
 export async function listPokemonTableRows(
   db: any,
   filters?: PokemonListFilters,

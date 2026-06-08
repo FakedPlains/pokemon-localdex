@@ -45,26 +45,41 @@ const PIE_COLORS = [
 
 // ─── Pie Chart (SVG) ───
 
-function PieChart({ data }: { data: { usage: number }[] }) {
+interface PieSliceData {
+  nameZh: string;
+  usage: number;
+}
+
+function PieChart({ data }: { data: PieSliceData[] }) {
   const total = data.reduce((sum, d) => sum + d.usage, 0);
   if (total === 0) return <div className="btd-pie-empty" />;
 
   let cumulative = 0;
-  const slices: { startAngle: number; endAngle: number; color: string }[] = [];
+  const slices: { startAngle: number; endAngle: number; color: string; label: string; usage: number }[] = [];
 
   for (let i = 0; i < data.length; i++) {
     const fraction = data[i].usage / total;
     const startAngle = cumulative * 360;
     cumulative += fraction;
     const endAngle = cumulative * 360;
-    slices.push({ startAngle, endAngle, color: PIE_COLORS[i % PIE_COLORS.length] });
+    slices.push({
+      startAngle, endAngle,
+      color: PIE_COLORS[i % PIE_COLORS.length],
+      label: data[i].nameZh,
+      usage: data[i].usage,
+    });
   }
 
   return (
     <svg className="btd-pie" viewBox="0 0 100 100">
       {slices.map((slice, i) => {
+        const tooltip = `${slice.label}  ${slice.usage.toFixed(1)}%`;
         if (slice.endAngle - slice.startAngle >= 359.99) {
-          return <circle key={i} cx="50" cy="50" r="45" fill={slice.color} />;
+          return (
+            <circle key={i} cx="50" cy="50" r="45" fill={slice.color}>
+              <title>{tooltip}</title>
+            </circle>
+          );
         }
         const startRad = ((slice.startAngle - 90) * Math.PI) / 180;
         const endRad = ((slice.endAngle - 90) * Math.PI) / 180;
@@ -74,7 +89,11 @@ function PieChart({ data }: { data: { usage: number }[] }) {
         const y2 = 50 + 45 * Math.sin(endRad);
         const largeArc = slice.endAngle - slice.startAngle > 180 ? 1 : 0;
         const d = `M50,50 L${x1},${y1} A45,45 0 ${largeArc},1 ${x2},${y2} Z`;
-        return <path key={i} d={d} fill={slice.color} />;
+        return (
+          <path key={i} d={d} fill={slice.color}>
+            <title>{tooltip}</title>
+          </path>
+        );
       })}
     </svg>
   );
@@ -264,7 +283,13 @@ export default function BattleTab({
               {usageData.items.map((item, i) => (
                 <li key={item.rank} className="btd-card-item">
                   <ExternalImage className="btd-item-icon" src={item.imageUrl} alt={item.nameZh} loading="lazy" />
-                  <span className="btd-card-item-name">{item.nameZh}</span>
+                  <a
+                    className="btd-card-item-name btd-link"
+                    href={item.id ? `#/items?expand=${item.id}` : "#/items"}
+                    title={item.nameZh}
+                  >
+                    {item.nameZh}
+                  </a>
                   <span className="btd-card-item-usage">{formatUsage(item.usage)}</span>
                 </li>
               ))}
@@ -332,7 +357,13 @@ export default function BattleTab({
               {usageData.teammates.map((tm) => (
                 <li key={tm.rank} className="btd-card-item btd-partner-item">
                   <ExternalImage className="btd-partner-icon" src={tm.iconUrl} alt={tm.nameZh} loading="lazy" />
-                  <span className="btd-card-item-name">{tm.nameZh}</span>
+                  <a
+                    className="btd-card-item-name btd-link"
+                    href={tm.pokemonId ? `#/pokemon?id=${tm.pokemonId}` : "#/pokedex"}
+                    title={tm.nameZh}
+                  >
+                    {tm.nameZh}
+                  </a>
                   <span className="btd-partner-rank">#{tm.rank}</span>
                 </li>
               ))}

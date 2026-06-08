@@ -600,6 +600,7 @@ export interface IStore {
   getMovePosition(id: number, filters?: { query?: string; type?: string; category?: string; generation?: number }): Promise<number | undefined>;
   getAbilityPosition(id: number, filters?: { query?: string; generation?: number }): Promise<number | undefined>;
   getItemPosition(id: number, filters?: { query?: string; category?: string }): Promise<number | undefined>;
+  getPokemonCardPosition(pokemonId: number, filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number; battleFormat?: string }): Promise<number | undefined>;
 
   // Global Search
   globalSearch(query: string, limit?: number): Promise<GlobalSearchResults>;

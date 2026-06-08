@@ -249,6 +249,7 @@
 .btd-link {
   cursor: pointer;
   color: var(--ink, #1A1A1A);
+  text-decoration: none;
 }
 
 .btd-link:hover {
