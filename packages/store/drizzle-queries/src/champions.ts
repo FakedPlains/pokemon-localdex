@@ -262,6 +262,7 @@ export async function getPokemonUsageRow(
     if (!teammateMap.has(key)) {
       teammateMap.set(key, {
         pokemonId: r.partnerPokemonId ?? null,
+        formId: r.partnerFormId ?? null,
         nameZh: r.nameZh ? String(r.nameZh) : String(r.partnerSlug),
         rank: Number(r.rank),
         iconUrl: r.image ? String(r.image) : undefined,

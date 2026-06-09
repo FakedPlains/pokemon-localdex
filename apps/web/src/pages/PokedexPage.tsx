@@ -95,6 +95,7 @@ export default function PokedexPage({
     initialPokemonId ? null : 0,
   );
   const navigateTargetRef = useRef<string | null>(null);
+  const navigateTargetFormIdRef = useRef<number | null>(null);
   const didNavigateRef = useRef(false);
   const filterMountedRef = useRef(false);
 
@@ -174,9 +175,10 @@ export default function PokedexPage({
   // useFilters: 是否携带当前过滤条件查询 position。
   //   - true：页面内导航（如 BattleTab 队友点击），在当前过滤列表中定位。
   //   - false：跨页导航（如全局搜索跳转），过滤条件即将被 reset，应在无过滤列表中定位。
-  const navigateToPokemon = useCallback((pokemonId: string, useFilters = true) => {
+  const navigateToPokemon = useCallback((pokemonId: string, useFilters = true, targetFormId?: number) => {
     fromUrlNavRef.current = true;
     navigateTargetRef.current = pokemonId;
+    navigateTargetFormIdRef.current = targetFormId ?? null;
     didNavigateRef.current = false;
 
     // 构建 position 请求参数：仅在页面内导航时使用当前过滤条件
@@ -188,6 +190,8 @@ export default function PokedexPage({
       if (championsSeasonId) {
         params.set("seasonId", championsSeasonId);
         params.set("format", battleFormat);
+        // usage 列表是形态级拆卡，传 formId 精确定位到队友的具体形态卡
+        if (targetFormId !== undefined) params.set("formId", String(targetFormId));
       }
     }
     const qs = params.toString();
@@ -244,11 +248,17 @@ export default function PokedexPage({
     if (!targetId || didNavigateRef.current) return;
     if (loading || list.length === 0) return;
 
-    // 在已加载列表中查找目标
-    const target = list.find((item) => String(item.id) === targetId);
+    // 在已加载列表中查找目标：优先精确匹配 formId（usage 形态级列表中同 id 有多张卡），
+    // 未指定或未命中时回退到按 pokemonId 匹配第一张
+    const targetFormId = navigateTargetFormIdRef.current;
+    const target =
+      (targetFormId != null
+        ? list.find((item) => String(item.id) === targetId && item.formId === targetFormId)
+        : undefined) ?? list.find((item) => String(item.id) === targetId);
     if (target) {
       didNavigateRef.current = true;
       navigateTargetRef.current = null;
+      navigateTargetFormIdRef.current = null;
       const slug = target.formId ? `${target.id}-f${target.formId}` : String(target.id);
       setSelectedSlug(slug);
       // 等 split view 布局动画完成后，将目标卡片滚动到可见区域
@@ -519,6 +529,7 @@ export default function PokedexPage({
                 championsSeasons={championsSeasons}
                 onApplyToCalc={handleBattleApplyToCalc}
                 onSearchMove={handleBattleSearchMove}
+                onSelectPokemon={(id, fid) => navigateToPokemon(String(id), true, fid)}
               />
             </motion.div>
           )}

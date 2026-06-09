@@ -269,8 +269,8 @@ export class DrizzleStore implements IStore {
     return getItemPosition(this.db, id, filters);
   }
 
-  async getPokemonCardPosition(pokemonId: number, filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number; battleFormat?: string }): Promise<number | undefined> {
-    return getPokemonCardPosition(this.db, pokemonId, filters);
+  async getPokemonCardPosition(pokemonId: number, filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number; battleFormat?: string }, formId?: number): Promise<number | undefined> {
+    return getPokemonCardPosition(this.db, pokemonId, filters, formId);
   }
 
   // ────────────────────────────────────────────────────────────────────────────

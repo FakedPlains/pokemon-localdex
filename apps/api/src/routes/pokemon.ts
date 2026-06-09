@@ -53,7 +53,8 @@ export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOption
     const championsSeasonId = numberQuery(c, "seasonId");
     const formatRaw = c.req.query("format");
     const battleFormat = formatRaw === "single" || formatRaw === "double" ? formatRaw : undefined;
-    const position = await getStore(c).getPokemonCardPosition(id, { query, type, generation, championsSeasonId, battleFormat });
+    const formId = numberQuery(c, "formId");
+    const position = await getStore(c).getPokemonCardPosition(id, { query, type, generation, championsSeasonId, battleFormat }, formId);
     if (position === undefined) return c.json({ error: "Pokemon not found in current list" }, 404);
     return c.json({ data: { position } });
   });

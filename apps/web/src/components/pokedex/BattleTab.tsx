@@ -15,6 +15,11 @@ interface BattleTabProps {
   championsSeasons: ChampionsSeasonSummary[];
   onApplyToCalc?: (nature: string, sps: Record<string, number>) => void;
   onSearchMove?: (moveName: string) => void;
+  /**
+   * 点击队友时的页面内导航回调（优先于 hash 跳转，避免 hash 未变化时 hashchange 不触发）。
+   * formId 用于在 usage 形态级列表中精确定位到队友的具体形态卡。
+   */
+  onSelectPokemon?: (pokemonId: number, formId?: number) => void;
 }
 
 interface SeasonOption {
@@ -109,6 +114,7 @@ export default function BattleTab({
   championsSeasons,
   onApplyToCalc,
   onSearchMove,
+  onSelectPokemon,
 }: BattleTabProps) {
   const [usageData, setUsageData] = useState<PokemonUsageData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -361,6 +367,12 @@ export default function BattleTab({
                     className="btd-card-item-name btd-link"
                     href={tm.pokemonId ? `#/pokemon?id=${tm.pokemonId}` : "#/pokedex"}
                     title={tm.nameZh}
+                    onClick={(e) => {
+                      if (tm.pokemonId && onSelectPokemon) {
+                        e.preventDefault();
+                        onSelectPokemon(tm.pokemonId, tm.formId ?? undefined);
+                      }
+                    }}
                   >
                     {tm.nameZh}
                   </a>
