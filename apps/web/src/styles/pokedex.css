@@ -1568,3 +1568,37 @@ display: block;
   width: 14px;
   height: 14px;
 }
+
+/* ── Back to Top Button ── */
+.dex-back-to-top {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.dex-back-to-top svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.5;
+}
+
+.dex-back-to-top:hover {
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+  border-color: var(--accent, #1aab8a);
+  color: var(--accent, #1aab8a);
+}
