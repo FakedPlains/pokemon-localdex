@@ -54,18 +54,6 @@ const NATURE_SELECT_OPTIONS = NATURES.map((nature) => {
   };
 });
 
-const IV_PRESETS = [
-  { label: "6V", values: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 } },
-  { label: "5V0攻", values: { hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 31 } },
-  { label: "5V0速", values: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 0 } },
-];
-
-const SP_PRESETS = [
-  { label: "极攻极速", values: { hp: 2, atk: 32, def: 0, spa: 0, spd: 0, spe: 32 } },
-  { label: "极特攻极速", values: { hp: 2, atk: 0, def: 0, spa: 32, spd: 0, spe: 32 } },
-  { label: "满HP满物耐", values: { hp: 32, atk: 0, def: 32, spa: 0, spd: 2, spe: 0 } },
-  { label: "满HP满特耐", values: { hp: 32, atk: 0, def: 2, spa: 0, spd: 32, spe: 0 } },
-];
 
 /* ══════════════════════════════════════════════════════════════════
    InlineStatCalculator — 左右平分布局
@@ -219,11 +207,7 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
     }
   }, [mode]);
 
-  /* ── Presets apply ── */
-  const applyIvPreset = useCallback((preset: typeof IV_PRESETS[number]) => {
-    setIvs({ ...preset.values });
-  }, []);
-
+  /* ── EV/SP max helpers ── */
   const applyEvMax = useCallback((key: string) => {
     setEvs((prev) => {
       const next = { ...prev };
@@ -231,10 +215,6 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
       next[key] = Math.min(EV_MAX, EV_TOTAL_MAX - othersTotal);
       return next;
     });
-  }, []);
-
-  const applySpPreset = useCallback((preset: typeof SP_PRESETS[number]) => {
-    setSps({ ...preset.values });
   }, []);
 
   const applySpMax = useCallback((key: string) => {
@@ -280,37 +260,6 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
           />
         </div>
       )}
-
-      {/* Presets */}
-      <div className="isc-presets">
-        {mode === "classic" ? (
-          IV_PRESETS.map((p) => {
-            const active = STAT_KEYS.every((k) => ivs[k] === p.values[k as keyof typeof p.values]);
-            return (
-              <button
-                key={p.label}
-                className={`isc-preset-chip ${active ? "isc-preset-active" : ""}`}
-                onClick={() => applyIvPreset(p)}
-              >
-                {p.label}
-              </button>
-            );
-          })
-        ) : (
-          SP_PRESETS.map((p) => {
-            const active = STAT_KEYS.every((k) => sps[k] === p.values[k as keyof typeof p.values]);
-            return (
-              <button
-                key={p.label}
-                className={`isc-preset-chip ${active ? "isc-preset-active" : ""}`}
-                onClick={() => applySpPreset(p)}
-              >
-                {p.label}
-              </button>
-            );
-          })
-        )}
-      </div>
 
       <span className={`isc-budget ${currentTotal >= totalMax ? "isc-budget-full" : ""}`}>
         {mode === "champions" ? "SP" : "EV"}: {currentTotal}/{totalMax}

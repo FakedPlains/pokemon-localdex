@@ -510,7 +510,7 @@ export type PokemonUsageItem = { id: number | null; nameZh: string; rank: number
 export type PokemonUsageNature = { natureId: number; nameZh: string; rank: number; usage: number; plus?: string; minus?: string };
 export type PokemonUsageMove = { id: number | null; nameZh: string; type?: string; category?: string; rank: number; usage: number };
 export type PokemonUsageSpread = { rank: number; usage: number; hp: number; atk: number; def: number; spa: number; spd: number; spe: number };
-export type PokemonUsageTeammate = { pokemonId: number | null; nameZh: string; rank: number; iconUrl?: string };
+export type PokemonUsageTeammate = { pokemonId: number | null; formId: number | null; nameZh: string; rank: number; iconUrl?: string };
 
 export type PokemonUsageData = {
   rank: number;
@@ -600,6 +600,7 @@ export interface IStore {
   getMovePosition(id: number, filters?: { query?: string; type?: string; category?: string; generation?: number }): Promise<number | undefined>;
   getAbilityPosition(id: number, filters?: { query?: string; generation?: number }): Promise<number | undefined>;
   getItemPosition(id: number, filters?: { query?: string; category?: string }): Promise<number | undefined>;
+  getPokemonCardPosition(pokemonId: number, filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number; battleFormat?: string }, formId?: number): Promise<number | undefined>;
 
   // Global Search
   globalSearch(query: string, limit?: number): Promise<GlobalSearchResults>;

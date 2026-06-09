@@ -13,8 +13,12 @@ interface PokedexCardListProps {
   selectedSlug: string | null;
   onSelect: (slug: string) => void;
   hasMore: boolean;
+  hasPrev?: boolean;
   sentinelRef: RefObject<HTMLDivElement | null>;
+  topSentinelRef?: RefObject<HTMLDivElement | null>;
   activeCardRef: RefObject<HTMLButtonElement | null>;
+  /** 三栏模式：仅显示宝可梦图片 */
+  iconOnly?: boolean;
 }
 
 export default function PokedexCardList({
@@ -24,11 +28,19 @@ export default function PokedexCardList({
   selectedSlug,
   onSelect,
   hasMore,
+  hasPrev = false,
   sentinelRef,
+  topSentinelRef,
   activeCardRef,
+  iconOnly = false,
 }: PokedexCardListProps) {
   return (
-    <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""}`}>
+    <div className={`dex-list ${hasSelection ? "dex-list-compact" : ""} ${iconOnly ? "dex-list-icon-only" : ""}`}>
+      {hasPrev && (
+        <div className="dex-load-more dex-load-prev" ref={topSentinelRef}>
+          <div className="pulse-dot" />
+        </div>
+      )}
       {displayList.length === 0 && !loading && <div className="dex-empty">没有匹配的宝可梦。</div>}
       {displayList.map((member) => {
         const slug = member.formId ? `${member.id}-f${member.formId}` : String(member.id);
@@ -41,35 +53,41 @@ export default function PokedexCardList({
             key={slug}
             ref={isActive ? activeCardRef : undefined}
             data-slug={slug}
-            className={`dex-item ${hasSelection ? "dex-item-compact" : ""} ${isActive ? "dex-item-active" : ""}`}
+            className={`dex-item ${hasSelection ? "dex-item-compact" : ""} ${isActive ? "dex-item-active" : ""} ${iconOnly ? "dex-item-icon-only" : ""}`}
             onClick={() => onSelect(slug)}
             transition={{ layout: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
           >
-            <div className="dex-item-numbers">
-              {member.usageRank != null && (
-                <span className="dex-item-usage-rank">#{member.usageRank}</span>
-              )}
-              <span className="dex-item-dex">#{String(member.dexNumber || "?").padStart(4, "0")}</span>
-            </div>
+            {!iconOnly && (
+              <div className="dex-item-numbers">
+                {member.usageRank != null && (
+                  <span className="dex-item-usage-rank">#{member.usageRank}</span>
+                )}
+                <span className="dex-item-dex">#{String(member.dexNumber || "?").padStart(4, "0")}</span>
+              </div>
+            )}
             <div
               className="dex-item-img"
               style={{ "--type-rgb": member.primaryType ? TYPE_BG_RGB[member.primaryType] || "200,200,200" : "200,200,200" } as React.CSSProperties}
             >
               {image?.url
-                ? <img src={image.url} alt={image.alt || member.nameZh} referrerPolicy="no-referrer" loading="lazy" />
+                ? <img src={image.url} alt={image.alt || member.nameZh} referrerPolicy="no-referrer" loading="lazy" title={member.nameZh} />
                 : <span className="dex-card-placeholder">?</span>}
             </div>
-            <div className="dex-item-info">
-              <span className="dex-item-name-row">
-                <strong className="dex-item-name">{member.nameZh}</strong>
-                {member.formName && <span className="dex-item-form">{getShortFormName(member.formName)}</span>}
-              </span>
-              <span className="dex-item-en">{member.nameEn || ""}</span>
-            </div>
-            <div className="dex-item-types">
-              <TypeChip type={member.primaryType} />
-              <TypeChip type={member.secondaryType} />
-            </div>
+            {!iconOnly && (
+              <>
+                <div className="dex-item-info">
+                  <span className="dex-item-name-row">
+                    <strong className="dex-item-name">{member.nameZh}</strong>
+                    {member.formName && <span className="dex-item-form">{getShortFormName(member.formName)}</span>}
+                  </span>
+                  <span className="dex-item-en">{member.nameEn || ""}</span>
+                </div>
+                <div className="dex-item-types">
+                  <TypeChip type={member.primaryType} />
+                  <TypeChip type={member.secondaryType} />
+                </div>
+              </>
+            )}
           </motion.button>
         );
       })}

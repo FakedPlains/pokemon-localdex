@@ -332,8 +332,8 @@
 }
 
 .dex-list-panel-narrow {
-  flex: 0 0 340px;
-  max-width: 340px;
+  flex: 0 0 295px;
+  max-width: 295px;
   /* no overflow-y: auto — scrolls with the page */
 }
 
@@ -429,6 +429,41 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   background: rgba(232, 69, 60, 0.06);
 }
 
+/* ── Icon-only mode (三栏 battle 模式下仅显示图片) ── */
+.dex-list-icon-only {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 6px;
+  padding: 8px;
+}
+
+.dex-item-icon-only {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 10px;
+  gap: 0;
+  aspect-ratio: 1;
+}
+
+.dex-item-icon-only .dex-item-img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(var(--type-rgb), 0.08);
+}
+
+.dex-item-icon-only:hover {
+  transform: none;
+  box-shadow: var(--shadow-hover);
+}
+
+.dex-item-icon-only.dex-item-active {
+  background: rgba(232, 69, 60, 0.08);
+  border-color: rgba(232, 69, 60, 0.3);
+}
+
 /* ── Numbers Container ── */
 .dex-item-numbers {
   display: contents;
@@ -451,13 +486,12 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   min-width: 28px;
   padding: 2px 6px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent, #E8453C), var(--accent-strong, #D03A32));
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
+  background: rgba(100, 116, 130, 0.1);
+  color: var(--muted, #6b7280);
+  font-size: 10px;
+  font-weight: 600;
   line-height: 1.3;
   text-align: center;
-  box-shadow: 0 1px 4px rgba(232, 69, 60, 0.25);
   z-index: 2;
 }
 
@@ -610,8 +644,9 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dex-item-compact .dex-item-types {
+  flex-direction: column;
+  align-items: flex-end;
   gap: 3px;
-  justify-content: flex-end;
 }
 
 /* ── Right: Detail Panel (sticky) ── */
@@ -652,6 +687,48 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* .dex-drawer-loading — replaced by shared Loading component (see shared.css) */
+
+/* ── Battle Panel: 独立第三栏卡片，突破容器居中到左对齐 ── */
+.dex-page.dex-page-battle-open {
+  /* 突破 .app-shell 的 max-width 居中限制，扩展到全屏宽度 */
+  width: calc(100vw - 24px);
+  max-width: calc(100vw - 24px);
+  margin-left: calc(-1 * (100vw - 24px - min(1200px, calc(100vw - 24px))) / 2);
+  transition: margin-left 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              width 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dex-body-with-battle .dex-list-panel-narrow {
+  flex: 0 0 160px;
+  max-width: 160px;
+}
+
+.dex-battle-panel {
+  position: sticky;
+  top: 72px;
+  padding: 24px;
+  overflow-y: auto;
+  max-height: calc(100vh - 84px);
+  transform-origin: top right;
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.dex-battle-panel-header {
+  margin-bottom: 16px;
+}
+
+.dex-battle-panel-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink, #2D2D2D);
+  margin: 0;
+}
+
+/* Tab bar 中的对战数据按钮样式 */
+.drawer-tab-battle {
+  margin-left: auto;
+}
 
 /* ── Drawer Hero ── */
 .drawer-hero {
@@ -805,7 +882,7 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   border-radius: 999px;
   font-size: 13px;
   font-weight: 600;
-  background: rgba(232, 69, 60, 0.15);
+  background: rgba(232, 69, 60, 0.12);
   color: var(--accent-strong);
 }
 
@@ -815,17 +892,18 @@ padding 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   transition: background 0.2s, box-shadow 0.2s;
 }
 .drawer-ability-link:hover {
-  background: rgba(232, 69, 60, 0.28);
-  box-shadow: 0 1px 4px rgba(61, 90, 30, 0.1);
+  background: rgba(232, 69, 60, 0.22);
+  box-shadow: 0 1px 4px rgba(232, 69, 60, 0.1);
 }
 
 .drawer-ability-hidden {
-  background: rgba(232, 69, 60, 0.1);
-  color: var(--accent-strong);
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--muted);
+  border: 1px dashed rgba(107, 114, 128, 0.3);
 }
 .drawer-ability-hidden.drawer-ability-link:hover {
-  background: rgba(232, 69, 60, 0.2);
-  box-shadow: 0 1px 4px rgba(232, 69, 60, 0.1);
+  background: rgba(107, 114, 128, 0.18);
+  box-shadow: 0 1px 4px rgba(107, 114, 128, 0.1);
 }
 
 /* Ability tooltip */
@@ -1489,4 +1567,38 @@ display: block;
 .matchup-type-list .type-chip-icon {
   width: 14px;
   height: 14px;
+}
+
+/* ── Back to Top Button ── */
+.dex-back-to-top {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.dex-back-to-top svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.5;
+}
+
+.dex-back-to-top:hover {
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+  border-color: var(--accent, #1aab8a);
+  color: var(--accent, #1aab8a);
 }

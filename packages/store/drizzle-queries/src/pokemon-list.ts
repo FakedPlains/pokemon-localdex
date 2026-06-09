@@ -488,6 +488,170 @@ async function listPokemonTableByUsage(
   return usePagination ? { items, hasMore } : items;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Position Query — 计算目标宝可梦在卡片列表中的 0-based offset
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * usage（赛季使用率）排序下的位置计算。
+ * 列表来自 champions_usage_pokemon，是形态级拆卡，排序为 ORDER BY rank ASC, dexNumber ASC。
+ *
+ * 定位目标优先级：
+ * 1. 若传入 formId 且该形态卡存在于当前 usage 列表，则精确定位到该形态卡（队友常常是特定形态）。
+ * 2. 否则取该 pokemonId 在 usage 列表中排名最靠前（rank 最小、dexNumber 最小）的那张卡，
+ *    与前端 list.find 命中第一张的行为保持一致。
+ */
+async function getPokemonCardPositionByUsage(
+  db: any,
+  pokemonId: number,
+  filters?: Omit<PokemonListFilters, "limit" | "offset" | "sort" | "order">,
+  formId?: number,
+): Promise<number | undefined> {
+  const seasonId = filters!.championsSeasonId!;
+  const format = filters?.battleFormat || "double";
+
+  // 复用 usage 列表的过滤条件（赛季、格式、搜索、属性、世代）
+  const conditions: SQL[] = [
+    eq(championsUsagePokemon.seasonId, seasonId),
+    eq(championsUsagePokemon.format, format),
+    eq(championsUsagePokemon.eventId, ""),
+  ];
+
+  if (filters?.query) {
+    const v = `%${filters.query}%`;
+    conditions.push(
+      or(
+        like(pokemon.nameZh, v),
+        like(pokemon.nameJa, v),
+        like(pokemon.nameEn, v),
+        like(pokemonForms.nameZh, v),
+        like(sql`CAST(${pokemon.dexNumber} AS TEXT)`, v),
+      )!,
+    );
+  }
+
+  if (filters?.type) {
+    const types = Array.isArray(filters.type) ? filters.type : [filters.type];
+    if (types.length === 1) {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM pokemon_form_types pft2 WHERE pft2.form_id = ${championsUsagePokemon.formId} AND pft2.type_name = ${types[0]})`,
+      );
+    } else if (types.length > 1) {
+      const placeholders = types.map((t) => sql`${t}`);
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM pokemon_form_types pft2 WHERE pft2.form_id = ${championsUsagePokemon.formId} AND pft2.type_name IN (${sql.join(placeholders, sql`, `)}))`,
+      );
+    }
+  }
+
+  if (filters?.generation) {
+    conditions.push(eq(pokemon.introducedGeneration, filters.generation));
+  }
+
+  // 找到定位目标卡的排序键：优先精确匹配 formId，命中则用该形态卡；否则取 pokemonId 排名最靠前的卡
+  const baseSelect = () =>
+    db
+      .select({ rank: championsUsagePokemon.rank, dexNumber: pokemon.dexNumber })
+      .from(championsUsagePokemon)
+      .innerJoin(pokemon, eq(pokemon.id, championsUsagePokemon.pokemonId))
+      .innerJoin(pokemonForms, eq(pokemonForms.id, championsUsagePokemon.formId));
+
+  let target: { rank: number; dexNumber: number } | undefined;
+  if (formId !== undefined) {
+    [target] = await baseSelect()
+      .where(and(...conditions, eq(championsUsagePokemon.formId, formId)))
+      .limit(1);
+  }
+  if (!target) {
+    // 无 formId 或该形态不在列表：回退到 pokemonId 排名最靠前的卡
+    [target] = await baseSelect()
+      .where(and(...conditions, eq(championsUsagePokemon.pokemonId, pokemonId)))
+      .orderBy(asc(championsUsagePokemon.rank), asc(pokemon.dexNumber))
+      .limit(1);
+  }
+
+  if (!target) return undefined;
+
+  // 计算排在目标前面的卡片数（与列表 ORDER BY rank ASC, dexNumber ASC 一致）
+  const positionCondition = or(
+    sql`${championsUsagePokemon.rank} < ${target.rank}`,
+    and(
+      eq(championsUsagePokemon.rank, target.rank),
+      sql`${pokemon.dexNumber} < ${target.dexNumber}`,
+    ),
+  )!;
+
+  const [result] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(championsUsagePokemon)
+    .innerJoin(pokemon, eq(pokemon.id, championsUsagePokemon.pokemonId))
+    .innerJoin(pokemonForms, eq(pokemonForms.id, championsUsagePokemon.formId))
+    .where(and(...conditions, positionCondition));
+
+  return result.count;
+}
+
+/**
+ * 获取某宝可梦在卡片列表排序中的 0-based 位置。
+ * 默认排序键：dexNumber ASC（与 listPokemonCardRows 一致）。
+ * 选了赛季（championsSeasonId）时走 usage 形态级排序路径。
+ *
+ * @param pokemonId pokemon.id
+ * @param filters 与列表相同的过滤条件（不含分页和排序）
+ * @param formId 可选，目标形态卡 id；usage 路径下用于精确定位到具体形态（如队友的特定形态）
+ */
+export async function getPokemonCardPosition(
+  db: any,
+  pokemonId: number,
+  filters?: Omit<PokemonListFilters, "limit" | "offset" | "sort" | "order">,
+  formId?: number,
+): Promise<number | undefined> {
+  // 选了赛季时，图鉴列表走 usage 形态级排序（ORDER BY rank ASC, dexNumber ASC），
+  // 与默认的 dexNumber 排序完全不同。此处必须用同一套排序规则计算位置，
+  // 否则跳转目标（尤其是排名靠后的形态宝可梦）会定位到错误的列表区域。
+  if (filters?.championsSeasonId !== undefined) {
+    return getPokemonCardPositionByUsage(db, pokemonId, filters, formId);
+  }
+
+  // 先查目标行的排序键值
+  const [target] = await db
+    .select({ id: pokemon.id, dexNumber: pokemon.dexNumber })
+    .from(pokemon)
+    .where(eq(pokemon.id, pokemonId))
+    .limit(1);
+
+  if (!target) return undefined;
+
+  // 构建与 listPokemonCardRows 一致的过滤条件
+  const where = buildPokemonListWhere(filters as PokemonListFilters);
+
+  // 验证目标行满足过滤条件
+  // 需要加入 pokemonForms JOIN，因为 buildPokemonListWhere 可能引用 pokemonForms.id
+  const existConditions: SQL[] = [eq(pokemon.id, pokemonId)];
+  if (where) existConditions.push(where);
+  const existQuery = db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(pokemon)
+    .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
+    .where(and(...existConditions));
+  const [exists] = await existQuery;
+  if (!exists || exists.count === 0) return undefined;
+
+  // 计算排在 target 前面的行数（dexNumber ASC）
+  const targetDex = target.dexNumber;
+  const positionCondition = sql`${pokemon.dexNumber} < ${targetDex}`;
+  const allConditions: SQL[] = [positionCondition];
+  if (where) allConditions.push(where);
+
+  const [result] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(pokemon)
+    .innerJoin(pokemonForms, and(eq(pokemonForms.pokemonId, pokemon.id), eq(pokemonForms.isDefault, 1)))
+    .where(and(...allConditions));
+
+  return result.count;
+}
+
 export async function listPokemonTableRows(
   db: any,
   filters?: PokemonListFilters,

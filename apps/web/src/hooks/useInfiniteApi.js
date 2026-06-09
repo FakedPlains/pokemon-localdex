@@ -165,19 +165,27 @@ export function useInfiniteApi(basePath, options = {}) {
   }, [loadMore, rootMargin]);
 
   // IntersectionObserver 自动触发向上加载
+  // 延迟启用：首次加载完成后需要等 DOM 稳定（布局动画、scrollIntoView），
+  // 避免 topSentinel 在视口内时立刻触发 loadPrev 破坏初始定位。
   useEffect(() => {
     const el = topSentinelRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          loadPrev();
-        }
-      },
-      { rootMargin }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
+    let observer;
+    const timer = setTimeout(() => {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            loadPrev();
+          }
+        },
+        { rootMargin }
+      );
+      observer.observe(el);
+    }, 500);
+    return () => {
+      clearTimeout(timer);
+      if (observer) observer.disconnect();
+    };
   }, [loadPrev, rootMargin]);
 
   // 手动重置

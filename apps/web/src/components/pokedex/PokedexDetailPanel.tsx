@@ -1,9 +1,9 @@
+import { useCallback, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { RefObject } from "react";
 import DrawerContent from "./DrawerContent.tsx";
 import Loading from "../Loading.tsx";
 import type { PokemonDetail } from "./types";
-import type { ChampionsSeasonSummary } from "@pokemon-localdex/store-types";
 
 interface PokedexDetailPanelProps {
   hasSelection: boolean;
@@ -13,9 +13,10 @@ interface PokedexDetailPanelProps {
   detailGeneration: string;
   onDetailGenerationChange: (gen: string) => void;
   onClose: () => void;
-  championsSeasonId: string;
-  battleFormat: "double" | "single";
-  championsSeasons: ChampionsSeasonSummary[];
+  onToggleBattle?: () => void;
+  battleOpen?: boolean;
+  battleApplyPreset?: { nature: string; sps: Record<string, number> } | null;
+  battleMoveSearch?: string | null;
 }
 
 export default function PokedexDetailPanel({
@@ -26,9 +27,10 @@ export default function PokedexDetailPanel({
   detailGeneration,
   onDetailGenerationChange,
   onClose,
-  championsSeasonId,
-  battleFormat,
-  championsSeasons,
+  onToggleBattle,
+  battleOpen,
+  battleApplyPreset,
+  battleMoveSearch,
 }: PokedexDetailPanelProps) {
   return (
     <AnimatePresence mode="wait">
@@ -47,15 +49,17 @@ export default function PokedexDetailPanel({
               <line x1="4" y1="4" x2="14" y2="14" /><line x1="14" y1="4" x2="4" y2="14" />
             </svg>
           </button>
+
           {detail ? (
             <DrawerContent
               detail={detail}
               initialFormId={initialFormId}
               detailGeneration={detailGeneration}
               onDetailGenerationChange={onDetailGenerationChange}
-              championsSeasonId={championsSeasonId}
-              battleFormat={battleFormat}
-              championsSeasons={championsSeasons}
+              onToggleBattle={onToggleBattle}
+              battleOpen={battleOpen}
+              battleApplyPreset={battleApplyPreset}
+              battleMoveSearch={battleMoveSearch}
             />
           ) : (
             <Loading variant="inline" text="加载详情…" style={{ padding: 40 }} />
