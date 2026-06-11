@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { unifiedApi } from "../../utils/api.js";
 import { getPokemonPreviewImage } from "../../utils/helpers.js";
 import TypeChip from "../TypeChip.jsx";
+import Loading from "../Loading.tsx";
 
 //  子组件：简洁宝可梦选择列表（图片 + 名称 + 属性）
 // ══════════════════════════════════════════════════════════════
@@ -64,7 +65,7 @@ export default function SimplePokemonList({ search, onSelect }) {
           </button>
         );
       })}
-      {loading && <div className="dc-simple-list-hint">加载中…</div>}
+      {loading && <Loading variant="text" text="加载中…" className="dc-simple-list-hint" />}
       {!loading && data.length === 0 && <div className="dc-simple-list-hint">没有找到匹配的宝可梦</div>}
     </div>
   );

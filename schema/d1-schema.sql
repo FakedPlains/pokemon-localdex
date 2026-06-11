@@ -490,12 +490,13 @@ CREATE TABLE IF NOT EXISTS champions_usage_natures (
 
 -- 队友排名
 CREATE TABLE IF NOT EXISTS champions_usage_partners (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  usage_pokemon_id INTEGER NOT NULL REFERENCES champions_usage_pokemon(id) ON DELETE CASCADE,
-  partner_pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE SET NULL,
-  partner_slug TEXT NOT NULL,
-  rank INTEGER NOT NULL,
-  UNIQUE (usage_pokemon_id, partner_slug)
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+usage_pokemon_id INTEGER NOT NULL REFERENCES champions_usage_pokemon(id) ON DELETE CASCADE,
+partner_pokemon_id INTEGER REFERENCES pokemon(id) ON DELETE SET NULL,
+partner_form_id INTEGER REFERENCES pokemon_forms(id) ON DELETE SET NULL,
+partner_slug TEXT NOT NULL,
+rank INTEGER NOT NULL,
+UNIQUE (usage_pokemon_id, partner_slug)
 );
 
 -- EV 分布排名

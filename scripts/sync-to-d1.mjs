@@ -59,6 +59,13 @@ const TABLES_IN_ORDER = [
   "champions_seasons",
   "champions_regulation_pokemon",
   "champions_regulation_items",
+  "champions_usage_pokemon",
+  "champions_usage_moves",
+  "champions_usage_items",
+  "champions_usage_abilities",
+  "champions_usage_natures",
+  "champions_usage_partners",
+  "champions_usage_ev_spreads",
 ];
 
 function escapeValue(val) {

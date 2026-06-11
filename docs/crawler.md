@@ -489,9 +489,12 @@ cli.py: crawl_usage()
 
 ### 数据源约定
 
-爬虫唯一的数据源是 [52Poké Wiki](https://wiki.52poke.com/)（神奇宝贝百科）。所有数据均从该站点的 HTML 页面中解析获取，不使用任何第三方 API 或其他数据源。
+爬虫使用两个数据源：
 
-采集入口页面包括：
+- **[52Poké Wiki](https://wiki.52poke.com/)**（神奇宝贝百科）：主数据源，宝可梦图鉴、招式、特性、道具、进化链、招式学习表和 Champions 赛制等全部基础数据均从该站点的 HTML 页面中解析获取。
+- **[pokechamdb.com](https://pokechamdb.com/)**：使用率数据源，提供 Champions 排位对战的使用率排名和配置统计。该站点是 Next.js App Router SPA，数据嵌入在 RSC payload 中。
+
+52Poké Wiki 采集入口页面包括：
 
 | 数据类型 | 入口页面 | 说明 |
 |---------|---------|------|
@@ -503,23 +506,25 @@ cli.py: crawl_usage()
 | Champions 赛制 | 赛制（Champions） | 赛制期间、特殊要素、持有物规则、可用宝可梦 |
 | Champions 道具 | 道具列表（Champions） | Champions 中的树果、对战影响道具、属性增强道具、超级石和票券 |
 
+pokechamdb.com 采集入口为 `https://pokechamdb.com/zh-Hans?format={single|double}&season={season_code}&view=pokemon`，详情页为 `https://pokechamdb.com/zh-Hans/pokemon/{slug}?season={season_code}&format={format}`。
+
 每个条目的详情数据通过列表页中的超链接跳转到对应的详情页获取。详情页 URL 的构造规则为 `https://wiki.52poke.com/wiki/{名称}（{类型后缀}）`，其中类型后缀为"招式"、"特性"或"道具"。宝可梦详情页直接使用中文名作为路径，不带后缀。
 
 招式学习表（learnset）页面的 URL 格式为 `https://wiki.52poke.com/wiki/{宝可梦名}/第{X}世代招式表`，Champions 赛制使用 `{宝可梦名}/Champions招式表`。
 
 ### 请求行为规范
 
-**User-Agent**：所有 HTTP 请求必须携带自定义 User-Agent 标识 `PokemonLocalDexCrawler/0.1 (local research cache; source https://wiki.52poke.com/)`，表明爬虫身份和用途。
+**User-Agent**：52Poké 请求携带自定义 User-Agent 标识 `PokemonLocalDexCrawler/0.1 (local research cache; source https://wiki.52poke.com/)`。pokechamdb 请求使用浏览器 User-Agent（Chrome on macOS）以避免触发 Cloudflare bot 保护。
 
-**请求间隔**：两次网络请求之间必须保持至少 1 秒的间隔（`request_interval=1.0`），避免对 Wiki 服务器造成过大压力。这个间隔通过 `PageFetcher._rate_limit()` 方法强制执行。
+**请求间隔**：52Poké 两次请求间隔至少 1 秒（`PageFetcher._rate_limit()`）。pokechamdb 默认间隔 4 秒（`PokechamdbFetcher`），因为该站点由 Cloudflare Worker SSR 提供服务，请求过快容易触发 1102 资源限制错误。
 
 **超时控制**：单次请求的超时时间默认为 30 秒。
 
-**降级策略**：当 Python `requests` 库因 DNS 或网络问题请求失败时，爬虫会自动降级到系统 `curl` 命令重试。这是为了兼容某些 macOS 沙箱环境下 Python 的 DNS 解析问题。
+**降级策略**：当 Python `requests` 库因 DNS 或网络问题请求失败时，爬虫会自动降级到系统 `curl` 命令重试。这是为了兼容某些 macOS 沙箱环境下 Python 的 DNS 解析问题。pokechamdb fetcher 优先使用 curl（支持 brotli 解压、更高的 Cloudflare 通过率），requests 作为 fallback。
 
 **404 处理**：当页面返回 404 时，爬虫抛出 `PageNotFoundError` 异常。调用方根据上下文决定是跳过该条目还是终止采集。对于道具和招式学习表，404 通常意味着该条目不存在于 Wiki 中，应跳过并记录日志。
 
-**缓存优先**：每次请求前先检查本地缓存（`data/raw/{cache_key}.json`），只有缓存不存在或显式指定 `--refresh-raw` 时才发起网络请求。缓存文件使用 JSON 格式存储，包含四个字段：`url`（原始 URL）、`title`（页面标题）、`fetchedAt`（ISO 8601 格式的抓取时间）、`html`（完整 HTML 内容）。
+**缓存优先**：每次请求前先检查本地缓存，只有缓存不存在或显式指定 `--refresh-raw` 时才发起网络请求。52Poké 缓存在 `data/raw/{cache_key}.json`，pokechamdb 缓存在 `data/raw/pokechamdb/{cache_key}.json`。缓存文件使用 JSON 格式存储，包含 `url`、`fetchedAt`（ISO 8601）、`html`（完整 HTML 内容）等字段。
 
 ### 缓存文件命名规范
 
@@ -539,8 +544,10 @@ cli.py: crawl_usage()
 | Champions 赛季 | `champions-seasons` | `champions-seasons.json` |
 | Champions 赛制 | `champions-regulations` | `champions-regulations.json` |
 | Champions 道具 | `champions-items` | `champions-items.json` |
+| 使用率列表 | `pokechamdb-usage-{season}-{format}` | `pokechamdb-usage-M-2-single.json` |
+| 使用率详情 | `pokechamdb-detail-{slug}-{season}-{format}` | `pokechamdb-detail-garchomp-M-2-double.json` |
 
-`slugify()` 函数将文本进行 NFKC 标准化后，用连字符替换非字母数字和非中文字符，并转为小写。
+`slugify()` 函数将文本进行 NFKC 标准化后，用连字符替换非字母数字和非中文字符，并转为小写。pokechamdb 缓存文件存储在 `data/raw/pokechamdb/` 子目录中。
 
 ### 文本处理规范
 

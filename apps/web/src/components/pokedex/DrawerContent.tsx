@@ -19,6 +19,12 @@ interface DrawerContentProps {
   initialFormId?: number;
   detailGeneration: string;
   onDetailGenerationChange: (gen: string) => void;
+  onToggleBattle?: () => void;
+  battleOpen?: boolean;
+  /** 从 BattleTab 联动过来的性格/SPs 预设 */
+  battleApplyPreset?: { nature: string; sps: Record<string, number> } | null;
+  /** 从 BattleTab 联动过来的招式搜索词 */
+  battleMoveSearch?: string | null;
 }
 
 type TabKey = "stats" | "moves" | "evolution";
@@ -29,6 +35,10 @@ export default function DrawerContent({
   initialFormId,
   detailGeneration,
   onDetailGenerationChange,
+  onToggleBattle,
+  battleOpen,
+  battleApplyPreset,
+  battleMoveSearch,
 }: DrawerContentProps) {
   const [tab, setTab] = useState<TabKey>("stats");
   const [imageMode, setImageMode] = useState("official");
@@ -148,6 +158,16 @@ export default function DrawerContent({
     return learnsetFormIds[0] ?? null;
   }, [learnsetFormOverride, learnsetFormIds, display.form, mapFormToLearnsetId]);
 
+  // ─── Battle panel 联动 ───
+  // 当收到联动预设时自动切换到对应 tab
+  useEffect(() => {
+    if (battleApplyPreset) setTab("stats");
+  }, [battleApplyPreset]);
+
+  useEffect(() => {
+    if (battleMoveSearch) setTab("moves");
+  }, [battleMoveSearch]);
+
   const tabs: { key: TabKey; label: string }[] = [
     { key: "stats", label: "种族值" },
     { key: "moves", label: "招式表" },
@@ -226,6 +246,14 @@ export default function DrawerContent({
             {t.label}
           </button>
         ))}
+        {onToggleBattle && (
+          <button
+            className={`drawer-tab drawer-tab-battle ${battleOpen ? "drawer-tab-active" : ""}`}
+            onClick={onToggleBattle}
+          >
+            对战数据 →
+          </button>
+        )}
       </div>
 
       {/* Tab content */}
@@ -243,6 +271,7 @@ export default function DrawerContent({
               detail={detail}
               display={display}
               onDetailGenerationChange={onDetailGenerationChange}
+              applyPreset={battleApplyPreset}
             />
           )}
           {tab === "moves" && (
@@ -253,6 +282,7 @@ export default function DrawerContent({
               onDetailGenerationChange={onDetailGenerationChange}
               learnsetMeta={learnsetMeta}
               externalFormId={activeLearnsetFormId}
+              initialSearch={battleMoveSearch}
             />
           )}
           {tab === "evolution" && (

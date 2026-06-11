@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { unifiedApi } from "../utils/api.js";
 import { TYPE_BG_COLORS_CARD } from "@pokemon-localdex/store-types/constants";
 import { typeIconSrc } from "../utils/iconPaths.js";
+import Loading from "./Loading.tsx";
 
 const POKEMON_PAGE_SIZE = 20;
 
@@ -33,12 +34,7 @@ export default function PokemonGrid({ apiPath, emptyText = "暂无数据", label
   useEffect(() => { fetchPage(0); }, [fetchPage]);
 
   if (loading && pokemon.length === 0) {
-    return (
-      <div className="shared-detail-loading">
-        <div className="pulse-dot" />
-        <span>加载中…</span>
-      </div>
-    );
+    return <Loading variant="inline" text="加载中…" />;
   }
 
   if (!loading && pokemon.length === 0) {
@@ -51,10 +47,7 @@ export default function PokemonGrid({ apiPath, emptyText = "暂无数据", label
   return (
     <>
       {loading && (
-        <div className="shared-detail-loading" style={{ padding: "8px 0" }}>
-          <div className="pulse-dot" />
-          <span>加载中…</span>
-        </div>
+        <Loading variant="inline" text="加载中…" style={{ padding: "8px 0" }} />
       )}
       <div className="shared-pokemon-grid" style={{ opacity: loading ? 0.5 : 1 }}>
         {pokemon.map((p) => (

@@ -28,12 +28,19 @@ interface CalcValues {
   champNature: string;
 }
 
+interface ApplyPreset {
+  nature?: string;
+  sps?: Record<string, number>;
+}
+
 interface InlineStatCalculatorProps {
   baseStats: Record<string, number>;
   diff?: Record<string, number> | null;
   mode: "classic" | "champions";
   onChange?: (values: CalcValues) => void;
   controlsPortal?: HTMLElement | null;
+  /** 从对战 Tab 联动注入的性格/EV 预设，消费后由父组件清空 */
+  applyPreset?: ApplyPreset | null;
 }
 
 /* ── Constants ── */
@@ -47,25 +54,13 @@ const NATURE_SELECT_OPTIONS = NATURES.map((nature) => {
   };
 });
 
-const IV_PRESETS = [
-  { label: "6V", values: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 } },
-  { label: "5V0攻", values: { hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 31 } },
-  { label: "5V0速", values: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 0 } },
-];
-
-const SP_PRESETS = [
-  { label: "极攻极速", values: { hp: 2, atk: 32, def: 0, spa: 0, spd: 0, spe: 32 } },
-  { label: "极特攻极速", values: { hp: 2, atk: 0, def: 0, spa: 32, spd: 0, spe: 32 } },
-  { label: "满HP满物耐", values: { hp: 32, atk: 0, def: 32, spa: 0, spd: 2, spe: 0 } },
-  { label: "满HP满特耐", values: { hp: 32, atk: 0, def: 2, spa: 0, spd: 32, spe: 0 } },
-];
 
 /* ══════════════════════════════════════════════════════════════════
    InlineStatCalculator — 左右平分布局
    左侧: 能力名 + 种族值 + 进度条
    右侧: IV(经典) + EV/SP + 性格 + 实际值
    ══════════════════════════════════════════════════════════════════ */
-export default function InlineStatCalculator({ baseStats, diff, mode, onChange, controlsPortal }: InlineStatCalculatorProps) {
+export default function InlineStatCalculator({ baseStats, diff, mode, onChange, controlsPortal, applyPreset }: InlineStatCalculatorProps) {
   /* Classic state */
   const [level, setLevel] = useState(50);
   const [nature, setNature] = useState("认真");
@@ -86,6 +81,9 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
   const prevModeRef = useRef(mode);
   useEffect(() => {
     if (prevModeRef.current === mode) return;
+    prevModeRef.current = mode;
+    // 如果有 applyPreset 正在注入，跳过自动转换，由 applyPreset effect 负责填充
+    if (applyPreset) return;
     if (mode === "champions") {
       setSps(convertEvsToSps(evs));
       setChampNature(nature);
@@ -95,8 +93,18 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
       setLevel(50);
       setNature(champNature);
     }
-    prevModeRef.current = mode;
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, applyPreset]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Apply preset from BattleTab linkage（直接填充 SP 值，不做转换） ── */
+  useEffect(() => {
+    if (!applyPreset) return;
+    if (applyPreset.nature) {
+      setChampNature(applyPreset.nature);
+    }
+    if (applyPreset.sps && Object.keys(applyPreset.sps).length > 0) {
+      setSps(applyPreset.sps);
+    }
+  }, [applyPreset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── onChange callback ── */
   const onChangeRef = useRef(onChange);
@@ -199,11 +207,7 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
     }
   }, [mode]);
 
-  /* ── Presets apply ── */
-  const applyIvPreset = useCallback((preset: typeof IV_PRESETS[number]) => {
-    setIvs({ ...preset.values });
-  }, []);
-
+  /* ── EV/SP max helpers ── */
   const applyEvMax = useCallback((key: string) => {
     setEvs((prev) => {
       const next = { ...prev };
@@ -211,10 +215,6 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
       next[key] = Math.min(EV_MAX, EV_TOTAL_MAX - othersTotal);
       return next;
     });
-  }, []);
-
-  const applySpPreset = useCallback((preset: typeof SP_PRESETS[number]) => {
-    setSps({ ...preset.values });
   }, []);
 
   const applySpMax = useCallback((key: string) => {
@@ -260,37 +260,6 @@ export default function InlineStatCalculator({ baseStats, diff, mode, onChange, 
           />
         </div>
       )}
-
-      {/* Presets */}
-      <div className="isc-presets">
-        {mode === "classic" ? (
-          IV_PRESETS.map((p) => {
-            const active = STAT_KEYS.every((k) => ivs[k] === p.values[k as keyof typeof p.values]);
-            return (
-              <button
-                key={p.label}
-                className={`isc-preset-chip ${active ? "isc-preset-active" : ""}`}
-                onClick={() => applyIvPreset(p)}
-              >
-                {p.label}
-              </button>
-            );
-          })
-        ) : (
-          SP_PRESETS.map((p) => {
-            const active = STAT_KEYS.every((k) => sps[k] === p.values[k as keyof typeof p.values]);
-            return (
-              <button
-                key={p.label}
-                className={`isc-preset-chip ${active ? "isc-preset-active" : ""}`}
-                onClick={() => applySpPreset(p)}
-              >
-                {p.label}
-              </button>
-            );
-          })
-        )}
-      </div>
 
       <span className={`isc-budget ${currentTotal >= totalMax ? "isc-budget-full" : ""}`}>
         {mode === "champions" ? "SP" : "EV"}: {currentTotal}/{totalMax}

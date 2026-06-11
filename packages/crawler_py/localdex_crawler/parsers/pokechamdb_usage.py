@@ -188,6 +188,10 @@ def parse_usage_list(html: str) -> list[UsagePokemonEntry]:
     if not rsc_text:
         return []
 
+    # RSC payload 的 chunk 拼接可能在 JSON 键名/值中间插入换行符，
+    # 导致正则无法匹配。在匹配前去除换行以确保完整提取。
+    rsc_text = rsc_text.replace("\n", "")
+
     entries: list[UsagePokemonEntry] = []
 
     # 使用正则从 RSC 文本中提取 entries 数组内的对象
@@ -236,6 +240,9 @@ def parse_usage_detail(html: str, slug: str) -> UsagePokemonDetail:
     rsc_text = extract_rsc_text(html)
     if not rsc_text:
         return UsagePokemonDetail(slug=slug, name_zh="")
+
+    # RSC chunk 拼接可能在任意位置插入换行符，统一去除
+    rsc_text = rsc_text.replace("\n", "")
 
     detail = UsagePokemonDetail(slug=slug, name_zh="")
 
@@ -497,8 +504,8 @@ def _parse_ev_spreads_from_table(rsc_text: str) -> list[UsageEvSpreadEntry]:
     if tbody_idx < 0:
         return results
 
-    # 提取 tbody 后的区域（EV 表最多 10 行，限制搜索范围）
-    ev_section = rsc_text[tbody_idx : tbody_idx + 8000]
+    # 提取 tbody 后的区域（EV 表最多 10 行，每行约 1000-1200 字符）
+    ev_section = rsc_text[tbody_idx : tbody_idx + 15000]
 
     # 找到所有 tr 的起始位置（tr 的 key 是排名数字）
     tr_starts = [m.start() for m in re.finditer(r'\["\$","tr","(\d+)"', ev_section)]

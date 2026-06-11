@@ -15,6 +15,7 @@ import type {
   PokemonIdentity,
   EvolutionStep,
   ChampionsSeasonSummary,
+  PokemonUsageData,
   MoveEntry,
   AbilityEntry,
   ItemEntry,
@@ -69,13 +70,14 @@ import {
 import {
   listPokemonCardRows,
   listPokemonTableRows,
+  getPokemonCardPosition,
   type PokemonListFilters,
 } from "./pokemon-list.ts";
 import {
   listPokemonRows,
   type PokemonSummaryListFilters,
 } from "./pokemon-summary.ts";
-import { listChampionsSeasonRows } from "./champions.ts";
+import { listChampionsSeasonRows, getPokemonUsageRow } from "./champions.ts";
 import {
   getLearnsetMetaRows,
   getPokemonLearnsetRows,
@@ -132,6 +134,10 @@ export class DrizzleStore implements IStore {
 
   async listChampionsSeasons(): Promise<ChampionsSeasonSummary[]> {
     return listChampionsSeasonRows(this.db);
+  }
+
+  async getPokemonUsage(pokemonId: number, seasonId: number, format: string, formId?: number): Promise<PokemonUsageData | undefined> {
+    return getPokemonUsageRow(this.db, pokemonId, seasonId, format, formId);
   }
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -261,6 +267,10 @@ export class DrizzleStore implements IStore {
 
   async getItemPosition(id: number, filters?: { query?: string; category?: string }): Promise<number | undefined> {
     return getItemPosition(this.db, id, filters);
+  }
+
+  async getPokemonCardPosition(pokemonId: number, filters?: { query?: string; type?: string | string[]; generation?: number; championsSeasonId?: number; battleFormat?: string }, formId?: number): Promise<number | undefined> {
+    return getPokemonCardPosition(this.db, pokemonId, filters, formId);
   }
 
   // ────────────────────────────────────────────────────────────────────────────

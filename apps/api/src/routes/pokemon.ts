@@ -41,6 +41,24 @@ export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOption
     return c.json({ data });
   });
 
+  api.get("/pokemon/cards/:id/position", async (c) => {
+    const id = Number(c.req.param("id"));
+    if (isNaN(id)) return c.json({ error: "Invalid pokemon ID" }, 400);
+    const query = c.req.query("q") || undefined;
+    const typeRaw = c.req.query("type") || undefined;
+    const type = typeRaw
+      ? typeRaw.includes(",") ? typeRaw.split(",") : typeRaw
+      : undefined;
+    const generation = numberQuery(c, "generation");
+    const championsSeasonId = numberQuery(c, "seasonId");
+    const formatRaw = c.req.query("format");
+    const battleFormat = formatRaw === "single" || formatRaw === "double" ? formatRaw : undefined;
+    const formId = numberQuery(c, "formId");
+    const position = await getStore(c).getPokemonCardPosition(id, { query, type, generation, championsSeasonId, battleFormat }, formId);
+    if (position === undefined) return c.json({ error: "Pokemon not found in current list" }, 404);
+    return c.json({ data: { position } });
+  });
+
   api.get("/pokemon/:id", async (c) => {
     const championsSeasonId = numberQuery(c, "seasonId");
     const entry = await getStore(c).getPokemon(c.req.param("id"), { championsSeasonId });
@@ -108,6 +126,20 @@ export function registerPokemonRoutes(api: Hono<any>, opts: RegisterRoutesOption
     if (!entry) return c.json({ error: "Pokemon not found" }, 404);
     const meta = await s.getLearnsetMeta(entry.id);
     return c.json({ data: meta, pokemonId: entry.id });
+  });
+
+  // 对战使用率数据
+  api.get("/pokemon/:id/usage", async (c) => {
+    const s = getStore(c);
+    const entry = await s.getPokemonIdentity(c.req.param("id"));
+    if (!entry) return c.json({ error: "Pokemon not found" }, 404);
+    const seasonId = numberQuery(c, "seasonId");
+    const formId = numberQuery(c, "formId");
+    const format = c.req.query("format") || "double";
+    if (!seasonId) return c.json({ error: "seasonId is required" }, 400);
+    const data = await s.getPokemonUsage(entry.id, seasonId, format, formId || undefined);
+    if (!data) return c.json({ error: "No usage data found" }, 404);
+    return c.json({ data });
   });
 }
 

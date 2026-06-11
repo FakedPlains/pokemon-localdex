@@ -17,6 +17,7 @@ import useFieldState from "../components/damage/useFieldState.js";
 import useMoveExtraState from "../components/damage/useMoveExtraState.ts";
 import usePokemonDetails from "../components/damage/usePokemonDetails.js";
 import StatusPanel from "../components/damage/StatusPanel.jsx";
+import Loading from "../components/Loading.tsx";
 
 const KoAnalysisPage = lazy(() => import("./KoAnalysisPage.tsx"));
 
@@ -329,7 +330,7 @@ export default function DamagePage({ initialTab = "damage" }: DamagePageProps) {
       </div>
 
       {activeTab === "ko" ? (
-        <Suspense fallback={<div className="shared-loading">加载中…</div>}>
+        <Suspense fallback={<Loading text="加载中…" />}>
           <KoAnalysisPage />
         </Suspense>
       ) : (

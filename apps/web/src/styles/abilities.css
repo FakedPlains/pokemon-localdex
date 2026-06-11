@@ -31,15 +31,15 @@
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  border: 1px solid rgba(138, 166, 90, 0.25);
-  background: rgba(138, 166, 90, 0.08);
+  border: 1px solid rgba(232, 69, 60, 0.25);
+  background: rgba(232, 69, 60, 0.08);
   min-height: 0;
 }
 
 .mv-gen-select .cs-trigger:hover,
 .mv-version-select .cs-trigger:hover {
   border-color: var(--accent);
-  background: rgba(138, 166, 90, 0.15);
+  background: rgba(232, 69, 60, 0.15);
 }
 
 .mv-gen-select .cs-dropdown,
@@ -73,10 +73,10 @@
 .mv-search-input {
   width: 100%;
   padding: 8px 32px 8px 34px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-l3);
   border-radius: 999px;
   font-size: 13px;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.5);
   outline: none;
   transition: border-color 200ms, background 200ms;
 }
@@ -99,7 +99,7 @@
   height: 20px;
   border: none;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--glass-l3);
   color: var(--muted);
   font-size: 14px;
   line-height: 1;
@@ -154,14 +154,14 @@
   font-size: 12px;
   font-weight: 500;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--glass-l3);
+  border: 1px solid var(--border-l3);
   cursor: pointer;
   transition: background 200ms, color 200ms;
 }
 
 .mv-method-pill:hover {
-  background: rgba(138, 166, 90, 0.15);
+  background: rgba(232, 69, 60, 0.15);
   transform: none;
   box-shadow: none;
 }
@@ -189,10 +189,10 @@
   padding: 8px 10px;
   border-radius: 10px;
   font-size: 13px;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--glass-l4);
 }
 
-.mv-row:nth-child(even) { background: rgba(255, 255, 255, 0.3); }
+.mv-row:nth-child(even) { background: var(--glass-l3); }
 
 .mv-head {
   position: sticky;
@@ -200,8 +200,8 @@
   z-index: 1;
   font-weight: 700;
   color: var(--muted);
-  background: rgba(247, 244, 233, 0.96);
-  backdrop-filter: blur(6px);
+  background: var(--glass-l5);
+  backdrop-filter: var(--blur-sm);
 }
 
 .mv-move-name {
@@ -214,17 +214,17 @@
   width: 100%;
   padding: 10px 0;
   margin: 8px 0;
-  border: 1px dashed rgba(138, 166, 90, 0.4);
+  border: 1px dashed rgba(232, 69, 60, 0.4);
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
   color: var(--accent);
-  background: rgba(138, 166, 90, 0.06);
+  background: rgba(232, 69, 60, 0.06);
   cursor: pointer;
   transition: background 200ms;
 }
 
 .mv-load-more-btn:hover {
-  background: rgba(138, 166, 90, 0.15);
+  background: rgba(232, 69, 60, 0.15);
 }
 

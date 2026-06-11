@@ -1,6 +1,8 @@
+import { useCallback, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { RefObject } from "react";
 import DrawerContent from "./DrawerContent.tsx";
+import Loading from "../Loading.tsx";
 import type { PokemonDetail } from "./types";
 
 interface PokedexDetailPanelProps {
@@ -11,6 +13,10 @@ interface PokedexDetailPanelProps {
   detailGeneration: string;
   onDetailGenerationChange: (gen: string) => void;
   onClose: () => void;
+  onToggleBattle?: () => void;
+  battleOpen?: boolean;
+  battleApplyPreset?: { nature: string; sps: Record<string, number> } | null;
+  battleMoveSearch?: string | null;
 }
 
 export default function PokedexDetailPanel({
@@ -21,6 +27,10 @@ export default function PokedexDetailPanel({
   detailGeneration,
   onDetailGenerationChange,
   onClose,
+  onToggleBattle,
+  battleOpen,
+  battleApplyPreset,
+  battleMoveSearch,
 }: PokedexDetailPanelProps) {
   return (
     <AnimatePresence mode="wait">
@@ -39,18 +49,20 @@ export default function PokedexDetailPanel({
               <line x1="4" y1="4" x2="14" y2="14" /><line x1="14" y1="4" x2="4" y2="14" />
             </svg>
           </button>
+
           {detail ? (
             <DrawerContent
               detail={detail}
               initialFormId={initialFormId}
               detailGeneration={detailGeneration}
               onDetailGenerationChange={onDetailGenerationChange}
+              onToggleBattle={onToggleBattle}
+              battleOpen={battleOpen}
+              battleApplyPreset={battleApplyPreset}
+              battleMoveSearch={battleMoveSearch}
             />
           ) : (
-            <div className="dex-drawer-loading">
-              <div className="pulse-dot" />
-              <span>加载详情…</span>
-            </div>
+            <Loading variant="inline" text="加载详情…" style={{ padding: 40 }} />
           )}
         </motion.div>
       )}

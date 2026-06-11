@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { unifiedApi } from "../../utils/api.js";
+import Loading from "../Loading.tsx";
 
 //  子组件：招式槽位面板（4个招式，样式与盒子一致）
 // ══════════════════════════════════════════════════════════════
@@ -194,7 +195,7 @@ export default function MoveSlotPanel({ moves, movesInfo, selectedIndex, onSelec
             <button className="dc-move-panel-close" onClick={() => { setEditingSlot(null); setQuery(""); setSearchResults(null); }}>取消</button>
           </div>
           <div className="dc-move-panel-list">
-            {loading && <div className="dc-move-panel-hint">加载中…</div>}
+            {loading && <Loading variant="text" text="加载中…" className="dc-move-panel-hint" />}
             {!loading && displayedMoves.length === 0 && <div className="dc-move-panel-hint">{query.trim() ? "无匹配结果" : "暂无招式数据"}</div>}
             {!loading && displayedMoves.map((opt) => (
               <div

@@ -200,6 +200,67 @@ GET /api/pokemon/25/learnset/meta
 
 小程序端对应函数：`fetchLearnsetMeta(pokemonId)`。
 
+### GET /pokemon/:id/usage
+
+获取指定宝可梦在某个 Champions 赛季的对战使用率详情数据，包括常用招式、道具、特性、性格、努力值分配和常见队友。
+
+查询参数：
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| seasonId | number | （必填） | Champions 赛季数据库 ID |
+| format | string | "double" | 对战格式：`single` 或 `double` |
+| formId | number | — | 形态 ID（`pokemon_forms.id`）。不同形态的使用率是分开统计的，建议始终传入。不传时按 `pokemonId` 匹配（可能命中错误形态）。 |
+
+返回结构（`PokemonUsageData`）：
+
+```json
+{
+  "data": {
+    "rank": 1,
+    "seasonId": 2,
+    "seasonCode": "S2",
+    "regulationCode": "H",
+    "format": "double",
+    "moves": [
+      { "id": 123, "nameZh": "保护", "type": "普通", "category": "变化", "rank": 1, "usage": 89.5 }
+    ],
+    "items": [
+      { "id": 45, "nameZh": "讲究围巾", "rank": 1, "usage": 42.3, "imageUrl": "..." }
+    ],
+    "abilities": [
+      { "id": 67, "nameZh": "威吓", "rank": 1, "usage": 95.0 }
+    ],
+    "natures": [
+      { "natureId": 3, "nameZh": "固执", "rank": 1, "usage": 55.0, "plus": "atk", "minus": "spa" }
+    ],
+    "spreads": [
+      { "rank": 1, "usage": 30.0, "hp": 252, "atk": 252, "def": 0, "spa": 0, "spd": 4, "spe": 0 }
+    ],
+    "teammates": [
+      { "pokemonId": 382, "nameZh": "盖欧卡", "rank": 1, "iconUrl": "..." }
+    ]
+  }
+}
+```
+
+说明：
+
+- 使用率（`usage`）为百分比值（0-100）。
+- `moves` 中包含招式属性（`type`）和分类（`category`）。
+- `items` 中包含道具图片 URL（`imageUrl`）。
+- `teammates` 中包含队友宝可梦的官方图片（`iconUrl`），通过 `partnerFormId` 关联获取形态级图片。队友名称为对应形态的全名（如"超级喷火龙X"而非"喷火龙"）。
+- `natures` 中 `plus`/`minus` 表示性格加减修正的能力项（`atk`/`def`/`spa`/`spd`/`spe`），无修正性格不含这两个字段。
+- `spreads` 中的六维数值为 EV/SP 分配值。
+- 当找不到使用率数据时返回 404。
+
+示例：
+
+```
+GET /api/pokemon/6/usage?seasonId=2&format=double&formId=6
+GET /api/pokemon/烈咬陆鲨/usage?seasonId=2&format=double&formId=1024
+```
+
 ## Champions
 
 ### GET /champions/seasons

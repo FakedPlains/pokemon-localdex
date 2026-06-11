@@ -589,6 +589,7 @@ export const championsUsagePartners = sqliteTable("champions_usage_partners", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   usagePokemonId: integer("usage_pokemon_id").notNull().references(() => championsUsagePokemon.id, { onDelete: "cascade" }),
   partnerPokemonId: integer("partner_pokemon_id").references(() => pokemon.id, { onDelete: "set null" }),
+  partnerFormId: integer("partner_form_id").references(() => pokemonForms.id, { onDelete: "set null" }),
   partnerSlug: text("partner_slug").notNull(),
   rank: integer("rank").notNull(),
 }, (table) => [
